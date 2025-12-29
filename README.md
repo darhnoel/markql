@@ -1,0 +1,207 @@
+# XSQL Documentation (v0.1 Prototype)
+
+XSQL is a SQL-style query language for static HTML. It treats each HTML element
+as a row in a node table and lets you filter by tag and attributes. This is a
+minimal, offline-first prototype built in C++20.
+
+## Quick Start
+
+Build:
+```
+./build.sh
+```
+
+Run on a file:
+```
+./build/xsql --query "SELECT a FROM doc WHERE attributes.id = 'login'" --input ./data/index.html
+```
+
+Interactive mode:
+```
+./build/xsql --interactive --input ./data/index.html
+```
+
+## CLI Usage
+
+```
+./build/xsql --query "<query>" --input <path>
+./build/xsql --query-file <file> --input <path>
+./build/xsql --interactive [--input <path>]
+./build/xsql --color=disabled
+```
+
+Notes:
+- `--input` is required unless reading HTML from stdin.
+- Colors are auto-disabled when stdout is not a TTY.
+
+## Interactive Mode (REPL)
+
+Commands:
+- `:load <path>`: set active input file
+- `:quit` / `:exit`: exit the REPL
+
+Keys:
+- Up/Down: history (max 5 entries)
+- Left/Right: move cursor
+- Ctrl+L: clear screen
+
+## Data Model
+
+Each HTML element becomes a row with fields:
+- `node_id` (int64)
+- `tag` (string)
+- `text` (string, includes descendant text)
+- `attributes` (map<string,string>)
+- `parent_id` (int64 or null)
+- `source_uri` (string)
+
+## Query Language
+
+### Basic Form
+```
+SELECT <tag_list> FROM <source> [WHERE <expr>] [LIMIT <n>] [TO LIST() | TO TABLE()]
+```
+
+### Source
+```
+FROM document
+FROM 'path.html'
+FROM 'https://example.com'   (URL parsing only; fetcher not implemented)
+FROM doc                     (alias for document)
+FROM document AS doc
+```
+
+### Tags
+```
+SELECT div
+SELECT div,span
+```
+
+### WHERE Expressions
+Supported operators:
+- `=`
+- `IN`
+- `<>` / `!=`
+- `IS NULL` / `IS NOT NULL`
+- `~` (regex, ECMAScript)
+- `AND`, `OR`
+
+Attribute references:
+```
+attributes.id = 'main'
+parent.attributes.class = 'menu'
+ancestor.attributes.id = 'root'
+descendant.attributes.class IN ('nav','top')
+```
+
+Field references:
+```
+text <> ''
+tag = 'div'
+parent.tag = 'section'
+ancestor.text ~ 'error|warning'
+```
+
+Shorthand attribute filters:
+```
+title = "Menu"
+doc.title = "Menu"
+```
+
+### Aliases
+Alias the source and qualify attribute filters:
+```
+SELECT a FROM document AS d WHERE d.attributes.id = 'login'
+```
+
+### Projections
+Project a field from a tag:
+```
+SELECT a.parent_id FROM doc
+SELECT link.href FROM doc
+SELECT a.attributes FROM doc
+```
+
+Supported base fields:
+- `node_id`, `tag`, `text`, `parent_id`, `source_uri`, `attributes`
+
+Attribute value projection:
+- `SELECT link.href FROM doc` returns the `href` value
+
+### TO LIST()
+Output a JSON list for a single projected column:
+```
+SELECT link.href FROM doc WHERE attributes.rel = "preload" TO LIST()
+```
+
+### TO TABLE()
+Extract an HTML `<table>` into rows (array of arrays):
+```
+SELECT table FROM doc TO TABLE()
+```
+
+If multiple tables match, the output is a list of objects:
+```
+[{ "node_id": 123, "rows": [[...], ...] }, ...]
+```
+
+### LIMIT
+```
+SELECT a FROM doc LIMIT 5
+```
+
+### COUNT()
+Minimal aggregate:
+```
+SELECT COUNT(a) FROM doc
+SELECT COUNT(link) FROM doc WHERE attributes.rel = "preload"
+```
+
+### Regex
+Use `~` with ECMAScript regex:
+```
+SELECT a FROM doc WHERE attributes.href ~ '.*\\.pdf$'
+```
+
+## Examples
+
+Select by id:
+```
+SELECT ul FROM doc WHERE attributes.id = 'countries';
+```
+
+Parent attribute filter:
+```
+SELECT table FROM doc WHERE parent.attributes.id = 'table-01';
+```
+
+Descendant attribute filter:
+```
+SELECT div FROM doc WHERE descendant.attributes.class = 'card';
+```
+
+Extract href list:
+```
+SELECT link.href FROM doc WHERE attributes.rel = "preload" TO LIST();
+```
+
+## Known Limitations (v0.1)
+
+- No XPath or positional predicates.
+- No `ORDER BY`, `GROUP BY`, or joins.
+- No XML mode (HTML only).
+- URL fetching requires libcurl.
+- Output is JSON only (pretty when `nlohmann/json` is linked).
+
+## Build Dependencies
+
+Optional:
+- `nlohmann/json` for pretty JSON output (vcpkg recommended).
+- `libxml2` for robust HTML parsing (fallback to naive parser if missing).
+- `libcurl` for URL fetching.
+
+## Troubleshooting
+
+- If you see `No input loaded` in REPL, run `:load <path>`.
+- If a query fails with `Expected FROM`, include a `FROM` clause.
+- If output is compact JSON, ensure `nlohmann/json` is linked via vcpkg.

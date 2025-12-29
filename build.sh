@@ -1,0 +1,26 @@
+#!/bin/bash
+
+set -euo pipefail
+VCPKG_ROOT=~/vcpkg
+
+cmake_args=(
+  -S .
+  -B build
+  -DXSQL_WITH_LIBXML2=ON
+  -DXSQL_WITH_CURL=ON
+)
+
+if [[ -z "${VCPKG_ROOT:-}" && -d "${HOME}/vcpkg" ]]; then
+  VCPKG_ROOT="${HOME}/vcpkg"
+fi
+
+if [[ -n "${VCPKG_ROOT:-}" ]]; then
+  cmake_args+=("-DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
+  cmake_args+=("-DVCPKG_TARGET_TRIPLET=x64-linux")
+  cmake_args+=("-DCMAKE_PREFIX_PATH=${VCPKG_ROOT}/installed/x64-linux")
+  cmake_args+=("-DCURL_DIR=${VCPKG_ROOT}/installed/x64-linux/share/curl")
+  cmake_args+=("-DOPENSSL_ROOT_DIR=${VCPKG_ROOT}/installed/x64-linux")
+fi
+
+cmake "${cmake_args[@]}"
+cmake --build build
