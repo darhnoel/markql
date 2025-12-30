@@ -1236,7 +1236,7 @@ int main(int argc, char** argv) {
           std::cout << "  .load <path|url>       Load input (or :load)\n";
           std::cout << "  .mode duckbox|json|plain  Set output mode\n";
           std::cout << "  .display_mode more|less   Control truncation\n";
-          std::cout << "  .max_rows <n>           Set duckbox max rows (0 = no limit)\n";
+          std::cout << "  .max_rows <n|inf>        Set duckbox max rows (inf = no limit)\n";
           std::cout << "  .summarize [doc|path|url]  Show tag counts\n";
           std::cout << "  .quit / .q             Exit\n";
           continue;
@@ -1273,17 +1273,25 @@ int main(int argc, char** argv) {
         if (line.rfind(".max_rows", 0) == 0) {
           std::istringstream iss(line);
           std::string cmd;
-          size_t value = 0;
+          std::string value;
           iss >> cmd >> value;
-          if (!iss.fail()) {
-            max_rows = value;
-            if (max_rows == 0) {
-              std::cout << "Duckbox max rows: unlimited" << std::endl;
-            } else {
-              std::cout << "Duckbox max rows: " << max_rows << std::endl;
+          if (value == "inf" || value == "infinite" || value == "unlimited") {
+            max_rows = 0;
+            std::cout << "Duckbox max rows: unlimited" << std::endl;
+          } else if (!value.empty()) {
+            try {
+              size_t parsed = std::stoull(value);
+              if (parsed == 0) {
+                std::cerr << "Use .max_rows inf for unlimited" << std::endl;
+              } else {
+                max_rows = parsed;
+                std::cout << "Duckbox max rows: " << max_rows << std::endl;
+              }
+            } catch (const std::exception&) {
+              std::cerr << "Usage: .max_rows <n|inf>" << std::endl;
             }
           } else {
-            std::cerr << "Usage: .max_rows <n>" << std::endl;
+            std::cerr << "Usage: .max_rows <n|inf>" << std::endl;
           }
           continue;
         }
