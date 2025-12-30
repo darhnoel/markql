@@ -110,6 +110,8 @@ if (XSQL_BUILD_TESTS)
     attributes_is_null
     attributes_is_not_null
     node_id_filter
+    select_exclude_single
+    select_exclude_list
     to_table_flag
     to_list_flag
     attribute_projection_value

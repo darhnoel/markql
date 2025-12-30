@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <unordered_map>
+#include <unordered_set>
 #include <algorithm>
 
 #include "xsql/xsql.h"
@@ -297,6 +298,10 @@ class LineEditor {
     cont_prompt_len_ = prompt_len;
   }
 
+  void set_keyword_color(bool enabled) {
+    keyword_color_ = enabled;
+  }
+
   void reset_render_state() {
     last_render_lines_ = 1;
     last_cursor_line_ = 0;
@@ -552,13 +557,7 @@ class LineEditor {
     clear_rendered_lines();
 
     std::cout << prompt_;
-    for (char c : buffer) {
-      if (c == '\n') {
-        std::cout << "\n" << cont_prompt_;
-      } else {
-        std::cout << c;
-      }
-    }
+    render_buffer(buffer);
 
     int end_line = 0;
     int end_col = static_cast<int>(prompt_len_);
@@ -614,6 +613,67 @@ class LineEditor {
   size_t cont_prompt_len_ = 0;
   int last_render_lines_ = 1;
   int last_cursor_line_ = 0;
+  bool keyword_color_ = false;
+
+  void render_buffer(const std::string& buffer) {
+    bool in_single = false;
+    bool in_double = false;
+    size_t i = 0;
+    while (i < buffer.size()) {
+      char c = buffer[i];
+      if (c == '\n') {
+        std::cout << "\n" << cont_prompt_;
+        ++i;
+        continue;
+      }
+      if (!in_double && c == '\'') {
+        in_single = !in_single;
+        std::cout << c;
+        ++i;
+        continue;
+      }
+      if (!in_single && c == '"') {
+        in_double = !in_double;
+        std::cout << c;
+        ++i;
+        continue;
+      }
+      if (!in_single && !in_double && std::isalpha(static_cast<unsigned char>(c))) {
+        size_t start = i;
+        while (i < buffer.size()) {
+          char wc = buffer[i];
+          if (std::isalnum(static_cast<unsigned char>(wc)) || wc == '_') {
+            ++i;
+            continue;
+          }
+          break;
+        }
+        std::string word = buffer.substr(start, i - start);
+        if (keyword_color_ && is_sql_keyword(word)) {
+          std::cout << kColor.cyan << word << kColor.reset;
+        } else {
+          std::cout << word;
+        }
+        continue;
+      }
+      std::cout << c;
+      ++i;
+    }
+  }
+
+  static bool is_sql_keyword(const std::string& word) {
+    static const std::unordered_set<std::string> keywords = {
+        "select", "from", "where", "and", "or", "in", "limit", "order", "by",
+        "asc", "desc", "to", "list", "table", "count", "summarize", "exclude",
+        "is", "null"
+    };
+    std::string lower;
+    lower.reserve(word.size());
+    for (char c : word) {
+      lower.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+    }
+    return keywords.find(lower) != keywords.end();
+  }
 
   class AutoCompleter {
    public:
@@ -649,13 +709,17 @@ class LineEditor {
         }
       }
       if (matches.empty()) return false;
-      std::string common = longest_common_prefix(matches);
-      if (common.size() > word.size() || matches.size() == 1) {
-        buffer.replace(start, cursor - start, common);
-        cursor = start + common.size();
+      std::string common = longest_common_prefix_lower(matches);
+      std::string cased_common = apply_case(word, common);
+      if (cased_common.size() > word.size() || matches.size() == 1) {
+        buffer.replace(start, cursor - start, cased_common);
+        cursor = start + cased_common.size();
         return true;
       }
-      suggestions = matches;
+      suggestions.reserve(matches.size());
+      for (const auto& cand : matches) {
+        suggestions.push_back(apply_case(word, cand));
+      }
       return false;
     }
 
@@ -677,18 +741,59 @@ class LineEditor {
       return value.rfind(prefix, 0) == 0;
     }
 
-    static std::string longest_common_prefix(const std::vector<std::string>& values) {
+    static std::string longest_common_prefix_lower(const std::vector<std::string>& values) {
       if (values.empty()) return "";
-      std::string prefix = values[0];
+      std::string prefix = to_lower(values[0]);
       for (size_t i = 1; i < values.size(); ++i) {
         size_t j = 0;
-        while (j < prefix.size() && j < values[i].size() && prefix[j] == values[i][j]) {
+        std::string lower = to_lower(values[i]);
+        while (j < prefix.size() && j < lower.size() && prefix[j] == lower[j]) {
           ++j;
         }
         prefix.resize(j);
         if (prefix.empty()) break;
       }
       return prefix;
+    }
+
+    static std::string apply_case(const std::string& pattern, const std::string& value) {
+      if (pattern.empty()) return value;
+      bool all_upper = true;
+      bool all_lower = true;
+      for (char c : pattern) {
+        if (std::isalpha(static_cast<unsigned char>(c))) {
+          if (std::islower(static_cast<unsigned char>(c))) {
+            all_upper = false;
+          } else if (std::isupper(static_cast<unsigned char>(c))) {
+            all_lower = false;
+          }
+        }
+      }
+      if (all_upper) {
+        std::string out;
+        out.reserve(value.size());
+        for (char c : value) {
+          out.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(c))));
+        }
+        return out;
+      }
+      if (all_lower) {
+        return to_lower(value);
+      }
+      bool capitalized = std::isupper(static_cast<unsigned char>(pattern[0]));
+      for (size_t i = 1; i < pattern.size(); ++i) {
+        if (std::isalpha(static_cast<unsigned char>(pattern[i])) &&
+            std::isupper(static_cast<unsigned char>(pattern[i]))) {
+          capitalized = false;
+          break;
+        }
+      }
+      if (capitalized) {
+        std::string out = to_lower(value);
+        out[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(out[0])));
+        return out;
+      }
+      return value;
     }
 
     std::vector<std::string> keywords_;
@@ -1097,6 +1202,7 @@ int main(int argc, char** argv) {
       const bool use_prompt = isatty(fileno(stdin)) != 0;
       std::string prompt = color ? (std::string(kColor.blue) + "xsql> " + kColor.reset) : "xsql> ";
       LineEditor editor(5, prompt, 6);
+      editor.set_keyword_color(color);
       std::string cont_prompt = color ? (std::string(kColor.cyan) + "----> " + kColor.reset) : "----> ";
       editor.set_cont_prompt(cont_prompt, 5);
       std::string active_source = input;

@@ -329,6 +329,30 @@ void test_node_id_filter() {
   }
 }
 
+void test_select_exclude_single() {
+  std::string html = "<div></div>";
+  auto result = run_query(html, "SELECT * EXCLUDE source_uri FROM document");
+  expect_eq(result.columns.size(), 4, "exclude single column count");
+  bool has_source_uri = false;
+  for (const auto& col : result.columns) {
+    if (col == "source_uri") has_source_uri = true;
+  }
+  expect_true(!has_source_uri, "exclude removes source_uri");
+}
+
+void test_select_exclude_list() {
+  std::string html = "<div></div>";
+  auto result = run_query(html, "SELECT * EXCLUDE (source_uri, tag) FROM document");
+  expect_eq(result.columns.size(), 3, "exclude list column count");
+  bool has_tag = false;
+  bool has_source_uri = false;
+  for (const auto& col : result.columns) {
+    if (col == "tag") has_tag = true;
+    if (col == "source_uri") has_source_uri = true;
+  }
+  expect_true(!has_tag && !has_source_uri, "exclude removes tag/source_uri");
+}
+
 void test_to_table_flag() {
   std::string html = "<table><tr><th>H</th></tr></table>";
   auto result = run_query(html, "SELECT table FROM document TO TABLE()");
@@ -587,6 +611,8 @@ const TestCase kTests[] = {
     {"attributes_is_null", test_attributes_is_null},
     {"attributes_is_not_null", test_attributes_is_not_null},
     {"node_id_filter", test_node_id_filter},
+    {"select_exclude_single", test_select_exclude_single},
+    {"select_exclude_list", test_select_exclude_list},
     {"to_table_flag", test_to_table_flag},
     {"to_list_flag", test_to_list_flag},
     {"attribute_projection_value", test_attribute_projection_value},

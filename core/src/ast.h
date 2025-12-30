@@ -70,6 +70,7 @@ struct Query {
   Source source;
   std::optional<Expr> where;
   std::vector<OrderBy> order_by;
+  std::vector<std::string> exclude_fields;
   std::optional<size_t> limit;
   bool to_list = false;
   bool to_table = false;

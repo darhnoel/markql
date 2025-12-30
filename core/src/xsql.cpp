@@ -6,6 +6,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <unordered_map>
+#include <algorithm>
 
 #include "executor.h"
 #include "html_parser.h"
@@ -94,6 +95,10 @@ bool has_wildcard_tag(const Query& query) {
   return false;
 }
 
+bool is_wildcard_only(const Query& query) {
+  return query.select_items.size() == 1 && query.select_items[0].tag == "*";
+}
+
 void validate_projection(const Query& query) {
   bool has_aggregate = false;
   bool has_summarize = false;
@@ -113,6 +118,17 @@ void validate_projection(const Query& query) {
   }
 
   if (!is_projection_query(query)) {
+    if (!query.exclude_fields.empty() && !is_wildcard_only(query)) {
+      throw std::runtime_error("EXCLUDE requires SELECT *");
+    }
+    if (!query.exclude_fields.empty()) {
+      const std::vector<std::string> allowed = {"node_id", "tag", "attributes", "parent_id", "source_uri"};
+      for (const auto& field : query.exclude_fields) {
+        if (std::find(allowed.begin(), allowed.end(), field) == allowed.end()) {
+          throw std::runtime_error("Unknown EXCLUDE field: " + field);
+        }
+      }
+    }
     if (query.to_list) {
       throw std::runtime_error("TO LIST() requires a projected column");
     }
@@ -305,7 +321,22 @@ std::vector<std::string> build_columns(const Query& query) {
     }
   }
   if (!is_projection_query(query)) {
-    return {"node_id", "tag", "attributes", "parent_id", "source_uri"};
+    std::vector<std::string> cols = {"node_id", "tag", "attributes", "parent_id", "source_uri"};
+    if (!query.exclude_fields.empty()) {
+      std::vector<std::string> out;
+      out.reserve(cols.size());
+      for (const auto& col : cols) {
+        if (std::find(query.exclude_fields.begin(), query.exclude_fields.end(), col) ==
+            query.exclude_fields.end()) {
+          out.push_back(col);
+        }
+      }
+      if (out.empty()) {
+        throw std::runtime_error("EXCLUDE removes all columns");
+      }
+      return out;
+    }
+    return cols;
   }
   std::vector<std::string> cols;
   cols.reserve(query.select_items.size());

@@ -86,6 +86,12 @@ SELECT div,span
 SELECT *
 ```
 
+Exclude columns:
+```
+SELECT * EXCLUDE source_uri FROM doc
+SELECT * EXCLUDE (source_uri, tag) FROM doc
+```
+
 ### WHERE Expressions
 Supported operators:
 - `=`

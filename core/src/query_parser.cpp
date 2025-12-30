@@ -27,6 +27,7 @@ enum class TokenType {
   KeywordIn,
   KeywordDocument,
   KeywordLimit,
+  KeywordExclude,
   KeywordOrder,
   KeywordBy,
   KeywordAsc,
@@ -149,6 +150,7 @@ class Lexer {
     if (upper == "IN") return Token{TokenType::KeywordIn, out, start};
     if (upper == "DOCUMENT") return Token{TokenType::KeywordDocument, out, start};
     if (upper == "LIMIT") return Token{TokenType::KeywordLimit, out, start};
+    if (upper == "EXCLUDE") return Token{TokenType::KeywordExclude, out, start};
     if (upper == "ORDER") return Token{TokenType::KeywordOrder, out, start};
     if (upper == "BY") return Token{TokenType::KeywordBy, out, start};
     if (upper == "ASC") return Token{TokenType::KeywordAsc, out, start};
@@ -207,6 +209,10 @@ class Parser {
     Query q;
     if (!consume(TokenType::KeywordSelect, "Expected SELECT")) return error_result();
     if (!parse_select_list(q.select_items)) return error_result();
+    if (current_.type == TokenType::KeywordExclude) {
+      advance();
+      if (!parse_exclude_list(q.exclude_fields)) return error_result();
+    }
     if (!consume(TokenType::KeywordFrom, "Expected FROM")) return error_result();
     if (!parse_source(q.source)) return error_result();
 
@@ -301,6 +307,38 @@ class Parser {
       return set_error("Cannot mix tag-only and projected fields in SELECT");
     }
     return true;
+  }
+
+  bool parse_exclude_list(std::vector<std::string>& fields) {
+    if (current_.type == TokenType::Identifier) {
+      fields.push_back(to_lower(current_.text));
+      advance();
+      return true;
+    }
+    if (current_.type == TokenType::LParen) {
+      advance();
+      if (current_.type != TokenType::Identifier) {
+        return set_error("Expected field name in EXCLUDE list");
+      }
+      while (true) {
+        if (current_.type != TokenType::Identifier) {
+          return set_error("Expected field name in EXCLUDE list");
+        }
+        fields.push_back(to_lower(current_.text));
+        advance();
+        if (current_.type == TokenType::Comma) {
+          advance();
+          continue;
+        }
+        if (current_.type == TokenType::RParen) {
+          advance();
+          break;
+        }
+        return set_error("Expected , or ) after EXCLUDE field");
+      }
+      return true;
+    }
+    return set_error("Expected field name or list after EXCLUDE");
   }
 
   bool parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_field, bool& saw_tag_only) {
