@@ -37,6 +37,8 @@ enum class TokenType {
   KeywordList,
   KeywordCount,
   KeywordTable,
+  KeywordCsv,
+  KeywordParquet,
   KeywordIs,
   KeywordNot,
   KeywordNull,
@@ -160,6 +162,8 @@ class Lexer {
     if (upper == "LIST") return Token{TokenType::KeywordList, out, start};
     if (upper == "COUNT") return Token{TokenType::KeywordCount, out, start};
     if (upper == "TABLE") return Token{TokenType::KeywordTable, out, start};
+    if (upper == "CSV") return Token{TokenType::KeywordCsv, out, start};
+    if (upper == "PARQUET") return Token{TokenType::KeywordParquet, out, start};
     if (upper == "IS") return Token{TokenType::KeywordIs, out, start};
     if (upper == "NOT") return Token{TokenType::KeywordNot, out, start};
     if (upper == "NULL") return Token{TokenType::KeywordNull, out, start};
@@ -273,8 +277,25 @@ class Parser {
         if (!consume(TokenType::LParen, "Expected ( after TABLE")) return error_result();
         if (!consume(TokenType::RParen, "Expected ) after TABLE(")) return error_result();
         q.to_table = true;
+      } else if (current_.type == TokenType::KeywordCsv || current_.type == TokenType::KeywordParquet) {
+        Query::ExportSink sink;
+        sink.kind = (current_.type == TokenType::KeywordCsv)
+                        ? Query::ExportSink::Kind::Csv
+                        : Query::ExportSink::Kind::Parquet;
+        size_t start = current_.pos;
+        advance();
+        if (!consume(TokenType::LParen, "Expected ( after export target")) return error_result();
+        if (current_.type != TokenType::String) {
+          set_error("Expected string literal path inside export target");
+          return error_result();
+        }
+        sink.path = current_.text;
+        sink.span = Span{start, current_.pos + current_.text.size()};
+        advance();
+        if (!consume(TokenType::RParen, "Expected ) after export path")) return error_result();
+        q.export_sink = sink;
       } else {
-        set_error("Expected LIST or TABLE after TO");
+        set_error("Expected LIST, TABLE, CSV, or PARQUET after TO");
         return error_result();
       }
     }

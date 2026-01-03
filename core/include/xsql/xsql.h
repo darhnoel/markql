@@ -19,6 +19,10 @@ struct QueryResultRow {
 };
 
 struct QueryResult {
+  struct ExportSink {
+    enum class Kind { None, Csv, Parquet } kind = Kind::None;
+    std::string path;
+  };
   std::vector<std::string> columns;
   std::vector<QueryResultRow> rows;
   bool to_list = false;
@@ -28,6 +32,7 @@ struct QueryResult {
   };
   std::vector<TableResult> tables;
   bool to_table = false;
+  ExportSink export_sink;
 };
 
 QueryResult execute_query_from_document(const std::string& html, const std::string& query);

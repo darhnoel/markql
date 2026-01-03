@@ -51,6 +51,11 @@ struct BinaryExpr {
 };
 
 struct Query {
+  struct ExportSink {
+    enum class Kind { None, Csv, Parquet } kind = Kind::None;
+    std::string path;
+    Span span;
+  };
   struct OrderBy {
     std::string field;
     bool descending = false;
@@ -74,6 +79,7 @@ struct Query {
   std::optional<size_t> limit;
   bool to_list = false;
   bool to_table = false;
+  std::optional<ExportSink> export_sink;
   Span span;
 };
 

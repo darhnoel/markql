@@ -17,6 +17,7 @@
 #include "xsql/xsql.h"
 #include "html_parser.h"
 #include "query_parser.h"
+#include "export/export_sinks.h"
 #include "render/duckbox_renderer.h"
 
 #ifdef XSQL_USE_NLOHMANN_JSON
@@ -664,7 +665,7 @@ class LineEditor {
   static bool is_sql_keyword(const std::string& word) {
     static const std::unordered_set<std::string> keywords = {
         "select", "from", "where", "and", "or", "in", "limit", "order", "by",
-        "asc", "desc", "to", "list", "table", "count", "summarize", "exclude",
+        "asc", "desc", "to", "list", "table", "csv", "parquet", "count", "summarize", "exclude",
         "is", "null"
     };
     std::string lower;
@@ -680,7 +681,7 @@ class LineEditor {
     AutoCompleter() {
       keywords_ = {
           "select", "from", "where", "and", "or", "in", "limit", "to", "list", "table",
-          "count", "summarize", "order", "by", "asc", "desc", "document", "doc",
+          "csv", "parquet", "count", "summarize", "order", "by", "asc", "desc", "document", "doc",
           "attributes", "tag", "text", "parent", "child", "ancestor", "descendant",
           "parent_id", "inner_html", "trim", "is", "null"
       };
@@ -1126,6 +1127,12 @@ std::string build_summary_json(const std::vector<std::pair<std::string, size_t>>
 #endif
 }
 
+std::string export_kind_label(xsql::QueryResult::ExportSink::Kind kind) {
+  if (kind == xsql::QueryResult::ExportSink::Kind::Csv) return "CSV";
+  if (kind == xsql::QueryResult::ExportSink::Kind::Parquet) return "Parquet";
+  return "Export";
+}
+
 int main(int argc, char** argv) {
   std::string query;
   std::string query_file;
@@ -1194,6 +1201,7 @@ int main(int argc, char** argv) {
       std::cout << "       xsql --timeout-ms <n>\n";
       std::cout << "       xsql --color=disabled\n";
       std::cout << "If --input is omitted, HTML is read from stdin.\n";
+      std::cout << "Use TO CSV('file.csv') or TO PARQUET('file.parquet') in queries to export.\n";
       return 0;
     }
   }
@@ -1238,6 +1246,7 @@ int main(int argc, char** argv) {
           std::cout << "  .display_mode more|less   Control truncation\n";
           std::cout << "  .max_rows <n|inf>        Set duckbox max rows (inf = no limit)\n";
           std::cout << "  .summarize [doc|path|url]  Show tag counts\n";
+          std::cout << "  Query export: TO CSV('file.csv') / TO PARQUET('file.parquet')\n";
           std::cout << "  .quit / .q             Exit\n";
           continue;
         }
@@ -1443,6 +1452,16 @@ int main(int argc, char** argv) {
               }
             }
           }
+          if (result.export_sink.kind != xsql::QueryResult::ExportSink::Kind::None) {
+            std::string export_error;
+            if (!xsql::cli::export_result(result, export_error)) {
+              throw std::runtime_error(export_error);
+            }
+            std::cout << "Wrote " << export_kind_label(result.export_sink.kind)
+                      << ": " << result.export_sink.path << std::endl;
+            editor.reset_render_state();
+            continue;
+          }
           if (output_mode == "duckbox") {
             if (result.to_table) {
               if (result.tables.empty()) {
@@ -1522,6 +1541,16 @@ int main(int argc, char** argv) {
       } else {
         result = xsql::execute_query_from_file(input, query);
       }
+    }
+
+    if (result.export_sink.kind != xsql::QueryResult::ExportSink::Kind::None) {
+      std::string export_error;
+      if (!xsql::cli::export_result(result, export_error)) {
+        throw std::runtime_error(export_error);
+      }
+      std::cout << "Wrote " << export_kind_label(result.export_sink.kind)
+                << ": " << result.export_sink.path << std::endl;
+      return 0;
     }
 
     if (output_mode == "duckbox") {

@@ -8,6 +8,7 @@ cmake_args=(
   -B build
   -DXSQL_WITH_LIBXML2=ON
   -DXSQL_WITH_CURL=ON
+  -DXSQL_WITH_ARROW=ON
 )
 
 if [[ -z "${VCPKG_ROOT:-}" && -d "${HOME}/vcpkg" ]]; then
@@ -20,6 +21,8 @@ if [[ -n "${VCPKG_ROOT:-}" ]]; then
   cmake_args+=("-DCMAKE_PREFIX_PATH=${VCPKG_ROOT}/installed/x64-linux")
   cmake_args+=("-DCURL_DIR=${VCPKG_ROOT}/installed/x64-linux/share/curl")
   cmake_args+=("-DOPENSSL_ROOT_DIR=${VCPKG_ROOT}/installed/x64-linux")
+  cmake_args+=("-DArrow_DIR=${VCPKG_ROOT}/installed/x64-linux/share/arrow")
+  cmake_args+=("-DParquet_DIR=${VCPKG_ROOT}/installed/x64-linux/share/parquet")
 fi
 
 cmake "${cmake_args[@]}"

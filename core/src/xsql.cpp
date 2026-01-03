@@ -311,6 +311,24 @@ void validate_to_table(const Query& query) {
   }
 }
 
+bool is_table_select(const Query& query) {
+  if (query.select_items.size() != 1) return false;
+  const auto& item = query.select_items[0];
+  if (item.aggregate != Query::SelectItem::Aggregate::None) return false;
+  if (item.field.has_value()) return false;
+  return to_lower(item.tag) == "table";
+}
+
+void validate_export_sink(const Query& query) {
+  if (!query.export_sink.has_value()) return;
+  if (query.to_list) {
+    throw std::runtime_error("TO LIST() cannot be combined with export sinks");
+  }
+  if (query.export_sink->path.empty()) {
+    throw std::runtime_error("Export path cannot be empty");
+  }
+}
+
 std::vector<std::string> build_columns(const Query& query) {
   for (const auto& item : query.select_items) {
     if (item.aggregate == Query::SelectItem::Aggregate::Count) {
@@ -546,6 +564,7 @@ QueryResult execute_query_from_document(const std::string& html, const std::stri
   validate_projection(*parsed.query);
   validate_order_by(*parsed.query);
   validate_to_table(*parsed.query);
+  validate_export_sink(*parsed.query);
   validate_qualifiers(*parsed.query);
   validate_predicates(*parsed.query);
   auto inner_html_depth = find_inner_html_depth(*parsed.query);
@@ -557,6 +576,15 @@ QueryResult execute_query_from_document(const std::string& html, const std::stri
   out.columns = build_columns(*parsed.query);
   out.to_list = parsed.query->to_list;
   out.to_table = parsed.query->to_table;
+  if (parsed.query->export_sink.has_value()) {
+    const auto& sink = *parsed.query->export_sink;
+    if (sink.kind == Query::ExportSink::Kind::Csv) {
+      out.export_sink.kind = QueryResult::ExportSink::Kind::Csv;
+    } else if (sink.kind == Query::ExportSink::Kind::Parquet) {
+      out.export_sink.kind = QueryResult::ExportSink::Kind::Parquet;
+    }
+    out.export_sink.path = sink.path;
+  }
   if (!parsed.query->select_items.empty() &&
       parsed.query->select_items[0].aggregate == Query::SelectItem::Aggregate::Summarize) {
     std::unordered_map<std::string, size_t> counts;
@@ -607,7 +635,8 @@ QueryResult execute_query_from_document(const std::string& html, const std::stri
     }
     return out;
   }
-  if (parsed.query->to_table) {
+  if (parsed.query->to_table ||
+      (parsed.query->export_sink.has_value() && is_table_select(*parsed.query))) {
     auto children = build_children(doc);
     for (const auto& node : exec.nodes) {
       QueryResult::TableResult table;
@@ -667,6 +696,7 @@ QueryResult execute_query_from_file(const std::string& path, const std::string& 
   validate_projection(*parsed.query);
   validate_order_by(*parsed.query);
   validate_to_table(*parsed.query);
+  validate_export_sink(*parsed.query);
   validate_qualifiers(*parsed.query);
   validate_predicates(*parsed.query);
   auto inner_html_depth = find_inner_html_depth(*parsed.query);
@@ -678,6 +708,15 @@ QueryResult execute_query_from_file(const std::string& path, const std::string& 
   out.columns = build_columns(*parsed.query);
   out.to_list = parsed.query->to_list;
   out.to_table = parsed.query->to_table;
+  if (parsed.query->export_sink.has_value()) {
+    const auto& sink = *parsed.query->export_sink;
+    if (sink.kind == Query::ExportSink::Kind::Csv) {
+      out.export_sink.kind = QueryResult::ExportSink::Kind::Csv;
+    } else if (sink.kind == Query::ExportSink::Kind::Parquet) {
+      out.export_sink.kind = QueryResult::ExportSink::Kind::Parquet;
+    }
+    out.export_sink.path = sink.path;
+  }
   if (!parsed.query->select_items.empty() &&
       parsed.query->select_items[0].aggregate == Query::SelectItem::Aggregate::Summarize) {
     std::unordered_map<std::string, size_t> counts;
@@ -728,7 +767,8 @@ QueryResult execute_query_from_file(const std::string& path, const std::string& 
     }
     return out;
   }
-  if (parsed.query->to_table) {
+  if (parsed.query->to_table ||
+      (parsed.query->export_sink.has_value() && is_table_select(*parsed.query))) {
     auto children = build_children(doc);
     for (const auto& node : exec.nodes) {
       QueryResult::TableResult table;
@@ -789,6 +829,7 @@ QueryResult execute_query_from_url(const std::string& url, const std::string& qu
   validate_projection(*parsed.query);
   validate_order_by(*parsed.query);
   validate_to_table(*parsed.query);
+  validate_export_sink(*parsed.query);
   validate_qualifiers(*parsed.query);
   validate_predicates(*parsed.query);
   auto inner_html_depth = find_inner_html_depth(*parsed.query);
@@ -800,6 +841,15 @@ QueryResult execute_query_from_url(const std::string& url, const std::string& qu
   out.columns = build_columns(*parsed.query);
   out.to_list = parsed.query->to_list;
   out.to_table = parsed.query->to_table;
+  if (parsed.query->export_sink.has_value()) {
+    const auto& sink = *parsed.query->export_sink;
+    if (sink.kind == Query::ExportSink::Kind::Csv) {
+      out.export_sink.kind = QueryResult::ExportSink::Kind::Csv;
+    } else if (sink.kind == Query::ExportSink::Kind::Parquet) {
+      out.export_sink.kind = QueryResult::ExportSink::Kind::Parquet;
+    }
+    out.export_sink.path = sink.path;
+  }
   if (!parsed.query->select_items.empty() &&
       parsed.query->select_items[0].aggregate == Query::SelectItem::Aggregate::Summarize) {
     std::unordered_map<std::string, size_t> counts;
@@ -850,7 +900,8 @@ QueryResult execute_query_from_url(const std::string& url, const std::string& qu
     }
     return out;
   }
-  if (parsed.query->to_table) {
+  if (parsed.query->to_table ||
+      (parsed.query->export_sink.has_value() && is_table_select(*parsed.query))) {
     auto children = build_children(doc);
     for (const auto& node : exec.nodes) {
       QueryResult::TableResult table;

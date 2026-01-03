@@ -21,6 +21,34 @@ Interactive mode:
 ./build/xsql --interactive --input ./data/index.html
 ```
 
+## Build on Linux/macOS/Windows
+
+Linux (Ubuntu/Debian):
+```
+sudo apt-get update
+sudo apt-get install -y build-essential cmake ninja-build pkg-config bison flex
+./build.sh
+```
+
+macOS (Homebrew):
+```
+brew install cmake ninja pkg-config bison flex
+./build.sh
+```
+
+Windows (PowerShell, MSVC):
+```
+cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows
+cmake --build build --config Release
+```
+
+Optional dependencies via vcpkg:
+```
+vcpkg install nlohmann-json libxml2 curl arrow[parquet]
+```
+
+If you do not want Parquet, configure with `-DXSQL_WITH_ARROW=OFF`.
+
 ## CLI Usage
 
 ```
@@ -37,6 +65,7 @@ Notes:
 - Colors are auto-disabled when stdout is not a TTY.
 - Default output mode is `duckbox` (table-style).
 - `--highlight` only affects duckbox headers (auto-disabled when not a TTY).
+- `TO CSV()` / `TO PARQUET()` write files instead of printing results.
 
 ## Interactive Mode (REPL)
 
@@ -45,7 +74,7 @@ Commands:
 - `.load <path|url>` / `:load <path|url>`: load input (path or URL)
 - `.mode duckbox|json|plain`: set output mode
 - `.display_mode more|less`: control JSON truncation
-- `.max_rows <n>`: set duckbox max rows (0 = unlimited)
+- `.max_rows <n|inf>`: set duckbox max rows (`inf` = unlimited)
 - `.summarize [doc|path|url]`: list all tags and counts for the active input or target
 - `.quit` / `.q` / `:quit` / `:exit`: exit the REPL
 
@@ -67,7 +96,8 @@ Each HTML element becomes a row with fields:
 
 ### Basic Form
 ```
-SELECT <tag_list> FROM <source> [WHERE <expr>] [LIMIT <n>] [TO LIST() | TO TABLE()]
+SELECT <tag_list> FROM <source> [WHERE <expr>] [LIMIT <n>]
+  [TO LIST() | TO TABLE() | TO CSV('file.csv') | TO PARQUET('file.parquet')]
 ```
 
 ### Source
@@ -175,6 +205,21 @@ If multiple tables match, the output is a list of objects:
 
 Note: `TO LIST()` always returns JSON output. `TO TABLE()` uses duckbox by default and JSON in `--mode json|plain`.
 
+### TO CSV()
+Write any rectangular result to a CSV file:
+```
+SELECT a.href, a.text FROM doc WHERE attributes.href IS NOT NULL TO CSV('links.csv')
+```
+
+### TO PARQUET()
+Write any rectangular result to a Parquet file (requires Apache Arrow feature):
+```
+SELECT * FROM doc TO PARQUET('nodes.parquet')
+```
+
+Note: `TO CSV()` and `TO PARQUET()` write files and do not print the result set.
+If you `SELECT table ... TO CSV(...)`, XSQL exports the HTML table rows directly.
+
 ### LIMIT
 ```
 SELECT a FROM doc LIMIT 5
@@ -214,6 +259,16 @@ SELECT div FROM doc WHERE descendant.attributes.class = 'card';
 Extract href list:
 ```
 SELECT link.href FROM doc WHERE attributes.rel = "preload" TO LIST();
+```
+
+Export to CSV:
+```
+SELECT a.href, a.text FROM doc WHERE attributes.href IS NOT NULL TO CSV('links.csv');
+```
+
+Export to Parquet:
+```
+SELECT * FROM doc TO PARQUET('nodes.parquet');
 ```
 
 Order results:
@@ -257,6 +312,7 @@ SELECT div FROM doc WHERE attributes IS NULL;
 - No XML mode (HTML only).
 - URL fetching requires libcurl.
 - Default output is duckbox tables; JSON output is available via `--mode json`.
+- `TO PARQUET()` requires Apache Arrow support at build time.
 
 ## Build Dependencies
 
@@ -264,6 +320,7 @@ Optional:
 - `nlohmann/json` for pretty JSON output (vcpkg recommended).
 - `libxml2` for robust HTML parsing (fallback to naive parser if missing).
 - `libcurl` for URL fetching.
+- `apache-arrow` (Arrow/Parquet) for `TO PARQUET()` export.
 
 ## Troubleshooting
 

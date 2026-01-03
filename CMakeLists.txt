@@ -6,6 +6,7 @@ option(XSQL_BUILD_TESTS "Build tests" ON)
 option(XSQL_WITH_LIBXML2 "Use libxml2 for HTML parsing" ON)
 option(XSQL_WITH_NLOHMANN_JSON "Use nlohmann/json for CLI output" ON)
 option(XSQL_WITH_CURL "Use libcurl for URL fetching" ON)
+option(XSQL_WITH_ARROW "Enable Apache Arrow for Parquet export" ON)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -54,9 +55,44 @@ if (XSQL_WITH_CURL)
   endif()
 endif()
 
+if (XSQL_WITH_ARROW)
+  find_package(Arrow CONFIG QUIET)
+  find_package(Parquet CONFIG QUIET)
+  if (TARGET Arrow::arrow_shared)
+    set(XSQL_ARROW_TARGET Arrow::arrow_shared)
+  elseif (TARGET Arrow::arrow_static)
+    set(XSQL_ARROW_TARGET Arrow::arrow_static)
+  elseif (TARGET Arrow::arrow)
+    set(XSQL_ARROW_TARGET Arrow::arrow)
+  elseif (TARGET arrow_shared)
+    set(XSQL_ARROW_TARGET arrow_shared)
+  elseif (TARGET arrow_static)
+    set(XSQL_ARROW_TARGET arrow_static)
+  elseif (TARGET arrow)
+    set(XSQL_ARROW_TARGET arrow)
+  endif()
+  if (TARGET Parquet::parquet_shared)
+    set(XSQL_PARQUET_TARGET Parquet::parquet_shared)
+  elseif (TARGET Parquet::parquet_static)
+    set(XSQL_PARQUET_TARGET Parquet::parquet_static)
+  elseif (TARGET Parquet::parquet)
+    set(XSQL_PARQUET_TARGET Parquet::parquet)
+  elseif (TARGET parquet_shared)
+    set(XSQL_PARQUET_TARGET parquet_shared)
+  elseif (TARGET parquet_static)
+    set(XSQL_PARQUET_TARGET parquet_static)
+  elseif (TARGET parquet)
+    set(XSQL_PARQUET_TARGET parquet)
+  endif()
+  if (NOT XSQL_ARROW_TARGET OR NOT XSQL_PARQUET_TARGET)
+    message(WARNING "Arrow/Parquet not found; TO PARQUET disabled.")
+  endif()
+endif()
+
 if (XSQL_BUILD_CLI)
   add_executable(xsql
     cli/main.cpp
+    cli/export/export_sinks.cpp
     cli/render/duckbox_renderer.cpp
   )
   target_link_libraries(xsql PRIVATE xsql_core)
@@ -70,16 +106,25 @@ if (XSQL_BUILD_CLI)
       message(WARNING "nlohmann_json not found; using built-in JSON output.")
     endif()
   endif()
+  if (XSQL_ARROW_TARGET AND XSQL_PARQUET_TARGET)
+    target_link_libraries(xsql PRIVATE ${XSQL_ARROW_TARGET} ${XSQL_PARQUET_TARGET})
+    target_compile_definitions(xsql PRIVATE XSQL_USE_ARROW)
+  endif()
 endif()
 
 if (XSQL_BUILD_TESTS)
   enable_testing()
   add_executable(xsql_tests
     tests/test_main.cpp
+    cli/export/export_sinks.cpp
     cli/render/duckbox_renderer.cpp
   )
   target_link_libraries(xsql_tests PRIVATE xsql_core)
   target_include_directories(xsql_tests PRIVATE cli)
+  if (XSQL_ARROW_TARGET AND XSQL_PARQUET_TARGET)
+    target_link_libraries(xsql_tests PRIVATE ${XSQL_ARROW_TARGET} ${XSQL_PARQUET_TARGET})
+    target_compile_definitions(xsql_tests PRIVATE XSQL_USE_ARROW)
+  endif()
   set(XSQL_TESTS
     select_ul_by_id
     class_in_matches_token
@@ -133,7 +178,12 @@ if (XSQL_BUILD_TESTS)
     duckbox_maxrows_truncate
     duckbox_numeric_alignment
     duckbox_null_rendering
+    csv_escaping
+    csv_export_integration
   )
+  if (XSQL_ARROW_TARGET AND XSQL_PARQUET_TARGET)
+    list(APPEND XSQL_TESTS parquet_export_smoke)
+  endif()
   foreach(test_name IN LISTS XSQL_TESTS)
     add_test(NAME xsql_${test_name} COMMAND xsql_tests ${test_name})
   endforeach()
