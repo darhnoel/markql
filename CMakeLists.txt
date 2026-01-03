@@ -116,11 +116,23 @@ if (XSQL_BUILD_TESTS)
   enable_testing()
   add_executable(xsql_tests
     tests/test_main.cpp
+    tests/test_harness.cpp
+    tests/test_utils.cpp
+    tests/test_query_basic.cpp
+    tests/test_sources_alias.cpp
+    tests/test_shorthand.cpp
+    tests/test_projections.cpp
+    tests/test_functions.cpp
+    tests/test_axes.cpp
+    tests/test_predicates.cpp
+    tests/test_order_by.cpp
+    tests/test_duckbox.cpp
+    tests/test_exports.cpp
     cli/export/export_sinks.cpp
     cli/render/duckbox_renderer.cpp
   )
   target_link_libraries(xsql_tests PRIVATE xsql_core)
-  target_include_directories(xsql_tests PRIVATE cli)
+  target_include_directories(xsql_tests PRIVATE cli tests)
   if (XSQL_ARROW_TARGET AND XSQL_PARQUET_TARGET)
     target_link_libraries(xsql_tests PRIVATE ${XSQL_ARROW_TARGET} ${XSQL_PARQUET_TARGET})
     target_compile_definitions(xsql_tests PRIVATE XSQL_USE_ARROW)
