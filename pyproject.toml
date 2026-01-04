@@ -3,7 +3,7 @@ requires = ["setuptools>=64.0", "wheel", "pybind11>=2.11.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "xsql"
+name = "pyxsql"
 version = "1.0.0"
 description = "SQL-style querying for static HTML with a deterministic node model."
 readme = "README.md"

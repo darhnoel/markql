@@ -34,6 +34,11 @@ doc = xsql.load("https://example.com", allow_network=True)
 rows = xsql.execute("SELECT title FROM document")
 ```
 
+Install:
+```
+pip install pyxsql
+```
+
 Security Notes:
 - Network access is disabled by default; enable with `allow_network=True`.
 - Private/localhost targets are blocked unless `allow_private_network=True`.
