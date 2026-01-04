@@ -23,9 +23,6 @@ demo/*
 demo_tests.txt
 notes/*
 
-# executable links
-xsql
-
 # test projects
 flex_test/*
 
@@ -33,6 +30,9 @@ flex_test/*
 xsql_venv/*
 .venv/
 downloads/
+!python/
+!python/xsql/
+!python/xsql/**
 python/xsql/env/*
 python/xsql/build/*
 python/xsql/dist/*

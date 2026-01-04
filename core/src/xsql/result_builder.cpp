@@ -1,0 +1,82 @@
+#include "xsql_internal.h"
+
+#include <algorithm>
+#include <stdexcept>
+
+namespace xsql::xsql_internal {
+
+namespace {
+
+/// Checks whether the query projects fields or aggregates.
+/// MUST return false for tag-only selections.
+/// Inputs are Query objects; outputs are boolean with no side effects.
+bool is_projection_query(const Query& query) {
+  for (const auto& item : query.select_items) {
+    if (item.field.has_value() || item.aggregate != Query::SelectItem::Aggregate::None) return true;
+  }
+  return false;
+}
+
+}  // namespace
+
+/// Builds column names for the result set based on query semantics.
+/// MUST enforce EXCLUDE rules and MUST preserve deterministic ordering.
+/// Inputs are Query objects; outputs are column name vectors.
+std::vector<std::string> build_columns(const Query& query) {
+  for (const auto& item : query.select_items) {
+    if (item.aggregate == Query::SelectItem::Aggregate::Count) {
+      return {"count"};
+    }
+    if (item.aggregate == Query::SelectItem::Aggregate::Summarize) {
+      return {"tag", "count"};
+    }
+  }
+  if (!is_projection_query(query)) {
+    std::vector<std::string> cols = {"node_id", "tag", "attributes", "parent_id", "source_uri"};
+    if (!query.exclude_fields.empty()) {
+      std::vector<std::string> out;
+      out.reserve(cols.size());
+      for (const auto& col : cols) {
+        if (std::find(query.exclude_fields.begin(), query.exclude_fields.end(), col) ==
+            query.exclude_fields.end()) {
+          out.push_back(col);
+        }
+      }
+      // WHY: empty columns would create unusable result schemas.
+      if (out.empty()) {
+        throw std::runtime_error("EXCLUDE removes all columns");
+      }
+      return out;
+    }
+    return cols;
+  }
+  std::vector<std::string> cols;
+  cols.reserve(query.select_items.size());
+  for (const auto& item : query.select_items) {
+    cols.push_back(*item.field);
+  }
+  return cols;
+}
+
+/// Extracts a shared inner_html depth override from the select items.
+/// MUST return nullopt when inner_html is not projected.
+/// Inputs are Query objects; outputs are optional depth values.
+std::optional<size_t> find_inner_html_depth(const Query& query) {
+  for (const auto& item : query.select_items) {
+    if (!item.field.has_value() || *item.field != "inner_html") continue;
+    if (item.inner_html_depth.has_value()) return item.inner_html_depth;
+  }
+  return std::nullopt;
+}
+
+/// Finds the single TRIM() select item if present.
+/// MUST return nullptr when trimming is not enabled.
+/// Inputs are Query objects; outputs are optional item pointers.
+const Query::SelectItem* find_trim_item(const Query& query) {
+  if (query.select_items.size() != 1) return nullptr;
+  const auto& item = query.select_items[0];
+  if (!item.trim) return nullptr;
+  return &item;
+}
+
+}  // namespace xsql::xsql_internal
