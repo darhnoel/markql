@@ -21,6 +21,25 @@ Interactive mode:
 ./build/xsql --interactive --input ./data/index.html
 ```
 
+## Python API (xsql package)
+
+```python
+import xsql
+
+doc = xsql.load("data/index.html")
+print(xsql.summarize(doc))
+rows = xsql.execute("SELECT a FROM document WHERE attributes.href IS NOT NULL")
+
+doc = xsql.load("https://example.com", allow_network=True)
+rows = xsql.execute("SELECT title FROM document")
+```
+
+Security Notes:
+- Network access is disabled by default; enable with `allow_network=True`.
+- Private/localhost targets are blocked unless `allow_private_network=True`.
+- File reads are confined to `base_dir` when provided.
+- Downloads are capped by `max_bytes`, and query output by `max_results`.
+
 ## Build on Linux/macOS/Windows
 
 Linux (Ubuntu/Debian):
@@ -48,6 +67,26 @@ vcpkg install nlohmann-json libxml2 curl arrow[parquet]
 ```
 
 If you do not want Parquet, configure with `-DXSQL_WITH_ARROW=OFF`.
+
+## Python Build & Tests
+
+Create a virtual environment and install the editable package:
+```
+python3 -m venv xsql_venv
+source ./xsql_venv/bin/activate
+pip install -U pip
+pip install -e .[test]
+```
+
+Run Python tests:
+```
+pytest -v python/tests
+```
+
+Shorthand:
+```
+./test_python.sh
+```
 
 ## CLI Usage
 
