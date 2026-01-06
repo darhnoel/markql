@@ -43,3 +43,7 @@ python/tests/__pycache__/*
 
 # local tests
 local_tests/*
+plugins/bin/
+plugins/src/
+plugins/.xsql_logs/
+plugins/cmake/*/build/

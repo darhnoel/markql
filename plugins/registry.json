@@ -1,0 +1,8 @@
+[
+  {
+    "name": "khmer_segmenter",
+    "repo": "https://github.com/Sovichea/khmer_segmenter.git",
+    "cmake_subdir": "port/c",
+    "artifact": "libkhmer_segmenter{ext}"
+  }
+]
