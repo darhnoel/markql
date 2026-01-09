@@ -13,10 +13,14 @@ struct Span {
   size_t end = 0;
 };
 
+struct Query;
+
 struct Source {
-  enum class Kind { Document, Path, Url } kind = Kind::Document;
+  enum class Kind { Document, Path, Url, RawHtml, Fragments } kind = Kind::Document;
   std::string value;
   std::optional<std::string> alias;
+  std::shared_ptr<Query> fragments_query;
+  std::optional<std::string> fragments_raw;
   Span span;
 };
 

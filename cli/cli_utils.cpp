@@ -300,6 +300,9 @@ std::string rewrite_from_path_if_needed(const std::string& query) {
     }
     if (start == i) return query;
     std::string token = query.substr(start, i - start);
+    if (token.find('(') != std::string::npos || token.find(')') != std::string::npos) {
+      return query;
+    }
     bool looks_like_path = token.find('/') != std::string::npos ||
                            token.find('.') != std::string::npos ||
                            (!token.empty() && (token[0] == '.' || token[0] == '~'));
@@ -335,6 +338,11 @@ std::optional<QuerySource> parse_query_source(const std::string& query) {
   QuerySource source;
   source.kind = parsed.query->source.kind;
   source.value = parsed.query->source.value;
+  if (source.kind == xsql::Source::Kind::RawHtml) {
+    source.needs_input = false;
+  } else if (source.kind == xsql::Source::Kind::Fragments) {
+    source.needs_input = !parsed.query->source.fragments_raw.has_value();
+  }
   return source;
 }
 

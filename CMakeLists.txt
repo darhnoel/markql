@@ -165,7 +165,9 @@ if (XSQL_BUILD_TESTS)
     tests/test_order_by.cpp
     tests/test_duckbox.cpp
     tests/test_exports.cpp
+    tests/test_malformed_html.cpp
     tests/test_repl.cpp
+    tests/test_fragments.cpp
     cli/repl/core/line_editor.cpp
     cli/repl/ui/autocomplete.cpp
     cli/repl/state/history.cpp

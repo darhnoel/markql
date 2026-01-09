@@ -74,6 +74,10 @@ int main(int argc, char** argv) {
       result = xsql::execute_query_from_url(source->value, query, timeout_ms);
     } else if (source.has_value() && source->kind == xsql::Source::Kind::Path) {
       result = xsql::execute_query_from_file(source->value, query);
+    } else if (source.has_value() && source->kind == xsql::Source::Kind::RawHtml) {
+      result = xsql::execute_query_from_document("", query);
+    } else if (source.has_value() && source->kind == xsql::Source::Kind::Fragments && !source->needs_input) {
+      result = xsql::execute_query_from_document("", query);
     } else if (input.empty() || input == "document") {
       std::string html = read_stdin();
       result = xsql::execute_query_from_document(html, query);

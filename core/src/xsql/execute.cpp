@@ -14,47 +14,90 @@ namespace xsql {
 
 namespace {
 
-/// Executes a parsed query over provided HTML and assembles QueryResult.
-/// MUST apply validation before execution and MUST propagate errors as exceptions.
-/// Inputs are HTML/source/query; outputs are QueryResult with no side effects.
-QueryResult execute_query_from_html(const std::string& html,
-                                    const std::string& source_uri,
-                                    const std::string& query) {
-  auto parsed = parse_query(query);
-  if (!parsed.query.has_value()) {
-    throw std::runtime_error("Query parse error: " + parsed.error->message);
-  }
-  xsql_internal::validate_projection(*parsed.query);
-  xsql_internal::validate_order_by(*parsed.query);
-  xsql_internal::validate_to_table(*parsed.query);
-  xsql_internal::validate_export_sink(*parsed.query);
-  xsql_internal::validate_qualifiers(*parsed.query);
-  xsql_internal::validate_predicates(*parsed.query);
-  auto inner_html_depth = xsql_internal::find_inner_html_depth(*parsed.query);
-  const Query::SelectItem* trim_item = xsql_internal::find_trim_item(*parsed.query);
-  bool use_text_function = false;
-  bool use_inner_html_function = false;
-  for (const auto& item : parsed.query->select_items) {
-    if (item.field.has_value() && *item.field == "text" && item.text_function) {
-      use_text_function = true;
-    }
-    if (item.field.has_value() && *item.field == "inner_html" && item.inner_html_function) {
-      use_inner_html_function = true;
-    }
-  }
-  std::optional<size_t> effective_inner_html_depth = inner_html_depth;
-  if (!effective_inner_html_depth.has_value() && use_inner_html_function) {
-    effective_inner_html_depth = 1;
-  }
+struct FragmentSource {
+  std::vector<std::string> fragments;
+};
 
-  HtmlDocument doc = parse_html(html);
-  ExecuteResult exec = execute_query(*parsed.query, doc, source_uri);
+bool looks_like_html_fragment(const std::string& value) {
+  return value.find('<') != std::string::npos && value.find('>') != std::string::npos;
+}
+
+std::optional<std::string> field_value_string(const QueryResultRow& row, const std::string& field) {
+  if (field == "node_id") return std::to_string(row.node_id);
+  if (field == "count") return std::to_string(row.node_id);
+  if (field == "tag") return row.tag;
+  if (field == "text") return row.text;
+  if (field == "inner_html") return row.inner_html;
+  if (field == "parent_id") {
+    if (!row.parent_id.has_value()) return std::nullopt;
+    return std::to_string(*row.parent_id);
+  }
+  if (field == "source_uri") return row.source_uri;
+  if (field == "attributes") return std::nullopt;
+  auto it = row.attributes.find(field);
+  if (it == row.attributes.end()) return std::nullopt;
+  return it->second;
+}
+
+void append_document(HtmlDocument& target, const HtmlDocument& source) {
+  const int64_t offset = static_cast<int64_t>(target.nodes.size());
+  target.nodes.reserve(target.nodes.size() + source.nodes.size());
+  for (const auto& node : source.nodes) {
+    HtmlNode copy = node;
+    copy.id = node.id + offset;
+    if (node.parent_id.has_value()) {
+      copy.parent_id = *node.parent_id + offset;
+    }
+    target.nodes.push_back(std::move(copy));
+  }
+}
+
+HtmlDocument build_fragments_document(const FragmentSource& fragments) {
+  HtmlDocument merged;
+  for (const auto& fragment : fragments.fragments) {
+    HtmlDocument doc = parse_html(fragment);
+    append_document(merged, doc);
+  }
+  return merged;
+}
+
+FragmentSource collect_fragments(const QueryResult& result) {
+  if (result.to_table || !result.tables.empty()) {
+    throw std::runtime_error("FRAGMENTS does not accept TO TABLE() results");
+  }
+  if (result.columns.size() != 1) {
+    throw std::runtime_error("FRAGMENTS expects a single HTML string column");
+  }
+  const std::string& field = result.columns[0];
+  FragmentSource out;
+  for (const auto& row : result.rows) {
+    std::optional<std::string> value = field_value_string(row, field);
+    if (!value.has_value()) {
+      throw std::runtime_error("FRAGMENTS expects HTML strings (use inner_html(...) or RAW('<...>'))");
+    }
+    std::string trimmed = util::trim_ws(*value);
+    if (trimmed.empty()) {
+      continue;
+    }
+    if (!looks_like_html_fragment(trimmed)) {
+      throw std::runtime_error("FRAGMENTS expects HTML strings (use inner_html(...) or RAW('<...>'))");
+    }
+    out.fragments.push_back(std::move(trimmed));
+  }
+  if (out.fragments.empty()) {
+    throw std::runtime_error("FRAGMENTS produced no HTML fragments");
+  }
+  return out;
+}
+
+QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const std::string& source_uri) {
+  ExecuteResult exec = execute_query(query, doc, source_uri);
   QueryResult out;
-  out.columns = xsql_internal::build_columns(*parsed.query);
-  out.to_list = parsed.query->to_list;
-  out.to_table = parsed.query->to_table;
-  if (parsed.query->export_sink.has_value()) {
-    const auto& sink = *parsed.query->export_sink;
+  out.columns = xsql_internal::build_columns(query);
+  out.to_list = query.to_list;
+  out.to_table = query.to_table;
+  if (query.export_sink.has_value()) {
+    const auto& sink = *query.export_sink;
     if (sink.kind == Query::ExportSink::Kind::Csv) {
       out.export_sink.kind = QueryResult::ExportSink::Kind::Csv;
     } else if (sink.kind == Query::ExportSink::Kind::Parquet) {
@@ -62,8 +105,8 @@ QueryResult execute_query_from_html(const std::string& html,
     }
     out.export_sink.path = sink.path;
   }
-  if (!parsed.query->select_items.empty() &&
-      parsed.query->select_items[0].aggregate == Query::SelectItem::Aggregate::Summarize) {
+  if (!query.select_items.empty() &&
+      query.select_items[0].aggregate == Query::SelectItem::Aggregate::Summarize) {
     std::unordered_map<std::string, size_t> counts;
     for (const auto& node : exec.nodes) {
       ++counts[node.tag];
@@ -73,10 +116,10 @@ QueryResult execute_query_from_html(const std::string& html,
     for (const auto& kv : counts) {
       summary.emplace_back(kv.first, kv.second);
     }
-    if (!parsed.query->order_by.empty()) {
+    if (!query.order_by.empty()) {
       std::sort(summary.begin(), summary.end(),
                 [&](const auto& a, const auto& b) {
-                  for (const auto& order_by : parsed.query->order_by) {
+                  for (const auto& order_by : query.order_by) {
                     int cmp = 0;
                     if (order_by.field == "count") {
                       if (a.second < b.second) cmp = -1;
@@ -100,8 +143,8 @@ QueryResult execute_query_from_html(const std::string& html,
                   return a.first < b.first;
                 });
     }
-    if (parsed.query->limit.has_value() && summary.size() > *parsed.query->limit) {
-      summary.resize(*parsed.query->limit);
+    if (query.limit.has_value() && summary.size() > *query.limit) {
+      summary.resize(*query.limit);
     }
     for (const auto& item : summary) {
       QueryResultRow row;
@@ -113,8 +156,8 @@ QueryResult execute_query_from_html(const std::string& html,
     return out;
   }
   // WHY: table extraction bypasses row projections to preserve table layout.
-  if (parsed.query->to_table ||
-      (parsed.query->export_sink.has_value() && xsql_internal::is_table_select(*parsed.query))) {
+  if (query.to_table ||
+      (query.export_sink.has_value() && xsql_internal::is_table_select(query))) {
     auto children = xsql_internal::build_children(doc);
     for (const auto& node : exec.nodes) {
       QueryResult::TableResult table;
@@ -124,7 +167,7 @@ QueryResult execute_query_from_html(const std::string& html,
     }
     return out;
   }
-  for (const auto& item : parsed.query->select_items) {
+  for (const auto& item : query.select_items) {
     if (item.aggregate == Query::SelectItem::Aggregate::Count) {
       QueryResultRow row;
       row.node_id = static_cast<int64_t>(exec.nodes.size());
@@ -132,6 +175,22 @@ QueryResult execute_query_from_html(const std::string& html,
       out.rows.push_back(row);
       return out;
     }
+  }
+  auto inner_html_depth = xsql_internal::find_inner_html_depth(query);
+  const Query::SelectItem* trim_item = xsql_internal::find_trim_item(query);
+  bool use_text_function = false;
+  bool use_inner_html_function = false;
+  for (const auto& item : query.select_items) {
+    if (item.field.has_value() && *item.field == "text" && item.text_function) {
+      use_text_function = true;
+    }
+    if (item.field.has_value() && *item.field == "inner_html" && item.inner_html_function) {
+      use_inner_html_function = true;
+    }
+  }
+  std::optional<size_t> effective_inner_html_depth = inner_html_depth;
+  if (!effective_inner_html_depth.has_value() && use_inner_html_function) {
+    effective_inner_html_depth = 1;
   }
   for (const auto& node : exec.nodes) {
     QueryResultRow row;
@@ -164,6 +223,61 @@ QueryResult execute_query_from_html(const std::string& html,
     out.rows.push_back(row);
   }
   return out;
+}
+
+void validate_query(const Query& query) {
+  xsql_internal::validate_projection(query);
+  xsql_internal::validate_order_by(query);
+  xsql_internal::validate_to_table(query);
+  xsql_internal::validate_export_sink(query);
+  xsql_internal::validate_qualifiers(query);
+  xsql_internal::validate_predicates(query);
+}
+
+QueryResult execute_query_with_source(const Query& query,
+                                      const std::string& default_html,
+                                      const std::string& default_source_uri) {
+  std::string effective_source_uri = default_source_uri;
+  if (query.source.kind == Source::Kind::RawHtml) {
+    HtmlDocument doc = parse_html(query.source.value);
+    effective_source_uri = "raw";
+    return execute_query_ast(query, doc, effective_source_uri);
+  }
+  if (query.source.kind == Source::Kind::Fragments) {
+    FragmentSource fragments;
+    if (query.source.fragments_raw.has_value()) {
+      fragments.fragments.push_back(*query.source.fragments_raw);
+    } else if (query.source.fragments_query != nullptr) {
+      const Query& subquery = *query.source.fragments_query;
+      validate_query(subquery);
+      if (subquery.source.kind == Source::Kind::Path || subquery.source.kind == Source::Kind::Url) {
+        throw std::runtime_error("FRAGMENTS subquery cannot use URL or file sources");
+      }
+      QueryResult sub_result = execute_query_with_source(subquery, default_html, default_source_uri);
+      fragments = collect_fragments(sub_result);
+    } else {
+      throw std::runtime_error("FRAGMENTS requires a subquery or RAW('<...>') input");
+    }
+    HtmlDocument doc = build_fragments_document(fragments);
+    effective_source_uri = "fragment";
+    return execute_query_ast(query, doc, effective_source_uri);
+  }
+  HtmlDocument doc = parse_html(default_html);
+  return execute_query_ast(query, doc, effective_source_uri);
+}
+
+/// Executes a parsed query over provided HTML and assembles QueryResult.
+/// MUST apply validation before execution and MUST propagate errors as exceptions.
+/// Inputs are HTML/source/query; outputs are QueryResult with no side effects.
+QueryResult execute_query_from_html(const std::string& html,
+                                    const std::string& source_uri,
+                                    const std::string& query) {
+  auto parsed = parse_query(query);
+  if (!parsed.query.has_value()) {
+    throw std::runtime_error("Query parse error: " + parsed.error->message);
+  }
+  validate_query(*parsed.query);
+  return execute_query_with_source(*parsed.query, html, source_uri);
 }
 
 }  // namespace

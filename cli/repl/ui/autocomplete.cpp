@@ -9,6 +9,7 @@ AutoCompleter::AutoCompleter() {
   keywords_ = {
       "select", "from", "where", "and", "or", "in", "limit", "to", "list", "table",
       "csv", "parquet", "count", "summarize", "order", "by", "asc", "desc", "document", "doc",
+      "raw", "fragments",
       "attributes", "tag", "text", "parent", "child", "ancestor", "descendant",
       "parent_id", "inner_html", "trim", "is", "null"
   };

@@ -79,6 +79,10 @@ int run_repl(ReplConfig& config) {
         result = xsql::execute_query_from_url(source->value, query_text, config.timeout_ms);
       } else if (source.has_value() && source->kind == xsql::Source::Kind::Path) {
         result = xsql::execute_query_from_file(source->value, query_text);
+      } else if (source.has_value() && source->kind == xsql::Source::Kind::RawHtml) {
+        result = xsql::execute_query_from_document("", query_text);
+      } else if (source.has_value() && source->kind == xsql::Source::Kind::Fragments && !source->needs_input) {
+        result = xsql::execute_query_from_document("", query_text);
       } else {
         if (active_source.empty() && !active_html.has_value()) {
           if (config.color) std::cerr << kColor.red;
@@ -90,7 +94,8 @@ int run_repl(ReplConfig& config) {
           active_html = load_html_input(active_source, config.timeout_ms);
         }
         result = xsql::execute_query_from_document(*active_html, query_text);
-        if (!active_source.empty()) {
+        if (!active_source.empty() &&
+            (!source.has_value() || source->kind == xsql::Source::Kind::Document)) {
           for (auto& row : result.rows) {
             row.source_uri = active_source;
           }

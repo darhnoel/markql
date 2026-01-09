@@ -39,6 +39,8 @@ enum class TokenType {
   KeywordTable,
   KeywordCsv,
   KeywordParquet,
+  KeywordRaw,
+  KeywordFragments,
   KeywordIs,
   KeywordNot,
   KeywordNull,
