@@ -40,6 +40,26 @@ bool contains_ci(const std::string& haystack, const std::string& needle) {
   return lower_haystack.find(lower_needle) != std::string::npos;
 }
 
+/// Performs a case-insensitive match for all tokens in the list.
+/// MUST return true only when every token is present.
+/// Inputs are haystack/tokens; outputs are boolean with no side effects.
+bool contains_all_ci(const std::string& haystack, const std::vector<std::string>& tokens) {
+  for (const auto& token : tokens) {
+    if (!contains_ci(haystack, token)) return false;
+  }
+  return true;
+}
+
+/// Performs a case-insensitive match for any token in the list.
+/// MUST return true when at least one token is present.
+/// Inputs are haystack/tokens; outputs are boolean with no side effects.
+bool contains_any_ci(const std::string& haystack, const std::vector<std::string>& tokens) {
+  for (const auto& token : tokens) {
+    if (contains_ci(haystack, token)) return true;
+  }
+  return false;
+}
+
 /// Parses a string as a strict int64 value.
 /// MUST reject partial parses and MUST return nullopt on errors.
 /// Inputs are strings; outputs are optional ints with no side effects.
@@ -88,7 +108,10 @@ bool match_field(const HtmlNode& node,
                  const std::string& attr,
                  const std::vector<std::string>& values,
                  CompareExpr::Op op) {
-  if (op == CompareExpr::Op::Contains && field_kind != Operand::FieldKind::Attribute) {
+  if ((op == CompareExpr::Op::Contains ||
+       op == CompareExpr::Op::ContainsAll ||
+       op == CompareExpr::Op::ContainsAny) &&
+      field_kind != Operand::FieldKind::Attribute) {
     return false;
   }
   bool is_in = op == CompareExpr::Op::In;
@@ -127,6 +150,16 @@ bool match_field(const HtmlNode& node,
       if (it == node.attributes.end()) return false;
       return contains_ci(it->second, values.front());
     }
+    if (op == CompareExpr::Op::ContainsAll) {
+      auto it = node.attributes.find(attr);
+      if (it == node.attributes.end()) return false;
+      return contains_all_ci(it->second, values);
+    }
+    if (op == CompareExpr::Op::ContainsAny) {
+      auto it = node.attributes.find(attr);
+      if (it == node.attributes.end()) return false;
+      return contains_any_ci(it->second, values);
+    }
     if (op == CompareExpr::Op::Regex) {
       auto it = node.attributes.find(attr);
       if (it == node.attributes.end()) return false;
@@ -152,7 +185,11 @@ bool match_field(const HtmlNode& node,
     return match_attribute(node, attr, values, is_in);
   }
   if (field_kind == Operand::FieldKind::Tag) {
-    if (op == CompareExpr::Op::Contains) return false;
+    if (op == CompareExpr::Op::Contains ||
+        op == CompareExpr::Op::ContainsAll ||
+        op == CompareExpr::Op::ContainsAny) {
+      return false;
+    }
     if (op == CompareExpr::Op::Regex) {
       try {
         std::regex re(values.front(), std::regex::ECMAScript);

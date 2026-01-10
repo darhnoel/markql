@@ -14,7 +14,7 @@ bool is_sql_keyword(const std::string& word) {
   static const std::unordered_set<std::string> keywords = {
       "select", "from", "where", "and", "or", "in", "limit", "order", "by",
       "asc", "desc", "to", "list", "table", "csv", "parquet", "count", "summarize", "exclude",
-      "is", "null"
+      "raw", "fragments", "contains", "all", "any", "has_direct_text", "is", "null"
   };
   std::string lower;
   lower.reserve(word.size());

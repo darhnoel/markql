@@ -43,6 +43,8 @@ enum class TokenType {
   KeywordFragments,
   KeywordContains,
   KeywordHasDirectText,
+  KeywordAll,
+  KeywordAny,
   KeywordIs,
   KeywordNot,
   KeywordNull,

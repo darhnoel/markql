@@ -605,13 +605,18 @@ class Parser {
     if (current_.type == TokenType::KeywordContains) {
       cmp.op = CompareExpr::Op::Contains;
       advance();
-      if (current_.type != TokenType::String) {
-        return set_error("Expected string literal after CONTAINS");
+      if (current_.type == TokenType::KeywordAll) {
+        cmp.op = CompareExpr::Op::ContainsAll;
+        advance();
+      } else if (current_.type == TokenType::KeywordAny) {
+        cmp.op = CompareExpr::Op::ContainsAny;
+        advance();
       }
       ValueList values;
-      values.values.push_back(current_.text);
-      values.span = Span{current_.pos, current_.pos + current_.text.size()};
-      advance();
+      if (!parse_string_list(values)) return false;
+      if (cmp.op == CompareExpr::Op::Contains && values.values.size() != 1) {
+        return set_error("CONTAINS with multiple values requires ALL or ANY");
+      }
       cmp.rhs = values;
       out = cmp;
       return true;
@@ -1129,6 +1134,39 @@ class Parser {
       return true;
     }
     return set_error("Expected literal or list");
+  }
+
+  /// Parses a string literal or list of string literals.
+  /// MUST reject non-string values and enforce list delimiters.
+  /// Inputs are tokens; outputs are ValueList or errors.
+  bool parse_string_list(ValueList& values) {
+    if (current_.type == TokenType::String) {
+      values.values.push_back(current_.text);
+      values.span = Span{current_.pos, current_.pos + current_.text.size()};
+      advance();
+      return true;
+    }
+    if (current_.type == TokenType::LParen) {
+      size_t start = current_.pos;
+      advance();
+      if (current_.type != TokenType::String) {
+        return set_error("Expected string literal");
+      }
+      values.values.push_back(current_.text);
+      advance();
+      while (current_.type == TokenType::Comma) {
+        advance();
+        if (current_.type != TokenType::String) {
+          return set_error("Expected string literal");
+        }
+        values.values.push_back(current_.text);
+        advance();
+      }
+      if (!consume(TokenType::RParen, "Expected )")) return false;
+      values.span = Span{start, current_.pos};
+      return true;
+    }
+    return set_error("Expected string literal or list");
   }
 
   /// Parses the LIMIT value as a non-negative integer.

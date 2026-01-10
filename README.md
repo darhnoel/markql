@@ -300,6 +300,8 @@ SELECT a FROM doc WHERE attributes.href ~ '.*\\.pdf$'
 Case-insensitive substring match for attribute values:
 ```
 SELECT a FROM doc WHERE attributes.href CONTAINS 'techkhmer'
+SELECT a FROM doc WHERE attributes.href CONTAINS ALL ('https', '.html')
+SELECT a FROM doc WHERE attributes.href CONTAINS ANY ('https', 'mailto')
 ```
 
 ### Direct Text

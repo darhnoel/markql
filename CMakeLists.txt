@@ -247,6 +247,8 @@ if (XSQL_BUILD_TESTS)
     text_not_equal
     regex_attribute
     contains_attribute
+    contains_all_attribute
+    contains_any_attribute
     has_direct_text
     parenthesized_predicates
     duckbox_basic_table

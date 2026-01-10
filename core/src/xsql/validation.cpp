@@ -220,12 +220,18 @@ void validate_predicates(const Query& query) {
   std::function<void(const Expr&)> visit = [&](const Expr& expr) {
     if (std::holds_alternative<CompareExpr>(expr)) {
       const auto& cmp = std::get<CompareExpr>(expr);
-      if (cmp.op == CompareExpr::Op::Contains) {
+      if (cmp.op == CompareExpr::Op::Contains ||
+          cmp.op == CompareExpr::Op::ContainsAll ||
+          cmp.op == CompareExpr::Op::ContainsAny) {
         if (cmp.lhs.field_kind != Operand::FieldKind::Attribute) {
           throw std::runtime_error("CONTAINS supports only attributes");
         }
-        if (cmp.rhs.values.size() != 1) {
+        if (cmp.op == CompareExpr::Op::Contains && cmp.rhs.values.size() != 1) {
           throw std::runtime_error("CONTAINS expects a single string literal");
+        }
+        if ((cmp.op == CompareExpr::Op::ContainsAll || cmp.op == CompareExpr::Op::ContainsAny) &&
+            cmp.rhs.values.empty()) {
+          throw std::runtime_error("CONTAINS expects at least one value");
         }
       }
       if (cmp.op == CompareExpr::Op::HasDirectText) {
