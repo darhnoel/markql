@@ -110,6 +110,47 @@ size_t write_to_string(void* contents, size_t size, size_t nmemb, void* userp) {
   out->append(static_cast<const char*>(contents), total);
   return total;
 }
+
+std::string normalize_content_type(const char* raw) {
+  if (!raw) return "";
+  std::string value(raw);
+  size_t end = value.find(';');
+  if (end != std::string::npos) {
+    value = value.substr(0, end);
+  }
+  size_t start = 0;
+  while (start < value.size() && std::isspace(static_cast<unsigned char>(value[start]))) {
+    ++start;
+  }
+  size_t finish = value.size();
+  while (finish > start && std::isspace(static_cast<unsigned char>(value[finish - 1]))) {
+    --finish;
+  }
+  value = value.substr(start, finish - start);
+  for (char& c : value) {
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+  return value;
+}
+
+void validate_content_type(CURL* curl) {
+  const char* raw = nullptr;
+  CURLcode info = curl_easy_getinfo(curl, CURLINFO_CONTENT_TYPE, &raw);
+  if (info != CURLE_OK) {
+    throw std::runtime_error("Failed to read Content-Type for URL");
+  }
+  std::string content_type = normalize_content_type(raw);
+  if (content_type.empty()) {
+    throw std::runtime_error("Missing Content-Type for URL");
+  }
+  if (content_type == "text/html" ||
+      content_type == "application/xhtml+xml" ||
+      content_type == "application/xml" ||
+      content_type == "text/xml") {
+    return;
+  }
+  throw std::runtime_error("Unsupported Content-Type for HTML fetch: " + content_type);
+}
 #endif
 
 }  // namespace
@@ -259,10 +300,12 @@ std::string load_html_input(const std::string& input, int timeout_ms) {
     curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, timeout_ms);
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "xsql/0.1");
     CURLcode res = curl_easy_perform(curl);
-    curl_easy_cleanup(curl);
     if (res != CURLE_OK) {
+      curl_easy_cleanup(curl);
       throw std::runtime_error(std::string("Failed to fetch URL: ") + curl_easy_strerror(res));
     }
+    validate_content_type(curl);
+    curl_easy_cleanup(curl);
     return buffer;
 #else
     (void)timeout_ms;
