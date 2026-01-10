@@ -310,72 +310,30 @@ SELECT div FROM doc WHERE div HAS_DIRECT_TEXT 'computer science'
 
 ## Examples
 
-Select by id:
 ```
+-- Filters
 SELECT ul FROM doc WHERE attributes.id = 'countries';
-```
-
-Parent attribute filter:
-```
 SELECT table FROM doc WHERE parent.attributes.id = 'table-01';
-```
-
-Descendant attribute filter:
-```
 SELECT div FROM doc WHERE descendant.attributes.class = 'card';
-```
-
-Extract href list:
-```
-SELECT link.href FROM doc WHERE attributes.rel = "preload" TO LIST();
-```
-
-Export to CSV:
-```
-SELECT a.href, a.text FROM doc WHERE attributes.href IS NOT NULL TO CSV('links.csv');
-```
-
-Export to Parquet:
-```
-SELECT * FROM doc TO PARQUET('nodes.parquet');
-```
-
-Query HTML fragments:
-```
-SELECT li FROM FRAGMENTS(SELECT inner_html(ul) FROM doc WHERE attributes.id = 'menu') AS frag;
-```
-
-Order results:
-```
-SELECT div FROM doc ORDER BY node_id DESC;
-```
-```
-SELECT * FROM doc ORDER BY tag, parent_id LIMIT 10;
-```
-
-Summarize tags:
-```
-SELECT summarize(*) FROM doc;
-```
-
-Top tags:
-```
-SELECT summarize(*) FROM doc ORDER BY count DESC LIMIT 5;
-```
-
-Filter by parent node id:
-```
 SELECT span FROM doc WHERE parent_id = 1;
-```
-
-Filter by node id:
-```
 SELECT span FROM doc WHERE node_id = 1;
-```
-
-Match elements with no attributes:
-```
 SELECT div FROM doc WHERE attributes IS NULL;
+
+-- Lists and exports
+SELECT link.href FROM doc WHERE attributes.rel = "preload" TO LIST();
+SELECT a.href, a.text FROM doc WHERE attributes.href IS NOT NULL TO CSV('links.csv');
+SELECT * FROM doc TO PARQUET('nodes.parquet');
+
+-- Fragments
+SELECT li FROM FRAGMENTS(SELECT inner_html(ul) FROM doc WHERE attributes.id = 'menu') AS frag;
+
+-- Ordering
+SELECT div FROM doc ORDER BY node_id DESC;
+SELECT * FROM doc ORDER BY tag, parent_id LIMIT 10;
+
+-- Summaries
+SELECT summarize(*) FROM doc;
+SELECT summarize(*) FROM doc ORDER BY count DESC LIMIT 5;
 ```
 
 ## Known Limitations (v0.1)
