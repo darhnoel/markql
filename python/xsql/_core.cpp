@@ -21,6 +21,13 @@ py::object field_value(const xsql::QueryResultRow& row, const std::string& field
   if (field == "tag") return py::str(row.tag);
   if (field == "text") return py::str(row.text);
   if (field == "inner_html") return py::str(row.inner_html);
+  if (field == "terms_score") {
+    py::dict out;
+    for (const auto& kv : row.term_scores) {
+      out[py::str(kv.first)] = py::float_(kv.second);
+    }
+    return out;
+  }
   if (field == "parent_id") {
     if (row.parent_id.has_value()) return py::int_(*row.parent_id);
     return py::none();

@@ -115,6 +115,16 @@ void validate_projection(const Query& query) {
     if (query.select_items[0].aggregate == Query::SelectItem::Aggregate::Summarize) {
       return;
     }
+    if (query.select_items[0].aggregate == Query::SelectItem::Aggregate::Tfidf) {
+      if (query.select_items[0].tfidf_top_terms == 0) {
+        throw std::runtime_error("TFIDF requires TOP_TERMS > 0");
+      }
+      if (query.select_items[0].tfidf_max_df > 0 &&
+          query.select_items[0].tfidf_max_df < query.select_items[0].tfidf_min_df) {
+        throw std::runtime_error("TFIDF MAX_DF must be >= MIN_DF");
+      }
+      return;
+    }
     if (query.select_items[0].aggregate != Query::SelectItem::Aggregate::Count) {
       throw std::runtime_error("Unsupported aggregate");
     }

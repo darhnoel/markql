@@ -35,6 +35,7 @@ add_library(xsql_core
   core/src/xsql/validation.cpp
   core/src/xsql/result_builder.cpp
   core/src/xsql/table_extract.cpp
+  core/src/xsql/tfidf.cpp
 )
 
 target_include_directories(xsql_core

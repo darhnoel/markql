@@ -76,6 +76,109 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
     saw_field = true;
     return true;
   }
+  if (current_.type == TokenType::Identifier && to_upper(current_.text) == "TFIDF") {
+    Query::SelectItem item;
+    item.aggregate = Query::SelectItem::Aggregate::Tfidf;
+    size_t start = current_.pos;
+    advance();
+    if (!consume(TokenType::LParen, "Expected ( after TFIDF")) return false;
+    bool saw_tag = false;
+    bool saw_star = false;
+    bool saw_option = false;
+    if (current_.type != TokenType::RParen) {
+      while (true) {
+        if (current_.type == TokenType::Star) {
+          if (saw_tag || saw_star) {
+            return set_error("TFIDF(*) cannot be combined with other tags");
+          }
+          item.tfidf_all_tags = true;
+          saw_star = true;
+          advance();
+        } else if (current_.type == TokenType::Identifier) {
+          std::string token = to_upper(current_.text);
+          if (peek().type == TokenType::Equal) {
+            saw_option = true;
+            advance();
+            if (!consume(TokenType::Equal, "Expected = after TFIDF option")) return false;
+            if (token == "TOP_TERMS") {
+              if (current_.type != TokenType::Number) {
+                return set_error("Expected numeric TOP_TERMS value");
+              }
+              try {
+                item.tfidf_top_terms = static_cast<size_t>(std::stoull(current_.text));
+              } catch (...) {
+                return set_error("Invalid TOP_TERMS value");
+              }
+              if (item.tfidf_top_terms == 0) {
+                return set_error("TOP_TERMS must be > 0");
+              }
+              advance();
+            } else if (token == "MIN_DF") {
+              if (current_.type != TokenType::Number) {
+                return set_error("Expected numeric MIN_DF value");
+              }
+              try {
+                item.tfidf_min_df = static_cast<size_t>(std::stoull(current_.text));
+              } catch (...) {
+                return set_error("Invalid MIN_DF value");
+              }
+              advance();
+            } else if (token == "MAX_DF") {
+              if (current_.type != TokenType::Number) {
+                return set_error("Expected numeric MAX_DF value");
+              }
+              try {
+                item.tfidf_max_df = static_cast<size_t>(std::stoull(current_.text));
+              } catch (...) {
+                return set_error("Invalid MAX_DF value");
+              }
+              advance();
+            } else if (token == "STOPWORDS") {
+              if (current_.type != TokenType::Identifier && current_.type != TokenType::String) {
+                return set_error("Expected STOPWORDS value");
+              }
+              std::string value = to_upper(current_.text);
+              if (value == "NONE" || value == "OFF") {
+                item.tfidf_stopwords = Query::SelectItem::TfidfStopwords::None;
+              } else if (value == "ENGLISH" || value == "DEFAULT") {
+                item.tfidf_stopwords = Query::SelectItem::TfidfStopwords::English;
+              } else {
+                return set_error("Expected STOPWORDS=ENGLISH or STOPWORDS=NONE");
+              }
+              advance();
+            } else {
+              return set_error("Unknown TFIDF option: " + token);
+            }
+          } else {
+            if (saw_option) {
+              return set_error("TFIDF tags must precede options");
+            }
+            if (saw_star) {
+              return set_error("TFIDF(*) cannot be combined with other tags");
+            }
+            item.tfidf_tags.push_back(current_.text);
+            saw_tag = true;
+            advance();
+          }
+        } else {
+          return set_error("Expected tag or option inside TFIDF()");
+        }
+        if (current_.type == TokenType::Comma) {
+          advance();
+          continue;
+        }
+        break;
+      }
+    }
+    if (!consume(TokenType::RParen, "Expected ) after TFIDF arguments")) return false;
+    if (!saw_tag && !saw_star) {
+      return set_error("TFIDF() requires at least one tag or *");
+    }
+    item.span = Span{start, current_.pos};
+    items.push_back(item);
+    saw_field = true;
+    return true;
+  }
   if (current_.type == TokenType::Identifier && to_upper(current_.text) == "TRIM") {
     Query::SelectItem item;
     size_t start = current_.pos;

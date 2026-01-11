@@ -85,9 +85,15 @@ struct Query {
     Span span;
   };
   struct SelectItem {
-    enum class Aggregate { None, Count, Summarize } aggregate = Aggregate::None;
+    enum class Aggregate { None, Count, Summarize, Tfidf } aggregate = Aggregate::None;
+    enum class TfidfStopwords { English, None } tfidf_stopwords = TfidfStopwords::English;
     std::string tag;
+    std::vector<std::string> tfidf_tags;
     std::optional<std::string> field;
+    bool tfidf_all_tags = false;
+    size_t tfidf_top_terms = 30;
+    size_t tfidf_min_df = 1;
+    size_t tfidf_max_df = 0;
     std::optional<size_t> inner_html_depth;
     bool inner_html_function = false;
     bool text_function = false;

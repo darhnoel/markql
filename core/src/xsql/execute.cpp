@@ -125,6 +125,11 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
         "Export requires a single table result; add a filter to select one table");
   }
   if (!query.select_items.empty() &&
+      query.select_items[0].aggregate == Query::SelectItem::Aggregate::Tfidf) {
+    out.rows = xsql_internal::build_tfidf_rows(query, exec.nodes);
+    return out;
+  }
+  if (!query.select_items.empty() &&
       query.select_items[0].aggregate == Query::SelectItem::Aggregate::Summarize) {
     std::unordered_map<std::string, size_t> counts;
     for (const auto& node : exec.nodes) {

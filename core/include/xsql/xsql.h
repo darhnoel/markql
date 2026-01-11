@@ -16,6 +16,7 @@ struct QueryResultRow {
   std::string tag;
   std::string text;
   std::string inner_html;
+  std::unordered_map<std::string, double> term_scores;
   std::unordered_map<std::string, std::string> attributes;
   std::optional<int64_t> parent_id;
   int64_t sibling_pos = 0;

@@ -11,6 +11,7 @@ struct ReplConfig {
   std::string input;
   bool color = true;
   bool highlight = true;
+  bool display_full = true;
   std::string output_mode = "duckbox";
   int timeout_ms = 5000;
 };

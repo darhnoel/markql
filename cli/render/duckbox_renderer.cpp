@@ -2,13 +2,14 @@
 
 #include <algorithm>
 #include <cctype>
-#include <unordered_map>
+#include <clocale>
+#include <cstring>
+#include <cwchar>
+#include <iomanip>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
-#include <clocale>
-#include <cwchar>
-#include <cstring>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -178,6 +179,26 @@ std::string attributes_to_string(const std::unordered_map<std::string, std::stri
   return oss.str();
 }
 
+/// Formats TFIDF term scores into a compact cell-friendly string.
+std::string term_scores_to_string(const std::unordered_map<std::string, double>& scores) {
+  if (scores.empty()) return "{}";
+  std::vector<std::pair<std::string, double>> items(scores.begin(), scores.end());
+  std::sort(items.begin(), items.end(),
+            [](const auto& a, const auto& b) {
+              if (a.second != b.second) return a.second > b.second;
+              return a.first < b.first;
+            });
+  std::ostringstream oss;
+  oss << "{";
+  oss << std::fixed << std::setprecision(4);
+  for (size_t i = 0; i < items.size(); ++i) {
+    if (i > 0) oss << ",";
+    oss << items[i].first << "=" << items[i].second;
+  }
+  oss << "}";
+  return oss.str();
+}
+
 std::string field_value(const xsql::QueryResultRow& row, const std::string& field) {
   if (field == "node_id") return std::to_string(row.node_id);
   if (field == "count") return std::to_string(row.node_id);
@@ -189,6 +210,7 @@ std::string field_value(const xsql::QueryResultRow& row, const std::string& fiel
   }
   if (field == "source_uri") return row.source_uri;
   if (field == "attributes") return attributes_to_string(row.attributes);
+  if (field == "terms_score") return term_scores_to_string(row.term_scores);
   auto it = row.attributes.find(field);
   if (it == row.attributes.end()) return "NULL";
   return it->second;

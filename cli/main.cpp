@@ -41,6 +41,7 @@ int main(int argc, char** argv) {
   std::string output_mode = options.output_mode;
   // Assumption: default highlight is on (per CLI flag requirement); auto-disabled on non-TTY.
   bool highlight = options.highlight;
+  bool display_full = options.display_mode_set ? options.display_full : false;
   int timeout_ms = options.timeout_ms;
 
   // WHY: reject unknown modes to avoid silently changing output contracts.
@@ -55,6 +56,7 @@ int main(int argc, char** argv) {
       repl_config.input = input;
       repl_config.color = color;
       repl_config.highlight = highlight;
+      repl_config.display_full = options.display_mode_set ? options.display_full : true;
       repl_config.output_mode = output_mode;
       repl_config.timeout_ms = timeout_ms;
       return run_repl(repl_config);
@@ -122,8 +124,8 @@ int main(int argc, char** argv) {
         std::cout << xsql::render::render_duckbox(result, options) << std::endl;
       } else {
         std::string json_out = build_json_list(result);
-        if (output_mode == "plain") {
-          std::cout << json_out << std::endl;
+        if (display_full) {
+          std::cout << colorize_json(json_out, color) << std::endl;
         } else {
           TruncateResult truncated = truncate_output(json_out, 10, 10);
           std::cout << colorize_json(truncated.output, color) << std::endl;
@@ -134,6 +136,8 @@ int main(int argc, char** argv) {
                             : (result.to_list ? build_json_list(result) : build_json(result));
       if (output_mode == "plain") {
         std::cout << json_out << std::endl;
+      } else if (display_full) {
+        std::cout << colorize_json(json_out, color) << std::endl;
       } else {
         TruncateResult truncated = truncate_output(json_out, 10, 10);
         std::cout << colorize_json(truncated.output, color) << std::endl;

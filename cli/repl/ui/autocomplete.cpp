@@ -12,7 +12,8 @@ AutoCompleter::AutoCompleter() {
       "raw", "fragments", "contains", "all", "any", "has_direct_text",
       "attributes", "tag", "text", "parent", "child", "ancestor", "descendant",
       "parent_id", "sibling_pos", "inner_html", "trim", "is", "null", "header", "noheader",
-      "no_header", "on", "off", "export"
+      "no_header", "on", "off", "export", "tfidf", "top_terms", "min_df", "max_df",
+      "stopwords", "english", "none", "default"
   };
   commands_ = {
       ".help", ".load", ".mode", ".display_mode", ".max_rows", ".summarize", ".summarize_content",

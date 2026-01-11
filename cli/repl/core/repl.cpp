@@ -23,7 +23,7 @@ int run_repl(ReplConfig& config) {
   std::string active_source = config.input;
   std::optional<std::string> active_html;
   std::string last_full_output;
-  bool display_full = true;
+  bool display_full = config.display_full;
   size_t max_rows = 40;
   std::string line;
 

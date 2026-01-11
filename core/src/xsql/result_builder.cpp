@@ -30,6 +30,9 @@ std::vector<std::string> build_columns(const Query& query) {
     if (item.aggregate == Query::SelectItem::Aggregate::Summarize) {
       return {"tag", "count"};
     }
+    if (item.aggregate == Query::SelectItem::Aggregate::Tfidf) {
+      return {"node_id", "parent_id", "tag", "terms_score"};
+    }
   }
   if (!is_projection_query(query)) {
     std::vector<std::string> cols = {"node_id", "tag", "attributes", "parent_id", "source_uri"};

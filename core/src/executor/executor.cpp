@@ -17,6 +17,16 @@ ExecuteResult execute_query(const Query& query, const HtmlDocument& doc, const s
   select_tags.reserve(query.select_items.size());
   bool select_all = false;
   for (const auto& item : query.select_items) {
+    if (item.aggregate == Query::SelectItem::Aggregate::Tfidf) {
+      if (item.tfidf_all_tags) {
+        select_all = true;
+        break;
+      }
+      for (const auto& tag : item.tfidf_tags) {
+        select_tags.push_back(util::to_lower(tag));
+      }
+      continue;
+    }
     if (item.tag == "*") {
       select_all = true;
       break;

@@ -16,6 +16,8 @@ struct CliOptions {
   bool color = true;
   std::string output_mode = "duckbox";
   bool highlight = true;
+  bool display_full = false;
+  bool display_mode_set = false;
   int timeout_ms = 5000;
   bool show_help = false;
 };

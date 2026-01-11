@@ -29,6 +29,7 @@ def core_sources() -> list[str]:
         "core/src/xsql/validation.cpp",
         "core/src/xsql/result_builder.cpp",
         "core/src/xsql/table_extract.cpp",
+        "core/src/xsql/tfidf.cpp",
     ]
     return sources
 

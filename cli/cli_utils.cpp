@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -60,6 +61,26 @@ std::string attributes_to_json(const xsql::QueryResultRow& row) {
   out += "}";
   return out;
 }
+
+/// Serializes term scores without nlohmann/json for deterministic TFIDF output.
+/// MUST emit numeric values and MUST keep keys stable for tests.
+std::string terms_score_to_json(const xsql::QueryResultRow& row) {
+  std::vector<std::pair<std::string, double>> items(row.term_scores.begin(), row.term_scores.end());
+  std::sort(items.begin(), items.end(),
+            [](const auto& a, const auto& b) {
+              if (a.first != b.first) return a.first < b.first;
+              return a.second < b.second;
+            });
+  std::ostringstream oss;
+  oss << "{";
+  oss << std::fixed << std::setprecision(6);
+  for (size_t i = 0; i < items.size(); ++i) {
+    if (i > 0) oss << ",";
+    oss << "\"" << json_escape(items[i].first) << "\":" << items[i].second;
+  }
+  oss << "}";
+  return oss.str();
+}
 #endif
 
 /// Prints a single field as JSON, handling NULLs and attribute projections.
@@ -89,6 +110,12 @@ void print_field(std::ostream& os, const std::string& field, const xsql::QueryRe
   } else if (field == "attributes") {
 #ifndef XSQL_USE_NLOHMANN_JSON
     os << attributes_to_json(row);
+#else
+    os << "null";
+#endif
+  } else if (field == "terms_score") {
+#ifndef XSQL_USE_NLOHMANN_JSON
+    os << terms_score_to_json(row);
 #else
     os << "null";
 #endif
@@ -273,7 +300,7 @@ TruncateResult truncate_output(const std::string& text, size_t head_lines, size_
   for (size_t i = 0; i < head_lines; ++i) {
     oss << lines[i] << "\n";
   }
-  oss << "... (abbreviated; use .display_mode more to show all or redirect to a file) ...\n";
+  oss << "... (abbreviated; use .display_mode more or --display_mode more, or redirect to a file) ...\n";
   for (size_t i = lines.size() - tail_lines; i < lines.size(); ++i) {
     oss << lines[i];
     if (i + 1 < lines.size()) {
@@ -422,6 +449,12 @@ std::string build_json(const xsql::QueryResult& result) {
           attrs[kv.first] = kv.second;
         }
         obj[field] = attrs;
+      } else if (field == "terms_score") {
+        json scores = json::object();
+        for (const auto& kv : row.term_scores) {
+          scores[kv.first] = kv.second;
+        }
+        obj[field] = scores;
       } else {
         auto it = row.attributes.find(field);
         obj[field] = (it != row.attributes.end()) ? json(it->second) : json(nullptr);

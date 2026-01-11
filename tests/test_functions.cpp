@@ -121,6 +121,63 @@ void test_to_list_flag() {
   expect_true(result.to_list, "to list flag set");
 }
 
+void test_tfidf_output_shape() {
+  std::string html =
+      "<p class='keep'>Apple banana</p>"
+      "<li class='keep'>Carrot banana</li>"
+      "<p class='skip'>Skip</p>";
+  auto result = run_query(
+      html,
+      "SELECT TFIDF(p, li, TOP_TERMS=2, STOPWORDS=NONE) FROM document "
+      "WHERE attributes.class = 'keep'");
+  expect_eq(result.columns.size(), 4, "tfidf columns size");
+  if (result.columns.size() == 4) {
+    expect_true(result.columns[0] == "node_id", "tfidf column node_id");
+    expect_true(result.columns[1] == "parent_id", "tfidf column parent_id");
+    expect_true(result.columns[2] == "tag", "tfidf column tag");
+    expect_true(result.columns[3] == "terms_score", "tfidf column terms_score");
+  }
+  expect_eq(result.rows.size(), 2, "tfidf row count");
+}
+
+void test_tfidf_scoring_top_term() {
+  std::string html =
+      "<p>apple apple banana</p>"
+      "<p>banana banana carrot</p>";
+  auto result = run_query(html, "SELECT TFIDF(p, TOP_TERMS=1, STOPWORDS=NONE) FROM document");
+  expect_eq(result.rows.size(), 2, "tfidf scoring row count");
+  if (result.rows.size() == 2) {
+    expect_true(result.rows[0].term_scores.count("apple") == 1, "tfidf top term for row 1");
+    expect_true(result.rows[1].term_scores.count("banana") == 1, "tfidf top term for row 2");
+  }
+}
+
+void test_tfidf_stopwords() {
+  std::string html = "<p>the the apple</p>";
+  auto result = run_query(html, "SELECT TFIDF(p, TOP_TERMS=5, STOPWORDS=ENGLISH) FROM document");
+  expect_eq(result.rows.size(), 1, "tfidf stopwords row count");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].term_scores.count("the") == 0, "tfidf stopwords removed");
+    expect_true(result.rows[0].term_scores.count("apple") == 1, "tfidf keeps non-stopword");
+  }
+}
+
+void test_tfidf_strips_html_markup() {
+  std::string html =
+      "<body>"
+      "<script type='text/x-handlebars-template'><tr><th>Title</th></tr></script>"
+      "<p>Visible text</p>"
+      "</body>";
+  auto result = run_query(html, "SELECT TFIDF(body, TOP_TERMS=10, STOPWORDS=NONE) FROM document");
+  expect_eq(result.rows.size(), 1, "tfidf strip markup row count");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].term_scores.count("th") == 0, "tfidf ignores markup tokens");
+    expect_true(result.rows[0].term_scores.count("tr") == 0, "tfidf ignores markup tokens");
+    expect_true(result.rows[0].term_scores.count("title") == 0, "tfidf ignores script html tokens");
+    expect_true(result.rows[0].term_scores.count("visible") == 1, "tfidf keeps visible text");
+  }
+}
+
 }  // namespace
 
 void register_function_tests(std::vector<TestCase>& tests) {
@@ -137,4 +194,8 @@ void register_function_tests(std::vector<TestCase>& tests) {
   tests.push_back({"to_table_header_on", test_to_table_header_on});
   tests.push_back({"to_table_header_off", test_to_table_header_off});
   tests.push_back({"to_list_flag", test_to_list_flag});
+  tests.push_back({"tfidf_output_shape", test_tfidf_output_shape});
+  tests.push_back({"tfidf_scoring_top_term", test_tfidf_scoring_top_term});
+  tests.push_back({"tfidf_stopwords", test_tfidf_stopwords});
+  tests.push_back({"tfidf_strips_html_markup", test_tfidf_strips_html_markup});
 }

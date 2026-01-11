@@ -14,6 +14,7 @@ void print_startup_help(std::ostream& os) {
   os << "  xsql --query-file <file> [--input <path>]\n";
   os << "  xsql --interactive [--input <path>]\n";
   os << "  xsql --mode duckbox|json|plain\n";
+  os << "  xsql --display_mode more|less\n";
   os << "  xsql --highlight on|off\n";
   os << "  xsql --timeout-ms <n>\n";
   os << "  xsql --color=disabled\n\n";
@@ -36,6 +37,7 @@ void print_help(std::ostream& os) {
   os << "       xsql --query-file <file> [--input <path>]\n";
   os << "       xsql --interactive [--input <path>]\n";
   os << "       xsql --mode duckbox|json|plain\n";
+  os << "       xsql --display_mode more|less\n";
   os << "       xsql --highlight on|off\n";
   os << "       xsql --timeout-ms <n>\n";
   os << "       xsql --color=disabled\n";
@@ -59,6 +61,19 @@ bool parse_cli_args(int argc, char** argv, CliOptions& options, std::string& err
       options.interactive = true;
     } else if (arg == "--mode" && i + 1 < argc) {
       options.output_mode = argv[++i];
+    } else if ((arg == "--display_mode" || arg == "--display-mode") && i + 1 < argc) {
+      std::string value = argv[++i];
+      if (value == "more") {
+        options.display_full = true;
+        options.display_mode_set = true;
+      } else if (value == "less") {
+        options.display_full = false;
+        options.display_mode_set = true;
+      } else {
+        // WHY: invalid display mode values must fail fast for consistent output.
+        error = "Invalid --display_mode value (use more|less)";
+        return false;
+      }
     } else if (arg == "--highlight" && i + 1 < argc) {
       std::string value = argv[++i];
       if (value == "on") {

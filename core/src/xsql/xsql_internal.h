@@ -7,6 +7,7 @@
 
 #include "../ast.h"
 #include "../html_parser.h"
+#include "xsql/xsql.h"
 
 namespace xsql::xsql_internal {
 
@@ -72,6 +73,10 @@ std::optional<size_t> find_inner_html_depth(const Query& query);
 /// MUST return nullptr when trimming is not enabled.
 /// Inputs are Query objects; outputs are optional item pointers.
 const Query::SelectItem* find_trim_item(const Query& query);
+/// Computes TFIDF term scores per node for TFIDF() queries.
+/// MUST return rows with term score dictionaries for each matched node.
+std::vector<QueryResultRow> build_tfidf_rows(const Query& query,
+                                             const std::vector<HtmlNode>& nodes);
 
 /// Builds a child adjacency list for efficient tree traversal.
 /// MUST preserve node order and MUST size the vector to doc.nodes.

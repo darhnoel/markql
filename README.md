@@ -1,8 +1,8 @@
-# XSQL Documentation (v1.1.3)
+# XSQL Documentation (v1.2.0)
 
 XSQL is a SQL-style query language for static HTML. It treats each HTML element
 as a row in a node table and lets you filter by tag, attributes, and position.
-The project is now at v1.1.3 as an offline-first C++20 tool.
+The project is now at v1.2.0 as an offline-first C++20 tool.
 
 ## Quick Start
 
@@ -101,6 +101,7 @@ Shorthand:
 ./build/xsql --query-file <file> --input <path>
 ./build/xsql --interactive [--input <path>]
 ./build/xsql --mode duckbox|json|plain
+./build/xsql --display_mode more|less
 ./build/xsql --highlight on|off
 ./build/xsql --color=disabled
 ```
@@ -110,6 +111,7 @@ Notes:
 - Colors are auto-disabled when stdout is not a TTY.
 - Default output mode is `duckbox` (table-style).
 - `--highlight` only affects duckbox headers (auto-disabled when not a TTY).
+- `--display_mode more` disables JSON truncation in non-interactive mode.
 - `TO CSV()` / `TO PARQUET()` write files instead of printing results.
 
 ## Interactive Mode (REPL)
@@ -318,6 +320,27 @@ Case-insensitive substring match on direct text only (excluding nested tags):
 ```
 SELECT div FROM doc WHERE div HAS_DIRECT_TEXT 'computer science'
 ```
+
+### TFIDF()
+Compute per-node TF-IDF scores across the matched nodes. Each matched node is
+treated as a document in the IDF corpus.
+```
+SELECT TFIDF(p, li, TOP_TERMS=30, MIN_DF=1, MAX_DF=0, STOPWORDS=ENGLISH)
+  FROM doc WHERE attributes.class = 'article'
+```
+
+Output columns: `node_id`, `parent_id`, `tag`, `terms_score` (term → score map).
+
+Options:
+- `TOP_TERMS` (default 30): max terms per node.
+- `MIN_DF` (default 1): minimum document frequency.
+- `MAX_DF` (default 0 = no max): maximum document frequency.
+- `STOPWORDS` (`ENGLISH` or `NONE`, default `ENGLISH`).
+
+Notes:
+- Tags must come before options inside `TFIDF(...)`.
+- TFIDF is an aggregate and must be the only select item.
+- TFIDF ignores HTML tags and skips script/style/noscript content.
 
 ## Examples
 

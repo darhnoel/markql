@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <iomanip>
 #include <memory>
 #include <sstream>
 #include <unordered_map>
@@ -41,6 +42,26 @@ struct CellValue {
   bool is_null = false;
 };
 
+/// Serializes TFIDF term scores for CSV export cells.
+std::string term_scores_to_string(const std::unordered_map<std::string, double>& scores) {
+  if (scores.empty()) return "{}";
+  std::vector<std::pair<std::string, double>> items(scores.begin(), scores.end());
+  std::sort(items.begin(), items.end(),
+            [](const auto& a, const auto& b) {
+              if (a.first != b.first) return a.first < b.first;
+              return a.second < b.second;
+            });
+  std::ostringstream oss;
+  oss << "{";
+  oss << std::fixed << std::setprecision(6);
+  for (size_t i = 0; i < items.size(); ++i) {
+    if (i > 0) oss << ",";
+    oss << "\"" << items[i].first << "\":" << items[i].second;
+  }
+  oss << "}";
+  return oss.str();
+}
+
 CellValue field_value(const xsql::QueryResultRow& row, const std::string& field) {
   if (field == "node_id") return {std::to_string(row.node_id), false};
   if (field == "count") return {std::to_string(row.node_id), false};
@@ -53,6 +74,7 @@ CellValue field_value(const xsql::QueryResultRow& row, const std::string& field)
   }
   if (field == "source_uri") return {row.source_uri, false};
   if (field == "attributes") return {attributes_to_string(row.attributes), false};
+  if (field == "terms_score") return {term_scores_to_string(row.term_scores), false};
   auto it = row.attributes.find(field);
   if (it == row.attributes.end()) return {"", true};
   return {it->second, false};
