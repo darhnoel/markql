@@ -111,6 +111,25 @@ std::string resolve_default_history_path() {
   return "xsql.history";
 }
 
+std::string expand_user_path(const std::string& raw) {
+  if (raw.empty()) return raw;
+  if (raw[0] == '~') {
+    std::string home = get_env("HOME");
+    if (home.empty()) return raw;
+    if (raw.size() == 1) return home;
+    if (raw[1] == '/') {
+      return home + raw.substr(1);
+    }
+  }
+  if (raw.rfind("$HOME/", 0) == 0) {
+    std::string home = get_env("HOME");
+    if (!home.empty()) {
+      return home + raw.substr(5);
+    }
+  }
+  return raw;
+}
+
 bool load_repl_config(const std::string& path, ReplSettings& out, std::string& error) {
   out = ReplSettings{};
   if (path.empty()) return false;
@@ -221,6 +240,7 @@ bool apply_repl_settings(const ReplSettings& settings,
     editor.set_history_size(*settings.history_max_entries);
   }
   std::string history_path = settings.history_path.value_or(resolve_default_history_path());
+  history_path = expand_user_path(history_path);
   if (!editor.set_history_path(history_path, error)) {
     return false;
   }
