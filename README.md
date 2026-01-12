@@ -130,6 +130,47 @@ Keys:
 - Left/Right: move cursor
 - Ctrl+L: clear screen
 
+## Playwright Fetch Plugin (Experimental)
+
+This optional plugin renders dynamic pages in headless Chromium via Playwright (Node)
+and saves the HTML for `.load`.
+
+Setup:
+```
+cd plugins/playwright_fetch
+npm install
+npx playwright install chromium
+cmake -S plugins/cmake/playwright_fetch -B plugins/cmake/playwright_fetch/build -DXSQL_ROOT=/path/to/XSQL
+cmake --build plugins/cmake/playwright_fetch/build
+```
+
+Usage:
+```
+./build/xsql --interactive
+.plugin load playwright_fetch
+.fetch "https://example.com/app" --out /tmp/page.html --state /tmp/state.json
+.load /tmp/page.html
+```
+
+Options:
+- `.fetch <url>` fetches and renders the page.
+- `--out <path>` writes HTML output (default: `<cache>/last.html`).
+- `--state [path]` loads/saves storage state (default: `<cache>/state.json` when provided).
+- `--cache-dir <path>` sets the cache directory.
+- `--timeout <ms>` sets navigation timeout (default: `60000`).
+- `--wait <selector>` waits for a CSS selector after navigation.
+- `--headed` launches a visible browser for manual interaction.
+- `--pause` waits for Enter before capturing HTML (implies `--headed`).
+- `--clean` deletes the cache directory.
+
+Cache directory:
+- Defaults to `$XDG_CACHE_HOME/xsql/playwright_fetch` or `~/.cache/xsql/playwright_fetch`.
+- Override with `XSQL_FETCH_CACHE_DIR` or `--cache-dir`.
+
+Environment overrides:
+- `XSQL_NODE` to select the Node.js binary.
+- `XSQL_PLAYWRIGHT_FETCH_SCRIPT` to point to a custom `fetch.js`.
+
 ## Data Model
 
 Each HTML element becomes a row with fields:

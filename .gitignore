@@ -48,3 +48,4 @@ plugins/bin/
 plugins/src/
 plugins/.xsql_logs/
 plugins/cmake/*/build/
+plugins/playwright_fetch/node_modules/
