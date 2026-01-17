@@ -177,6 +177,34 @@ Notes:
 
 ## Query Language
 
+## Syntax Diagrams
+
+Railroad diagrams are auto-generated for the current parser. Rebuild with
+`python3 docs/generate_diagrams.py` after installing `docs/requirements.txt`.
+
+Query shape:
+![query](docs/diagrams/query.svg)
+
+Select queries:
+![select_query](docs/diagrams/select_query.svg)
+
+Select items:
+![select_item](docs/diagrams/select_item.svg)
+
+Sources:
+![source](docs/diagrams/source.svg)
+
+Where expressions:
+![expr](docs/diagrams/expr.svg)
+
+Output clauses:
+![to_clause](docs/diagrams/to_clause.svg)
+
+Notes:
+- Tag-only selections cannot mix with projected fields.
+- Shorthand attributes (e.g., `href = '...'`) are parsed as `attributes.href`.
+- Semicolon is optional, but the REPL requires it to end a statement on a single line.
+
 ### Basic Form
 ```
 SELECT <tag_list> FROM <source> [WHERE <expr>] [LIMIT <n>]

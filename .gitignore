@@ -48,3 +48,6 @@ plugins/bin/
 plugins/src/
 plugins/.xsql_logs/
 plugins/cmake/*/build/
+# Python cache
+__pycache__/
+*.pyc
