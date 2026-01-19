@@ -241,6 +241,7 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
               {"text(tag)", "string", "Text content of a tag"},
               {"inner_html(tag[, depth])", "string", "HTML inside a tag"},
               {"flatten_text(tag[, depth])", "string[]", "Flatten descendant text at depth into columns"},
+              {"flatten(tag[, depth])", "string[]", "Alias of flatten_text"},
               {"trim(inner_html(...))", "string", "Trim whitespace in inner_html"},
               {"count(tag|*)", "int64", "Aggregate node count"},
               {"summarize(*)", "table<tag,count>", "Tag counts summary"},

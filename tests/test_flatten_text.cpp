@@ -99,6 +99,16 @@ void test_flatten_text_default_alias() {
   }
 }
 
+void test_flatten_alias_function() {
+  std::string html = "<div><p>One</p></div>";
+  auto result = run_query(html, "SELECT FLATTEN(div) FROM document");
+  expect_eq(result.columns.size(), 1, "flatten alias column count");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].computed_fields["flatten_text"] == "One",
+                "flatten alias value");
+  }
+}
+
 void test_flatten_text_descendant_attribute_filter() {
   std::string html =
       "<div>"
@@ -164,6 +174,7 @@ void register_flatten_text_tests(std::vector<TestCase>& tests) {
   tests.push_back({"flatten_text_truncation", test_flatten_text_truncation});
   tests.push_back({"flatten_text_default_uses_deepest_text", test_flatten_text_default_uses_deepest_text});
   tests.push_back({"flatten_text_default_alias", test_flatten_text_default_alias});
+  tests.push_back({"flatten_alias_function", test_flatten_alias_function});
   tests.push_back({"flatten_text_descendant_attribute_filter", test_flatten_text_descendant_attribute_filter});
   tests.push_back({"flatten_text_realistic_flight_card", test_flatten_text_realistic_flight_card});
 }

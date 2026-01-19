@@ -59,30 +59,34 @@ bool Parser::parse_exclude_list(std::vector<std::string>& fields) {
 /// MUST set saw_field/saw_tag_only consistently for validation.
 /// Inputs are tokens; outputs are select items or errors.
 bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_field, bool& saw_tag_only) {
-  if (current_.type == TokenType::Identifier && to_upper(current_.text) == "FLATTEN_TEXT") {
+  if (current_.type == TokenType::Identifier) {
+    std::string fn = to_upper(current_.text);
+    if (fn != "FLATTEN_TEXT" && fn != "FLATTEN") {
+      // fallthrough
+    } else {
     Query::SelectItem item;
     item.flatten_text = true;
     size_t start = current_.pos;
     advance();
-    if (!consume(TokenType::LParen, "Expected ( after FLATTEN_TEXT")) return false;
+    if (!consume(TokenType::LParen, "Expected ( after FLATTEN_TEXT/FLATTEN")) return false;
     if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
-      return set_error("Expected base tag identifier inside FLATTEN_TEXT()");
+      return set_error("Expected base tag identifier inside FLATTEN_TEXT()/FLATTEN()");
     }
     item.tag = current_.text;
     advance();
     if (current_.type == TokenType::Comma) {
       advance();
       if (current_.type != TokenType::Number) {
-        return set_error("Expected numeric depth in FLATTEN_TEXT()");
+        return set_error("Expected numeric depth in FLATTEN_TEXT()/FLATTEN()");
       }
       try {
         item.flatten_depth = static_cast<size_t>(std::stoull(current_.text));
       } catch (...) {
-        return set_error("Invalid FLATTEN_TEXT() depth");
+        return set_error("Invalid FLATTEN_TEXT()/FLATTEN() depth");
       }
       advance();
     }
-    if (!consume(TokenType::RParen, "Expected ) after FLATTEN_TEXT arguments")) return false;
+    if (!consume(TokenType::RParen, "Expected ) after FLATTEN_TEXT/FLATTEN arguments")) return false;
     if (current_.type == TokenType::KeywordAs) {
       advance();
       if (!consume(TokenType::LParen, "Expected ( after AS")) return false;
@@ -112,6 +116,7 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
     items.push_back(item);
     saw_field = true;
     return true;
+    }
   }
   if (current_.type == TokenType::Identifier && to_upper(current_.text) == "SUMMARIZE") {
     Query::SelectItem item;

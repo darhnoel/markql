@@ -431,6 +431,7 @@ Notes:
 - `FLATTEN_TEXT()` extracts direct text from the matched element and falls back to inline descendant text when direct text is empty or whitespace-only; output is trimmed and whitespace-collapsed. When depth is omitted, empty-text nodes are skipped.
 - `FLATTEN_TEXT(base, depth)` targets the exact element depth from `base` (0 = base itself).
 - `FLATTEN_TEXT(base)` defaults to a single output column named `flatten_text` when no `AS (...)` list is provided.
+- `FLATTEN()` is an alias of `FLATTEN_TEXT()`.
 
 ### TO LIST()
 Output a JSON list for a single projected column:
