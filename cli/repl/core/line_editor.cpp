@@ -161,6 +161,17 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
       if (::read(STDIN_FILENO, &seq[0], 1) <= 0) continue;
       if (::read(STDIN_FILENO, &seq[1], 1) <= 0) continue;
       if (seq[0] == '[') {
+        if (seq[1] == '3') {
+          if (::read(STDIN_FILENO, &seq[2], 1) <= 0) continue;
+          if (seq[2] == '~') {
+            if (cursor < buffer.size()) {
+              size_t next = next_codepoint_start(buffer, cursor);
+              buffer.erase(cursor, next - cursor);
+              redraw_line(buffer, cursor);
+            }
+            continue;
+          }
+        }
         if (seq[1] == '2') {
           if (::read(STDIN_FILENO, &seq[2], 1) <= 0) continue;
           if (::read(STDIN_FILENO, &seq[3], 1) <= 0) continue;
