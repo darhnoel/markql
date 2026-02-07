@@ -102,7 +102,7 @@ Examples:
 ```sql
 SELECT div FROM doc WHERE id = 'main';
 SELECT a FROM doc WHERE href IN ('/a','/b');
-SELECT a FROM doc WHERE href ~ '.*\\.pdf$';
+SELECT a FROM doc WHERE href ~ '.*\.pdf$';
 SELECT div FROM doc WHERE attributes IS NULL;
 SELECT div FROM doc WHERE div HAS_DIRECT_TEXT 'buy now';
 ```
