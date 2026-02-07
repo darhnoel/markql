@@ -8,15 +8,26 @@ else()
 endif()
 project(markql VERSION ${MARKQL_PROJECT_VERSION} LANGUAGES CXX)
 
+set(_markql_build_agent_default ON)
+if (DEFINED XSQL_BUILD_AGENT)
+  set(_markql_build_agent_default "${XSQL_BUILD_AGENT}")
+endif()
+set(_markql_agent_fetch_deps_default ON)
+if (DEFINED XSQL_AGENT_FETCH_DEPS)
+  set(_markql_agent_fetch_deps_default "${XSQL_AGENT_FETCH_DEPS}")
+endif()
+
 option(MARKQL_BUILD_CLI "Build the MarkQL CLI" ON)
 option(MARKQL_BUILD_TESTS "Build tests" ON)
 option(MARKQL_BUILD_PYTHON "Build the Python module" OFF)
+option(MARKQL_BUILD_AGENT "Build the localhost xsql-agent service" ${_markql_build_agent_default})
 option(MARKQL_WITH_LIBXML2 "Use libxml2 for HTML parsing" ON)
 option(MARKQL_WITH_NLOHMANN_JSON "Use nlohmann/json for CLI output" ON)
 option(MARKQL_WITH_CURL "Use libcurl for URL fetching" ON)
 option(MARKQL_WITH_ARROW "Enable Apache Arrow for Parquet export" ON)
 option(MARKQL_WITH_FLATBUFFERS "Use FlatBuffers for DOCN artifact payloads" ON)
 option(MARKQL_ENABLE_KHMER_NUMBER "Enable built-in Khmer number module" ON)
+option(MARKQL_AGENT_FETCH_DEPS "Fetch xsql-agent deps with FetchContent when missing" ${_markql_agent_fetch_deps_default})
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -125,9 +136,9 @@ if (MARKQL_WITH_FLATBUFFERS)
   )
   add_dependencies(markql_core GENERATE_markql_artifact_docn_flatbuffers)
   add_dependencies(markql_core GENERATE_markql_artifact_qast_flatbuffers)
-  target_link_libraries(markql_core PUBLIC flatbuffers::flatbuffers
-                                         markql_artifact_docn_flatbuffers
-                                         markql_artifact_qast_flatbuffers)
+  target_link_libraries(markql_core PRIVATE flatbuffers::flatbuffers
+                                          markql_artifact_docn_flatbuffers
+                                          markql_artifact_qast_flatbuffers)
 endif()
 
 if (MARKQL_ENABLE_KHMER_NUMBER)
@@ -195,6 +206,10 @@ if (MARKQL_WITH_ARROW)
   if (NOT MARKQL_ARROW_TARGET OR NOT MARKQL_PARQUET_TARGET)
     message(WARNING "Arrow/Parquet not found; TO PARQUET disabled.")
   endif()
+endif()
+
+if (MARKQL_BUILD_AGENT)
+  add_subdirectory(browser_plugin/agent)
 endif()
 
 if (MARKQL_BUILD_CLI)
@@ -356,7 +371,8 @@ if (MARKQL_BUILD_TESTS)
   target_link_libraries(markql_tests PRIVATE markql_core)
   target_include_directories(markql_tests PRIVATE cli core/src core/include tests)
   if (MARKQL_WITH_FLATBUFFERS)
-    target_link_libraries(markql_tests PRIVATE markql_artifact_docn_flatbuffers
+    target_link_libraries(markql_tests PRIVATE flatbuffers::flatbuffers
+                                             markql_artifact_docn_flatbuffers
                                              markql_artifact_qast_flatbuffers)
   endif()
   if (MARKQL_ARROW_TARGET AND MARKQL_PARQUET_TARGET)
@@ -383,7 +399,8 @@ if (MARKQL_BUILD_TESTS)
   target_link_libraries(markql_bench_artifacts PRIVATE markql_core)
   target_include_directories(markql_bench_artifacts PRIVATE cli core/src core/include tests)
   if (MARKQL_WITH_FLATBUFFERS)
-    target_link_libraries(markql_bench_artifacts PRIVATE markql_artifact_docn_flatbuffers
+    target_link_libraries(markql_bench_artifacts PRIVATE flatbuffers::flatbuffers
+                                                      markql_artifact_docn_flatbuffers
                                                       markql_artifact_qast_flatbuffers)
   endif()
   set_target_properties(markql_bench_artifacts PROPERTIES OUTPUT_NAME markql_bench_artifacts)

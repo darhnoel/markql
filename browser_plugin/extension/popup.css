@@ -1,0 +1,158 @@
+:root {
+  color-scheme: light;
+  --bg: #f4f6f8;
+  --panel: #ffffff;
+  --border: #d9e0e6;
+  --text: #1d2731;
+  --muted: #576574;
+  --accent: #006d77;
+  --accent-2: #83c5be;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 760px;
+  min-height: 560px;
+  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+  background: linear-gradient(140deg, #f4f6f8, #ecf2f5);
+  color: var(--text);
+}
+
+.app {
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.field span,
+.label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.inline-fields {
+  display: flex;
+  gap: 10px;
+}
+
+.compact {
+  width: 160px;
+}
+
+input,
+textarea,
+button {
+  font: inherit;
+}
+
+input,
+textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px;
+  background: #fff;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+button {
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 7px 10px;
+  cursor: pointer;
+  background: var(--accent);
+  color: #fff;
+}
+
+button.secondary {
+  background: #fff;
+  color: var(--text);
+  border-color: var(--border);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.hint {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.status {
+  min-height: 20px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.table-wrap {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: auto;
+  max-height: 260px;
+  background: #fff;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+th,
+td {
+  border-bottom: 1px solid #edf1f4;
+  padding: 6px 8px;
+  vertical-align: top;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+th {
+  position: sticky;
+  top: 0;
+  background: #f8fbfd;
+  z-index: 1;
+}
