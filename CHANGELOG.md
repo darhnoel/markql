@@ -7,6 +7,13 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 
 ## [Unreleased]
 
+### Added
+- Restored `EXISTS(axis [WHERE expr])` predicate support in parser, AST, executor, and validation.
+- Added predicate tests for `EXISTS(child)`, `EXISTS(child WHERE tag = ...)`, and same-node matching behavior.
+
+### Changed
+- Updated CLI and tutorial docs to document `EXISTS(...)` syntax, supported axes (`self|parent|child|ancestor|descendant`), and inner `WHERE` semantics.
+
 ## [1.4.0] - 2026-02-07
 Includes major changes first landed between 2026-01-12 and 2026-02-07.
 

@@ -141,6 +141,7 @@ Filters (`WHERE ...`) operators shown in the guide:
 - `~` (regex)
 - `CONTAINS`, `CONTAINS ALL`, `CONTAINS ANY`
 - `HAS_DIRECT_TEXT`
+- `EXISTS(axis [WHERE expr])`
 
 Examples:
 
@@ -150,6 +151,8 @@ SELECT a FROM doc WHERE href IN ('/login', '/signup');
 SELECT a FROM doc WHERE href ~ '.*\.pdf$';
 SELECT div FROM doc WHERE attributes IS NULL;
 SELECT div FROM doc WHERE div HAS_DIRECT_TEXT 'buy now';
+SELECT div FROM doc WHERE EXISTS(child);
+SELECT div FROM doc WHERE EXISTS(child WHERE tag = 'h2');
 ```
 
 Hierarchy axes (relationship filters):
@@ -165,6 +168,19 @@ Examples:
 SELECT span FROM doc WHERE parent.tag = 'div';
 SELECT div FROM doc WHERE descendant.attributes.data-field = 'body';
 SELECT a FROM doc WHERE ancestor.id = 'content';
+```
+
+`EXISTS` is a predicate form that works with axes:
+- `EXISTS(axis)` means at least one node exists on that axis.
+- `EXISTS(axis WHERE expr)` means at least one axis node satisfies `expr`.
+- The inner `expr` is evaluated against each axis node directly (same-node semantics).
+
+Example:
+
+```sql
+SELECT div
+FROM doc
+WHERE EXISTS(child WHERE tag = 'span' AND attributes.class = 'price');
 ```
 
 Branch-specific caveat (important):
@@ -641,6 +657,13 @@ They are aliases and behave the same.
 
 **Why does `child.foo` fail but `child.attributes.foo` works?**  
 This branch requires explicit axis attribute access using `child.attributes.<name>` (and the same pattern for `parent`, `ancestor`, `descendant`).
+
+**How does `EXISTS(axis [WHERE ...])` work?**  
+Use one of: `self`, `parent`, `child`, `ancestor`, `descendant`.  
+`EXISTS(child)` checks if a node has any child.  
+`EXISTS(child WHERE tag = 'h2')` checks if any child matches that predicate.  
+Inner conditions are evaluated on the same axis node, so this is valid and strict:
+`EXISTS(child WHERE tag = 'span' AND attributes.class = 'price')`.
 
 **Does XSQL support `ORDER BY` and `EXCLUDE`?**  
 Yes.

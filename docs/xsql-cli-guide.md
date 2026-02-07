@@ -97,6 +97,7 @@ Basic operators:
 - `~` regex
 - `CONTAINS`, `CONTAINS ALL`, `CONTAINS ANY` (attributes)
 - `HAS_DIRECT_TEXT`
+- `EXISTS(axis [WHERE expr])`
 
 Examples:
 ```sql
@@ -105,6 +106,8 @@ SELECT a FROM doc WHERE href IN ('/a','/b');
 SELECT a FROM doc WHERE href ~ '.*\.pdf$';
 SELECT div FROM doc WHERE attributes IS NULL;
 SELECT div FROM doc WHERE div HAS_DIRECT_TEXT 'buy now';
+SELECT div FROM doc WHERE EXISTS(child);
+SELECT div FROM doc WHERE EXISTS(child WHERE tag = 'h2');
 ```
 
 ## Hierarchy (Axes)
@@ -125,6 +128,19 @@ SELECT a FROM doc WHERE ancestor.id = 'content';
 Important parser detail for axis attributes:
 - Use `child.attributes.foo`, `parent.attributes.foo`, `descendant.attributes.foo`, etc.
 - In this branch, shorthand like `child.foo` may fail parse.
+
+`EXISTS` predicate:
+- Syntax: `EXISTS(self|parent|child|ancestor|descendant [WHERE <expr>])`
+- `EXISTS(axis)` checks whether at least one node exists on that axis.
+- `EXISTS(axis WHERE ...)` evaluates `<expr>` on each axis node and returns true if any one node matches.
+- Conditions inside `EXISTS(... WHERE ...)` are applied to the same axis node.
+
+Examples:
+```sql
+SELECT div FROM doc WHERE EXISTS(child);
+SELECT div FROM doc WHERE EXISTS(child WHERE tag = 'h2');
+SELECT div FROM doc WHERE EXISTS(child WHERE tag = 'span' AND attributes.class = 'price');
+```
 
 ## Projections
 
