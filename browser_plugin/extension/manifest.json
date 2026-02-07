@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "XSQL Browser Plugin",
+  "version": "0.1.0",
+  "description": "Capture rendered DOM HTML and run XSQL queries via local xsql-agent.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:7337/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "XSQL Browser Plugin",
+    "default_popup": "popup.html"
+  }
+}

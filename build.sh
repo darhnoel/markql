@@ -2,6 +2,8 @@
 
 set -euo pipefail
 VCPKG_ROOT=~/vcpkg
+: "${XSQL_BUILD_AGENT:=ON}"
+: "${XSQL_AGENT_FETCH_DEPS:=ON}"
 
 cmake_args=(
   -S .
@@ -9,6 +11,8 @@ cmake_args=(
   -DXSQL_WITH_LIBXML2=ON
   -DXSQL_WITH_CURL=ON
   -DXSQL_WITH_ARROW=ON
+  "-DXSQL_BUILD_AGENT=${XSQL_BUILD_AGENT}"
+  "-DXSQL_AGENT_FETCH_DEPS=${XSQL_AGENT_FETCH_DEPS}"
 )
 
 if [[ -z "${VCPKG_ROOT:-}" && -d "${HOME}/vcpkg" ]]; then

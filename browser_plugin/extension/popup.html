@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>XSQL Browser Plugin</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="panel">
+        <h1>XSQL Browser Plugin</h1>
+        <label class="field">
+          <span>Agent Token</span>
+          <input id="tokenInput" type="password" placeholder="Paste token from xsql-agent terminal" />
+        </label>
+        <button id="saveTokenBtn" class="secondary">Save Token</button>
+        <p id="tokenHelp" class="hint"></p>
+      </section>
+
+      <section class="panel">
+        <div class="row">
+          <span class="label">Capture Scope</span>
+          <label><input type="radio" name="scope" value="main" checked /> Main</label>
+          <label><input type="radio" name="scope" value="full" /> Full Page</label>
+        </div>
+        <label class="field">
+          <span>XSQL Query</span>
+          <textarea id="queryInput" rows="7" spellcheck="false" placeholder="SELECT a.href FROM document WHERE href CONTAINS 'http'"></textarea>
+        </label>
+        <div class="inline-fields">
+          <label class="field compact">
+            <span>Max Rows</span>
+            <input id="maxRowsInput" type="number" min="1" max="10000" value="2000" />
+          </label>
+          <label class="field compact">
+            <span>Timeout (ms)</span>
+            <input id="timeoutInput" type="number" min="100" max="120000" value="5000" />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="captureBtn">Capture</button>
+          <button id="runBtn">Run</button>
+          <button id="recaptureBtn" class="secondary">Recapture</button>
+          <button id="copyCsvBtn" class="secondary">Copy CSV</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div id="statusLine" class="status">Ready.</div>
+        <div class="table-wrap">
+          <table id="resultsTable">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

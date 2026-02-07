@@ -21,6 +21,119 @@ Interactive mode:
 ./build/xsql --interactive --input ./data/index.html
 ```
 
+## XSQL Browser Plugin MVP
+
+### Build and run xsql-agent
+
+Configure and build:
+```
+cmake -S . -B build
+cmake --build build
+```
+
+Dependency note:
+- `xsql-agent` requires `cpp-httplib` and `nlohmann/json`.
+- By default CMake fetches them automatically (`XSQL_AGENT_FETCH_DEPS=ON`).
+- Offline build option: vendor to `third_party/cpp-httplib` and `third_party/nlohmann_json`.
+
+Run agent (binds to `127.0.0.1:7337` only):
+```
+XSQL_AGENT_TOKEN=your-secret-token ./build/xsql-agent
+```
+
+If `XSQL_AGENT_TOKEN` is not set, `xsql-agent` generates one at startup and prints it to stdout.
+
+### Load Chrome extension (unpacked)
+
+1. Open `chrome://extensions`
+2. Enable `Developer mode`
+3. Click `Load unpacked`
+4. Select folder: `browser_plugin/extension`
+
+Required extension permissions:
+- `activeTab`
+- `scripting`
+- `storage`
+- Host permission: `http://127.0.0.1:7337/*`
+
+### Use the plugin
+
+1. Open any website in Chrome.
+2. Open the extension popup.
+3. Paste token from `xsql-agent` terminal output and click `Save Token`.
+4. Choose capture scope:
+   - `Main` (default heuristic)
+   - `Full Page` (`document.documentElement.outerHTML`)
+5. Click `Capture`, then run queries repeatedly with `Run`.
+6. Use `Recapture` when page content changes.
+7. Use `Copy CSV` to copy the current result table.
+
+If token is missing, popup shows:
+`Start xsql-agent and copy token from terminal output.`
+
+### Example queries
+
+```
+SELECT a.href FROM document WHERE href CONTAINS 'http'
+```
+
+```
+SELECT h1, h2, h3 FROM document
+```
+
+```
+SELECT table FROM document TO TABLE()
+```
+
+### Agent HTTP API
+
+- `GET /health` => `{ "ok": true, "agent_version": "0.1.0" }`
+- `OPTIONS /v1/query` => CORS preflight
+- `POST /v1/query` with header `X-XSQL-Token: <token>`
+
+Request:
+```json
+{
+  "html": "<html>...</html>",
+  "query": "SELECT ...",
+  "options": { "max_rows": 2000, "timeout_ms": 5000 }
+}
+```
+
+Response:
+```json
+{
+  "elapsed_ms": 12,
+  "columns": [{"name":"col1","type":"string"}],
+  "rows": [["v1"]],
+  "truncated": false,
+  "error": null
+}
+```
+
+Error response:
+```json
+{
+  "elapsed_ms": 0,
+  "columns": [],
+  "rows": [],
+  "truncated": false,
+  "error": { "code": "QUERY_ERROR", "message": "..." }
+}
+```
+
+### Troubleshooting
+
+- CORS errors:
+  - Ensure requests go to `http://127.0.0.1:7337` (not another host/port).
+  - Ensure extension host permission includes `http://127.0.0.1:7337/*`.
+- Token mismatch (`401`):
+  - Restart `xsql-agent` and copy the latest token exactly.
+  - Re-save token in popup settings.
+- Localhost connection refused:
+  - Confirm agent is running and listening on `127.0.0.1:7337`.
+  - Some endpoint security tools block localhost servers; allow `xsql-agent`.
+
 ## Python API (xsql package)
 
 ```python
@@ -260,6 +373,9 @@ Notes:
 - `source_uri` is stored for provenance but hidden from default output unless multiple sources appear.
 
 ## Query Language
+
+For a step-by-step CLI learning path (why XSQL, beginner to advanced patterns),
+see `docs/XSQL_CLI_GUIDE.md`.
 
 ## Syntax Diagrams
 
