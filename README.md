@@ -43,6 +43,7 @@ Run interactive REPL:
 - If `--input` is omitted, the CLI reads HTML from `stdin`.
 - URL sources (`FROM 'https://...'`) require `XSQL_WITH_CURL=ON`.
 - `TO PARQUET(...)` requires `XSQL_WITH_ARROW=ON`.
+- `INNER_HTML(...)` returns minified HTML by default. Use `RAW_INNER_HTML(...)` for unmodified raw output.
 
 ## Testing
 
@@ -51,6 +52,12 @@ C++ tests:
 ```bash
 cmake --build build --target xsql_tests
 ctest --test-dir build --output-on-failure
+```
+
+Benchmark harness (inner_html minified vs raw):
+
+```bash
+./build/xsql_bench_inner_html 10000
 ```
 
 Python package/tests (optional):

@@ -1,5 +1,6 @@
 #include "test_harness.h"
 #include "test_utils.h"
+#include "util/string_util.h"
 
 namespace {
 
@@ -28,6 +29,40 @@ void test_inner_html_function() {
   }
 }
 
+void test_minify_html_basic() {
+  std::string input = "<div>\n <span> hi </span>\n</div>";
+  std::string got = xsql::util::minify_html(input);
+  expect_true(got == "<div><span> hi </span></div>", "minify html basic");
+}
+
+void test_minify_html_preserves_attribute_quotes() {
+  std::string input = "<a href=\"x y\" title='a b'>   link </a>";
+  std::string got = xsql::util::minify_html(input);
+  expect_true(got.find("href=\"x y\"") != std::string::npos, "minify keeps double-quoted attribute value");
+  expect_true(got.find("title='a b'") != std::string::npos, "minify keeps single-quoted attribute value");
+  expect_true(got == "<a href=\"x y\" title='a b'> link </a>", "minify normalizes text spacing");
+}
+
+void test_minify_html_preserves_protected_tags() {
+  std::string input = "<pre>\n a  b\n</pre><div>\n x   y\n</div>";
+  std::string got = xsql::util::minify_html(input);
+  expect_true(got == "<pre>\n a  b\n</pre><div> x y </div>", "minify preserves pre and compacts div text");
+}
+
+void test_minify_html_preserves_script_style() {
+  std::string input =
+      "<script>var  x = \"a  b\";\nif (x) { y = 1; }</script>"
+      "<style>.a {  color: red; }</style>"
+      "<div>\n z   z\n</div>";
+  std::string got = xsql::util::minify_html(input);
+  expect_true(got.find("<script>var  x = \"a  b\";\nif (x) { y = 1; }</script>") != std::string::npos,
+              "minify preserves script content");
+  expect_true(got.find("<style>.a {  color: red; }</style>") != std::string::npos,
+              "minify preserves style content");
+  expect_true(got.find("<div> z z </div>") != std::string::npos,
+              "minify compacts non-protected text");
+}
+
 void test_inner_html_depth() {
   std::string html = "<div id='root'><span><b>Hi</b></span><em>There</em></div>";
   auto result = run_query(html, "SELECT inner_html(div, 1) FROM document WHERE attributes.id = 'root'");
@@ -45,6 +80,26 @@ void test_trim_inner_html() {
   if (!result.rows.empty()) {
     expect_true(result.rows[0].inner_html == "<a href=\"/x\">Link</a>",
                 "trim inner_html content");
+  }
+}
+
+void test_inner_html_minified_by_default() {
+  std::string html = "<div id='root'><span>   hi   there  </span></div>";
+  auto result = run_query(html, "SELECT inner_html(div) FROM document WHERE attributes.id = 'root'");
+  expect_eq(result.rows.size(), 1, "inner_html minified row count");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].inner_html == "<span> hi there </span>",
+                "inner_html minified by default");
+  }
+}
+
+void test_raw_inner_html_opt_out() {
+  std::string html = "<div id='root'><span>   hi   there  </span></div>";
+  auto result = run_query(html, "SELECT raw_inner_html(div) FROM document WHERE attributes.id = 'root'");
+  expect_eq(result.rows.size(), 1, "raw inner_html row count");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].inner_html == "<span>   hi   there  </span>",
+                "raw_inner_html preserves original spacing");
   }
 }
 
@@ -183,8 +238,14 @@ void test_tfidf_strips_html_markup() {
 void register_function_tests(std::vector<TestCase>& tests) {
   tests.push_back({"text_requires_non_tag_filter", test_text_requires_non_tag_filter});
   tests.push_back({"inner_html_function", test_inner_html_function});
+  tests.push_back({"minify_html_basic", test_minify_html_basic});
+  tests.push_back({"minify_html_preserves_attribute_quotes", test_minify_html_preserves_attribute_quotes});
+  tests.push_back({"minify_html_preserves_protected_tags", test_minify_html_preserves_protected_tags});
+  tests.push_back({"minify_html_preserves_script_style", test_minify_html_preserves_script_style});
   tests.push_back({"inner_html_depth", test_inner_html_depth});
   tests.push_back({"trim_inner_html", test_trim_inner_html});
+  tests.push_back({"inner_html_minified_by_default", test_inner_html_minified_by_default});
+  tests.push_back({"raw_inner_html_opt_out", test_raw_inner_html_opt_out});
   tests.push_back({"count_aggregate", test_count_aggregate});
   tests.push_back({"count_star", test_count_star});
   tests.push_back({"summarize_star", test_summarize_star});

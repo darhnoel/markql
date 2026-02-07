@@ -243,30 +243,34 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
     size_t start = current_.pos;
     advance();
     if (!consume(TokenType::LParen, "Expected ( after TRIM")) return false;
-    if (current_.type == TokenType::Identifier && to_upper(current_.text) == "INNER_HTML") {
+    if (current_.type == TokenType::Identifier &&
+        (to_upper(current_.text) == "INNER_HTML" ||
+         to_upper(current_.text) == "RAW_INNER_HTML")) {
+      bool raw_inner_html = to_upper(current_.text) == "RAW_INNER_HTML";
       size_t inner_start = current_.pos;
       advance();
-      if (!consume(TokenType::LParen, "Expected ( after inner_html")) return false;
+      if (!consume(TokenType::LParen, "Expected ( after inner_html/raw_inner_html")) return false;
       if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
-        return set_error("Expected tag identifier inside inner_html()");
+        return set_error("Expected tag identifier inside inner_html()/raw_inner_html()");
       }
       item.tag = current_.text;
       item.field = "inner_html";
       item.inner_html_function = true;
+      item.raw_inner_html_function = raw_inner_html;
       advance();
       if (current_.type == TokenType::Comma) {
         advance();
         if (current_.type != TokenType::Number) {
-          return set_error("Expected numeric depth in inner_html()");
+          return set_error("Expected numeric depth in inner_html()/raw_inner_html()");
         }
         try {
           item.inner_html_depth = static_cast<size_t>(std::stoull(current_.text));
         } catch (...) {
-          return set_error("Invalid inner_html() depth");
+          return set_error("Invalid inner_html()/raw_inner_html() depth");
         }
         advance();
       }
-      if (!consume(TokenType::RParen, "Expected ) after inner_html argument")) return false;
+      if (!consume(TokenType::RParen, "Expected ) after inner_html/raw_inner_html argument")) return false;
       item.span = Span{inner_start, current_.pos};
     } else if (current_.type == TokenType::Identifier && to_upper(current_.text) == "TEXT") {
       size_t text_start = current_.pos;
@@ -363,29 +367,31 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
     saw_field = true;
     return true;
   }
-  if (to_upper(tag_token.text) == "INNER_HTML" && current_.type == TokenType::LParen) {
+  std::string fn_name = to_upper(tag_token.text);
+  if ((fn_name == "INNER_HTML" || fn_name == "RAW_INNER_HTML") && current_.type == TokenType::LParen) {
     Query::SelectItem item;
     item.field = "inner_html";
     item.inner_html_function = true;
+    item.raw_inner_html_function = (fn_name == "RAW_INNER_HTML");
     advance();
     if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
-      return set_error("Expected tag identifier inside inner_html()");
+      return set_error("Expected tag identifier inside inner_html()/raw_inner_html()");
     }
     item.tag = current_.text;
     advance();
     if (current_.type == TokenType::Comma) {
       advance();
       if (current_.type != TokenType::Number) {
-        return set_error("Expected numeric depth in inner_html()");
+        return set_error("Expected numeric depth in inner_html()/raw_inner_html()");
       }
       try {
         item.inner_html_depth = static_cast<size_t>(std::stoull(current_.text));
       } catch (...) {
-        return set_error("Invalid inner_html() depth");
+        return set_error("Invalid inner_html()/raw_inner_html() depth");
       }
       advance();
     }
-    if (!consume(TokenType::RParen, "Expected ) after inner_html argument")) return false;
+    if (!consume(TokenType::RParen, "Expected ) after inner_html/raw_inner_html argument")) return false;
     item.span = Span{start, current_.pos};
     items.push_back(item);
     saw_field = true;

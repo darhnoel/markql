@@ -137,12 +137,14 @@ SELECT div(node_id, tag, parent_id) FROM doc;
 Project functions:
 ```sql
 SELECT inner_html(div) FROM doc WHERE id = 'card';
+SELECT raw_inner_html(div) FROM doc WHERE id = 'card';
 SELECT trim(inner_html(div)) FROM doc WHERE id = 'card';
 SELECT text(div) FROM doc WHERE attributes.class = 'summary';
 ```
 
 Notes:
 - `TEXT()` and `INNER_HTML()` require a `WHERE` with a non-tag filter.
+- `INNER_HTML()` is minified by default; use `RAW_INNER_HTML()` for raw spacing.
 
 ## FLATTEN_TEXT / FLATTEN
 

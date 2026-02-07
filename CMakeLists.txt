@@ -226,6 +226,13 @@ if (XSQL_BUILD_TESTS)
     target_link_libraries(xsql_tests PRIVATE ${XSQL_ARROW_TARGET} ${XSQL_PARQUET_TARGET})
     target_compile_definitions(xsql_tests PRIVATE XSQL_USE_ARROW)
   endif()
+  add_executable(xsql_bench_inner_html tests/bench_inner_html.cpp)
+  target_link_libraries(xsql_bench_inner_html PRIVATE xsql_core)
+  target_include_directories(xsql_bench_inner_html PRIVATE core/include)
+  if (XSQL_ARROW_TARGET AND XSQL_PARQUET_TARGET)
+    target_link_libraries(xsql_bench_inner_html PRIVATE ${XSQL_ARROW_TARGET} ${XSQL_PARQUET_TARGET})
+    target_compile_definitions(xsql_bench_inner_html PRIVATE XSQL_USE_ARROW)
+  endif()
   set(XSQL_TESTS
     select_ul_by_id
     class_in_matches_token
@@ -241,8 +248,14 @@ if (XSQL_BUILD_TESTS)
     projection_tag_field_list
     projection_sibling_pos
     inner_html_function
+    minify_html_basic
+    minify_html_preserves_attribute_quotes
+    minify_html_preserves_protected_tags
+    minify_html_preserves_script_style
     inner_html_depth
     trim_inner_html
+    inner_html_minified_by_default
+    raw_inner_html_opt_out
     child_axis_direct_only
     ancestor_filter_on_a
     limit

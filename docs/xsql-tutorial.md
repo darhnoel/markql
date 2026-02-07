@@ -192,6 +192,7 @@ Text/HTML extraction functions:
 
 ```sql
 SELECT INNER_HTML(div) FROM doc WHERE id = 'card';
+SELECT RAW_INNER_HTML(div) FROM doc WHERE id = 'card';
 SELECT TRIM(INNER_HTML(div)) FROM doc WHERE id = 'card';
 SELECT TEXT(div) FROM doc WHERE attributes.class = 'summary';
 ```
@@ -209,6 +210,7 @@ SELECT TEXT(div) FROM doc WHERE id = 'card';
 ```
 
 `TEXT()` and `INNER_HTML()` require a `WHERE` clause with a non-tag filter (for example, `id = ...`, `attributes.class = ...`, or an axis predicate).
+`INNER_HTML()` returns minified HTML by default; use `RAW_INNER_HTML()` to preserve raw spacing.
 
 ## Beginner query recipes
 
