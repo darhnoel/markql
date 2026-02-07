@@ -211,6 +211,7 @@ SELECT TEXT(div) FROM doc WHERE id = 'card';
 
 `TEXT()` and `INNER_HTML()` require a `WHERE` clause with a non-tag filter (for example, `id = ...`, `attributes.class = ...`, or an axis predicate).
 `INNER_HTML()` returns minified HTML by default; use `RAW_INNER_HTML()` to preserve raw spacing.
+`a.text` is not a valid projection form in this branch; use `TEXT(a)` instead.
 
 ## Beginner query recipes
 
@@ -287,7 +288,7 @@ SELECT span FROM doc WHERE parent.tag = 'div' LIMIT 50;
 
 **Recipe: find links only inside a specific ancestor container**
 ```sql
-SELECT a.href, a.text
+SELECT a.href, TEXT(a)
 FROM doc
 WHERE ancestor.id = 'navbar' AND href IS NOT NULL
 TO CSV('nav_links.csv');
@@ -390,7 +391,7 @@ WHERE descendant.tag = 'span';
 
 **Recipe: export a link table to CSV**
 ```sql
-SELECT a.href, a.text
+SELECT a.href, TEXT(a)
 FROM doc
 WHERE href IS NOT NULL
 TO CSV('links.csv');
@@ -481,7 +482,7 @@ SELECT a FROM doc WHERE href IS NOT NULL LIMIT 20;
 
 6) Project only the fields you want:
 ```sql
-SELECT a.href, a.text FROM doc WHERE href IS NOT NULL LIMIT 20;
+SELECT a.href, TEXT(a) FROM doc WHERE href IS NOT NULL LIMIT 20;
 ```
 
 7) Switch output mode if you want:
@@ -491,7 +492,7 @@ SELECT a.href, a.text FROM doc WHERE href IS NOT NULL LIMIT 20;
 
 8) Export once it looks right:
 ```sql
-SELECT a.href, a.text FROM doc WHERE href IS NOT NULL TO CSV('links.csv');
+SELECT a.href, TEXT(a) FROM doc WHERE href IS NOT NULL TO CSV('links.csv');
 ```
 
 Helpful REPL commands listed in the guide:
@@ -514,6 +515,7 @@ Helpful REPL commands listed in the guide:
 | `Expected FROM` | Your query is missing the `FROM ...` clause. | Add `FROM doc` (or another source). Example: `SELECT a FROM doc;` |
 | `Expected attributes, tag, text... after child` | The parser rejected your axis field access. | Use `child.attributes.<name>` (and similarly for `parent/ancestor/descendant`). |
 | `FLATTEN_TEXT() requires AS (...)` | This message may appear in older/stale builds. In the current parser, `FLATTEN(...)`/`FLATTEN_TEXT(...)` can run without `AS` and default to one column named `flatten_text`. | If you need multiple columns or explicit names, use `AS (col1, col2, ...)`. If this error appears unexpectedly, confirm you are running the latest built binary. |
+| `TEXT() must be used to project text` | You projected text as `a.text` instead of using the text function. | Use `TEXT(a)` (for example: `SELECT a.href, TEXT(a) FROM doc ...`). |
 | `TEXT()/INNER_HTML() requires a non-tag filter` | You used `TEXT()` or `INNER_HTML()` without a `WHERE` predicate that is not just a tag selection. | Add a predicate like `id = '...'`, `attributes.class = '...'`, or an axis predicate. |
 
 **If you get zero rows (not an error, but common)**
@@ -528,7 +530,7 @@ Helpful REPL commands listed in the guide:
 - Build queries in layers:
   - First: return tags (`SELECT a FROM doc LIMIT 20;`)
   - Then: add `WHERE` (`... WHERE href IS NOT NULL`)
-  - Then: project fields (`SELECT a.href, a.text ...`)
+  - Then: project fields/functions (`SELECT a.href, TEXT(a) ...`)
   - Then: export (`TO LIST`, `TO CSV`, `TO TABLE`)
 - Prefer “broader then narrower”:
   - Use `CONTAINS` to discover matching shape.
@@ -586,7 +588,7 @@ SELECT span FROM doc WHERE parent.tag = 'div' LIMIT 50;
 ```
 
 ```sql
-SELECT a.href, a.text
+SELECT a.href, TEXT(a)
 FROM doc
 WHERE ancestor.id = 'navbar' AND href IS NOT NULL
 LIMIT 50;
@@ -601,7 +603,7 @@ SELECT table FROM doc TO TABLE();
 ```
 
 ```sql
-SELECT a.href, a.text
+SELECT a.href, TEXT(a)
 FROM doc
 WHERE href IS NOT NULL
 TO CSV('links.csv');

@@ -184,7 +184,7 @@ SELECT table FROM doc WHERE id = 'stats' TO TABLE(EXPORT='stats.csv');
 
 ### TO CSV / TO PARQUET
 ```sql
-SELECT a.href, a.text FROM doc WHERE href IS NOT NULL TO CSV('links.csv');
+SELECT a.href, TEXT(a) FROM doc WHERE href IS NOT NULL TO CSV('links.csv');
 SELECT * FROM doc TO PARQUET('nodes.parquet');
 ```
 
@@ -219,7 +219,7 @@ WHERE attributes.class = 'review'
 
 ### 2) Navigation audit
 ```sql
-SELECT a.href, a.text
+SELECT a.href, TEXT(a)
 FROM doc
 WHERE ancestor.id = 'navbar' AND href IS NOT NULL
 TO CSV('nav_links.csv');
