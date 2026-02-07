@@ -2,6 +2,7 @@
 
 - Tutorial: [xsql-tutorial.md](xsql-tutorial.md)
 - CLI guide: [xsql-cli-guide.md](xsql-cli-guide.md)
+- Changelog: [../CHANGELOG.md](../CHANGELOG.md)
 
 ## Syntax Diagrams
 

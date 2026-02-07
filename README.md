@@ -72,6 +72,7 @@ Python package/tests (optional):
 - Tutorial: [docs/xsql-tutorial.md](docs/xsql-tutorial.md)
 - CLI guide (intro to advanced): [docs/xsql-cli-guide.md](docs/xsql-cli-guide.md)
 - Syntax diagrams and generator: [docs/README.md](docs/README.md)
+- Changelog: [CHANGELOG.md](CHANGELOG.md)
 
 ## License
 
