@@ -51,4 +51,9 @@ size_t column_to_index(const std::string& text, size_t start, size_t end, size_t
 /// Inputs are text slice; outputs are column width.
 size_t column_width(const std::string& text, size_t start, size_t end);
 
+/// Maps a cursor column proportionally when source/target line lengths differ.
+/// MUST preserve start/end positions and clamp to the target line width.
+/// Inputs are source column/width and target width; outputs are target columns.
+size_t proportional_column(size_t source_col, size_t source_len, size_t target_len);
+
 }  // namespace xsql::cli

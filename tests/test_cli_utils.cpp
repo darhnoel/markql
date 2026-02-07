@@ -1,6 +1,7 @@
 #include "test_harness.h"
 
 #include "cli_utils.h"
+#include "repl/input/text_util.h"
 
 namespace {
 
@@ -32,10 +33,28 @@ void test_count_result_rows() {
   expect_eq(count, 3, "count_result_rows returns row count");
 }
 
+void test_proportional_column_end_maps_to_end() {
+  size_t mapped = xsql::cli::proportional_column(17, 17, 23);
+  expect_eq(mapped, 23, "proportional_column keeps end alignment");
+}
+
+void test_proportional_column_scales_middle() {
+  size_t mapped = xsql::cli::proportional_column(5, 10, 20);
+  expect_eq(mapped, 10, "proportional_column scales middle cursor");
+}
+
+void test_proportional_column_zero_source_len() {
+  size_t mapped = xsql::cli::proportional_column(3, 0, 2);
+  expect_eq(mapped, 2, "proportional_column clamps when source length is zero");
+}
+
 }  // namespace
 
 void register_cli_utils_tests(std::vector<TestCase>& tests) {
   tests.push_back({"count_table_rows_header", test_count_table_rows_header});
   tests.push_back({"count_table_rows_no_header", test_count_table_rows_no_header});
   tests.push_back({"count_result_rows", test_count_result_rows});
+  tests.push_back({"proportional_column_end_maps_to_end", test_proportional_column_end_maps_to_end});
+  tests.push_back({"proportional_column_scales_middle", test_proportional_column_scales_middle});
+  tests.push_back({"proportional_column_zero_source_len", test_proportional_column_zero_source_len});
 }

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(xsql LANGUAGES CXX)
+project(xsql VERSION 1.4.0 LANGUAGES CXX)
 
 option(XSQL_BUILD_CLI "Build the xsql CLI" ON)
 option(XSQL_BUILD_TESTS "Build tests" ON)
@@ -325,6 +325,9 @@ if (XSQL_BUILD_TESTS)
     count_table_rows_header
     count_table_rows_no_header
     count_result_rows
+    proportional_column_end_maps_to_end
+    proportional_column_scales_middle
+    proportional_column_zero_source_len
   )
   if (XSQL_ENABLE_KHMER_NUMBER)
     list(APPEND XSQL_TESTS
