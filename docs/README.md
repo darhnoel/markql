@@ -1,14 +1,19 @@
-# Docs: Syntax Diagrams
+# XSQL Docs
 
-This folder contains auto-generated railroad diagrams for the XSQL grammar.
+- Tutorial: [xsql-tutorial.md](xsql-tutorial.md)
+- CLI guide: [xsql-cli-guide.md](xsql-cli-guide.md)
 
-How to generate:
-1. Install the docs dependencies:
-   `python3 -m pip install -r docs/requirements.txt`
-2. Run the generator:
-   `python3 docs/generate_diagrams.py`
-   (or `./docs/build_diagrams.sh`)
+## Syntax Diagrams
 
-Output:
-- SVGs are written to `docs/diagrams/`.
-- The top-level README links to these SVGs.
+This folder also contains auto-generated railroad diagrams for the XSQL grammar.
+
+Generate them with:
+
+```bash
+python3 -m pip install -r docs/requirements.txt
+python3 docs/generate_diagrams.py
+# or
+./docs/build_diagrams.sh
+```
+
+Output files are written to `docs/diagrams/`.
