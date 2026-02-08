@@ -97,7 +97,7 @@ std::string fetch_url(const std::string& url, int timeout_ms) {
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buffer);
   curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, timeout_ms);
   // WHY: a stable user agent helps servers classify client behavior.
-  curl_easy_setopt(curl, CURLOPT_USERAGENT, "xsql/0.1");
+  curl_easy_setopt(curl, CURLOPT_USERAGENT, "markql/0.1");
   CURLcode res = curl_easy_perform(curl);
   if (res != CURLE_OK) {
     curl_easy_cleanup(curl);

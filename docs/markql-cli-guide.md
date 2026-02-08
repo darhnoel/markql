@@ -1,12 +1,12 @@
-# XSQL CLI Guide: Intro to Advanced
+# MarkQL CLI Guide: Intro to Advanced
 
-This guide explains why XSQL exists, how to use it from the CLI, and how to move from basic to advanced workflows.
+This guide explains why MarkQL exists, how to use it from the CLI, and how to move from basic to advanced workflows.
 
-## Why XSQL?
+## Why MarkQL?
 
-XSQL is useful when you want SQL-like querying over HTML without building a custom scraper for every page shape.
+MarkQL is useful when you want SQL-like querying over HTML without building a custom scraper for every page shape.
 
-Use XSQL when you need to:
+Use MarkQL when you need to:
 - Inspect and extract structured data from static HTML quickly.
 - Filter elements by attributes, hierarchy, and text rules.
 - Iterate fast in terminal/REPL before writing production automation.
@@ -14,7 +14,7 @@ Use XSQL when you need to:
 
 ## Core Mental Model
 
-XSQL treats HTML elements as rows in a node table.
+MarkQL treats HTML elements as rows in a node table.
 
 Each row has core fields:
 - `node_id`
@@ -41,13 +41,16 @@ Build:
 
 Run one query:
 ```bash
-./build/xsql --query "SELECT a FROM doc WHERE href CONTAINS 'https'" --input ./data/index.html
+./build/markql --query "SELECT a FROM doc WHERE href CONTAINS 'https'" --input ./data/index.html
 ```
 
 Run REPL:
 ```bash
-./build/xsql --interactive --input ./data/index.html
+./build/markql --interactive --input ./data/index.html
 ```
+
+Compatibility note:
+- `./build/xsql` remains available as a legacy command name.
 
 ## Fast Start: 5 Queries
 

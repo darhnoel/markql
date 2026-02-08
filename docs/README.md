@@ -1,12 +1,12 @@
-# XSQL Docs
+# MarkQL Docs
 
-- Tutorial: [xsql-tutorial.md](xsql-tutorial.md)
-- CLI guide: [xsql-cli-guide.md](xsql-cli-guide.md)
+- Tutorial: [markql-tutorial.md](markql-tutorial.md)
+- CLI guide: [markql-cli-guide.md](markql-cli-guide.md)
 - Changelog: [../CHANGELOG.md](../CHANGELOG.md)
 
 ## Syntax Diagrams
 
-This folder also contains auto-generated railroad diagrams for the XSQL grammar.
+This folder also contains auto-generated railroad diagrams for the MarkQL grammar.
 
 Generate them with:
 

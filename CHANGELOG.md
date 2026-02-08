@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to XSQL will be documented in this file.
+All notable changes to MarkQL will be documented in this file.
 
 This project follows a Keep a Changelog style and uses Semantic Versioning.
 Historical entries were backfilled from git commit history on 2026-02-07 and focus on major changes on `main` (not every docs/chore commit).
@@ -13,6 +13,8 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 
 ### Changed
 - Updated CLI and tutorial docs to document `EXISTS(...)` syntax, supported axes (`self|parent|child|ancestor|descendant`), and inner `WHERE` semantics.
+- Rebranded user-facing CLI/documentation name to MarkQL while keeping internal `xsql` namespace and APIs unchanged.
+- REPL prompt is now `markql> `, and the default CLI binary output is now `markql` (with `xsql` compatibility binary still generated).
 
 ## [1.4.0] - 2026-02-07
 Includes major changes first landed between 2026-01-12 and 2026-02-07.

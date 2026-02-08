@@ -249,7 +249,7 @@ static void test_khmer_command_to_words() {
   config.highlight = false;
   config.input = "";
 
-  xsql::cli::LineEditor editor(5, "xsql> ", 6);
+  xsql::cli::LineEditor editor(5, "markql> ", 8);
   std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
   std::string active_alias = "doc";
   std::string last_full_output;
@@ -285,7 +285,7 @@ static void test_khmer_command_compact() {
   config.highlight = false;
   config.input = "";
 
-  xsql::cli::LineEditor editor(5, "xsql> ", 6);
+  xsql::cli::LineEditor editor(5, "markql> ", 8);
   std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
   std::string active_alias = "doc";
   std::string last_full_output;
@@ -321,7 +321,7 @@ static void test_khmer_command_numerals() {
   config.highlight = false;
   config.input = "";
 
-  xsql::cli::LineEditor editor(5, "xsql> ", 6);
+  xsql::cli::LineEditor editor(5, "markql> ", 8);
   std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
   std::string active_alias = "doc";
   std::string last_full_output;
@@ -357,7 +357,7 @@ static void test_khmer_command_to_number_numerals() {
   config.highlight = false;
   config.input = "";
 
-  xsql::cli::LineEditor editor(5, "xsql> ", 6);
+  xsql::cli::LineEditor editor(5, "markql> ", 8);
   std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
   std::string active_alias = "doc";
   std::string last_full_output;

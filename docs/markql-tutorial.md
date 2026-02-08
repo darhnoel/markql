@@ -1,13 +1,13 @@
-# XSQL CLI Practical Usage Guide for Beginners
+# MarkQL CLI Practical Usage Guide for Beginners
 
 ## Getting started
 
-**Why XSQL**  
-XSQL is useful when you want SQL-like querying over HTML without building a custom scraper for every page shape. It helps you inspect and extract structured data from static HTML, filter elements by attributes and hierarchy, iterate fast in a terminal/REPL, and export results in machine-friendly formats like JSON lists, table rows, CSV, and Parquet.
+**Why MarkQL**  
+MarkQL is useful when you want SQL-like querying over HTML without building a custom scraper for every page shape. It helps you inspect and extract structured data from static HTML, filter elements by attributes and hierarchy, iterate fast in a terminal/REPL, and export results in machine-friendly formats like JSON lists, table rows, CSV, and Parquet.
 
 **Quick Start (build + first 3 commands)**
 
-Build XSQL:
+Build MarkQL:
 
 ```bash
 ./build.sh
@@ -16,20 +16,23 @@ Build XSQL:
 Run a first query (sanity check that it works):
 
 ```bash
-./build/xsql --query "SELECT div FROM doc LIMIT 5;" --input ./data/index.html
+./build/markql --query "SELECT div FROM doc LIMIT 5;" --input ./data/index.html
 ```
 
 Find links that look like real URLs:
 
 ```bash
-./build/xsql --query "SELECT a FROM doc WHERE href CONTAINS 'https';" --input ./data/index.html
+./build/markql --query "SELECT a FROM doc WHERE href CONTAINS 'https';" --input ./data/index.html
 ```
 
 Start the interactive REPL (best way to learn fast):
 
 ```bash
-./build/xsql --interactive --input ./data/index.html
+./build/markql --interactive --input ./data/index.html
 ```
+
+Compatibility note:
+- `./build/xsql` remains available as a legacy command name.
 
 ## Mental model and syntax
 
@@ -37,7 +40,7 @@ Start the interactive REPL (best way to learn fast):
 
 Think: “HTML elements become rows.”
 
-XSQL treats HTML elements as rows in a node table. Each element row has core fields like:
+MarkQL treats HTML elements as rows in a node table. Each element row has core fields like:
 
 - `node_id`
 - `tag`
@@ -466,7 +469,7 @@ Code-accurate notes for this branch:
 Start REPL:
 
 ```bash
-./build/xsql --interactive --input ./data/index.html
+./build/markql --interactive --input ./data/index.html
 ```
 
 Then use this loop:
@@ -665,7 +668,7 @@ Use one of: `self`, `parent`, `child`, `ancestor`, `descendant`.
 Inner conditions are evaluated on the same axis node, so this is valid and strict:
 `EXISTS(child WHERE tag = 'span' AND attributes.class = 'price')`.
 
-**Does XSQL support `ORDER BY` and `EXCLUDE`?**  
+**Does MarkQL support `ORDER BY` and `EXCLUDE`?**  
 Yes.
 
 `ORDER BY`:

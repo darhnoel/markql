@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
-project(xsql VERSION 1.4.0 LANGUAGES CXX)
+project(markql VERSION 1.4.0 LANGUAGES CXX)
 
-option(XSQL_BUILD_CLI "Build the xsql CLI" ON)
+option(XSQL_BUILD_CLI "Build the MarkQL CLI" ON)
 option(XSQL_BUILD_TESTS "Build tests" ON)
 option(XSQL_BUILD_PYTHON "Build the Python module" OFF)
 option(XSQL_WITH_LIBXML2 "Use libxml2 for HTML parsing" ON)
@@ -164,6 +164,15 @@ if (XSQL_BUILD_CLI)
     target_link_libraries(xsql PRIVATE ${XSQL_ARROW_TARGET} ${XSQL_PARQUET_TARGET})
     target_compile_definitions(xsql PRIVATE XSQL_USE_ARROW)
   endif()
+  set_target_properties(xsql PROPERTIES OUTPUT_NAME markql)
+  add_custom_command(
+    TARGET xsql
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:xsql>"
+            "$<TARGET_FILE_DIR:xsql>/xsql${CMAKE_EXECUTABLE_SUFFIX}"
+    COMMENT "Creating compatibility binary: xsql -> markql"
+  )
 endif()
 
 if (XSQL_BUILD_TESTS)
@@ -233,6 +242,15 @@ if (XSQL_BUILD_TESTS)
     target_link_libraries(xsql_bench_inner_html PRIVATE ${XSQL_ARROW_TARGET} ${XSQL_PARQUET_TARGET})
     target_compile_definitions(xsql_bench_inner_html PRIVATE XSQL_USE_ARROW)
   endif()
+  set_target_properties(xsql_bench_inner_html PROPERTIES OUTPUT_NAME markql_bench_inner_html)
+  add_custom_command(
+    TARGET xsql_bench_inner_html
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:xsql_bench_inner_html>"
+            "$<TARGET_FILE_DIR:xsql_bench_inner_html>/xsql_bench_inner_html${CMAKE_EXECUTABLE_SUFFIX}"
+    COMMENT "Creating compatibility binary: xsql_bench_inner_html -> markql_bench_inner_html"
+  )
   set(XSQL_TESTS
     select_ul_by_id
     class_in_matches_token

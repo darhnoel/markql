@@ -1,6 +1,6 @@
-# XSQL
+# MarkQL
 
-XSQL is a C++20 SQL-style query engine for HTML. It treats HTML elements as rows and lets you query them with familiar `SELECT ... FROM ... WHERE ...` syntax.
+MarkQL is a C++20 SQL-style query engine for HTML. It treats HTML elements as rows and lets you query them with familiar `SELECT ... FROM ... WHERE ...` syntax.
 
 ## Quick Start
 
@@ -28,17 +28,19 @@ cmake --build build
 Run one query:
 
 ```bash
-./build/xsql --query "SELECT div FROM doc LIMIT 5;" --input ./data/index.html
+./build/markql --query "SELECT div FROM doc LIMIT 5;" --input ./data/index.html
 ```
 
 Run interactive REPL:
 
 ```bash
-./build/xsql --interactive --input ./data/index.html
+./build/markql --interactive --input ./data/index.html
 ```
 
 ## CLI Notes
 
+- Primary CLI binary is `./build/markql`.
+- Legacy compatibility binary `./build/xsql` is still generated.
 - `doc` and `document` are both valid sources in `FROM`.
 - If `--input` is omitted, the CLI reads HTML from `stdin`.
 - URL sources (`FROM 'https://...'`) require `XSQL_WITH_CURL=ON`.
@@ -57,7 +59,7 @@ ctest --test-dir build --output-on-failure
 Benchmark harness (inner_html minified vs raw):
 
 ```bash
-./build/xsql_bench_inner_html 10000
+./build/markql_bench_inner_html 10000
 ```
 
 Python package/tests (optional):
@@ -69,8 +71,8 @@ Python package/tests (optional):
 
 ## Documentation
 
-- Tutorial: [docs/xsql-tutorial.md](docs/xsql-tutorial.md)
-- CLI guide (intro to advanced): [docs/xsql-cli-guide.md](docs/xsql-cli-guide.md)
+- Tutorial: [docs/markql-tutorial.md](docs/markql-tutorial.md)
+- CLI guide (intro to advanced): [docs/markql-cli-guide.md](docs/markql-cli-guide.md)
 - Syntax diagrams and generator: [docs/README.md](docs/README.md)
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 

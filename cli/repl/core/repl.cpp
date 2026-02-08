@@ -44,8 +44,9 @@ int run_repl(ReplConfig& config) {
     config.highlight = false;
   }
 
-  std::string prompt = config.color ? (std::string(kColor.blue) + "xsql> " + kColor.reset) : "xsql> ";
-  LineEditor editor(history_max_entries, prompt, 6);
+  std::string prompt =
+      config.color ? (std::string(kColor.blue) + "markql> " + kColor.reset) : "markql> ";
+  LineEditor editor(history_max_entries, prompt, 8);
   editor.set_keyword_color(config.color);
   editor.set_cont_prompt("", 0);
   CommandRegistry registry;
@@ -87,7 +88,7 @@ int run_repl(ReplConfig& config) {
   }
 
   while (true) {
-    editor.set_prompt(prompt, 6);
+    editor.set_prompt(prompt, 8);
     if (!editor.read_line(line)) {
       break;
     }

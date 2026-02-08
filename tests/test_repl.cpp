@@ -42,7 +42,7 @@ static void test_summarize_content_basic() {
   config.highlight = false;
   config.input = "";
 
-  xsql::cli::LineEditor editor(5, "xsql> ", 6);
+  xsql::cli::LineEditor editor(5, "markql> ", 8);
   std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
   sources["doc"] = xsql::cli::LoadedSource{
       "inline", std::optional<std::string>("<html><body><div>Hello Khmer World</div></body></html>")};
@@ -79,7 +79,7 @@ static void test_summarize_content_khmer_requires_plugin() {
   config.highlight = false;
   config.input = "";
 
-  xsql::cli::LineEditor editor(5, "xsql> ", 6);
+  xsql::cli::LineEditor editor(5, "markql> ", 8);
   std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
   sources["doc"] = xsql::cli::LoadedSource{
       "inline", std::optional<std::string>("<html><body><div>សូមអរគុណ</div></body></html>")};
@@ -117,7 +117,7 @@ static void test_summarize_content_max_tokens() {
   config.highlight = false;
   config.input = "";
 
-  xsql::cli::LineEditor editor(5, "xsql> ", 6);
+  xsql::cli::LineEditor editor(5, "markql> ", 8);
   std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
   sources["doc"] = xsql::cli::LoadedSource{
       "inline",
