@@ -44,9 +44,18 @@ int run_repl(ReplConfig& config) {
     config.highlight = false;
   }
 
-  std::string prompt =
+  std::string prompt_normal =
       config.color ? (std::string(kColor.blue) + "markql> " + kColor.reset) : "markql> ";
-  LineEditor editor(history_max_entries, prompt, 8);
+  std::string prompt_vim_normal = config.color
+                                      ? (std::string(kColor.blue) + "markql (vim:normal)> " +
+                                         kColor.reset)
+                                      : "markql (vim:normal)> ";
+  std::string prompt_vim_insert = config.color
+                                      ? (std::string(kColor.blue) + "markql (vim:edit)  > " +
+                                         kColor.reset)
+                                      : "markql (vim:edit)  > ";
+  LineEditor editor(history_max_entries, prompt_normal, 8);
+  editor.set_mode_prompts(prompt_vim_normal, 21, prompt_vim_insert, 21);
   editor.set_keyword_color(config.color);
   editor.set_cont_prompt("", 0);
   CommandRegistry registry;
@@ -88,7 +97,6 @@ int run_repl(ReplConfig& config) {
   }
 
   while (true) {
-    editor.set_prompt(prompt, 8);
     if (!editor.read_line(line)) {
       break;
     }

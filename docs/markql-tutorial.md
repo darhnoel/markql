@@ -530,6 +530,16 @@ Helpful REPL commands listed in the guide:
 - `.reload_config`
 - `.quit`
 
+Vim navigation mode:
+- Default editor mode is normal.
+- Press `Esc` to switch into Vim normal mode.
+- In Vim mode, press `Esc` to toggle between `vim:edit` and `vim:normal`, and back to normal mode.
+- Prompts:
+  - normal: `markql> `
+  - vim normal: `markql (vim:normal)> `
+  - vim edit: `markql (vim:edit)  > ` (padded to keep width aligned)
+- Vim keys: `h/j/k/l`, `i/a/I/A`, `o/O`.
+
 ## Troubleshooting and best practices
 
 **Error Decoder**

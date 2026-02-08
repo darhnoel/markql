@@ -218,6 +218,21 @@ bool load_repl_config(const std::string& path, ReplSettings& out, std::string& e
         return false;
       }
       out.output_mode = parsed;
+    } else if (full_key == "repl.editor_mode") {
+      std::string parsed = parse_string_value(value, ok);
+      if (!ok) {
+        error = "Invalid repl.editor_mode at line " + std::to_string(line_no);
+        return false;
+      }
+      std::string lower;
+      lower.reserve(parsed.size());
+      for (unsigned char c : parsed) lower.push_back(static_cast<char>(std::tolower(c)));
+      if (lower != "normal" && lower != "vim") {
+        error = "Invalid repl.editor_mode value at line " + std::to_string(line_no) +
+                " (expected normal|vim)";
+        return false;
+      }
+      out.editor_mode = lower;
     } else if (full_key == "repl.highlight") {
       bool parsed = false;
       if (!parse_bool(value, parsed)) {
@@ -246,6 +261,13 @@ bool apply_repl_settings(const ReplSettings& settings,
   }
   if (settings.output_mode.has_value()) {
     config.output_mode = *settings.output_mode;
+  }
+  if (settings.editor_mode.has_value()) {
+    if (*settings.editor_mode == "vim") {
+      editor.set_editor_mode(LineEditor::EditorMode::Vim);
+    } else {
+      editor.set_editor_mode(LineEditor::EditorMode::Normal);
+    }
   }
   if (settings.highlight.has_value()) {
     config.highlight = *settings.highlight;

@@ -32,6 +32,7 @@ CommandHandler make_help_command() {
     std::cout << "  SHOW INPUT(S) / SHOW FUNCTIONS / SHOW AXES / SHOW OPERATORS\n"
                  "  DESCRIBE DOC / DESCRIBE LANGUAGE\n";
     std::cout << "  Query export: TO CSV('file.csv') / TO PARQUET('file.parquet')\n";
+    std::cout << "  Editor modes: Esc toggles normal <-> vim:normal; i/a/I/A/o/O in vim mode\n";
     std::cout << "  .quit / .q             Exit\n";
     return true;
   };
