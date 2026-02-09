@@ -44,12 +44,20 @@ std::vector<std::string> build_columns(const Query& query) {
   for (const auto& item : query.select_items) {
     if (item.flatten_text) {
       extra += item.flatten_aliases.size();
+    } else if (item.flatten_extract) {
+      extra += item.flatten_extract_aliases.size();
     }
   }
   cols.reserve(query.select_items.size() + extra);
   for (const auto& item : query.select_items) {
     if (item.flatten_text) {
       cols.insert(cols.end(), item.flatten_aliases.begin(), item.flatten_aliases.end());
+      continue;
+    }
+    if (item.flatten_extract) {
+      cols.insert(cols.end(),
+                  item.flatten_extract_aliases.begin(),
+                  item.flatten_extract_aliases.end());
       continue;
     }
     cols.push_back(*item.field);
@@ -66,16 +74,6 @@ std::optional<size_t> find_inner_html_depth(const Query& query) {
     if (item.inner_html_depth.has_value()) return item.inner_html_depth;
   }
   return std::nullopt;
-}
-
-/// Finds the single TRIM() select item if present.
-/// MUST return nullptr when trimming is not enabled.
-/// Inputs are Query objects; outputs are optional item pointers.
-const Query::SelectItem* find_trim_item(const Query& query) {
-  if (query.select_items.size() != 1) return nullptr;
-  const auto& item = query.select_items[0];
-  if (!item.trim) return nullptr;
-  return &item;
 }
 
 }  // namespace xsql::xsql_internal

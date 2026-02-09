@@ -193,6 +193,7 @@ if (XSQL_BUILD_TESTS)
     tests/test_exports.cpp
     tests/test_malformed_html.cpp
     tests/test_flatten_text.cpp
+    tests/test_flatten_extract.cpp
     tests/test_repl.cpp
     tests/test_fragments.cpp
     tests/test_guardrails.cpp
@@ -272,6 +273,7 @@ if (XSQL_BUILD_TESTS)
     minify_html_preserves_script_style
     inner_html_depth
     trim_inner_html
+    trim_mixed_with_other_projection
     inner_html_minified_by_default
     raw_inner_html_opt_out
     child_axis_direct_only
@@ -349,6 +351,10 @@ if (XSQL_BUILD_TESTS)
     proportional_column_end_maps_to_end
     proportional_column_scales_middle
     proportional_column_zero_source_len
+    flatten_extract_basic
+    flatten_extract_has_direct_text_predicate
+    flatten_extract_requires_as_pairs
+    flatten_extract_alias_compatibility
   )
   if (XSQL_ENABLE_KHMER_NUMBER)
     list(APPEND XSQL_TESTS

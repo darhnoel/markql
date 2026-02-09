@@ -104,6 +104,14 @@ struct Query {
     Span span;
   };
   struct SelectItem {
+    struct FlattenExtractExpr {
+      enum class Kind { Text, Attr, Coalesce } kind = Kind::Text;
+      std::string tag;
+      std::optional<std::string> attribute;
+      std::optional<Expr> where;
+      std::vector<FlattenExtractExpr> args;
+      Span span;
+    };
     enum class Aggregate { None, Count, Summarize, Tfidf } aggregate = Aggregate::None;
     enum class TfidfStopwords { English, None } tfidf_stopwords = TfidfStopwords::English;
     std::string tag;
@@ -119,8 +127,11 @@ struct Query {
     bool text_function = false;
     bool trim = false;
     bool flatten_text = false;
+    bool flatten_extract = false;
     std::optional<size_t> flatten_depth;
     std::vector<std::string> flatten_aliases;
+    std::vector<std::string> flatten_extract_aliases;
+    std::vector<FlattenExtractExpr> flatten_extract_exprs;
     Span span;
   };
   std::vector<SelectItem> select_items;

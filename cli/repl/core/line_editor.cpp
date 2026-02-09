@@ -12,37 +12,6 @@ namespace xsql::cli {
 
 namespace {
 
-struct LineSpan {
-  size_t start = 0;
-  size_t end = 0;
-};
-
-LineSpan first_line_span(const std::string& text) {
-  size_t end = text.find('\n');
-  if (end == std::string::npos) end = text.size();
-  return LineSpan{0, end};
-}
-
-LineSpan last_line_span(const std::string& text) {
-  size_t start = text.rfind('\n');
-  start = (start == std::string::npos) ? 0 : start + 1;
-  return LineSpan{start, text.size()};
-}
-
-size_t map_cursor_by_line_proportion(const std::string& from_text,
-                                     size_t from_cursor,
-                                     LineSpan from_span,
-                                     const std::string& to_text,
-                                     LineSpan to_span) {
-  if (from_cursor < from_span.start) from_cursor = from_span.start;
-  if (from_cursor > from_span.end) from_cursor = from_span.end;
-  size_t from_col = column_width(from_text, from_span.start, from_cursor);
-  size_t from_len = column_width(from_text, from_span.start, from_span.end);
-  size_t to_len = column_width(to_text, to_span.start, to_span.end);
-  size_t to_col = proportional_column(from_col, from_len, to_len);
-  return column_to_index(to_text, to_span.start, to_span.end, to_col);
-}
-
 bool read_byte_with_timeout(char* out, int timeout_ms) {
   if (!out) return false;
   fd_set readfds;
@@ -186,13 +155,8 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
       size_t line_start = buffer.rfind('\n', cursor > 0 ? cursor - 1 : 0);
       size_t current_line_start = (line_start == std::string::npos) ? 0 : line_start + 1;
       if (current_line_start == 0) {
-        std::string from_buffer = buffer;
-        size_t from_cursor = cursor;
-        LineSpan from_span = first_line_span(from_buffer);
         if (!history_.empty() && history_.prev(buffer)) {
-          LineSpan to_span = first_line_span(buffer);
-          cursor = map_cursor_by_line_proportion(
-              from_buffer, from_cursor, from_span, buffer, to_span);
+          cursor = buffer.size();
           redraw_line(buffer, cursor);
         }
         return;
@@ -211,13 +175,8 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
                                proportional_column(col, current_len, prev_len));
       redraw_line(buffer, cursor);
     } else if (!history_.empty()) {
-      std::string from_buffer = buffer;
-      size_t from_cursor = cursor;
-      LineSpan from_span = first_line_span(from_buffer);
       if (history_.prev(buffer)) {
-        LineSpan to_span = first_line_span(buffer);
-        cursor = map_cursor_by_line_proportion(
-            from_buffer, from_cursor, from_span, buffer, to_span);
+        cursor = buffer.size();
         redraw_line(buffer, cursor);
       }
     }
@@ -229,13 +188,8 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
       size_t current_line_start = (line_start == std::string::npos) ? 0 : line_start + 1;
       size_t line_end = buffer.find('\n', current_line_start);
       if (line_end == std::string::npos) {
-        std::string from_buffer = buffer;
-        size_t from_cursor = cursor;
-        LineSpan from_span = last_line_span(from_buffer);
         if (history_.next(buffer)) {
-          LineSpan to_span = last_line_span(buffer);
-          cursor = map_cursor_by_line_proportion(
-              from_buffer, from_cursor, from_span, buffer, to_span);
+          cursor = buffer.size();
           redraw_line(buffer, cursor);
         }
         return;
@@ -254,13 +208,8 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
                                proportional_column(col, current_len, next_len));
       redraw_line(buffer, cursor);
     } else if (!history_.empty()) {
-      std::string from_buffer = buffer;
-      size_t from_cursor = cursor;
-      LineSpan from_span = first_line_span(from_buffer);
       if (history_.next(buffer)) {
-        LineSpan to_span = first_line_span(buffer);
-        cursor = map_cursor_by_line_proportion(
-            from_buffer, from_cursor, from_span, buffer, to_span);
+        cursor = buffer.size();
         redraw_line(buffer, cursor);
       }
     }

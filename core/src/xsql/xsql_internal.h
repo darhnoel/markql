@@ -74,10 +74,6 @@ std::vector<std::string> build_columns(const Query& query);
 /// MUST return nullopt when no depth is specified.
 /// Inputs are Query objects; outputs are optional depth values.
 std::optional<size_t> find_inner_html_depth(const Query& query);
-/// Returns the TRIM() select item if present and valid.
-/// MUST return nullptr when trimming is not enabled.
-/// Inputs are Query objects; outputs are optional item pointers.
-const Query::SelectItem* find_trim_item(const Query& query);
 /// Computes TFIDF term scores per node for TFIDF() queries.
 /// MUST return rows with term score dictionaries for each matched node.
 std::vector<QueryResultRow> build_tfidf_rows(const Query& query,

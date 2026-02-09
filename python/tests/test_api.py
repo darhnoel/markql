@@ -5,6 +5,28 @@ import pytest
 import xsql
 
 
+def _supports_project() -> bool:
+    doc = xsql.load("<table><tbody><tr><td>2025</td></tr></tbody></table>")
+    try:
+        xsql.execute(
+            "SELECT PROJECT(tr) AS (period: TEXT(td WHERE sibling_pos = 1)) "
+            "FROM document WHERE EXISTS(child WHERE tag = 'td')",
+            doc=doc,
+        )
+        return True
+    except RuntimeError:
+        return False
+
+
+def _supports_describe_language() -> bool:
+    doc = xsql.load("<html><body></body></html>")
+    try:
+        xsql.execute("DESCRIBE language", doc=doc)
+        return True
+    except RuntimeError:
+        return False
+
+
 def test_load_local_file_with_base_dir(tmp_path: pathlib.Path) -> None:
     # Load from an allowed base_dir to ensure safe local access.
     html_path = tmp_path / "sample.html"
@@ -66,6 +88,64 @@ def test_execute_examples() -> None:
     assert result.rows[0]["attributes"]["href"] == "x"
     count = xsql.execute("SELECT COUNT(a) FROM document", doc=doc)
     assert count.rows[0]["count"] == 2
+
+
+def test_execute_project_projection() -> None:
+    # PROJECT should expose computed alias columns through Python bindings.
+    if not _supports_project():
+        pytest.skip("native xsql._core module does not include PROJECT support yet")
+    doc = xsql.load(
+        "<table><tbody>"
+        "<tr><td>2025</td><td><a href='direct.pdf'>PDF</a></td></tr>"
+        "<tr><td>2024</td><td>Pending</td></tr>"
+        "</tbody></table>"
+    )
+    result = xsql.execute(
+        "SELECT tr.node_id, "
+        "PROJECT(tr) AS ("
+        "period: TEXT(td WHERE sibling_pos = 1),"
+        "pdf_direct: COALESCE("
+        "ATTR(a, href WHERE parent.sibling_pos = 2 AND href CONTAINS '.pdf'),"
+        "TEXT(td WHERE sibling_pos = 2)"
+        ")"
+        ") "
+        "FROM document "
+        "WHERE EXISTS(child WHERE tag = 'td')",
+        doc=doc,
+    )
+    assert result.columns == ["node_id", "period", "pdf_direct"]
+    assert len(result.rows) == 2
+    assert result.rows[0]["period"] == "2025"
+    assert result.rows[0]["pdf_direct"] == "direct.pdf"
+    assert result.rows[1]["period"] == "2024"
+    assert result.rows[1]["pdf_direct"] == "Pending"
+
+
+def test_execute_flatten_extract_alias_compatibility() -> None:
+    # FLATTEN_EXTRACT remains an alias for compatibility.
+    if not _supports_project():
+        pytest.skip("native xsql._core module does not include PROJECT support yet")
+    doc = xsql.load("<table><tbody><tr><td>2025</td></tr></tbody></table>")
+    result = xsql.execute(
+        "SELECT FLATTEN_EXTRACT(tr) AS (period: TEXT(td WHERE sibling_pos = 1)) "
+        "FROM document "
+        "WHERE EXISTS(child WHERE tag = 'td')",
+        doc=doc,
+    )
+    assert len(result.rows) == 1
+    assert result.rows[0]["period"] == "2025"
+
+
+def test_describe_language_lists_project() -> None:
+    # DESCRIBE language should include PROJECT as canonical function entry.
+    if not _supports_describe_language():
+        pytest.skip("native xsql._core module does not include DESCRIBE language yet")
+    doc = xsql.load("<html><body></body></html>")
+    result = xsql.execute("DESCRIBE language", doc=doc)
+    assert any(
+        row.get("category") == "function" and row.get("name") == "project"
+        for row in result.rows
+    )
 
 
 def test_summarize_output_shape() -> None:

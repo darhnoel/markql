@@ -19,6 +19,8 @@ class Parser {
   bool parse_select_list(std::vector<Query::SelectItem>& items);
   bool parse_exclude_list(std::vector<std::string>& fields);
   bool parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_field, bool& saw_tag_only);
+  bool parse_flatten_extract_expr(Query::SelectItem::FlattenExtractExpr& expr);
+  bool parse_flatten_extract_alias_expr_pairs(Query::SelectItem& item);
 
   bool parse_source(Source& src);
   bool parse_subquery(std::shared_ptr<Query>& out);

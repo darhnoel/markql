@@ -100,7 +100,7 @@ bool scan_descendant_filter(const Expr& expr,
 
 bool is_projection_query(const Query& query) {
   for (const auto& item : query.select_items) {
-    if (item.flatten_text || item.field.has_value() ||
+    if (item.flatten_text || item.flatten_extract || item.field.has_value() ||
         item.aggregate != Query::SelectItem::Aggregate::None) {
       return true;
     }
@@ -114,16 +114,24 @@ bool is_projection_query(const Query& query) {
 void validate_projection(const Query& query) {
   bool has_aggregate = false;
   bool has_summarize = false;
-  bool has_trim = false;
   bool has_flatten = false;
+  bool has_flatten_extract = false;
   const Query::SelectItem* flatten_item = nullptr;
+  const Query::SelectItem* flatten_extract_item = nullptr;
   for (const auto& item : query.select_items) {
     if (item.flatten_text) {
-      if (flatten_item != nullptr) {
-        throw std::runtime_error("FLATTEN_TEXT() supports a single instance per query");
+      if (flatten_item != nullptr || flatten_extract_item != nullptr) {
+        throw std::runtime_error("FLATTEN_TEXT()/PROJECT()/FLATTEN_EXTRACT() supports a single instance per query");
       }
       flatten_item = &item;
       has_flatten = true;
+    }
+    if (item.flatten_extract) {
+      if (flatten_item != nullptr || flatten_extract_item != nullptr) {
+        throw std::runtime_error("FLATTEN_TEXT()/PROJECT()/FLATTEN_EXTRACT() supports a single instance per query");
+      }
+      flatten_extract_item = &item;
+      has_flatten_extract = true;
     }
     if (item.aggregate != Query::SelectItem::Aggregate::None) {
       has_aggregate = true;
@@ -138,8 +146,8 @@ void validate_projection(const Query& query) {
   if (has_aggregate && !query.order_by.empty() && !has_summarize) {
     throw std::runtime_error("ORDER BY is not supported with aggregate queries");
   }
-  if (has_flatten && has_aggregate) {
-    throw std::runtime_error("FLATTEN_TEXT() cannot be combined with aggregates");
+  if ((has_flatten || has_flatten_extract) && has_aggregate) {
+    throw std::runtime_error("FLATTEN_TEXT()/PROJECT()/FLATTEN_EXTRACT() cannot be combined with aggregates");
   }
   if (has_flatten && query.where.has_value()) {
     size_t descendant_count = 0;
@@ -212,14 +220,22 @@ void validate_projection(const Query& query) {
         throw std::runtime_error("TO LIST() requires a single projected column");
       }
     }
+  } else if (has_flatten_extract && flatten_extract_item != nullptr) {
+    if (flatten_extract_item->flatten_extract_aliases.empty()) {
+      throw std::runtime_error("PROJECT()/FLATTEN_EXTRACT() requires AS (alias: expression, ...)");
+    }
+    if (flatten_extract_item->flatten_extract_aliases.size() !=
+        flatten_extract_item->flatten_extract_exprs.size()) {
+      throw std::runtime_error("PROJECT()/FLATTEN_EXTRACT() alias/expression count mismatch");
+    }
+    if (query.to_list) {
+      if (flatten_extract_item->flatten_extract_aliases.size() != 1 ||
+          query.select_items.size() != 1) {
+        throw std::runtime_error("TO LIST() requires a single projected column");
+      }
+    }
   } else if (query.to_list && query.select_items.size() != 1) {
     throw std::runtime_error("TO LIST() requires a single projected column");
-  }
-  for (const auto& item : query.select_items) {
-    if (item.trim) {
-      has_trim = true;
-      break;
-    }
   }
   bool has_text_function = false;
   bool has_inner_html_function = false;
@@ -236,14 +252,11 @@ void validate_projection(const Query& query) {
           "TEXT()/INNER_HTML()/RAW_INNER_HTML() requires a non-tag filter (e.g., attributes or parent)");
     }
   }
-  if (has_trim && query.select_items.size() != 1) {
-    throw std::runtime_error("TRIM() requires a single projected column");
-  }
   std::string tag;
   std::optional<size_t> inner_html_depth;
   std::optional<bool> inner_html_raw;
   for (const auto& item : query.select_items) {
-    if (!item.field.has_value() && !item.flatten_text) {
+    if (!item.field.has_value() && !item.flatten_text && !item.flatten_extract) {
       throw std::runtime_error("Cannot mix tag-only and projected fields in SELECT");
     }
     if (tag.empty()) {
@@ -251,7 +264,7 @@ void validate_projection(const Query& query) {
     } else if (tag != item.tag) {
       throw std::runtime_error("Projected fields must use a single tag");
     }
-    if (item.flatten_text) {
+    if (item.flatten_text || item.flatten_extract) {
       continue;
     }
     const std::string& field = *item.field;
@@ -345,6 +358,21 @@ void validate_qualifiers(const Query& query) {
   if (query.where.has_value()) {
     visit(*query.where);
   }
+  std::function<void(const Query::SelectItem::FlattenExtractExpr&)> visit_extract =
+      [&](const Query::SelectItem::FlattenExtractExpr& expr) {
+        if (expr.where.has_value()) {
+          visit(*expr.where);
+        }
+        for (const auto& arg : expr.args) {
+          visit_extract(arg);
+        }
+      };
+  for (const auto& item : query.select_items) {
+    if (!item.flatten_extract) continue;
+    for (const auto& expr : item.flatten_extract_exprs) {
+      visit_extract(expr);
+    }
+  }
 }
 
 /// Validates predicate operators against supported field kinds.
@@ -406,6 +434,21 @@ void validate_predicates(const Query& query) {
 
   if (query.where.has_value()) {
     visit(*query.where);
+  }
+  std::function<void(const Query::SelectItem::FlattenExtractExpr&)> visit_extract =
+      [&](const Query::SelectItem::FlattenExtractExpr& expr) {
+        if (expr.where.has_value()) {
+          visit(*expr.where);
+        }
+        for (const auto& arg : expr.args) {
+          visit_extract(arg);
+        }
+      };
+  for (const auto& item : query.select_items) {
+    if (!item.flatten_extract) continue;
+    for (const auto& expr : item.flatten_extract_exprs) {
+      visit_extract(expr);
+    }
   }
 }
 

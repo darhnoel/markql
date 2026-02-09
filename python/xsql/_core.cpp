@@ -21,6 +21,8 @@ py::object field_value(const xsql::QueryResultRow& row, const std::string& field
   if (field == "tag") return py::str(row.tag);
   if (field == "text") return py::str(row.text);
   if (field == "inner_html") return py::str(row.inner_html);
+  if (field == "max_depth") return py::int_(row.max_depth);
+  if (field == "doc_order") return py::int_(row.doc_order);
   if (field == "terms_score") {
     py::dict out;
     for (const auto& kv : row.term_scores) {
@@ -35,6 +37,8 @@ py::object field_value(const xsql::QueryResultRow& row, const std::string& field
   if (field == "sibling_pos") return py::int_(row.sibling_pos);
   if (field == "source_uri") return py::str(row.source_uri);
   if (field == "attributes") return attributes_to_dict(row.attributes);
+  auto computed = row.computed_fields.find(field);
+  if (computed != row.computed_fields.end()) return py::str(computed->second);
   auto it = row.attributes.find(field);
   if (it == row.attributes.end()) return py::none();
   return py::str(it->second);

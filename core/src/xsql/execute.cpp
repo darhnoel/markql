@@ -4,6 +4,7 @@
 #include <cctype>
 #include <stdexcept>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "../executor/executor_internal.h"
 #include "../executor.h"
@@ -30,6 +31,10 @@ struct DescendantTagFilter {
   std::vector<Predicate> predicates;
 };
 
+void collect_descendants_any_depth(const std::vector<std::vector<int64_t>>& children,
+                                   int64_t node_id,
+                                   std::vector<int64_t>& out);
+
 std::string normalize_flatten_text(const std::string& value) {
   std::string trimmed = util::trim_ws(value);
   std::string out;
@@ -47,6 +52,70 @@ std::string normalize_flatten_text(const std::string& value) {
     out.push_back(c);
   }
   return out;
+}
+
+void collect_row_scope_nodes(const std::vector<std::vector<int64_t>>& children,
+                             int64_t node_id,
+                             std::vector<int64_t>& out) {
+  out.push_back(node_id);
+  collect_descendants_any_depth(children, node_id, out);
+}
+
+std::string normalized_extract_text(const HtmlNode& node) {
+  std::string direct = xsql_internal::extract_direct_text_strict(node.inner_html);
+  std::string normalized = normalize_flatten_text(direct);
+  if (!normalized.empty()) return normalized;
+  direct = xsql_internal::extract_direct_text(node.inner_html);
+  normalized = normalize_flatten_text(direct);
+  if (!normalized.empty()) return normalized;
+  return normalize_flatten_text(node.text);
+}
+
+std::optional<std::string> eval_flatten_extract_expr(
+    const Query::SelectItem::FlattenExtractExpr& expr,
+    const HtmlNode& base_node,
+    const HtmlDocument& doc,
+    const std::vector<std::vector<int64_t>>& children) {
+  using ExtractKind = Query::SelectItem::FlattenExtractExpr::Kind;
+
+  if (expr.kind == ExtractKind::Coalesce) {
+    for (const auto& arg : expr.args) {
+      std::optional<std::string> value =
+          eval_flatten_extract_expr(arg, base_node, doc, children);
+      if (!value.has_value()) continue;
+      if (util::trim_ws(*value).empty()) continue;
+      return value;
+    }
+    return std::nullopt;
+  }
+
+  std::vector<int64_t> scope_nodes;
+  scope_nodes.reserve(32);
+  collect_row_scope_nodes(children, base_node.id, scope_nodes);
+  const std::string extract_tag = util::to_lower(expr.tag);
+
+  for (int64_t id : scope_nodes) {
+    const HtmlNode& node = doc.nodes.at(static_cast<size_t>(id));
+    if (node.tag != extract_tag) continue;
+    if (expr.where.has_value() &&
+        !executor_internal::eval_expr(*expr.where, doc, children, node)) {
+      continue;
+    }
+    if (expr.kind == ExtractKind::Text) {
+      std::string value = normalized_extract_text(node);
+      if (value.empty()) continue;
+      return value;
+    }
+    if (expr.kind == ExtractKind::Attr) {
+      if (!expr.attribute.has_value()) continue;
+      auto it = node.attributes.find(*expr.attribute);
+      if (it == node.attributes.end()) continue;
+      if (it->second.empty()) continue;
+      return it->second;
+    }
+  }
+
+  return std::nullopt;
 }
 
 void collect_descendants_at_depth(const std::vector<std::vector<int64_t>>& children,
@@ -246,6 +315,8 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
               {"raw_inner_html(tag[, depth])", "string", "Raw inner HTML without minification"},
               {"flatten_text(tag[, depth])", "string[]", "Flatten descendant text at depth into columns"},
               {"flatten(tag[, depth])", "string[]", "Alias of flatten_text"},
+              {"project(tag)", "mixed[]", "Evaluate named extraction expressions per row"},
+              {"flatten_extract(tag)", "mixed[]", "Compatibility alias of project(tag)"},
               {"trim(inner_html(...))", "string", "Trim whitespace in inner_html"},
               {"count(tag|*)", "int64", "Aggregate node count"},
               {"summarize(*)", "table<tag,count>", "Tag counts summary"},
@@ -333,6 +404,12 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
                "Raw inner HTML (no minify); requires WHERE"},
               {"function", "trim", "trim(text(...)) | trim(inner_html(...))",
                "Trim whitespace"},
+              {"function", "project",
+               "project(tag) AS (alias: expr, ...)",
+               "Expressions: TEXT(tag WHERE ...), ATTR(tag, attr WHERE ...), COALESCE(...)"},
+              {"function", "flatten_extract",
+               "flatten_extract(tag) AS (alias: expr, ...)",
+               "Expressions: TEXT(tag WHERE ...), ATTR(tag, attr WHERE ...), COALESCE(...)"},
               {"aggregate", "count", "count(tag|*)", "int64"},
               {"aggregate", "summarize", "summarize(*)", "tag counts table"},
               {"aggregate", "tfidf", "tfidf(tag|*)", "map<string,double>"},
@@ -525,11 +602,87 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
     return out;
   }
   const Query::SelectItem* flatten_item = nullptr;
+  const Query::SelectItem* flatten_extract_item = nullptr;
   for (const auto& item : query.select_items) {
     if (item.flatten_text) {
       flatten_item = &item;
-      break;
     }
+    if (item.flatten_extract) {
+      flatten_extract_item = &item;
+    }
+  }
+  if (flatten_extract_item != nullptr) {
+    auto children = xsql_internal::build_children(doc);
+    std::vector<int64_t> sibling_positions(doc.nodes.size(), 1);
+    for (size_t parent = 0; parent < children.size(); ++parent) {
+      const auto& kids = children[parent];
+      for (size_t idx = 0; idx < kids.size(); ++idx) {
+        sibling_positions.at(static_cast<size_t>(kids[idx])) = static_cast<int64_t>(idx + 1);
+      }
+    }
+    std::string base_tag = util::to_lower(flatten_extract_item->tag);
+    bool tag_is_alias = query.source.alias.has_value() &&
+                        util::to_lower(*query.source.alias) == base_tag;
+    bool match_all_tags = tag_is_alias || base_tag == "document";
+    struct FlattenExtractRow {
+      const HtmlNode* node = nullptr;
+      QueryResultRow row;
+    };
+    std::vector<FlattenExtractRow> rows;
+    rows.reserve(doc.nodes.size());
+    for (const auto& node : doc.nodes) {
+      if (!match_all_tags && node.tag != base_tag) {
+        continue;
+      }
+      if (query.where.has_value()) {
+        if (!executor_internal::eval_expr(*query.where, doc, children, node)) {
+          continue;
+        }
+      }
+      QueryResultRow row;
+      row.node_id = node.id;
+      row.tag = node.tag;
+      row.text = node.text;
+      row.inner_html = node.inner_html;
+      row.attributes = node.attributes;
+      row.source_uri = source_uri;
+      row.sibling_pos = sibling_positions.at(static_cast<size_t>(node.id));
+      row.max_depth = node.max_depth;
+      row.doc_order = node.doc_order;
+      row.parent_id = node.parent_id;
+
+      for (size_t i = 0; i < flatten_extract_item->flatten_extract_aliases.size(); ++i) {
+        const auto& alias = flatten_extract_item->flatten_extract_aliases[i];
+        const auto& expr = flatten_extract_item->flatten_extract_exprs[i];
+        std::optional<std::string> value =
+            eval_flatten_extract_expr(expr, node, doc, children);
+        if (!value.has_value()) continue;
+        row.computed_fields[alias] = *value;
+      }
+      rows.push_back(FlattenExtractRow{&node, std::move(row)});
+    }
+    if (!query.order_by.empty()) {
+      std::stable_sort(rows.begin(), rows.end(),
+                       [&](const auto& left, const auto& right) {
+                         for (const auto& order_by : query.order_by) {
+                           int cmp = executor_internal::compare_nodes(*left.node, *right.node, order_by.field);
+                           if (cmp == 0) continue;
+                           if (order_by.descending) {
+                             return cmp > 0;
+                           }
+                           return cmp < 0;
+                         }
+                         return false;
+                       });
+    }
+    if (query.limit.has_value() && rows.size() > *query.limit) {
+      rows.resize(*query.limit);
+    }
+    out.rows.reserve(rows.size());
+    for (auto& entry : rows) {
+      out.rows.push_back(std::move(entry.row));
+    }
+    return out;
   }
   if (flatten_item != nullptr) {
     auto children = xsql_internal::build_children(doc);
@@ -644,7 +797,14 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
     }
   }
   auto inner_html_depth = xsql_internal::find_inner_html_depth(query);
-  const Query::SelectItem* trim_item = xsql_internal::find_trim_item(query);
+  std::unordered_set<std::string> trim_fields;
+  trim_fields.reserve(query.select_items.size());
+  for (const auto& item : query.select_items) {
+    if (!item.trim || !item.field.has_value()) {
+      continue;
+    }
+    trim_fields.insert(*item.field);
+  }
   bool use_text_function = false;
   bool use_inner_html_function = false;
   bool use_raw_inner_html_function = false;
@@ -687,8 +847,7 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
     row.sibling_pos = sibling_positions.at(static_cast<size_t>(node.id));
     row.max_depth = node.max_depth;
     row.doc_order = node.doc_order;
-    if (trim_item != nullptr && trim_item->field.has_value()) {
-      const std::string& field = *trim_item->field;
+    for (const auto& field : trim_fields) {
       if (field == "text") {
         row.text = util::trim_ws(row.text);
       } else if (field == "inner_html") {
