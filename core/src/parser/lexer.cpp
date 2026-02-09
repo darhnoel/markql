@@ -17,6 +17,10 @@ Token Lexer::next() {
     ++pos_;
     return Token{TokenType::Comma, ",", pos_ - 1};
   }
+  if (c == ':') {
+    ++pos_;
+    return Token{TokenType::Colon, ":", pos_ - 1};
+  }
   if (c == '.') {
     ++pos_;
     return Token{TokenType::Dot, ".", pos_ - 1};
@@ -125,6 +129,7 @@ Token Lexer::lex_identifier_or_keyword() {
   if (upper == "NULL") return Token{TokenType::KeywordNull, out, start};
   if (upper == "SHOW") return Token{TokenType::KeywordShow, out, start};
   if (upper == "DESCRIBE") return Token{TokenType::KeywordDescribe, out, start};
+  if (upper == "PROJECT") return Token{TokenType::KeywordProject, out, start};
   if (upper == "INPUT") return Token{TokenType::KeywordInput, out, start};
   if (upper == "INPUTS") return Token{TokenType::KeywordInputs, out, start};
   if (upper == "FUNCTIONS") return Token{TokenType::KeywordFunctions, out, start};

@@ -83,6 +83,22 @@ void test_trim_inner_html() {
   }
 }
 
+void test_trim_mixed_with_other_projection() {
+  std::string html = "<table><tr><td class='keep'>  Value  </td></tr></table>";
+  auto result =
+      run_query(html, "SELECT trim(text(td)), td.node_id FROM document WHERE attributes.class = 'keep'");
+  expect_eq(result.columns.size(), 2, "trim mixed projection column count");
+  if (result.columns.size() == 2) {
+    expect_true(result.columns[0] == "text", "trim mixed first column");
+    expect_true(result.columns[1] == "node_id", "trim mixed second column");
+  }
+  expect_eq(result.rows.size(), 1, "trim mixed projection row count");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].text == "Value", "trim mixed projection trims text");
+    expect_true(result.rows[0].node_id > 0, "trim mixed projection preserves node_id");
+  }
+}
+
 void test_inner_html_minified_by_default() {
   std::string html = "<div id='root'><span>   hi   there  </span></div>";
   auto result = run_query(html, "SELECT inner_html(div) FROM document WHERE attributes.id = 'root'");
@@ -244,6 +260,7 @@ void register_function_tests(std::vector<TestCase>& tests) {
   tests.push_back({"minify_html_preserves_script_style", test_minify_html_preserves_script_style});
   tests.push_back({"inner_html_depth", test_inner_html_depth});
   tests.push_back({"trim_inner_html", test_trim_inner_html});
+  tests.push_back({"trim_mixed_with_other_projection", test_trim_mixed_with_other_projection});
   tests.push_back({"inner_html_minified_by_default", test_inner_html_minified_by_default});
   tests.push_back({"raw_inner_html_opt_out", test_raw_inner_html_opt_out});
   tests.push_back({"count_aggregate", test_count_aggregate});

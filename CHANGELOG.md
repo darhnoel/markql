@@ -10,11 +10,19 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 ### Added
 - Restored `EXISTS(axis [WHERE expr])` predicate support in parser, AST, executor, and validation.
 - Added predicate tests for `EXISTS(child)`, `EXISTS(child WHERE tag = ...)`, and same-node matching behavior.
+- Added `FLATTEN_EXTRACT(tag) AS (alias: expr, ...)` projection support with expression mapping:
+  `TEXT(tag WHERE ...)`, `ATTR(tag, attr WHERE ...)`, and `COALESCE(...)`.
+- Added dedicated `FLATTEN_EXTRACT` tests for extraction, `HAS_DIRECT_TEXT` predicate usage, and syntax validation.
+- Added reserved keyword `PROJECT` as the canonical syntax for structured extraction:
+  `PROJECT(tag) AS (alias: expr, ...)`.
 
 ### Changed
 - Updated CLI and tutorial docs to document `EXISTS(...)` syntax, supported axes (`self|parent|child|ancestor|descendant`), and inner `WHERE` semantics.
+- Updated docs and language metadata (`SHOW FUNCTIONS` / `DESCRIBE language`) to include `FLATTEN_EXTRACT` usage.
+- Updated docs and language metadata to prefer `PROJECT(...)`; `FLATTEN_EXTRACT(...)` remains a compatibility alias.
 - Rebranded user-facing CLI/documentation name to MarkQL while keeping internal `xsql` namespace and APIs unchanged.
 - REPL prompt is now `markql> `, and the default CLI binary output is now `markql` (with `xsql` compatibility binary still generated).
+- REPL history recall now places the cursor at end-of-line by default when navigating with Up/Down.
 
 ## [1.4.0] - 2026-02-07
 Includes major changes first landed between 2026-01-12 and 2026-02-07.

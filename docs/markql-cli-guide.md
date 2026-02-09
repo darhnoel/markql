@@ -185,6 +185,39 @@ Common mistakes:
 - `FLATTENT(...)` is invalid. Use `FLATTEN_TEXT(...)` or `FLATTEN(...)`.
 - If validation requires aliases, use `AS (col1, col2, ...)`.
 
+## PROJECT
+
+`PROJECT` is for stable field extraction per base row using expression mapping.
+
+Supported expression forms:
+- `TEXT(tag WHERE <predicate>)`
+- `ATTR(tag, attr WHERE <predicate>)`
+- `COALESCE(expr1, expr2, ...)`
+
+Example:
+```sql
+SELECT tr.node_id,
+PROJECT(tr) AS (
+  period: TEXT(td WHERE sibling_pos = 1),
+  pdf_direct: COALESCE(
+    ATTR(a, href WHERE parent.sibling_pos = 3 AND href CONTAINS '.pdf'),
+    TEXT(td WHERE sibling_pos = 3)
+  ),
+  excel_direct: COALESCE(
+    ATTR(a, href WHERE parent.sibling_pos = 5 AND href CONTAINS '.xlsx'),
+    TEXT(td WHERE sibling_pos = 5)
+  )
+)
+FROM doc
+WHERE EXISTS(child WHERE tag = 'td');
+```
+
+Notes:
+- `AS (...)` is required and must use `alias: expression`.
+- `COALESCE` returns the first non-empty extracted value.
+- Use `HAS_DIRECT_TEXT` as an operator (`td HAS_DIRECT_TEXT '2025'`), not as a field.
+- `FLATTEN_EXTRACT(...)` is kept as a compatibility alias.
+
 ## Output Modes
 
 ### TO LIST

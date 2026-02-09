@@ -55,10 +55,139 @@ bool Parser::parse_exclude_list(std::vector<std::string>& fields) {
   return set_error("Expected field name or list after EXCLUDE");
 }
 
+bool Parser::parse_flatten_extract_expr(Query::SelectItem::FlattenExtractExpr& expr) {
+  if (current_.type != TokenType::Identifier) {
+    return set_error("Expected TEXT(), ATTR(), or COALESCE() expression");
+  }
+  size_t start = current_.pos;
+  std::string fn = to_upper(current_.text);
+  advance();
+
+  if (fn == "TEXT") {
+    if (!consume(TokenType::LParen, "Expected ( after TEXT")) return false;
+    if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
+      return set_error("Expected tag identifier inside TEXT()");
+    }
+    expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::Text;
+    expr.tag = current_.text;
+    advance();
+    if (current_.type == TokenType::KeywordWhere) {
+      advance();
+      Expr where_expr;
+      if (!parse_expr(where_expr)) return false;
+      expr.where = where_expr;
+    }
+    if (!consume(TokenType::RParen, "Expected ) after TEXT expression")) return false;
+    expr.span = Span{start, current_.pos};
+    return true;
+  }
+
+  if (fn == "ATTR") {
+    if (!consume(TokenType::LParen, "Expected ( after ATTR")) return false;
+    if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
+      return set_error("Expected tag identifier inside ATTR()");
+    }
+    expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::Attr;
+    expr.tag = current_.text;
+    advance();
+    if (!consume(TokenType::Comma, "Expected , after tag in ATTR()")) return false;
+    if (current_.type != TokenType::Identifier) {
+      return set_error("Expected attribute identifier in ATTR()");
+    }
+    expr.attribute = to_lower(current_.text);
+    advance();
+    if (current_.type == TokenType::KeywordWhere) {
+      advance();
+      Expr where_expr;
+      if (!parse_expr(where_expr)) return false;
+      expr.where = where_expr;
+    }
+    if (!consume(TokenType::RParen, "Expected ) after ATTR expression")) return false;
+    expr.span = Span{start, current_.pos};
+    return true;
+  }
+
+  if (fn == "COALESCE") {
+    if (!consume(TokenType::LParen, "Expected ( after COALESCE")) return false;
+    expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::Coalesce;
+    Query::SelectItem::FlattenExtractExpr arg;
+    if (!parse_flatten_extract_expr(arg)) return false;
+    expr.args.push_back(std::move(arg));
+    while (current_.type == TokenType::Comma) {
+      advance();
+      Query::SelectItem::FlattenExtractExpr next_arg;
+      if (!parse_flatten_extract_expr(next_arg)) return false;
+      expr.args.push_back(std::move(next_arg));
+    }
+    if (expr.args.size() < 2) {
+      return set_error("COALESCE() requires at least two expressions");
+    }
+    if (!consume(TokenType::RParen, "Expected ) after COALESCE expression")) return false;
+    expr.span = Span{start, current_.pos};
+    return true;
+  }
+
+  return set_error("Expected TEXT(), ATTR(), or COALESCE() expression");
+}
+
+bool Parser::parse_flatten_extract_alias_expr_pairs(Query::SelectItem& item) {
+  if (current_.type != TokenType::Identifier) {
+    return set_error("Expected alias: expression inside PROJECT/FLATTEN_EXTRACT AS (...)");
+  }
+  while (true) {
+    if (current_.type != TokenType::Identifier) {
+      return set_error("Expected alias identifier in PROJECT/FLATTEN_EXTRACT AS (...)");
+    }
+    item.flatten_extract_aliases.push_back(current_.text);
+    advance();
+    if (!consume(TokenType::Colon, "Expected : after alias in PROJECT/FLATTEN_EXTRACT AS (...)")) {
+      return false;
+    }
+    Query::SelectItem::FlattenExtractExpr expr;
+    if (!parse_flatten_extract_expr(expr)) return false;
+    item.flatten_extract_exprs.push_back(std::move(expr));
+    if (current_.type == TokenType::Comma) {
+      advance();
+      continue;
+    }
+    if (current_.type == TokenType::RParen) {
+      advance();
+      break;
+    }
+    return set_error("Expected , or ) after PROJECT/FLATTEN_EXTRACT expression");
+  }
+  return true;
+}
+
 /// Parses a single select item including functions and aggregates.
 /// MUST set saw_field/saw_tag_only consistently for validation.
 /// Inputs are tokens; outputs are select items or errors.
 bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_field, bool& saw_tag_only) {
+  if (current_.type == TokenType::KeywordProject ||
+      (current_.type == TokenType::Identifier &&
+       to_upper(current_.text) == "FLATTEN_EXTRACT")) {
+      Query::SelectItem item;
+      item.flatten_extract = true;
+      size_t start = current_.pos;
+      advance();
+      if (!consume(TokenType::LParen, "Expected ( after PROJECT/FLATTEN_EXTRACT")) return false;
+      if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
+        return set_error("Expected base tag identifier inside PROJECT()/FLATTEN_EXTRACT()");
+      }
+      item.tag = current_.text;
+      advance();
+      if (!consume(TokenType::RParen, "Expected ) after PROJECT/FLATTEN_EXTRACT argument")) return false;
+      if (current_.type != TokenType::KeywordAs) {
+        return set_error("PROJECT()/FLATTEN_EXTRACT() requires AS (alias: expression, ...)");
+      }
+      advance();
+      if (!consume(TokenType::LParen, "Expected ( after AS")) return false;
+      if (!parse_flatten_extract_alias_expr_pairs(item)) return false;
+      item.span = Span{start, current_.pos};
+      items.push_back(item);
+      saw_field = true;
+      return true;
+  }
   if (current_.type == TokenType::Identifier) {
     std::string fn = to_upper(current_.text);
     if (fn != "FLATTEN_TEXT" && fn != "FLATTEN") {

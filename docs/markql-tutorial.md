@@ -406,6 +406,38 @@ SELECT FLATTEN(div) FROM doc;
 
 This is valid in the current parser and returns one column named `flatten_text`.
 
+**Structured row extraction with `PROJECT`**
+
+Use `PROJECT` when positional flattening is too fragile and you want explicit field mapping.
+
+Supported expression forms:
+- `TEXT(tag WHERE <predicate>)`
+- `ATTR(tag, attr WHERE <predicate>)`
+- `COALESCE(expr1, expr2, ...)`
+
+Example:
+```sql
+SELECT tr.node_id,
+PROJECT(tr) AS (
+  period: TEXT(td WHERE sibling_pos = 1),
+  pdf_direct: COALESCE(
+    ATTR(a, href WHERE parent.sibling_pos = 3 AND href CONTAINS '.pdf'),
+    TEXT(td WHERE sibling_pos = 3)
+  ),
+  pdf_layover: COALESCE(
+    ATTR(a, href WHERE parent.sibling_pos = 4 AND href CONTAINS '.pdf'),
+    TEXT(td WHERE sibling_pos = 4)
+  )
+)
+FROM doc
+WHERE EXISTS(child WHERE tag = 'td');
+```
+
+Important syntax details:
+- `AS (...)` is required and must use `alias: expression`.
+- `HAS_DIRECT_TEXT` is an operator form (`td HAS_DIRECT_TEXT '2025'`), not a projected field.
+- `FLATTEN_EXTRACT(...)` is supported as a compatibility alias.
+
 **Recipe: flatten generic values (FLATTEN)**
 ```sql
 SELECT FLATTEN(div) AS (value)
