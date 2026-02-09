@@ -1,6 +1,7 @@
 #include "line_editor.h"
 
 #include <iostream>
+#include <sys/select.h>
 #include <unistd.h>
 #include "repl/ui/autocomplete.h"
 #include "repl/ui/render.h"
@@ -11,12 +12,58 @@ namespace xsql::cli {
 
 namespace {
 
+struct LineSpan {
+  size_t start = 0;
+  size_t end = 0;
+};
+
+LineSpan first_line_span(const std::string& text) {
+  size_t end = text.find('\n');
+  if (end == std::string::npos) end = text.size();
+  return LineSpan{0, end};
+}
+
+LineSpan last_line_span(const std::string& text) {
+  size_t start = text.rfind('\n');
+  start = (start == std::string::npos) ? 0 : start + 1;
+  return LineSpan{start, text.size()};
+}
+
+size_t map_cursor_by_line_proportion(const std::string& from_text,
+                                     size_t from_cursor,
+                                     LineSpan from_span,
+                                     const std::string& to_text,
+                                     LineSpan to_span) {
+  if (from_cursor < from_span.start) from_cursor = from_span.start;
+  if (from_cursor > from_span.end) from_cursor = from_span.end;
+  size_t from_col = column_width(from_text, from_span.start, from_cursor);
+  size_t from_len = column_width(from_text, from_span.start, from_span.end);
+  size_t to_len = column_width(to_text, to_span.start, to_span.end);
+  size_t to_col = proportional_column(from_col, from_len, to_len);
+  return column_to_index(to_text, to_span.start, to_span.end, to_col);
+}
+
+bool read_byte_with_timeout(char* out, int timeout_ms) {
+  if (!out) return false;
+  fd_set readfds;
+  FD_ZERO(&readfds);
+  FD_SET(STDIN_FILENO, &readfds);
+  timeval tv{};
+  tv.tv_sec = timeout_ms / 1000;
+  tv.tv_usec = (timeout_ms % 1000) * 1000;
+  int ready = select(STDIN_FILENO + 1, &readfds, nullptr, nullptr, &tv);
+  if (ready <= 0) return false;
+  return ::read(STDIN_FILENO, out, 1) > 0;
+}
+
 }  // namespace
 
 LineEditor::LineEditor(size_t max_history, std::string prompt, size_t prompt_len)
     : history_(max_history),
       prompt_(std::move(prompt)),
       prompt_len_(prompt_len),
+      normal_prompt_(prompt_),
+      normal_prompt_len_(prompt_len_),
       cont_prompt_(""),
       cont_prompt_len_(0),
       completer_(std::make_unique<AutoCompleter>()) {}
@@ -24,8 +71,12 @@ LineEditor::LineEditor(size_t max_history, std::string prompt, size_t prompt_len
 LineEditor::~LineEditor() = default;
 
 void LineEditor::set_prompt(std::string prompt, size_t prompt_len) {
-  prompt_ = std::move(prompt);
-  prompt_len_ = prompt_len;
+  normal_prompt_ = std::move(prompt);
+  normal_prompt_len_ = prompt_len;
+  if (editor_mode_ == EditorMode::Normal) {
+    prompt_ = normal_prompt_;
+    prompt_len_ = normal_prompt_len_;
+  }
 }
 
 void LineEditor::set_cont_prompt(std::string prompt, size_t prompt_len) {
@@ -35,6 +86,33 @@ void LineEditor::set_cont_prompt(std::string prompt, size_t prompt_len) {
 
 void LineEditor::set_keyword_color(bool enabled) {
   keyword_color_ = enabled;
+}
+
+void LineEditor::set_mode_prompts(std::string vim_normal_prompt,
+                                  size_t vim_normal_prompt_len,
+                                  std::string vim_insert_prompt,
+                                  size_t vim_insert_prompt_len) {
+  vim_normal_prompt_ = std::move(vim_normal_prompt);
+  vim_normal_prompt_len_ = vim_normal_prompt_len;
+  vim_insert_prompt_ = std::move(vim_insert_prompt);
+  vim_insert_prompt_len_ = vim_insert_prompt_len;
+}
+
+void LineEditor::set_editor_mode(EditorMode mode) {
+  editor_mode_ = mode;
+  vim_insert_mode_ = true;
+  if (editor_mode_ == EditorMode::Normal) {
+    prompt_ = normal_prompt_;
+    prompt_len_ = normal_prompt_len_;
+    return;
+  }
+  if (!vim_insert_prompt_.empty()) {
+    prompt_ = vim_insert_prompt_;
+    prompt_len_ = vim_insert_prompt_len_;
+    return;
+  }
+  prompt_ = normal_prompt_;
+  prompt_len_ = normal_prompt_len_;
 }
 
 void LineEditor::reset_render_state() {
@@ -56,12 +134,235 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
   std::string buffer = initial;
   size_t cursor = buffer.size();
   history_.reset_navigation();
-  redraw_line(buffer, cursor);
 
   bool paste_mode = false;
   std::string paste_buffer;
   std::string utf8_pending;
   size_t utf8_expected = 0;
+  if (editor_mode_ == EditorMode::Vim) {
+    vim_insert_mode_ = true;
+  } else {
+    vim_insert_mode_ = false;
+  }
+
+  auto current_line_start = [&]() -> size_t {
+    size_t line_start = buffer.rfind('\n', cursor > 0 ? cursor - 1 : 0);
+    return (line_start == std::string::npos) ? 0 : line_start + 1;
+  };
+
+  auto current_line_end = [&]() -> size_t {
+    size_t line_start = current_line_start();
+    size_t line_end = buffer.find('\n', line_start);
+    return (line_end == std::string::npos) ? buffer.size() : line_end;
+  };
+
+  auto apply_mode_prompt = [&]() {
+    if (editor_mode_ == EditorMode::Normal) {
+      prompt_ = normal_prompt_;
+      prompt_len_ = normal_prompt_len_;
+      return;
+    }
+    if (vim_insert_mode_) {
+      if (!vim_insert_prompt_.empty()) {
+        prompt_ = vim_insert_prompt_;
+        prompt_len_ = vim_insert_prompt_len_;
+      } else {
+        prompt_ = normal_prompt_;
+        prompt_len_ = normal_prompt_len_;
+      }
+      return;
+    }
+    if (!vim_normal_prompt_.empty()) {
+      prompt_ = vim_normal_prompt_;
+      prompt_len_ = vim_normal_prompt_len_;
+    } else {
+      prompt_ = normal_prompt_;
+      prompt_len_ = normal_prompt_len_;
+    }
+  };
+
+  auto move_up = [&]() {
+    if (buffer.find('\n') != std::string::npos) {
+      size_t line_start = buffer.rfind('\n', cursor > 0 ? cursor - 1 : 0);
+      size_t current_line_start = (line_start == std::string::npos) ? 0 : line_start + 1;
+      if (current_line_start == 0) {
+        std::string from_buffer = buffer;
+        size_t from_cursor = cursor;
+        LineSpan from_span = first_line_span(from_buffer);
+        if (!history_.empty() && history_.prev(buffer)) {
+          LineSpan to_span = first_line_span(buffer);
+          cursor = map_cursor_by_line_proportion(
+              from_buffer, from_cursor, from_span, buffer, to_span);
+          redraw_line(buffer, cursor);
+        }
+        return;
+      }
+      size_t prev_line_end = current_line_start - 1;
+      size_t prev_line_start = buffer.rfind('\n', prev_line_end > 0 ? prev_line_end - 1 : 0);
+      prev_line_start = (prev_line_start == std::string::npos) ? 0 : prev_line_start + 1;
+      size_t col = column_width(buffer, current_line_start, cursor);
+      size_t current_line_end_pos = buffer.find('\n', current_line_start);
+      if (current_line_end_pos == std::string::npos) current_line_end_pos = buffer.size();
+      size_t current_len = column_width(buffer, current_line_start, current_line_end_pos);
+      size_t prev_len = column_width(buffer, prev_line_start, prev_line_end);
+      cursor = column_to_index(buffer,
+                               prev_line_start,
+                               prev_line_end,
+                               proportional_column(col, current_len, prev_len));
+      redraw_line(buffer, cursor);
+    } else if (!history_.empty()) {
+      std::string from_buffer = buffer;
+      size_t from_cursor = cursor;
+      LineSpan from_span = first_line_span(from_buffer);
+      if (history_.prev(buffer)) {
+        LineSpan to_span = first_line_span(buffer);
+        cursor = map_cursor_by_line_proportion(
+            from_buffer, from_cursor, from_span, buffer, to_span);
+        redraw_line(buffer, cursor);
+      }
+    }
+  };
+
+  auto move_down = [&]() {
+    if (buffer.find('\n') != std::string::npos) {
+      size_t line_start = buffer.rfind('\n', cursor > 0 ? cursor - 1 : 0);
+      size_t current_line_start = (line_start == std::string::npos) ? 0 : line_start + 1;
+      size_t line_end = buffer.find('\n', current_line_start);
+      if (line_end == std::string::npos) {
+        std::string from_buffer = buffer;
+        size_t from_cursor = cursor;
+        LineSpan from_span = last_line_span(from_buffer);
+        if (history_.next(buffer)) {
+          LineSpan to_span = last_line_span(buffer);
+          cursor = map_cursor_by_line_proportion(
+              from_buffer, from_cursor, from_span, buffer, to_span);
+          redraw_line(buffer, cursor);
+        }
+        return;
+      }
+      size_t next_line_start = line_end + 1;
+      size_t next_line_end = buffer.find('\n', next_line_start);
+      if (next_line_end == std::string::npos) {
+        next_line_end = buffer.size();
+      }
+      size_t col = column_width(buffer, current_line_start, cursor);
+      size_t current_len = column_width(buffer, current_line_start, line_end);
+      size_t next_len = column_width(buffer, next_line_start, next_line_end);
+      cursor = column_to_index(buffer,
+                               next_line_start,
+                               next_line_end,
+                               proportional_column(col, current_len, next_len));
+      redraw_line(buffer, cursor);
+    } else if (!history_.empty()) {
+      std::string from_buffer = buffer;
+      size_t from_cursor = cursor;
+      LineSpan from_span = first_line_span(from_buffer);
+      if (history_.next(buffer)) {
+        LineSpan to_span = first_line_span(buffer);
+        cursor = map_cursor_by_line_proportion(
+            from_buffer, from_cursor, from_span, buffer, to_span);
+        redraw_line(buffer, cursor);
+      }
+    }
+  };
+
+  auto enter_insert_mode = [&]() {
+    editor_mode_ = EditorMode::Vim;
+    vim_insert_mode_ = true;
+    apply_mode_prompt();
+    redraw_line(buffer, cursor);
+  };
+
+  auto enter_vim_normal_mode = [&]() {
+    editor_mode_ = EditorMode::Vim;
+    vim_insert_mode_ = false;
+    apply_mode_prompt();
+    redraw_line(buffer, cursor);
+  };
+
+  auto enter_normal_mode = [&]() {
+    editor_mode_ = EditorMode::Normal;
+    vim_insert_mode_ = false;
+    apply_mode_prompt();
+    redraw_line(buffer, cursor);
+  };
+
+  auto handle_vim_normal_key = [&](char key) {
+    switch (key) {
+      case 'h':
+        if (cursor > 0) {
+          cursor = prev_codepoint_start(buffer, cursor);
+          redraw_line(buffer, cursor);
+        }
+        break;
+      case 'l':
+        if (cursor < buffer.size()) {
+          cursor = next_codepoint_start(buffer, cursor);
+          redraw_line(buffer, cursor);
+        }
+        break;
+      case 'k':
+        move_up();
+        break;
+      case 'j':
+        move_down();
+        break;
+      case '0':
+        cursor = current_line_start();
+        redraw_line(buffer, cursor);
+        break;
+      case '$':
+        cursor = current_line_end();
+        redraw_line(buffer, cursor);
+        break;
+      case 'i':
+        enter_insert_mode();
+        break;
+      case 'a':
+        if (cursor < buffer.size()) {
+          cursor = next_codepoint_start(buffer, cursor);
+        }
+        enter_insert_mode();
+        break;
+      case 'I':
+        cursor = current_line_start();
+        enter_insert_mode();
+        break;
+      case 'A':
+        cursor = current_line_end();
+        enter_insert_mode();
+        break;
+      case 'o': {
+        if (buffer.empty()) {
+          enter_insert_mode();
+          break;
+        }
+        size_t line_end = current_line_end();
+        size_t insert_pos = (line_end < buffer.size()) ? line_end + 1 : line_end;
+        buffer.insert(buffer.begin() + static_cast<long>(insert_pos), '\n');
+        cursor = insert_pos + 1;
+        enter_insert_mode();
+        break;
+      }
+      case 'O': {
+        if (buffer.empty()) {
+          enter_insert_mode();
+          break;
+        }
+        size_t line_start = current_line_start();
+        buffer.insert(buffer.begin() + static_cast<long>(line_start), '\n');
+        cursor = line_start;
+        enter_insert_mode();
+        break;
+      }
+      default:
+        break;
+    }
+  };
+
+  apply_mode_prompt();
+  redraw_line(buffer, cursor);
+
   while (true) {
     char c = 0;
     ssize_t n = ::read(STDIN_FILENO, &c, 1);
@@ -104,6 +405,12 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
       std::cout << std::endl;
       out = buffer;
       return true;
+    }
+
+    if (editor_mode_ == EditorMode::Vim && !vim_insert_mode_ && c != 27) {
+      flush_utf8_pending();
+      handle_vim_normal_key(c);
+      continue;
     }
 
     if (c == 127 || c == 8) {
@@ -158,14 +465,33 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
     if (c == 27) {
       flush_utf8_pending();
       char seq[6] = {0, 0, 0, 0, 0, 0};
-      if (::read(STDIN_FILENO, &seq[0], 1) <= 0) continue;
-      if (::read(STDIN_FILENO, &seq[1], 1) <= 0) continue;
+      if (!read_byte_with_timeout(&seq[0], 25) || !read_byte_with_timeout(&seq[1], 25)) {
+        if (editor_mode_ == EditorMode::Normal) {
+          enter_vim_normal_mode();
+        } else if (vim_insert_mode_) {
+          enter_vim_normal_mode();
+        } else {
+          enter_normal_mode();
+        }
+        continue;
+      }
       if (seq[0] == '[') {
+        if (seq[1] == '3') {
+          if (!read_byte_with_timeout(&seq[2], 25)) continue;
+          if (seq[2] == '~') {
+            if (cursor < buffer.size()) {
+              size_t next = next_codepoint_start(buffer, cursor);
+              buffer.erase(cursor, next - cursor);
+              redraw_line(buffer, cursor);
+            }
+            continue;
+          }
+        }
         if (seq[1] == '2') {
-          if (::read(STDIN_FILENO, &seq[2], 1) <= 0) continue;
-          if (::read(STDIN_FILENO, &seq[3], 1) <= 0) continue;
+          if (!read_byte_with_timeout(&seq[2], 25)) continue;
+          if (!read_byte_with_timeout(&seq[3], 25)) continue;
           if (seq[2] == '0' && seq[3] == '0') {
-            if (::read(STDIN_FILENO, &seq[4], 1) <= 0) continue;
+            if (!read_byte_with_timeout(&seq[4], 25)) continue;
             if (seq[4] == '~') {
               paste_mode = true;
               paste_buffer.clear();
@@ -173,7 +499,7 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
             }
           }
           if (seq[2] == '0' && seq[3] == '1') {
-            if (::read(STDIN_FILENO, &seq[4], 1) <= 0) continue;
+            if (!read_byte_with_timeout(&seq[4], 25)) continue;
             if (seq[4] == '~') {
               paste_mode = false;
               for (char pc : paste_buffer) {
@@ -187,60 +513,11 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
           }
         }
         if (seq[1] == 'A') {
-          if (buffer.find('\n') != std::string::npos) {
-            size_t line_start = buffer.rfind('\n', cursor > 0 ? cursor - 1 : 0);
-            size_t current_line_start = (line_start == std::string::npos) ? 0 : line_start + 1;
-            if (current_line_start == 0) {
-              if (!history_.empty() && history_.prev(buffer)) {
-                cursor = buffer.size();
-                redraw_line(buffer, cursor);
-              }
-              continue;
-            }
-            size_t prev_line_end = current_line_start - 1;
-            size_t prev_line_start = buffer.rfind('\n', prev_line_end > 0 ? prev_line_end - 1 : 0);
-            prev_line_start = (prev_line_start == std::string::npos) ? 0 : prev_line_start + 1;
-            size_t col = column_width(buffer, current_line_start, cursor);
-            size_t prev_len = column_width(buffer, prev_line_start, prev_line_end);
-            cursor = column_to_index(buffer,
-                                     prev_line_start,
-                                     prev_line_end,
-                                     std::min(col, prev_len));
-            redraw_line(buffer, cursor);
-          } else if (!history_.empty() && history_.prev(buffer)) {
-            cursor = buffer.size();
-            redraw_line(buffer, cursor);
-          }
+          move_up();
           continue;
         }
         if (seq[1] == 'B') {
-          if (buffer.find('\n') != std::string::npos) {
-            size_t line_start = buffer.rfind('\n', cursor > 0 ? cursor - 1 : 0);
-            size_t current_line_start = (line_start == std::string::npos) ? 0 : line_start + 1;
-            size_t line_end = buffer.find('\n', current_line_start);
-            if (line_end == std::string::npos) {
-              if (history_.next(buffer)) {
-                cursor = buffer.size();
-                redraw_line(buffer, cursor);
-              }
-              continue;
-            }
-            size_t next_line_start = line_end + 1;
-            size_t next_line_end = buffer.find('\n', next_line_start);
-            if (next_line_end == std::string::npos) {
-              next_line_end = buffer.size();
-            }
-            size_t col = column_width(buffer, current_line_start, cursor);
-            size_t next_len = column_width(buffer, next_line_start, next_line_end);
-            cursor = column_to_index(buffer,
-                                     next_line_start,
-                                     next_line_end,
-                                     std::min(col, next_len));
-            redraw_line(buffer, cursor);
-          } else if (history_.next(buffer)) {
-            cursor = buffer.size();
-            redraw_line(buffer, cursor);
-          }
+          move_down();
           continue;
         }
         if (seq[1] == 'C') {

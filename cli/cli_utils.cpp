@@ -338,7 +338,7 @@ std::string load_html_input(const std::string& input, int timeout_ms) {
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_to_string);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buffer);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, timeout_ms);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "xsql/0.1");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "markql/0.1");
     CURLcode res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
       curl_easy_cleanup(curl);
@@ -410,7 +410,9 @@ std::string sanitize_pasted_line(std::string line) {
     if (!chunk.empty() && chunk.back() == '\r') {
       chunk.pop_back();
     }
-    if (chunk.rfind("xsql> ", 0) == 0) {
+    if (chunk.rfind("markql> ", 0) == 0) {
+      chunk = chunk.substr(8);
+    } else if (chunk.rfind("xsql> ", 0) == 0) {
       chunk = chunk.substr(6);
     } else if (chunk.rfind("> ", 0) == 0) {
       chunk = chunk.substr(2);

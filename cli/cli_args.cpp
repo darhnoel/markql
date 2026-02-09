@@ -8,39 +8,41 @@ namespace xsql::cli {
 /// MUST keep examples aligned with current CLI and MUST not throw on stream errors.
 /// Inputs are the output stream; side effects are writing text to stdout/stderr.
 void print_startup_help(std::ostream& os) {
-  os << "xsql - XSQL command line interface\n\n";
+  os << "markql - MarkQL command line interface\n\n";
   os << "Usage:\n";
-  os << "  xsql --query <query> [--input <path>]\n";
-  os << "  xsql --query-file <file> [--input <path>]\n";
-  os << "  xsql --interactive [--input <path>]\n";
-  os << "  xsql --mode duckbox|json|plain\n";
-  os << "  xsql --display_mode more|less\n";
-  os << "  xsql --highlight on|off\n";
-  os << "  xsql --timeout-ms <n>\n";
-  os << "  xsql --color=disabled\n\n";
+  os << "  markql --query <query> [--input <path>]\n";
+  os << "  markql --query-file <file> [--input <path>]\n";
+  os << "  markql --interactive [--input <path>]\n";
+  os << "  markql --mode duckbox|json|plain\n";
+  os << "  markql --display_mode more|less\n";
+  os << "  markql --highlight on|off\n";
+  os << "  markql --timeout-ms <n>\n";
+  os << "  markql --color=disabled\n\n";
   os << "Notes:\n";
+  os << "  - Legacy `xsql` binary name is still available for compatibility.\n";
   os << "  - If --input is omitted, HTML is read from stdin.\n";
   os << "  - URLs are supported when libcurl is available.\n";
   os << "  - TO LIST() outputs a JSON list for a single projected column.\n";
   os << "  - TO TABLE() extracts HTML tables into rows.\n\n";
   os << "Examples:\n";
-  os << "  xsql --query \"SELECT table FROM doc\" --input ./data/index.html\n";
-  os << "  xsql --query \"SELECT link.href FROM doc WHERE attributes.rel = 'preload' TO LIST()\" --input ./data/index.html\n";
-  os << "  xsql --interactive --input ./data/index.html\n";
+  os << "  markql --query \"SELECT table FROM doc\" --input ./data/index.html\n";
+  os << "  markql --query \"SELECT link.href FROM doc WHERE attributes.rel = 'preload' TO LIST()\" --input ./data/index.html\n";
+  os << "  markql --interactive --input ./data/index.html\n";
 }
 
 /// Prints the explicit help requested by --help.
 /// MUST stay synchronized with supported flags and MUST not throw on stream errors.
 /// Inputs are the output stream; side effects are writing text to stdout/stderr.
 void print_help(std::ostream& os) {
-  os << "Usage: xsql --query <query> [--input <path>]\n";
-  os << "       xsql --query-file <file> [--input <path>]\n";
-  os << "       xsql --interactive [--input <path>]\n";
-  os << "       xsql --mode duckbox|json|plain\n";
-  os << "       xsql --display_mode more|less\n";
-  os << "       xsql --highlight on|off\n";
-  os << "       xsql --timeout-ms <n>\n";
-  os << "       xsql --color=disabled\n";
+  os << "Usage: markql --query <query> [--input <path>]\n";
+  os << "       markql --query-file <file> [--input <path>]\n";
+  os << "       markql --interactive [--input <path>]\n";
+  os << "       markql --mode duckbox|json|plain\n";
+  os << "       markql --display_mode more|less\n";
+  os << "       markql --highlight on|off\n";
+  os << "       markql --timeout-ms <n>\n";
+  os << "       markql --color=disabled\n";
+  os << "Legacy `xsql` command name remains available.\n";
   os << "If --input is omitted, HTML is read from stdin.\n";
   os << "Use TO CSV('file.csv') or TO PARQUET('file.parquet') in queries to export.\n";
 }

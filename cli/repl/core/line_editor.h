@@ -16,6 +16,8 @@ class AutoCompleter;
 /// Inputs are keystrokes; outputs are completed lines with terminal side effects.
 class LineEditor {
  public:
+  enum class EditorMode { Normal, Vim };
+
   /// Constructs the editor with initial prompt and history capacity.
   /// MUST keep prompt_len consistent with visible prompt width.
   /// Inputs are history size/prompt; side effects include terminal state changes.
@@ -37,6 +39,16 @@ class LineEditor {
   /// MUST be false when output is not a TTY to avoid escape noise.
   /// Inputs are a boolean; side effects are ANSI-colored output.
   void set_keyword_color(bool enabled);
+  /// Sets mode-specific prompts used in Vim mode.
+  /// Inputs are visible prompt strings and their visible widths.
+  void set_mode_prompts(std::string vim_normal_prompt,
+                        size_t vim_normal_prompt_len,
+                        std::string vim_insert_prompt,
+                        size_t vim_insert_prompt_len);
+  /// Sets editing behavior style.
+  /// `Normal` keeps the existing non-modal editing behavior.
+  /// `Vim` enables modal navigation/edit commands.
+  void set_editor_mode(EditorMode mode);
   /// Resets render bookkeeping after printing external output.
   /// MUST be called after writes that disturb the cursor position.
   /// Inputs are none; side effects are internal state resets only.
@@ -67,11 +79,19 @@ class LineEditor {
   History history_;
   std::string prompt_;
   size_t prompt_len_ = 0;
+  std::string normal_prompt_;
+  size_t normal_prompt_len_ = 0;
+  std::string vim_normal_prompt_;
+  size_t vim_normal_prompt_len_ = 0;
+  std::string vim_insert_prompt_;
+  size_t vim_insert_prompt_len_ = 0;
   std::string cont_prompt_;
   size_t cont_prompt_len_ = 0;
   int last_render_lines_ = 1;
   int last_cursor_line_ = 0;
   bool keyword_color_ = false;
+  EditorMode editor_mode_ = EditorMode::Normal;
+  bool vim_insert_mode_ = true;
 
   std::unique_ptr<AutoCompleter> completer_;
 };

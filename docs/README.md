@@ -1,14 +1,20 @@
-# Docs: Syntax Diagrams
+# MarkQL Docs
 
-This folder contains auto-generated railroad diagrams for the XSQL grammar.
+- Tutorial: [markql-tutorial.md](markql-tutorial.md)
+- CLI guide: [markql-cli-guide.md](markql-cli-guide.md)
+- Changelog: [../CHANGELOG.md](../CHANGELOG.md)
 
-How to generate:
-1. Install the docs dependencies:
-   `python3 -m pip install -r docs/requirements.txt`
-2. Run the generator:
-   `python3 docs/generate_diagrams.py`
-   (or `./docs/build_diagrams.sh`)
+## Syntax Diagrams
 
-Output:
-- SVGs are written to `docs/diagrams/`.
-- The top-level README links to these SVGs.
+This folder also contains auto-generated railroad diagrams for the MarkQL grammar.
+
+Generate them with:
+
+```bash
+python3 -m pip install -r docs/requirements.txt
+python3 docs/generate_diagrams.py
+# or
+./docs/build_diagrams.sh
+```
+
+Output files are written to `docs/diagrams/`.

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
-project(xsql LANGUAGES CXX)
+project(markql VERSION 1.4.0 LANGUAGES CXX)
 
-option(XSQL_BUILD_CLI "Build the xsql CLI" ON)
+option(XSQL_BUILD_CLI "Build the MarkQL CLI" ON)
 option(XSQL_BUILD_TESTS "Build tests" ON)
 option(XSQL_BUILD_PYTHON "Build the Python module" OFF)
 option(XSQL_BUILD_AGENT "Build the localhost xsql-agent service" ON)
@@ -170,6 +170,15 @@ if (XSQL_BUILD_CLI)
     target_link_libraries(xsql PRIVATE ${XSQL_ARROW_TARGET} ${XSQL_PARQUET_TARGET})
     target_compile_definitions(xsql PRIVATE XSQL_USE_ARROW)
   endif()
+  set_target_properties(xsql PROPERTIES OUTPUT_NAME markql)
+  add_custom_command(
+    TARGET xsql
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:xsql>"
+            "$<TARGET_FILE_DIR:xsql>/xsql${CMAKE_EXECUTABLE_SUFFIX}"
+    COMMENT "Creating compatibility binary: xsql -> markql"
+  )
 endif()
 
 if (XSQL_BUILD_TESTS)
@@ -232,6 +241,22 @@ if (XSQL_BUILD_TESTS)
     target_link_libraries(xsql_tests PRIVATE ${XSQL_ARROW_TARGET} ${XSQL_PARQUET_TARGET})
     target_compile_definitions(xsql_tests PRIVATE XSQL_USE_ARROW)
   endif()
+  add_executable(xsql_bench_inner_html tests/bench_inner_html.cpp)
+  target_link_libraries(xsql_bench_inner_html PRIVATE xsql_core)
+  target_include_directories(xsql_bench_inner_html PRIVATE core/include)
+  if (XSQL_ARROW_TARGET AND XSQL_PARQUET_TARGET)
+    target_link_libraries(xsql_bench_inner_html PRIVATE ${XSQL_ARROW_TARGET} ${XSQL_PARQUET_TARGET})
+    target_compile_definitions(xsql_bench_inner_html PRIVATE XSQL_USE_ARROW)
+  endif()
+  set_target_properties(xsql_bench_inner_html PROPERTIES OUTPUT_NAME markql_bench_inner_html)
+  add_custom_command(
+    TARGET xsql_bench_inner_html
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:xsql_bench_inner_html>"
+            "$<TARGET_FILE_DIR:xsql_bench_inner_html>/xsql_bench_inner_html${CMAKE_EXECUTABLE_SUFFIX}"
+    COMMENT "Creating compatibility binary: xsql_bench_inner_html -> markql_bench_inner_html"
+  )
   set(XSQL_TESTS
     select_ul_by_id
     class_in_matches_token
@@ -247,8 +272,14 @@ if (XSQL_BUILD_TESTS)
     projection_tag_field_list
     projection_sibling_pos
     inner_html_function
+    minify_html_basic
+    minify_html_preserves_attribute_quotes
+    minify_html_preserves_protected_tags
+    minify_html_preserves_script_style
     inner_html_depth
     trim_inner_html
+    inner_html_minified_by_default
+    raw_inner_html_opt_out
     child_axis_direct_only
     ancestor_filter_on_a
     limit
@@ -287,6 +318,9 @@ if (XSQL_BUILD_TESTS)
     sibling_pos_filter
     has_direct_text
     parenthesized_predicates
+    exists_child_any
+    exists_child_tag
+    exists_child_same_node
     duckbox_basic_table
     duckbox_truncate_cells
     duckbox_maxrows_truncate
@@ -318,6 +352,9 @@ if (XSQL_BUILD_TESTS)
     count_table_rows_header
     count_table_rows_no_header
     count_result_rows
+    proportional_column_end_maps_to_end
+    proportional_column_scales_middle
+    proportional_column_zero_source_len
   )
   if (XSQL_ENABLE_KHMER_NUMBER)
     list(APPEND XSQL_TESTS

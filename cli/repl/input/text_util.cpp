@@ -124,4 +124,13 @@ size_t column_width(const std::string& text, size_t start, size_t end) {
   return col;
 }
 
+size_t proportional_column(size_t source_col, size_t source_len, size_t target_len) {
+  if (source_col == 0) return 0;
+  if (source_len == 0) return std::min(source_col, target_len);
+  if (source_col >= source_len) return target_len;
+  // WHY: preserve relative cursor intent when line lengths differ in history navigation.
+  size_t mapped = (source_col * target_len + source_len / 2) / source_len;
+  return std::min(mapped, target_len);
+}
+
 }  // namespace xsql::cli

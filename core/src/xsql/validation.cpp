@@ -19,6 +19,12 @@ bool has_non_tag_self_predicate(const Expr& expr) {
     if (cmp.op == CompareExpr::Op::HasDirectText) return true;
     return !(cmp.lhs.axis == Operand::Axis::Self && cmp.lhs.field_kind == Operand::FieldKind::Tag);
   }
+  if (std::holds_alternative<std::shared_ptr<ExistsExpr>>(expr)) {
+    const auto& exists = *std::get<std::shared_ptr<ExistsExpr>>(expr);
+    if (exists.axis != Operand::Axis::Self) return true;
+    if (!exists.where.has_value()) return false;
+    return has_non_tag_self_predicate(*exists.where);
+  }
   const auto& bin = *std::get<std::shared_ptr<BinaryExpr>>(expr);
   return has_non_tag_self_predicate(bin.left) || has_non_tag_self_predicate(bin.right);
 }
@@ -76,6 +82,9 @@ bool scan_descendant_filter(const Expr& expr,
       }
       return true;
     }
+    return false;
+  }
+  if (std::holds_alternative<std::shared_ptr<ExistsExpr>>(expr)) {
     return false;
   }
   const auto& bin = *std::get<std::shared_ptr<BinaryExpr>>(expr);
@@ -219,11 +228,12 @@ void validate_projection(const Query& query) {
     if (item.inner_html_function) has_inner_html_function = true;
   }
   if ((has_text_function || has_inner_html_function) && !query.where.has_value()) {
-    throw std::runtime_error("TEXT()/INNER_HTML() requires a WHERE clause");
+    throw std::runtime_error("TEXT()/INNER_HTML()/RAW_INNER_HTML() requires a WHERE clause");
   }
   if (has_text_function || has_inner_html_function) {
     if (!query.where.has_value() || !has_non_tag_self_predicate(*query.where)) {
-      throw std::runtime_error("TEXT()/INNER_HTML() requires a non-tag filter (e.g., attributes or parent)");
+      throw std::runtime_error(
+          "TEXT()/INNER_HTML()/RAW_INNER_HTML() requires a non-tag filter (e.g., attributes or parent)");
     }
   }
   if (has_trim && query.select_items.size() != 1) {
@@ -231,6 +241,7 @@ void validate_projection(const Query& query) {
   }
   std::string tag;
   std::optional<size_t> inner_html_depth;
+  std::optional<bool> inner_html_raw;
   for (const auto& item : query.select_items) {
     if (!item.field.has_value() && !item.flatten_text) {
       throw std::runtime_error("Cannot mix tag-only and projected fields in SELECT");
@@ -254,6 +265,10 @@ void validate_projection(const Query& query) {
       throw std::runtime_error("TRIM() does not support attributes or sibling_pos");
     }
     if (field == "inner_html") {
+      if (inner_html_raw.has_value() && *inner_html_raw != item.raw_inner_html_function) {
+        throw std::runtime_error("INNER_HTML() and RAW_INNER_HTML() cannot be mixed in one SELECT");
+      }
+      inner_html_raw = item.raw_inner_html_function;
       if (item.inner_html_depth.has_value()) {
         if (inner_html_depth.has_value() && *inner_html_depth != *item.inner_html_depth) {
           throw std::runtime_error("inner_html() depth must be consistent");
@@ -315,6 +330,13 @@ void validate_qualifiers(const Query& query) {
       }
       return;
     }
+    if (std::holds_alternative<std::shared_ptr<ExistsExpr>>(expr)) {
+      const auto& exists = *std::get<std::shared_ptr<ExistsExpr>>(expr);
+      if (exists.where.has_value()) {
+        visit(*exists.where);
+      }
+      return;
+    }
     const auto& bin = *std::get<std::shared_ptr<BinaryExpr>>(expr);
     visit(bin.left);
     visit(bin.right);
@@ -367,6 +389,13 @@ void validate_predicates(const Query& query) {
             throw std::runtime_error("Regex pattern exceeds maximum length");
           }
         }
+      }
+      return;
+    }
+    if (std::holds_alternative<std::shared_ptr<ExistsExpr>>(expr)) {
+      const auto& exists = *std::get<std::shared_ptr<ExistsExpr>>(expr);
+      if (exists.where.has_value()) {
+        visit(*exists.where);
       }
       return;
     }

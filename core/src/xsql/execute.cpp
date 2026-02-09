@@ -94,6 +94,9 @@ bool collect_descendant_tag_filter(const Expr& expr, DescendantTagFilter& filter
     }
     return false;
   }
+  if (std::holds_alternative<std::shared_ptr<ExistsExpr>>(expr)) {
+    return false;
+  }
   const auto& bin = *std::get<std::shared_ptr<BinaryExpr>>(expr);
   bool left = collect_descendant_tag_filter(bin.left, filter);
   bool right = collect_descendant_tag_filter(bin.right, filter);
@@ -239,7 +242,8 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
           {"function", "returns", "description"},
           {
               {"text(tag)", "string", "Text content of a tag"},
-              {"inner_html(tag[, depth])", "string", "HTML inside a tag"},
+              {"inner_html(tag[, depth])", "string", "Minified HTML inside a tag"},
+              {"raw_inner_html(tag[, depth])", "string", "Raw inner HTML without minification"},
               {"flatten_text(tag[, depth])", "string[]", "Flatten descendant text at depth into columns"},
               {"flatten(tag[, depth])", "string[]", "Alias of flatten_text"},
               {"trim(inner_html(...))", "string", "Trim whitespace in inner_html"},
@@ -324,7 +328,9 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
               {"field", "source_uri", "source_uri", "Hidden unless multi-source"},
               {"function", "text", "text(tag)", "Direct text content; requires WHERE"},
               {"function", "inner_html", "inner_html(tag[, depth])",
-               "Inner HTML; requires WHERE"},
+               "Minified inner HTML; requires WHERE"},
+              {"function", "raw_inner_html", "raw_inner_html(tag[, depth])",
+               "Raw inner HTML (no minify); requires WHERE"},
               {"function", "trim", "trim(text(...)) | trim(inner_html(...))",
                "Trim whitespace"},
               {"aggregate", "count", "count(tag|*)", "int64"},
@@ -334,6 +340,7 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
               {"axis", "child", "child.<field>", "Direct child"},
               {"axis", "ancestor", "ancestor.<field>", "Any ancestor"},
               {"axis", "descendant", "descendant.<field>", "Any descendant"},
+              {"predicate", "exists", "EXISTS(axis [WHERE expr])", "Existential axis predicate"},
               {"operator", "=", "lhs = rhs", "Equality"},
               {"operator", "<>", "lhs <> rhs", "Not equal"},
               {"operator", "IN", "lhs IN ('a','b')", "Membership"},
@@ -640,12 +647,16 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
   const Query::SelectItem* trim_item = xsql_internal::find_trim_item(query);
   bool use_text_function = false;
   bool use_inner_html_function = false;
+  bool use_raw_inner_html_function = false;
   for (const auto& item : query.select_items) {
     if (item.field.has_value() && *item.field == "text" && item.text_function) {
       use_text_function = true;
     }
     if (item.field.has_value() && *item.field == "inner_html" && item.inner_html_function) {
       use_inner_html_function = true;
+      if (item.raw_inner_html_function) {
+        use_raw_inner_html_function = true;
+      }
     }
   }
   std::optional<size_t> effective_inner_html_depth = inner_html_depth;
@@ -668,6 +679,9 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
     row.inner_html = effective_inner_html_depth.has_value()
                          ? xsql_internal::limit_inner_html(node.inner_html, *effective_inner_html_depth)
                          : node.inner_html;
+    if (use_inner_html_function && !use_raw_inner_html_function) {
+      row.inner_html = util::minify_html(row.inner_html);
+    }
     row.attributes = node.attributes;
     row.source_uri = source_uri;
     row.sibling_pos = sibling_positions.at(static_cast<size_t>(node.id));
