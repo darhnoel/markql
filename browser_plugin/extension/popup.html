@@ -3,16 +3,16 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>XSQL Browser Plugin</title>
+    <title>MarkQL Browser Plugin</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
     <main class="app">
       <section class="panel">
-        <h1>XSQL Browser Plugin</h1>
+        <h1>MarkQL Browser Plugin</h1>
         <label class="field">
           <span>Agent Token</span>
-          <input id="tokenInput" type="password" placeholder="Paste token from xsql-agent terminal" />
+          <input id="tokenInput" type="password" placeholder="Paste token from MarkQL agent terminal" />
         </label>
         <button id="saveTokenBtn" class="secondary">Save Token</button>
         <p id="tokenHelp" class="hint"></p>
@@ -25,8 +25,18 @@
           <label><input type="radio" name="scope" value="full" /> Full Page</label>
         </div>
         <label class="field">
-          <span>XSQL Query</span>
-          <textarea id="queryInput" rows="7" spellcheck="false" placeholder="SELECT a.href FROM document WHERE href CONTAINS 'http'"></textarea>
+          <span>MarkQL Query</span>
+          <div class="sql-editor">
+            <div
+              id="queryInput"
+              class="query-editor"
+              contenteditable="true"
+              spellcheck="false"
+              role="textbox"
+              aria-multiline="true"
+              data-placeholder="SELECT a.href FROM document WHERE href CONTAINS 'http'"
+            ></div>
+          </div>
         </label>
         <div class="inline-fields">
           <label class="field compact">

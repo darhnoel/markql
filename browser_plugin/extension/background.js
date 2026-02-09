@@ -19,12 +19,23 @@ function sendMessageToTab(tabId, message) {
 
 async function captureSnapshot(tabId, scope) {
   await ensureContentScript(tabId);
-  const response = await sendMessageToTab(tabId, { type: "xsql_capture", scope });
+  const response = await sendMessageToTab(tabId, { type: "markql_capture", scope });
   if (!response || !response.ok || typeof response.html !== "string") {
     throw new Error(response && response.error ? response.error : "Failed to capture page snapshot");
   }
   return response;
 }
+
+chrome.action.onClicked.addListener(async (tab) => {
+  if (!chrome.sidePanel || !chrome.sidePanel.open || !tab || typeof tab.id !== "number") {
+    return;
+  }
+  try {
+    await chrome.sidePanel.open({ tabId: tab.id });
+  } catch (err) {
+    console.warn("Failed to open side panel:", err);
+  }
+});
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!message || message.type !== "captureSnapshot") {

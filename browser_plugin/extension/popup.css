@@ -15,8 +15,8 @@
 
 body {
   margin: 0;
-  min-width: 760px;
-  min-height: 560px;
+  min-width: 320px;
+  min-height: 100vh;
   font-family: "Segoe UI", "Helvetica Neue", sans-serif;
   background: linear-gradient(140deg, #f4f6f8, #ecf2f5);
   color: var(--text);
@@ -52,6 +52,13 @@ h1 {
   color: var(--muted);
 }
 
+.sql-editor {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+  overflow: hidden;
+}
+
 .inline-fields {
   display: flex;
   gap: 10px;
@@ -62,13 +69,11 @@ h1 {
 }
 
 input,
-textarea,
 button {
   font: inherit;
 }
 
-input,
-textarea {
+input {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 7px;
@@ -76,8 +81,75 @@ textarea {
   background: #fff;
 }
 
-textarea {
-  resize: vertical;
+#queryInput {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  width: 100%;
+  min-height: 152px;
+  padding: 10px 12px;
+  font-family: "JetBrains Mono", "Fira Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  tab-size: 2;
+  overflow: auto;
+  outline: none;
+}
+
+#queryInput {
+  background: #f6f8fa;
+  color: #1f2328;
+  caret-color: #1f2328;
+  cursor: text;
+}
+
+#queryInput * {
+  cursor: text;
+}
+
+#queryInput::selection,
+#queryInput *::selection {
+  background: #d9e2f2;
+  color: #1f2328;
+}
+
+#queryInput:focus {
+  box-shadow: inset 0 0 0 1px #8cb9ff;
+}
+
+#queryInput:empty::before {
+  content: attr(data-placeholder);
+  color: #8a8f98;
+  pointer-events: none;
+}
+
+.sql-kw {
+  color: #c2185b;
+  font-weight: 600;
+}
+
+.sql-fn {
+  color: #1565c0;
+}
+
+.sql-str {
+  color: #827717;
+}
+
+.sql-num {
+  color: #6a1b9a;
+}
+
+.sql-op {
+  color: #ef6c00;
+}
+
+.sql-comment {
+  color: #7b8088;
+  font-style: italic;
 }
 
 .row {

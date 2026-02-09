@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "XSQL Browser Plugin",
+  "name": "MarkQL Browser Plugin",
   "version": "0.1.0",
-  "description": "Capture rendered DOM HTML and run XSQL queries via local xsql-agent.",
+  "description": "Capture rendered DOM HTML and run MarkQL queries via local MarkQL agent.",
   "permissions": [
     "activeTab",
     "scripting",
-    "storage"
+    "storage",
+    "sidePanel"
   ],
   "host_permissions": [
     "http://127.0.0.1:7337/*"
@@ -14,8 +15,10 @@
   "background": {
     "service_worker": "background.js"
   },
+  "side_panel": {
+    "default_path": "popup.html"
+  },
   "action": {
-    "default_title": "XSQL Browser Plugin",
-    "default_popup": "popup.html"
+    "default_title": "MarkQL Browser Plugin"
   }
 }
