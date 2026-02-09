@@ -1,8 +1,8 @@
 (() => {
-  if (window.__xsqlContentCaptureInstalled) {
+  if (window.__markqlContentCaptureInstalled) {
     return;
   }
-  window.__xsqlContentCaptureInstalled = true;
+  window.__markqlContentCaptureInstalled = true;
 
   function textLen(el) {
     if (!el || !el.textContent) return 0;
@@ -62,7 +62,7 @@
   }
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (!message || message.type !== "xsql_capture") {
+    if (!message || (message.type !== "markql_capture" && message.type !== "xsql_capture")) {
       return;
     }
     try {

@@ -1,10 +1,23 @@
 const AGENT_URL = "http://127.0.0.1:7337/v1/query";
-const STORAGE_KEY_TOKEN = "xsqlAgentToken";
-const STORAGE_KEY_QUERY = "xsqlLastQuery";
-const STORAGE_KEY_SNAPSHOT = "xsqlSnapshotHtml";
+const STORAGE_KEY_TOKEN = "markqlAgentToken";
+const STORAGE_KEY_QUERY = "markqlLastQuery";
+const STORAGE_KEY_SNAPSHOT = "markqlSnapshotHtml";
+const LEGACY_STORAGE_KEY_TOKEN = "xsqlAgentToken";
+const LEGACY_STORAGE_KEY_QUERY = "xsqlLastQuery";
+const LEGACY_STORAGE_KEY_SNAPSHOT = "xsqlSnapshotHtml";
 
 let snapshotHtml = "";
 let lastResult = null;
+const SQL_KEYWORDS = new Set([
+  "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "AS", "LIMIT",
+  "ORDER", "BY", "ASC", "DESC", "EXISTS", "IS", "NULL", "CONTAINS",
+  "ANY", "ALL", "TO", "TABLE", "LIST", "RAW", "FRAGMENTS", "ON", "OFF"
+]);
+const SQL_FUNCTIONS = new Set([
+  "TEXT", "INNER_HTML", "RAW_INNER_HTML", "FLATTEN", "FLATTEN_TEXT",
+  "PROJECT", "FLATTEN_EXTRACT", "COALESCE", "ATTR", "COUNT", "SUMMARIZE",
+  "TFIDF", "TRIM", "HAS_DIRECT_TEXT"
+]);
 
 const ui = {
   tokenInput: document.getElementById("tokenInput"),
@@ -21,6 +34,186 @@ const ui = {
   resultsHead: document.querySelector("#resultsTable thead"),
   resultsBody: document.querySelector("#resultsTable tbody")
 };
+
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function highlightSql(query) {
+  let i = 0;
+  const out = [];
+
+  const pushToken = (cls, text) => {
+    out.push(`<span class="${cls}">${escapeHtml(text)}</span>`);
+  };
+
+  while (i < query.length) {
+    const ch = query[i];
+
+    if (ch === "-" && query[i + 1] === "-") {
+      let j = i + 2;
+      while (j < query.length && query[j] !== "\n") j += 1;
+      pushToken("sql-comment", query.slice(i, j));
+      i = j;
+      continue;
+    }
+
+    if (ch === "/" && query[i + 1] === "*") {
+      let j = i + 2;
+      while (j + 1 < query.length && !(query[j] === "*" && query[j + 1] === "/")) j += 1;
+      j = Math.min(query.length, j + 2);
+      pushToken("sql-comment", query.slice(i, j));
+      i = j;
+      continue;
+    }
+
+    if (ch === "'") {
+      let j = i + 1;
+      while (j < query.length) {
+        if (query[j] === "'") {
+          if (query[j + 1] === "'") {
+            j += 2;
+            continue;
+          }
+          j += 1;
+          break;
+        }
+        j += 1;
+      }
+      pushToken("sql-str", query.slice(i, j));
+      i = j;
+      continue;
+    }
+
+    if (/\s/.test(ch)) {
+      out.push(escapeHtml(ch));
+      i += 1;
+      continue;
+    }
+
+    if ("(),.;".includes(ch)) {
+      pushToken("sql-op", ch);
+      i += 1;
+      continue;
+    }
+
+    if (/[<>~=:+\-*/]/.test(ch)) {
+      let j = i + 1;
+      while (j < query.length && /[<>~=:+\-*/]/.test(query[j])) j += 1;
+      pushToken("sql-op", query.slice(i, j));
+      i = j;
+      continue;
+    }
+
+    if (/[0-9]/.test(ch)) {
+      let j = i + 1;
+      while (j < query.length && /[0-9.]/.test(query[j])) j += 1;
+      pushToken("sql-num", query.slice(i, j));
+      i = j;
+      continue;
+    }
+
+    if (/[A-Za-z_]/.test(ch)) {
+      let j = i + 1;
+      while (j < query.length && /[A-Za-z0-9_]/.test(query[j])) j += 1;
+      const word = query.slice(i, j);
+      const upper = word.toUpperCase();
+      if (SQL_KEYWORDS.has(upper)) {
+        pushToken("sql-kw", word);
+      } else if (SQL_FUNCTIONS.has(upper)) {
+        pushToken("sql-fn", word);
+      } else {
+        out.push(escapeHtml(word));
+      }
+      i = j;
+      continue;
+    }
+
+    out.push(escapeHtml(ch));
+    i += 1;
+  }
+
+  return out.join("");
+}
+
+function getQueryText() {
+  if (!ui.queryInput) return "";
+  return ui.queryInput.textContent || "";
+}
+
+function setQueryText(text) {
+  ui.queryInput.textContent = text || "";
+}
+
+function getCaretOffset(container) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return 0;
+  const range = selection.getRangeAt(0);
+  if (!container.contains(range.endContainer)) return getQueryText().length;
+  const before = range.cloneRange();
+  before.selectNodeContents(container);
+  before.setEnd(range.endContainer, range.endOffset);
+  return before.toString().length;
+}
+
+function setCaretOffset(container, offset) {
+  const selection = window.getSelection();
+  if (!selection) return;
+
+  const range = document.createRange();
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  let remaining = Math.max(0, offset);
+  let node = walker.nextNode();
+  while (node) {
+    const length = node.nodeValue.length;
+    if (remaining <= length) {
+      range.setStart(node, remaining);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      return;
+    }
+    remaining -= length;
+    node = walker.nextNode();
+  }
+
+  range.selectNodeContents(container);
+  range.collapse(false);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function renderQueryHighlight(preserveCaret = false) {
+  if (!ui.queryInput) return;
+  const query = getQueryText();
+  const caret = preserveCaret ? getCaretOffset(ui.queryInput) : 0;
+  ui.queryInput.innerHTML = highlightSql(query);
+  if (!query) {
+    ui.queryInput.innerHTML = "";
+  }
+  if (preserveCaret) {
+    setCaretOffset(ui.queryInput, caret);
+  }
+}
+
+function insertAtCaret(text) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) {
+    ui.queryInput.append(document.createTextNode(text));
+    return;
+  }
+  const range = selection.getRangeAt(0);
+  range.deleteContents();
+  const node = document.createTextNode(text);
+  range.insertNode(node);
+  range.setStartAfter(node);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
 
 function selectedScope() {
   const selected = document.querySelector("input[name='scope']:checked");
@@ -132,13 +325,13 @@ function getTokenOrExplain() {
     ui.tokenHelp.textContent = "";
     return token;
   }
-  ui.tokenHelp.textContent = "Start xsql-agent and copy token from terminal output.";
+  ui.tokenHelp.textContent = "Start MarkQL agent and copy token from terminal output.";
   throw new Error("Missing token");
 }
 
 async function runQuery() {
   const token = getTokenOrExplain();
-  const query = ui.queryInput.value.trim();
+  const query = getQueryText().trim();
   if (!query) {
     throw new Error("Query is required");
   }
@@ -197,7 +390,7 @@ async function saveToken() {
   const token = ui.tokenInput.value.trim();
   await chrome.storage.local.set({ [STORAGE_KEY_TOKEN]: token });
   if (!token) {
-    ui.tokenHelp.textContent = "Start xsql-agent and copy token from terminal output.";
+    ui.tokenHelp.textContent = "Start MarkQL agent and copy token from terminal output.";
     return;
   }
   ui.tokenHelp.textContent = "Token saved.";
@@ -205,18 +398,37 @@ async function saveToken() {
 }
 
 async function restoreSettings() {
-  const localData = await chrome.storage.local.get([STORAGE_KEY_TOKEN, STORAGE_KEY_QUERY]);
-  const token = localData[STORAGE_KEY_TOKEN];
-  const query = localData[STORAGE_KEY_QUERY];
+  const localData = await chrome.storage.local.get([
+    STORAGE_KEY_TOKEN,
+    STORAGE_KEY_QUERY,
+    LEGACY_STORAGE_KEY_TOKEN,
+    LEGACY_STORAGE_KEY_QUERY
+  ]);
+  const token = localData[STORAGE_KEY_TOKEN] || localData[LEGACY_STORAGE_KEY_TOKEN];
+  const query = localData[STORAGE_KEY_QUERY] || localData[LEGACY_STORAGE_KEY_QUERY];
 
   if (typeof token === "string") {
     ui.tokenInput.value = token;
+    if (localData[STORAGE_KEY_TOKEN] !== token) {
+      await chrome.storage.local.set({ [STORAGE_KEY_TOKEN]: token });
+    }
   }
   if (typeof query === "string") {
-    ui.queryInput.value = query;
+    setQueryText(query);
+    if (localData[STORAGE_KEY_QUERY] !== query) {
+      await chrome.storage.local.set({ [STORAGE_KEY_QUERY]: query });
+    }
   }
 
   snapshotHtml = await restoreSnapshotFromSession();
+  if (!snapshotHtml && chrome.storage.session) {
+    const legacySnapshotData = await chrome.storage.session.get([LEGACY_STORAGE_KEY_SNAPSHOT]);
+    const legacySnapshot = legacySnapshotData[LEGACY_STORAGE_KEY_SNAPSHOT];
+    if (typeof legacySnapshot === "string" && legacySnapshot) {
+      snapshotHtml = legacySnapshot;
+      await saveSnapshotToSession(snapshotHtml);
+    }
+  }
   if (snapshotHtml) {
     status(`Restored cached snapshot (${snapshotHtml.length} bytes).`);
   } else {
@@ -224,8 +436,9 @@ async function restoreSettings() {
   }
 
   if (!ui.tokenInput.value.trim()) {
-    ui.tokenHelp.textContent = "Start xsql-agent and copy token from terminal output.";
+    ui.tokenHelp.textContent = "Start MarkQL agent and copy token from terminal output.";
   }
+  renderQueryHighlight();
 }
 
 async function guarded(action) {
@@ -250,7 +463,23 @@ ui.captureBtn.addEventListener("click", () => guarded(() => captureSnapshot(fals
 ui.recaptureBtn.addEventListener("click", () => guarded(() => captureSnapshot(true)));
 ui.runBtn.addEventListener("click", () => guarded(runQuery));
 ui.copyCsvBtn.addEventListener("click", () => guarded(copyCsv));
-
+ui.queryInput.addEventListener("input", () => renderQueryHighlight(true));
+ui.queryInput.addEventListener("keydown", (event) => {
+  if (event.key === "Tab") {
+    event.preventDefault();
+    insertAtCaret("  ");
+    renderQueryHighlight(true);
+  }
+});
+ui.queryInput.addEventListener("paste", (event) => {
+  event.preventDefault();
+  const text = event.clipboardData ? event.clipboardData.getData("text/plain") : "";
+  if (text) {
+    insertAtCaret(text);
+    renderQueryHighlight(true);
+  }
+});
+renderQueryHighlight();
 restoreSettings().catch((err) => {
   status(`Error: ${err && err.message ? err.message : String(err)}`);
 });
