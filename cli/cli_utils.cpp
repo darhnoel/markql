@@ -809,6 +809,8 @@ std::string render_table_duckbox(const xsql::QueryResult::TableResult& table,
 std::string export_kind_label(xsql::QueryResult::ExportSink::Kind kind) {
   if (kind == xsql::QueryResult::ExportSink::Kind::Csv) return "CSV";
   if (kind == xsql::QueryResult::ExportSink::Kind::Parquet) return "Parquet";
+  if (kind == xsql::QueryResult::ExportSink::Kind::Json) return "JSON";
+  if (kind == xsql::QueryResult::ExportSink::Kind::Ndjson) return "NDJSON";
   return "Export";
 }
 

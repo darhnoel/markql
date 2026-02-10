@@ -145,25 +145,37 @@ bool Parser::parse_query_body(Query& q) {
       }
       if (!consume(TokenType::RParen, "Expected ) after TABLE(")) return false;
       q.to_table = true;
-    } else if (current_.type == TokenType::KeywordCsv || current_.type == TokenType::KeywordParquet) {
+    } else if (current_.type == TokenType::KeywordCsv ||
+               current_.type == TokenType::KeywordParquet ||
+               current_.type == TokenType::KeywordJson ||
+               current_.type == TokenType::KeywordNdjson) {
       Query::ExportSink sink;
       sink.kind = (current_.type == TokenType::KeywordCsv)
                       ? Query::ExportSink::Kind::Csv
-                      : Query::ExportSink::Kind::Parquet;
+                      : (current_.type == TokenType::KeywordParquet)
+                            ? Query::ExportSink::Kind::Parquet
+                            : (current_.type == TokenType::KeywordJson)
+                                  ? Query::ExportSink::Kind::Json
+                                  : Query::ExportSink::Kind::Ndjson;
       size_t start = current_.pos;
       advance();
       if (!consume(TokenType::LParen, "Expected ( after export target")) return false;
-      if (current_.type != TokenType::String) {
+      if (current_.type == TokenType::String) {
+        sink.path = current_.text;
+        sink.span = Span{start, current_.pos + current_.text.size()};
+        advance();
+      } else if (sink.kind == Query::ExportSink::Kind::Csv ||
+                 sink.kind == Query::ExportSink::Kind::Parquet) {
         set_error("Expected string literal path inside export target");
         return false;
+      } else {
+        sink.path.clear();
+        sink.span = Span{start, current_.pos};
       }
-      sink.path = current_.text;
-      sink.span = Span{start, current_.pos + current_.text.size()};
-      advance();
       if (!consume(TokenType::RParen, "Expected ) after export path")) return false;
       q.export_sink = sink;
     } else {
-      set_error("Expected LIST, TABLE, CSV, or PARQUET after TO");
+      set_error("Expected LIST, TABLE, CSV, PARQUET, JSON, or NDJSON after TO");
       return false;
     }
   }

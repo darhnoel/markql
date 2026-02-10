@@ -44,7 +44,8 @@ void print_help(std::ostream& os) {
   os << "       markql --color=disabled\n";
   os << "Legacy `xsql` command name remains available.\n";
   os << "If --input is omitted, HTML is read from stdin.\n";
-  os << "Use TO CSV('file.csv') or TO PARQUET('file.parquet') in queries to export.\n";
+  os << "Use TO CSV('file.csv'), TO PARQUET('file.parquet'), TO JSON('file.json'), or\n"
+        "TO NDJSON('file.ndjson') in queries to export.\n";
 }
 
 /// Parses argv into typed options so main can dispatch consistently.

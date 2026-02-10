@@ -3,21 +3,12 @@
 #include <algorithm>
 #include <cctype>
 
+#include "sql_keywords.h"
+
 namespace xsql::cli {
 
 AutoCompleter::AutoCompleter() {
-  keywords_ = {
-      "select", "from", "where", "and", "or", "in", "limit", "to", "list", "table",
-      "csv", "parquet", "count", "summarize", "order", "by", "asc", "desc", "document", "doc",
-      "raw", "fragments", "contains", "all", "any", "has_direct_text", "flatten_text", "flatten",
-      "project", "flatten_extract",
-      "attributes", "tag", "text", "parent", "child", "ancestor", "descendant",
-      "node_id", "parent_id", "sibling_pos", "max_depth", "doc_order", "source_uri",
-      "inner_html", "trim", "is", "null", "header", "noheader", "no_header",
-      "on", "off", "export", "tfidf", "top_terms", "min_df", "max_df",
-      "stopwords", "english", "none", "default", "show", "describe", "input", "inputs",
-      "functions", "axes", "operators", "language"
-  };
+  keywords_ = markql_completion_keywords();
   commands_ = {
       ".help", ".load", ".mode", ".display_mode", ".max_rows", ".reload_config",
       ".summarize", ".summarize_content",

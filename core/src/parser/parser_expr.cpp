@@ -94,34 +94,56 @@ bool Parser::parse_cmp_expr(Expr& out) {
     out = node;
     return true;
   }
+  // WHY: keep the legacy shorthand while routing behavior through SQL-style LIKE semantics.
   if (current_.type == TokenType::Identifier && peek().type == TokenType::KeywordHasDirectText) {
     Token tag_token = current_;
-    Operand operand;
-    operand.axis = Operand::Axis::Self;
-    operand.field_kind = Operand::FieldKind::Tag;
-    operand.attribute = to_lower(tag_token.text);
-    operand.span = Span{tag_token.pos, tag_token.pos + tag_token.text.size()};
     advance();
-    CompareExpr cmp;
-    cmp.lhs = operand;
-    cmp.op = CompareExpr::Op::HasDirectText;
     advance();
     if (current_.type != TokenType::String) {
       return set_error("Expected string literal after HAS_DIRECT_TEXT");
     }
-    ValueList values;
-    values.values.push_back(current_.text);
-    values.span = Span{current_.pos, current_.pos + current_.text.size()};
+    std::string needle = current_.text;
     advance();
-    cmp.rhs = values;
-    out = cmp;
+
+    CompareExpr tag_cmp;
+    tag_cmp.op = CompareExpr::Op::Eq;
+    tag_cmp.lhs.axis = Operand::Axis::Self;
+    tag_cmp.lhs.field_kind = Operand::FieldKind::Tag;
+    tag_cmp.lhs.attribute = "tag";
+    tag_cmp.rhs.values = {to_lower(tag_token.text)};
+
+    ScalarExpr direct_text_expr;
+    direct_text_expr.kind = ScalarExpr::Kind::FunctionCall;
+    direct_text_expr.function_name = "DIRECT_TEXT";
+    ScalarExpr tag_arg;
+    tag_arg.kind = ScalarExpr::Kind::StringLiteral;
+    tag_arg.string_value = to_lower(tag_token.text);
+    direct_text_expr.args.push_back(tag_arg);
+
+    CompareExpr like_cmp;
+    like_cmp.op = CompareExpr::Op::Like;
+    like_cmp.lhs_expr = direct_text_expr;
+    ScalarExpr pattern_expr;
+    pattern_expr.kind = ScalarExpr::Kind::StringLiteral;
+    pattern_expr.string_value = "%" + needle + "%";
+    like_cmp.rhs_expr = pattern_expr;
+
+    auto node = std::make_shared<BinaryExpr>();
+    node->op = BinaryExpr::Op::And;
+    node->left = tag_cmp;
+    node->right = like_cmp;
+    out = node;
     return true;
   }
-  Operand operand;
-  if (!parse_operand(operand)) return false;
+
+  ScalarExpr lhs;
+  if (!parse_scalar_expr(lhs)) return false;
 
   CompareExpr cmp;
-  cmp.lhs = operand;
+  cmp.lhs_expr = lhs;
+  if (lhs.kind == ScalarExpr::Kind::Operand) {
+    cmp.lhs = lhs.operand;
+  }
   if (current_.type == TokenType::KeywordContains) {
     cmp.op = CompareExpr::Op::Contains;
     advance();
@@ -138,13 +160,21 @@ bool Parser::parse_cmp_expr(Expr& out) {
       return set_error("CONTAINS with multiple values requires ALL or ANY");
     }
     cmp.rhs = values;
+    cmp.rhs_expr_list.clear();
+    for (const auto& value : values.values) {
+      ScalarExpr lit;
+      lit.kind = ScalarExpr::Kind::StringLiteral;
+      lit.string_value = value;
+      cmp.rhs_expr_list.push_back(std::move(lit));
+    }
     out = cmp;
     return true;
   }
   if (current_.type == TokenType::KeywordHasDirectText) {
     cmp.op = CompareExpr::Op::HasDirectText;
     advance();
-    if (cmp.lhs.field_kind != Operand::FieldKind::Tag || cmp.lhs.attribute.empty()) {
+    if (!(lhs.kind == ScalarExpr::Kind::Operand &&
+          lhs.operand.field_kind == Operand::FieldKind::Tag)) {
       return set_error("HAS_DIRECT_TEXT expects a tag identifier");
     }
     if (current_.type != TokenType::String) {
@@ -155,43 +185,47 @@ bool Parser::parse_cmp_expr(Expr& out) {
     values.span = Span{current_.pos, current_.pos + current_.text.size()};
     advance();
     cmp.rhs = values;
-    out = cmp;
-    return true;
-  }
-  if (current_.type == TokenType::Equal) {
-    cmp.op = CompareExpr::Op::Eq;
-    advance();
-    ValueList values;
-    if (!parse_value_list(values)) return false;
-    cmp.rhs = values;
+    ScalarExpr rhs;
+    rhs.kind = ScalarExpr::Kind::StringLiteral;
+    rhs.string_value = values.values.front();
+    cmp.rhs_expr = rhs;
     out = cmp;
     return true;
   }
   if (current_.type == TokenType::KeywordIn) {
     cmp.op = CompareExpr::Op::In;
     advance();
-    ValueList values;
-    if (!parse_value_list(values)) return false;
-    cmp.rhs = values;
-    out = cmp;
-    return true;
-  }
-  if (current_.type == TokenType::NotEqual) {
-    cmp.op = CompareExpr::Op::NotEq;
-    advance();
-    ValueList values;
-    if (!parse_value_list(values)) return false;
-    cmp.rhs = values;
-    out = cmp;
-    return true;
-  }
-  if (current_.type == TokenType::RegexMatch) {
-    cmp.op = CompareExpr::Op::Regex;
-    advance();
-    ValueList values;
-    if (!parse_value_list(values)) return false;
-    if (values.values.size() != 1) return set_error("Regex expects a single pattern");
-    cmp.rhs = values;
+    if (current_.type == TokenType::LParen) {
+      advance();
+      ScalarExpr value;
+      if (!parse_scalar_expr(value)) return false;
+      cmp.rhs_expr_list.push_back(value);
+      while (current_.type == TokenType::Comma) {
+        advance();
+        ScalarExpr next_value;
+        if (!parse_scalar_expr(next_value)) return false;
+        cmp.rhs_expr_list.push_back(next_value);
+      }
+      if (!consume(TokenType::RParen, "Expected )")) return false;
+    } else {
+      ScalarExpr value;
+      if (!parse_scalar_expr(value)) return false;
+      cmp.rhs_expr_list.push_back(value);
+    }
+    bool all_literals = true;
+    for (const auto& value : cmp.rhs_expr_list) {
+      if (value.kind == ScalarExpr::Kind::StringLiteral) {
+        cmp.rhs.values.push_back(value.string_value);
+      } else if (value.kind == ScalarExpr::Kind::NumberLiteral) {
+        cmp.rhs.values.push_back(std::to_string(value.number_value));
+      } else {
+        all_literals = false;
+        break;
+      }
+    }
+    if (!all_literals) {
+      cmp.rhs.values.clear();
+    }
     out = cmp;
     return true;
   }
@@ -209,7 +243,148 @@ bool Parser::parse_cmp_expr(Expr& out) {
     out = cmp;
     return true;
   }
-  return set_error("Expected =, <>, ~, IN, CONTAINS, HAS_DIRECT_TEXT, or IS");
+
+  if (current_.type == TokenType::Equal) {
+    cmp.op = CompareExpr::Op::Eq;
+  } else if (current_.type == TokenType::NotEqual) {
+    cmp.op = CompareExpr::Op::NotEq;
+  } else if (current_.type == TokenType::Less) {
+    cmp.op = CompareExpr::Op::Lt;
+  } else if (current_.type == TokenType::LessEqual) {
+    cmp.op = CompareExpr::Op::Lte;
+  } else if (current_.type == TokenType::Greater) {
+    cmp.op = CompareExpr::Op::Gt;
+  } else if (current_.type == TokenType::GreaterEqual) {
+    cmp.op = CompareExpr::Op::Gte;
+  } else if (current_.type == TokenType::RegexMatch) {
+    cmp.op = CompareExpr::Op::Regex;
+  } else if (current_.type == TokenType::KeywordLike) {
+    cmp.op = CompareExpr::Op::Like;
+  } else {
+    return set_error("Expected =, <>, <, <=, >, >=, ~, LIKE, IN, CONTAINS, HAS_DIRECT_TEXT, or IS");
+  }
+  advance();
+  ScalarExpr rhs;
+  if (!parse_scalar_expr(rhs)) return false;
+  cmp.rhs_expr = rhs;
+  if (rhs.kind == ScalarExpr::Kind::StringLiteral || rhs.kind == ScalarExpr::Kind::NumberLiteral) {
+    cmp.rhs.values.push_back(rhs.kind == ScalarExpr::Kind::StringLiteral
+                                 ? rhs.string_value
+                                 : std::to_string(rhs.number_value));
+  }
+  out = cmp;
+  return true;
+}
+
+bool Parser::parse_scalar_expr(ScalarExpr& out) {
+  if (current_.type == TokenType::String) {
+    out.kind = ScalarExpr::Kind::StringLiteral;
+    out.string_value = current_.text;
+    out.span = Span{current_.pos, current_.pos + current_.text.size()};
+    advance();
+    return true;
+  }
+  if (current_.type == TokenType::Number) {
+    out.kind = ScalarExpr::Kind::NumberLiteral;
+    try {
+      out.number_value = std::stoll(current_.text);
+    } catch (...) {
+      return set_error("Invalid numeric literal");
+    }
+    out.span = Span{current_.pos, current_.pos + current_.text.size()};
+    advance();
+    return true;
+  }
+  if (current_.type == TokenType::KeywordNull) {
+    out.kind = ScalarExpr::Kind::NullLiteral;
+    out.span = Span{current_.pos, current_.pos + 4};
+    advance();
+    return true;
+  }
+  if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
+    return set_error("Expected scalar expression");
+  }
+  Token ident = current_;
+  std::string fn_name = to_upper(current_.text);
+  if (peek().type == TokenType::LParen) {
+    advance();
+    return parse_scalar_function(fn_name, ident.pos, out);
+  }
+  Operand operand;
+  if (!parse_operand(operand)) return false;
+  out.kind = ScalarExpr::Kind::Operand;
+  out.operand = std::move(operand);
+  out.span = out.operand.span;
+  return true;
+}
+
+bool Parser::parse_scalar_function(const std::string& function_name, size_t start_pos, ScalarExpr& out) {
+  if (!consume(TokenType::LParen, "Expected ( after function name")) return false;
+  out.kind = ScalarExpr::Kind::FunctionCall;
+  out.function_name = function_name;
+
+  if (function_name == "POSITION") {
+    ScalarExpr needle;
+    if (!parse_scalar_expr(needle)) return false;
+    out.args.push_back(std::move(needle));
+    if (!consume(TokenType::KeywordIn, "Expected IN inside POSITION(substr IN str)")) return false;
+    ScalarExpr haystack;
+    if (!parse_scalar_expr(haystack)) return false;
+    out.args.push_back(std::move(haystack));
+    if (!consume(TokenType::RParen, "Expected ) after POSITION arguments")) return false;
+    out.span = Span{start_pos, current_.pos};
+    return true;
+  }
+
+  if (function_name == "TEXT" || function_name == "DIRECT_TEXT") {
+    if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
+      return set_error("Expected tag identifier inside TEXT()/DIRECT_TEXT()");
+    }
+    ScalarExpr tag_arg;
+    tag_arg.kind = ScalarExpr::Kind::StringLiteral;
+    tag_arg.string_value = to_lower(current_.text);
+    out.args.push_back(std::move(tag_arg));
+    advance();
+    if (!consume(TokenType::RParen, "Expected ) after TEXT()/DIRECT_TEXT()")) return false;
+    out.span = Span{start_pos, current_.pos};
+    return true;
+  }
+
+  if (function_name == "ATTR") {
+    if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
+      return set_error("Expected tag identifier inside ATTR()");
+    }
+    ScalarExpr tag_arg;
+    tag_arg.kind = ScalarExpr::Kind::StringLiteral;
+    tag_arg.string_value = to_lower(current_.text);
+    out.args.push_back(std::move(tag_arg));
+    advance();
+    if (!consume(TokenType::Comma, "Expected , after ATTR tag")) return false;
+    if (current_.type != TokenType::Identifier) return set_error("Expected attribute identifier inside ATTR()");
+    ScalarExpr attr_arg;
+    attr_arg.kind = ScalarExpr::Kind::StringLiteral;
+    attr_arg.string_value = to_lower(current_.text);
+    out.args.push_back(std::move(attr_arg));
+    advance();
+    if (!consume(TokenType::RParen, "Expected ) after ATTR arguments")) return false;
+    out.span = Span{start_pos, current_.pos};
+    return true;
+  }
+
+  if (current_.type != TokenType::RParen) {
+    ScalarExpr arg;
+    if (!parse_scalar_expr(arg)) return false;
+    out.args.push_back(std::move(arg));
+    while (current_.type == TokenType::Comma) {
+      advance();
+      ScalarExpr next_arg;
+      if (!parse_scalar_expr(next_arg)) return false;
+      out.args.push_back(std::move(next_arg));
+    }
+  }
+  if (!consume(TokenType::RParen, "Expected ) after function arguments")) return false;
+  out.span = Span{start_pos, current_.pos};
+  return true;
 }
 
 /// Parses an operand with axes, fields, and qualifiers.

@@ -2,28 +2,13 @@
 
 #include <cctype>
 #include <iostream>
-#include <unordered_set>
 
 #include "ui/color.h"
 #include "repl/input/text_util.h"
+#include "sql_keywords.h"
 
 namespace xsql::cli {
 namespace {
-
-bool is_sql_keyword(const std::string& word) {
-  static const std::unordered_set<std::string> keywords = {
-      "select", "from", "where", "and", "or", "in", "limit", "order", "by",
-      "asc", "desc", "to", "list", "csv", "parquet", "count", "summarize", "exclude",
-      "raw", "fragments", "contains", "all", "any", "has_direct_text", "sibling_pos", "is", "null",
-      "project"
-  };
-  std::string lower;
-  lower.reserve(word.size());
-  for (char c : word) {
-    lower.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-  }
-  return keywords.find(lower) != keywords.end();
-}
 
 }  // namespace
 
@@ -157,9 +142,7 @@ void render_buffer(const std::string& buffer,
       for (char wc : word) {
         lower_word.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(wc))));
       }
-      bool highlight_table = (lower_word == "table" && last_word == "to");
-      if (keyword_color && !command_line &&
-          (highlight_table || is_sql_keyword(word))) {
+      if (keyword_color && !command_line && is_sql_keyword_token(word)) {
         std::cout << kColor.cyan << word << kColor.reset;
       } else {
         std::cout << word;

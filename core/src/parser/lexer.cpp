@@ -51,11 +51,25 @@ Token Lexer::next() {
       return Token{TokenType::NotEqual, "!=", pos_ - 2};
     }
   }
+  if (c == '>') {
+    if (pos_ + 1 < input_.size() && input_[pos_ + 1] == '=') {
+      pos_ += 2;
+      return Token{TokenType::GreaterEqual, ">=", pos_ - 2};
+    }
+    ++pos_;
+    return Token{TokenType::Greater, ">", pos_ - 1};
+  }
   if (c == '<') {
     if (pos_ + 1 < input_.size() && input_[pos_ + 1] == '>') {
       pos_ += 2;
       return Token{TokenType::NotEqual, "<>", pos_ - 2};
     }
+    if (pos_ + 1 < input_.size() && input_[pos_ + 1] == '=') {
+      pos_ += 2;
+      return Token{TokenType::LessEqual, "<=", pos_ - 2};
+    }
+    ++pos_;
+    return Token{TokenType::Less, "<", pos_ - 1};
   }
   if (c == '~') {
     ++pos_;
@@ -118,15 +132,23 @@ Token Lexer::lex_identifier_or_keyword() {
   if (upper == "TABLE") return Token{TokenType::KeywordTable, out, start};
   if (upper == "CSV") return Token{TokenType::KeywordCsv, out, start};
   if (upper == "PARQUET") return Token{TokenType::KeywordParquet, out, start};
+  if (upper == "JSON") return Token{TokenType::KeywordJson, out, start};
+  if (upper == "NDJSON") return Token{TokenType::KeywordNdjson, out, start};
   if (upper == "RAW") return Token{TokenType::KeywordRaw, out, start};
   if (upper == "FRAGMENTS") return Token{TokenType::KeywordFragments, out, start};
   if (upper == "CONTAINS") return Token{TokenType::KeywordContains, out, start};
   if (upper == "HAS_DIRECT_TEXT") return Token{TokenType::KeywordHasDirectText, out, start};
+  if (upper == "LIKE") return Token{TokenType::KeywordLike, out, start};
   if (upper == "ALL") return Token{TokenType::KeywordAll, out, start};
   if (upper == "ANY") return Token{TokenType::KeywordAny, out, start};
   if (upper == "IS") return Token{TokenType::KeywordIs, out, start};
   if (upper == "NOT") return Token{TokenType::KeywordNot, out, start};
   if (upper == "NULL") return Token{TokenType::KeywordNull, out, start};
+  if (upper == "CASE") return Token{TokenType::KeywordCase, out, start};
+  if (upper == "WHEN") return Token{TokenType::KeywordWhen, out, start};
+  if (upper == "THEN") return Token{TokenType::KeywordThen, out, start};
+  if (upper == "ELSE") return Token{TokenType::KeywordElse, out, start};
+  if (upper == "END") return Token{TokenType::KeywordEnd, out, start};
   if (upper == "SHOW") return Token{TokenType::KeywordShow, out, start};
   if (upper == "DESCRIBE") return Token{TokenType::KeywordDescribe, out, start};
   if (upper == "PROJECT") return Token{TokenType::KeywordProject, out, start};

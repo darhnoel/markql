@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <fstream>
 #include <iomanip>
+#include <iostream>
 #include <memory>
 #include <sstream>
 #include <unordered_map>
@@ -108,9 +109,54 @@ std::string csv_escape(const std::string& value) {
   return out;
 }
 
+std::string json_escape(const std::string& value) {
+  std::string out;
+  out.reserve(value.size() + 8);
+  for (char c : value) {
+    switch (c) {
+      case '\"': out += "\\\""; break;
+      case '\\': out += "\\\\"; break;
+      case '\b': out += "\\b"; break;
+      case '\f': out += "\\f"; break;
+      case '\n': out += "\\n"; break;
+      case '\r': out += "\\r"; break;
+      case '\t': out += "\\t"; break;
+      default:
+        if (static_cast<unsigned char>(c) < 0x20) {
+          std::ostringstream hex;
+          hex << "\\u" << std::hex << std::setw(4) << std::setfill('0')
+              << static_cast<int>(static_cast<unsigned char>(c));
+          out += hex.str();
+        } else {
+          out.push_back(c);
+        }
+        break;
+    }
+  }
+  return out;
+}
+
+void write_json_row(std::ostream& out,
+                    const xsql::QueryResultRow& row,
+                    const std::vector<std::string>& columns) {
+  out << "{";
+  for (size_t i = 0; i < columns.size(); ++i) {
+    if (i > 0) out << ",";
+    const std::string& column = columns[i];
+    out << "\"" << json_escape(column) << "\":";
+    CellValue cell = field_value(row, column);
+    if (cell.is_null) {
+      out << "null";
+    } else {
+      out << "\"" << json_escape(cell.value) << "\"";
+    }
+  }
+  out << "}";
+}
+
 bool validate_rectangular(const xsql::QueryResult& result, std::string& error) {
   if (result.to_table || !result.tables.empty()) {
-    error = "TO CSV/PARQUET does not support TO TABLE() results";
+    error = "TO CSV/PARQUET/JSON/NDJSON does not support TO TABLE() results";
     return false;
   }
   if (result.columns.empty()) {
@@ -144,6 +190,49 @@ bool write_csv(const xsql::QueryResult& result, const std::string& path, std::st
       out << csv_escape(value);
     }
     out << "\n";
+  }
+  return true;
+}
+
+bool write_json(const xsql::QueryResult& result, const std::string& path, std::string& error) {
+  if (!validate_rectangular(result, error)) return false;
+  std::ofstream file;
+  std::ostream* out = &std::cout;
+  if (!path.empty()) {
+    file.open(path, std::ios::binary);
+    if (!file) {
+      error = "Failed to open file for writing: " + path;
+      return false;
+    }
+    out = &file;
+  }
+  // WHY: write delimiters incrementally so large results do not require buffering.
+  *out << "[";
+  bool first = true;
+  for (const auto& row : result.rows) {
+    if (!first) *out << ",";
+    first = false;
+    write_json_row(*out, row, result.columns);
+  }
+  *out << "]\n";
+  return true;
+}
+
+bool write_ndjson(const xsql::QueryResult& result, const std::string& path, std::string& error) {
+  if (!validate_rectangular(result, error)) return false;
+  std::ofstream file;
+  std::ostream* out = &std::cout;
+  if (!path.empty()) {
+    file.open(path, std::ios::binary);
+    if (!file) {
+      error = "Failed to open file for writing: " + path;
+      return false;
+    }
+    out = &file;
+  }
+  for (const auto& row : result.rows) {
+    write_json_row(*out, row, result.columns);
+    *out << "\n";
   }
   return true;
 }
@@ -341,12 +430,23 @@ bool export_result(const xsql::QueryResult& result, std::string& error) {
     if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Parquet) {
       return write_table_parquet(result.tables[0], result.export_sink.path, error);
     }
+    if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Json ||
+        result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Ndjson) {
+      error = "TO JSON/NDJSON does not support TO TABLE() results";
+      return false;
+    }
   }
   if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Csv) {
     return write_csv(result, result.export_sink.path, error);
   }
   if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Parquet) {
     return write_parquet(result, result.export_sink.path, error);
+  }
+  if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Json) {
+    return write_json(result, result.export_sink.path, error);
+  }
+  if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Ndjson) {
+    return write_ndjson(result, result.export_sink.path, error);
   }
   error = "Unknown export sink";
   return false;

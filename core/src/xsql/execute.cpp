@@ -31,6 +31,8 @@ struct DescendantTagFilter {
   std::vector<Predicate> predicates;
 };
 
+bool like_match_ci(const std::string& text, const std::string& pattern);
+
 void collect_descendants_any_depth(const std::vector<std::vector<int64_t>>& children,
                                    int64_t node_id,
                                    std::vector<int64_t>& out);
@@ -71,17 +73,373 @@ std::string normalized_extract_text(const HtmlNode& node) {
   return normalize_flatten_text(node.text);
 }
 
+std::optional<int64_t> parse_int64_value(const std::string& value) {
+  try {
+    size_t idx = 0;
+    int64_t out = std::stoll(value, &idx);
+    if (idx != value.size()) return std::nullopt;
+    return out;
+  } catch (...) {
+    return std::nullopt;
+  }
+}
+
+struct ScalarProjectionValue {
+  enum class Kind { Null, String, Number } kind = Kind::Null;
+  std::string string_value;
+  int64_t number_value = 0;
+};
+
+ScalarProjectionValue make_null_projection() { return ScalarProjectionValue{}; }
+
+ScalarProjectionValue make_string_projection(std::string value) {
+  ScalarProjectionValue out;
+  out.kind = ScalarProjectionValue::Kind::String;
+  out.string_value = std::move(value);
+  return out;
+}
+
+ScalarProjectionValue make_number_projection(int64_t value) {
+  ScalarProjectionValue out;
+  out.kind = ScalarProjectionValue::Kind::Number;
+  out.number_value = value;
+  return out;
+}
+
+std::string projection_to_string(const ScalarProjectionValue& value) {
+  if (value.kind == ScalarProjectionValue::Kind::Number) {
+    return std::to_string(value.number_value);
+  }
+  return value.string_value;
+}
+
+std::optional<int64_t> projection_to_int(const ScalarProjectionValue& value) {
+  if (value.kind == ScalarProjectionValue::Kind::Number) return value.number_value;
+  if (value.kind == ScalarProjectionValue::Kind::String) return parse_int64_value(value.string_value);
+  return std::nullopt;
+}
+
+bool projection_is_null(const ScalarProjectionValue& value) {
+  return value.kind == ScalarProjectionValue::Kind::Null;
+}
+
+ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr, const HtmlNode& node) {
+  switch (expr.kind) {
+    case ScalarExpr::Kind::NullLiteral:
+      return make_null_projection();
+    case ScalarExpr::Kind::StringLiteral:
+      return make_string_projection(expr.string_value);
+    case ScalarExpr::Kind::NumberLiteral:
+      return make_number_projection(expr.number_value);
+    case ScalarExpr::Kind::Operand: {
+      const Operand& op = expr.operand;
+      if (op.axis != Operand::Axis::Self) return make_null_projection();
+      if (op.field_kind == Operand::FieldKind::Tag) return make_string_projection(node.tag);
+      if (op.field_kind == Operand::FieldKind::Text) return make_string_projection(node.text);
+      if (op.field_kind == Operand::FieldKind::NodeId) return make_number_projection(node.id);
+      if (op.field_kind == Operand::FieldKind::ParentId) {
+        if (!node.parent_id.has_value()) return make_null_projection();
+        return make_number_projection(*node.parent_id);
+      }
+      if (op.field_kind == Operand::FieldKind::MaxDepth) return make_number_projection(node.max_depth);
+      if (op.field_kind == Operand::FieldKind::DocOrder) return make_number_projection(node.doc_order);
+      if (op.field_kind == Operand::FieldKind::Attribute) {
+        auto it = node.attributes.find(op.attribute);
+        if (it == node.attributes.end()) return make_null_projection();
+        return make_string_projection(it->second);
+      }
+      return make_null_projection();
+    }
+    case ScalarExpr::Kind::FunctionCall:
+      break;
+  }
+
+  std::string fn = util::to_upper(expr.function_name);
+  std::vector<ScalarProjectionValue> args;
+  args.reserve(expr.args.size());
+  for (const auto& arg : expr.args) {
+    args.push_back(eval_select_scalar_expr(arg, node));
+  }
+
+  if (fn == "COALESCE") {
+    for (const auto& value : args) {
+      if (!projection_is_null(value)) return value;
+    }
+    return make_null_projection();
+  }
+  if (fn == "CONCAT") {
+    std::string out;
+    for (const auto& value : args) {
+      if (projection_is_null(value)) return make_null_projection();
+      out += projection_to_string(value);
+    }
+    return make_string_projection(out);
+  }
+  if (fn == "LOWER" || fn == "UPPER") {
+    if (args.size() != 1 || projection_is_null(args[0])) return make_null_projection();
+    if (fn == "LOWER") return make_string_projection(util::to_lower(projection_to_string(args[0])));
+    return make_string_projection(util::to_upper(projection_to_string(args[0])));
+  }
+  if (fn == "TRIM" || fn == "LTRIM" || fn == "RTRIM") {
+    if (args.size() != 1 || projection_is_null(args[0])) return make_null_projection();
+    std::string value = projection_to_string(args[0]);
+    if (fn == "TRIM") return make_string_projection(util::trim_ws(value));
+    if (fn == "LTRIM") {
+      size_t i = 0;
+      while (i < value.size() && std::isspace(static_cast<unsigned char>(value[i]))) ++i;
+      return make_string_projection(value.substr(i));
+    }
+    size_t end = value.size();
+    while (end > 0 && std::isspace(static_cast<unsigned char>(value[end - 1]))) --end;
+    return make_string_projection(value.substr(0, end));
+  }
+  if (fn == "REPLACE") {
+    if (args.size() != 3 || projection_is_null(args[0]) || projection_is_null(args[1]) || projection_is_null(args[2])) {
+      return make_null_projection();
+    }
+    std::string out = projection_to_string(args[0]);
+    std::string from = projection_to_string(args[1]);
+    std::string to = projection_to_string(args[2]);
+    if (from.empty()) return make_string_projection(out);
+    size_t pos = 0;
+    while ((pos = out.find(from, pos)) != std::string::npos) {
+      out.replace(pos, from.size(), to);
+      pos += to.size();
+    }
+    return make_string_projection(out);
+  }
+  if (fn == "LENGTH" || fn == "CHAR_LENGTH") {
+    if (args.size() != 1 || projection_is_null(args[0])) return make_null_projection();
+    return make_number_projection(static_cast<int64_t>(projection_to_string(args[0]).size()));
+  }
+  if (fn == "SUBSTRING" || fn == "SUBSTR") {
+    if (args.size() < 2 || args.size() > 3 || projection_is_null(args[0]) || projection_is_null(args[1])) {
+      return make_null_projection();
+    }
+    std::string text = projection_to_string(args[0]);
+    auto start = projection_to_int(args[1]);
+    if (!start.has_value()) return make_null_projection();
+    int64_t from = std::max<int64_t>(1, *start) - 1;
+    if (static_cast<size_t>(from) >= text.size()) return make_string_projection("");
+    if (args.size() == 2 || projection_is_null(args[2])) {
+      return make_string_projection(text.substr(static_cast<size_t>(from)));
+    }
+    auto len = projection_to_int(args[2]);
+    if (!len.has_value() || *len <= 0) return make_string_projection("");
+    return make_string_projection(text.substr(static_cast<size_t>(from), static_cast<size_t>(*len)));
+  }
+  if (fn == "POSITION" || fn == "LOCATE") {
+    if (args.size() < 2 || projection_is_null(args[0]) || projection_is_null(args[1])) return make_null_projection();
+    std::string needle = projection_to_string(args[0]);
+    std::string haystack = projection_to_string(args[1]);
+    size_t start = 0;
+    if (fn == "LOCATE" && args.size() == 3 && !projection_is_null(args[2])) {
+      auto parsed = projection_to_int(args[2]);
+      if (!parsed.has_value()) return make_null_projection();
+      if (*parsed > 1) start = static_cast<size_t>(*parsed - 1);
+    }
+    size_t pos = haystack.find(needle, start);
+    if (pos == std::string::npos) return make_number_projection(0);
+    return make_number_projection(static_cast<int64_t>(pos + 1));
+  }
+  if (fn == "TEXT" || fn == "DIRECT_TEXT" || fn == "ATTR") {
+    if ((fn == "TEXT" || fn == "DIRECT_TEXT") && args.size() != 1) return make_null_projection();
+    if (fn == "ATTR" && args.size() != 2) return make_null_projection();
+    if (args.empty() || projection_is_null(args[0])) return make_null_projection();
+    std::string tag = util::to_lower(projection_to_string(args[0]));
+    if (node.tag != tag) return make_null_projection();
+    if (fn == "TEXT") return make_string_projection(node.text);
+    if (fn == "DIRECT_TEXT") return make_string_projection(xsql_internal::extract_direct_text_strict(node.inner_html));
+    if (projection_is_null(args[1])) return make_null_projection();
+    std::string attr = util::to_lower(projection_to_string(args[1]));
+    auto it = node.attributes.find(attr);
+    if (it == node.attributes.end()) return make_null_projection();
+    return make_string_projection(it->second);
+  }
+  return make_null_projection();
+}
+
+std::optional<std::string> selector_value(
+    const std::string& tag,
+    const std::optional<std::string>& attr,
+    const std::optional<Expr>& where,
+    const std::optional<int64_t>& selector_index,
+    bool selector_last,
+    bool direct_text,
+    const HtmlNode& base_node,
+    const HtmlDocument& doc,
+    const std::vector<std::vector<int64_t>>& children) {
+  std::vector<int64_t> scope_nodes;
+  scope_nodes.reserve(32);
+  collect_row_scope_nodes(children, base_node.id, scope_nodes);
+  const std::string extract_tag = util::to_lower(tag);
+  int64_t seen = 0;
+  std::optional<std::string> last_value;
+  int64_t target = selector_index.value_or(1);
+  for (int64_t id : scope_nodes) {
+    const HtmlNode& node = doc.nodes.at(static_cast<size_t>(id));
+    if (node.tag != extract_tag) continue;
+    if (where.has_value() && !executor_internal::eval_expr(*where, doc, children, node)) {
+      continue;
+    }
+    std::optional<std::string> value;
+    if (attr.has_value()) {
+      auto it = node.attributes.find(*attr);
+      if (it == node.attributes.end() || it->second.empty()) continue;
+      value = it->second;
+    } else if (direct_text) {
+      std::string direct = util::trim_ws(xsql_internal::extract_direct_text_strict(node.inner_html));
+      if (direct.empty()) continue;
+      value = std::move(direct);
+    } else {
+      std::string text = normalized_extract_text(node);
+      if (text.empty()) continue;
+      value = std::move(text);
+    }
+    if (!value.has_value()) continue;
+    if (selector_last) {
+      last_value = std::move(value);
+      continue;
+    }
+    ++seen;
+    if (seen == target) return value;
+  }
+  if (selector_last) return last_value;
+  return std::nullopt;
+}
+
+int64_t sibling_pos_for_projection(const HtmlDocument& doc,
+                                   const std::vector<std::vector<int64_t>>& children,
+                                   const HtmlNode& node) {
+  if (!node.parent_id.has_value()) return 1;
+  const auto& siblings = children.at(static_cast<size_t>(*node.parent_id));
+  for (size_t i = 0; i < siblings.size(); ++i) {
+    if (siblings[i] == node.id) return static_cast<int64_t>(i + 1);
+  }
+  return 1;
+}
+
+std::vector<const HtmlNode*> projection_axis_nodes(const HtmlDocument& doc,
+                                                   const std::vector<std::vector<int64_t>>& children,
+                                                   const HtmlNode& node,
+                                                   Operand::Axis axis) {
+  std::vector<const HtmlNode*> out;
+  if (axis == Operand::Axis::Self) {
+    out.push_back(&node);
+    return out;
+  }
+  if (axis == Operand::Axis::Parent) {
+    if (node.parent_id.has_value()) {
+      out.push_back(&doc.nodes.at(static_cast<size_t>(*node.parent_id)));
+    }
+    return out;
+  }
+  if (axis == Operand::Axis::Child) {
+    for (int64_t id : children.at(static_cast<size_t>(node.id))) {
+      out.push_back(&doc.nodes.at(static_cast<size_t>(id)));
+    }
+    return out;
+  }
+  if (axis == Operand::Axis::Ancestor) {
+    const HtmlNode* current = &node;
+    while (current->parent_id.has_value()) {
+      const HtmlNode& parent = doc.nodes.at(static_cast<size_t>(*current->parent_id));
+      out.push_back(&parent);
+      current = &parent;
+    }
+    return out;
+  }
+  std::vector<int64_t> stack;
+  stack.insert(stack.end(),
+               children.at(static_cast<size_t>(node.id)).begin(),
+               children.at(static_cast<size_t>(node.id)).end());
+  while (!stack.empty()) {
+    int64_t id = stack.back();
+    stack.pop_back();
+    const HtmlNode& child = doc.nodes.at(static_cast<size_t>(id));
+    out.push_back(&child);
+    const auto& next = children.at(static_cast<size_t>(id));
+    stack.insert(stack.end(), next.begin(), next.end());
+  }
+  return out;
+}
+
+std::optional<std::string> projection_operand_value(const Operand& operand,
+                                                    const HtmlNode& base_node,
+                                                    const HtmlDocument& doc,
+                                                    const std::vector<std::vector<int64_t>>& children) {
+  std::vector<const HtmlNode*> candidates =
+      projection_axis_nodes(doc, children, base_node, operand.axis);
+  for (const HtmlNode* candidate : candidates) {
+    if (candidate == nullptr) continue;
+    switch (operand.field_kind) {
+      case Operand::FieldKind::Attribute: {
+        auto it = candidate->attributes.find(operand.attribute);
+        if (it != candidate->attributes.end()) return it->second;
+        break;
+      }
+      case Operand::FieldKind::Tag:
+        return candidate->tag;
+      case Operand::FieldKind::Text:
+        return candidate->text;
+      case Operand::FieldKind::NodeId:
+        return std::to_string(candidate->id);
+      case Operand::FieldKind::ParentId:
+        if (candidate->parent_id.has_value()) return std::to_string(*candidate->parent_id);
+        break;
+      case Operand::FieldKind::SiblingPos:
+        return std::to_string(sibling_pos_for_projection(doc, children, *candidate));
+      case Operand::FieldKind::MaxDepth:
+        return std::to_string(candidate->max_depth);
+      case Operand::FieldKind::DocOrder:
+        return std::to_string(candidate->doc_order);
+      case Operand::FieldKind::AttributesMap:
+        break;
+    }
+  }
+  return std::nullopt;
+}
+
 std::optional<std::string> eval_flatten_extract_expr(
     const Query::SelectItem::FlattenExtractExpr& expr,
     const HtmlNode& base_node,
     const HtmlDocument& doc,
-    const std::vector<std::vector<int64_t>>& children) {
+    const std::vector<std::vector<int64_t>>& children,
+    const std::unordered_map<std::string, std::string>& bindings) {
   using ExtractKind = Query::SelectItem::FlattenExtractExpr::Kind;
+
+  if (expr.kind == ExtractKind::StringLiteral) {
+    return expr.string_value;
+  }
+  if (expr.kind == ExtractKind::NumberLiteral) {
+    return std::to_string(expr.number_value);
+  }
+  if (expr.kind == ExtractKind::NullLiteral) {
+    return std::nullopt;
+  }
+  if (expr.kind == ExtractKind::AliasRef) {
+    auto it = bindings.find(expr.alias_ref);
+    if (it == bindings.end()) return std::nullopt;
+    return it->second;
+  }
+  if (expr.kind == ExtractKind::OperandRef) {
+    return projection_operand_value(expr.operand, base_node, doc, children);
+  }
+  if (expr.kind == ExtractKind::CaseWhen) {
+    for (size_t i = 0; i < expr.case_when_conditions.size() && i < expr.case_when_values.size(); ++i) {
+      if (!executor_internal::eval_expr(expr.case_when_conditions[i], doc, children, base_node)) continue;
+      return eval_flatten_extract_expr(expr.case_when_values[i], base_node, doc, children, bindings);
+    }
+    if (expr.case_else != nullptr) {
+      return eval_flatten_extract_expr(*expr.case_else, base_node, doc, children, bindings);
+    }
+    return std::nullopt;
+  }
 
   if (expr.kind == ExtractKind::Coalesce) {
     for (const auto& arg : expr.args) {
       std::optional<std::string> value =
-          eval_flatten_extract_expr(arg, base_node, doc, children);
+          eval_flatten_extract_expr(arg, base_node, doc, children, bindings);
       if (!value.has_value()) continue;
       if (util::trim_ws(*value).empty()) continue;
       return value;
@@ -89,29 +447,147 @@ std::optional<std::string> eval_flatten_extract_expr(
     return std::nullopt;
   }
 
-  std::vector<int64_t> scope_nodes;
-  scope_nodes.reserve(32);
-  collect_row_scope_nodes(children, base_node.id, scope_nodes);
-  const std::string extract_tag = util::to_lower(expr.tag);
+  if (expr.kind == ExtractKind::Text) {
+    return selector_value(expr.tag, std::nullopt, expr.where, expr.selector_index, expr.selector_last,
+                          false, base_node, doc, children);
+  }
+  if (expr.kind == ExtractKind::Attr) {
+    return selector_value(expr.tag, expr.attribute, expr.where, expr.selector_index, expr.selector_last,
+                          false, base_node, doc, children);
+  }
 
-  for (int64_t id : scope_nodes) {
-    const HtmlNode& node = doc.nodes.at(static_cast<size_t>(id));
-    if (node.tag != extract_tag) continue;
-    if (expr.where.has_value() &&
-        !executor_internal::eval_expr(*expr.where, doc, children, node)) {
-      continue;
+  if (expr.kind == ExtractKind::FunctionCall) {
+    const std::string fn = util::to_upper(expr.function_name);
+    std::vector<std::optional<std::string>> args;
+    args.reserve(expr.args.size());
+    for (const auto& arg : expr.args) {
+      args.push_back(eval_flatten_extract_expr(arg, base_node, doc, children, bindings));
     }
-    if (expr.kind == ExtractKind::Text) {
-      std::string value = normalized_extract_text(node);
-      if (value.empty()) continue;
-      return value;
+    if (fn == "TEXT") {
+      if (args.size() != 1 || !args[0].has_value()) return std::nullopt;
+      return selector_value(*args[0], std::nullopt, expr.where, expr.selector_index, expr.selector_last,
+                            false, base_node, doc, children);
     }
-    if (expr.kind == ExtractKind::Attr) {
-      if (!expr.attribute.has_value()) continue;
-      auto it = node.attributes.find(*expr.attribute);
-      if (it == node.attributes.end()) continue;
-      if (it->second.empty()) continue;
-      return it->second;
+    if (fn == "DIRECT_TEXT") {
+      if (args.size() != 1 || !args[0].has_value()) return std::nullopt;
+      return selector_value(*args[0], std::nullopt, expr.where, expr.selector_index, expr.selector_last,
+                            true, base_node, doc, children);
+    }
+    if (fn == "ATTR") {
+      if (args.size() != 2 || !args[0].has_value() || !args[1].has_value()) return std::nullopt;
+      return selector_value(*args[0], util::to_lower(*args[1]), expr.where, expr.selector_index, expr.selector_last,
+                            false, base_node, doc, children);
+    }
+    if (fn == "CONCAT") {
+      std::string out;
+      for (const auto& arg : args) {
+        if (!arg.has_value()) return std::nullopt;
+        out += *arg;
+      }
+      return out;
+    }
+    if (fn == "LOWER") {
+      if (args.size() != 1 || !args[0].has_value()) return std::nullopt;
+      return util::to_lower(*args[0]);
+    }
+    if (fn == "UPPER") {
+      if (args.size() != 1 || !args[0].has_value()) return std::nullopt;
+      return util::to_upper(*args[0]);
+    }
+    if (fn == "TRIM") {
+      if (args.size() != 1 || !args[0].has_value()) return std::nullopt;
+      return util::trim_ws(*args[0]);
+    }
+    if (fn == "LTRIM") {
+      if (args.size() != 1 || !args[0].has_value()) return std::nullopt;
+      size_t i = 0;
+      while (i < args[0]->size() && std::isspace(static_cast<unsigned char>((*args[0])[i]))) ++i;
+      return args[0]->substr(i);
+    }
+    if (fn == "RTRIM") {
+      if (args.size() != 1 || !args[0].has_value()) return std::nullopt;
+      size_t end = args[0]->size();
+      while (end > 0 && std::isspace(static_cast<unsigned char>((*args[0])[end - 1]))) --end;
+      return args[0]->substr(0, end);
+    }
+    if (fn == "REPLACE") {
+      if (args.size() != 3 || !args[0].has_value() || !args[1].has_value() || !args[2].has_value()) return std::nullopt;
+      std::string out = *args[0];
+      if (args[1]->empty()) return out;
+      size_t pos = 0;
+      while ((pos = out.find(*args[1], pos)) != std::string::npos) {
+        out.replace(pos, args[1]->size(), *args[2]);
+        pos += args[2]->size();
+      }
+      return out;
+    }
+    if (fn == "LENGTH" || fn == "CHAR_LENGTH") {
+      if (args.size() != 1 || !args[0].has_value()) return std::nullopt;
+      return std::to_string(args[0]->size());
+    }
+    if (fn == "SUBSTRING" || fn == "SUBSTR") {
+      if (args.size() < 2 || args.size() > 3 || !args[0].has_value() || !args[1].has_value()) return std::nullopt;
+      auto start = parse_int64_value(*args[1]);
+      if (!start.has_value()) return std::nullopt;
+      int64_t from = std::max<int64_t>(1, *start) - 1;
+      if (static_cast<size_t>(from) >= args[0]->size()) return std::string{};
+      if (args.size() == 2 || !args[2].has_value()) return args[0]->substr(static_cast<size_t>(from));
+      auto len = parse_int64_value(*args[2]);
+      if (!len.has_value() || *len <= 0) return std::string{};
+      return args[0]->substr(static_cast<size_t>(from), static_cast<size_t>(*len));
+    }
+    if (fn == "POSITION") {
+      if (args.size() != 2 || !args[0].has_value() || !args[1].has_value()) return std::nullopt;
+      size_t pos = args[1]->find(*args[0]);
+      if (pos == std::string::npos) return std::string("0");
+      return std::to_string(pos + 1);
+    }
+    if (fn == "LOCATE") {
+      if (args.size() < 2 || args.size() > 3 || !args[0].has_value() || !args[1].has_value()) return std::nullopt;
+      size_t start = 0;
+      if (args.size() == 3 && args[2].has_value()) {
+        auto parsed = parse_int64_value(*args[2]);
+        if (!parsed.has_value()) return std::nullopt;
+        if (*parsed > 1) start = static_cast<size_t>(*parsed - 1);
+      }
+      size_t pos = args[1]->find(*args[0], start);
+      if (pos == std::string::npos) return std::string("0");
+      return std::to_string(pos + 1);
+    }
+    if (fn == "__CMP_EQ" || fn == "__CMP_NE" || fn == "__CMP_LT" || fn == "__CMP_LE" ||
+        fn == "__CMP_GT" || fn == "__CMP_GE" || fn == "__CMP_LIKE") {
+      if (args.size() != 2 || !args[0].has_value() || !args[1].has_value()) return std::nullopt;
+      bool result = false;
+      if (fn == "__CMP_LIKE") {
+        result = like_match_ci(*args[0], *args[1]);
+      } else {
+        auto lnum = parse_int64_value(*args[0]);
+        auto rnum = parse_int64_value(*args[1]);
+        if (lnum.has_value() && rnum.has_value()) {
+          if (fn == "__CMP_EQ") result = *lnum == *rnum;
+          else if (fn == "__CMP_NE") result = *lnum != *rnum;
+          else if (fn == "__CMP_LT") result = *lnum < *rnum;
+          else if (fn == "__CMP_LE") result = *lnum <= *rnum;
+          else if (fn == "__CMP_GT") result = *lnum > *rnum;
+          else result = *lnum >= *rnum;
+        } else {
+          if (fn == "__CMP_EQ") result = *args[0] == *args[1];
+          else if (fn == "__CMP_NE") result = *args[0] != *args[1];
+          else if (fn == "__CMP_LT") result = *args[0] < *args[1];
+          else if (fn == "__CMP_LE") result = *args[0] <= *args[1];
+          else if (fn == "__CMP_GT") result = *args[0] > *args[1];
+          else result = *args[0] >= *args[1];
+        }
+      }
+      return result ? std::string("true") : std::string("false");
+    }
+    if (fn == "COALESCE") {
+      for (const auto& value : args) {
+        if (!value.has_value()) continue;
+        if (util::trim_ws(*value).empty()) continue;
+        return value;
+      }
+      return std::nullopt;
     }
   }
 
@@ -177,6 +653,35 @@ bool contains_ci(const std::string& haystack, const std::string& needle) {
   std::string lower_haystack = util::to_lower(haystack);
   std::string lower_needle = util::to_lower(needle);
   return lower_haystack.find(lower_needle) != std::string::npos;
+}
+
+bool like_match_ci(const std::string& text, const std::string& pattern) {
+  std::string s = util::to_lower(text);
+  std::string p = util::to_lower(pattern);
+  size_t si = 0;
+  size_t pi = 0;
+  size_t star = std::string::npos;
+  size_t match = 0;
+  while (si < s.size()) {
+    if (pi < p.size() && (p[pi] == '_' || p[pi] == s[si])) {
+      ++si;
+      ++pi;
+      continue;
+    }
+    if (pi < p.size() && p[pi] == '%') {
+      star = pi++;
+      match = si;
+      continue;
+    }
+    if (star != std::string::npos) {
+      pi = star + 1;
+      si = ++match;
+      continue;
+    }
+    return false;
+  }
+  while (pi < p.size() && p[pi] == '%') ++pi;
+  return pi == p.size();
 }
 
 bool contains_all_ci(const std::string& haystack, const std::vector<std::string>& tokens) {
@@ -311,6 +816,25 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
           {"function", "returns", "description"},
           {
               {"text(tag)", "string", "Text content of a tag"},
+              {"direct_text(tag)", "string", "Immediate text content of a tag"},
+              {"first_text(tag WHERE ...)", "string", "First scoped TEXT match (alias of TEXT(..., 1))"},
+              {"last_text(tag WHERE ...)", "string", "Last scoped TEXT match"},
+              {"first_attr(tag, attr WHERE ...)", "string", "First scoped ATTR match"},
+              {"last_attr(tag, attr WHERE ...)", "string", "Last scoped ATTR match"},
+              {"concat(a, b, ...)", "string", "Concatenate strings; NULL if any arg is NULL"},
+              {"substring(str, start, len)", "string", "1-based substring"},
+              {"substr(str, start, len)", "string", "Alias of substring"},
+              {"length(str)", "int64", "String length in UTF-8 bytes"},
+              {"char_length(str)", "int64", "Alias of length"},
+              {"position(substr IN str)", "int64", "1-based position, 0 if not found"},
+              {"locate(substr, str[, start])", "int64", "1-based position, 0 if not found"},
+              {"replace(str, from, to)", "string", "Replace substring"},
+              {"lower(str)", "string", "Lowercase"},
+              {"upper(str)", "string", "Uppercase"},
+              {"ltrim(str)", "string", "Trim left whitespace"},
+              {"rtrim(str)", "string", "Trim right whitespace"},
+              {"coalesce(a, b, ...)", "scalar", "First non-NULL value"},
+              {"case when ... then ... else ... end", "scalar", "Conditional expression"},
               {"inner_html(tag[, depth])", "string", "Minified HTML inside a tag"},
               {"raw_inner_html(tag[, depth])", "string", "Raw inner HTML without minification"},
               {"flatten_text(tag[, depth])", "string[]", "Flatten descendant text at depth into columns"},
@@ -339,7 +863,9 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
           {
               {"=", "Equality"},
               {"<>", "Not equal"},
+              {"<, <=, >, >=", "Ordered comparison"},
               {"IN (...)", "Membership"},
+              {"LIKE", "SQL-style wildcard match (% and _)"},
               {"CONTAINS", "Substring or list contains"},
               {"CONTAINS ALL", "Contains all values"},
               {"CONTAINS ANY", "Contains any value"},
@@ -381,6 +907,8 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
                "Select table tags only"},
               {"output", "TO CSV", "TO CSV('file.csv')", "Export result"},
               {"output", "TO PARQUET", "TO PARQUET('file.parquet')", "Export result"},
+              {"output", "TO JSON", "TO JSON(['file.json'])", "Export rows as a JSON array"},
+              {"output", "TO NDJSON", "TO NDJSON(['file.ndjson'])", "Export rows as newline-delimited JSON"},
               {"source", "document", "FROM document", "Active input in REPL"},
               {"source", "alias", "FROM doc", "Alias for document"},
               {"source", "path", "FROM 'file.html'", "Local file"},
@@ -404,12 +932,26 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
                "Raw inner HTML (no minify); requires WHERE"},
               {"function", "trim", "trim(text(...)) | trim(inner_html(...))",
                "Trim whitespace"},
+              {"function", "direct_text", "direct_text(tag)", "Immediate text children only"},
+              {"function", "concat", "concat(a, b, ...)", "NULL if any arg is NULL"},
+              {"function", "substring", "substring(str, start, len)", "1-based slicing"},
+              {"function", "length", "length(str)", "UTF-8 byte length"},
+              {"function", "position", "position(substr IN str)", "1-based; 0 if not found"},
+              {"function", "replace", "replace(str, from, to)", "Substring replacement"},
+              {"function", "case expression",
+               "CASE WHEN <expr> THEN <value> [ELSE <value>] END",
+               "Evaluates WHEN clauses top-to-bottom"},
+              {"function", "trim family", "ltrim/rtrim/trim(str)", "Whitespace trimming"},
+              {"function", "first_text", "first_text(tag WHERE ...)", "First scoped text match"},
+              {"function", "last_text", "last_text(tag WHERE ...)", "Last scoped text match"},
+              {"function", "first_attr", "first_attr(tag, attr WHERE ...)", "First scoped attr match"},
+              {"function", "last_attr", "last_attr(tag, attr WHERE ...)", "Last scoped attr match"},
               {"function", "project",
                "project(tag) AS (alias: expr, ...)",
-               "Expressions: TEXT(tag WHERE ...), ATTR(tag, attr WHERE ...), COALESCE(...)"},
+               "Expressions: TEXT/ATTR/DIRECT_TEXT/COALESCE plus SQL string functions"},
               {"function", "flatten_extract",
                "flatten_extract(tag) AS (alias: expr, ...)",
-               "Expressions: TEXT(tag WHERE ...), ATTR(tag, attr WHERE ...), COALESCE(...)"},
+               "Expressions: TEXT/ATTR/DIRECT_TEXT/COALESCE plus SQL string functions"},
               {"aggregate", "count", "count(tag|*)", "int64"},
               {"aggregate", "summarize", "summarize(*)", "tag counts table"},
               {"aggregate", "tfidf", "tfidf(tag|*)", "map<string,double>"},
@@ -420,7 +962,9 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
               {"predicate", "exists", "EXISTS(axis [WHERE expr])", "Existential axis predicate"},
               {"operator", "=", "lhs = rhs", "Equality"},
               {"operator", "<>", "lhs <> rhs", "Not equal"},
+              {"operator", "<, <=, >, >=", "lhs > rhs", "Ordered comparison"},
               {"operator", "IN", "lhs IN ('a','b')", "Membership"},
+              {"operator", "LIKE", "lhs LIKE '%x%'", "SQL-style wildcard match"},
               {"operator", "CONTAINS", "lhs CONTAINS 'x'", "Substring or list contains"},
               {"operator", "CONTAINS ALL", "lhs CONTAINS ALL ('a','b')", "All values"},
               {"operator", "CONTAINS ANY", "lhs CONTAINS ANY ('a','b')", "Any value"},
@@ -525,6 +1069,10 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
       out.export_sink.kind = QueryResult::ExportSink::Kind::Csv;
     } else if (sink.kind == Query::ExportSink::Kind::Parquet) {
       out.export_sink.kind = QueryResult::ExportSink::Kind::Parquet;
+    } else if (sink.kind == Query::ExportSink::Kind::Json) {
+      out.export_sink.kind = QueryResult::ExportSink::Kind::Json;
+    } else if (sink.kind == Query::ExportSink::Kind::Ndjson) {
+      out.export_sink.kind = QueryResult::ExportSink::Kind::Ndjson;
     }
     out.export_sink.path = sink.path;
   }
@@ -655,7 +1203,7 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
         const auto& alias = flatten_extract_item->flatten_extract_aliases[i];
         const auto& expr = flatten_extract_item->flatten_extract_exprs[i];
         std::optional<std::string> value =
-            eval_flatten_extract_expr(expr, node, doc, children);
+            eval_flatten_extract_expr(expr, node, doc, children, row.computed_fields);
         if (!value.has_value()) continue;
         row.computed_fields[alias] = *value;
       }
@@ -847,6 +1395,20 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
     row.sibling_pos = sibling_positions.at(static_cast<size_t>(node.id));
     row.max_depth = node.max_depth;
     row.doc_order = node.doc_order;
+    for (const auto& item : query.select_items) {
+      if (!item.expr_projection || !item.field.has_value()) continue;
+      if (item.project_expr.has_value()) {
+        std::optional<std::string> value =
+            eval_flatten_extract_expr(*item.project_expr, node, doc, children, row.computed_fields);
+        if (!value.has_value()) continue;
+        row.computed_fields[*item.field] = *value;
+        continue;
+      }
+      if (!item.expr.has_value()) continue;
+      ScalarProjectionValue value = eval_select_scalar_expr(*item.expr, node);
+      if (projection_is_null(value)) continue;
+      row.computed_fields[*item.field] = projection_to_string(value);
+    }
     for (const auto& field : trim_fields) {
       if (field == "text") {
         row.text = util::trim_ws(row.text);

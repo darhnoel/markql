@@ -7,7 +7,38 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-02-10
+
 ### Added
+- Added `CASE WHEN ... THEN ... [ELSE ...] END` expressions for:
+  - `SELECT` expression projections
+  - `PROJECT(...) AS (alias: expr, ...)` mappings
+- Added stable selector picking for scoped extraction:
+  - `TEXT(..., n)` / `ATTR(..., n)` with 1-based indexes
+  - `FIRST_TEXT(...)`, `LAST_TEXT(...)`, `FIRST_ATTR(...)`, `LAST_ATTR(...)`
+- Added `TO JSON(...)` export sink (single JSON array of row objects).
+- Added `TO NDJSON(...)` export sink (one JSON object per line).
+- Added stdout export fallback for JSON sinks via `TO JSON()` / `TO NDJSON()`.
+- Added parser/runtime/export tests for:
+  - CASE parsing and evaluation
+  - selector index semantics (first/nth/last and out-of-range nulls)
+  - JSON/NDJSON file output and stdout fallback
+
+### Changed
+- Updated `SHOW FUNCTIONS` / `DESCRIBE language` metadata for CASE, selector helpers, and JSON sinks.
+- Updated CLI help/autocomplete and docs to include JSON/NDJSON export and CASE/selectors.
+- Bumped project version to `1.6.0`.
+
+## [1.5.0] - 2026-02-10
+
+### Added
+- Added SQL-style `LIKE` operator with `%` and `_` wildcard semantics.
+- Added string functions across query expressions: `CONCAT`, `SUBSTRING`/`SUBSTR`, `LENGTH`/`CHAR_LENGTH`,
+  `POSITION`, `LOCATE`, `REPLACE`, `LOWER`, `UPPER`, `LTRIM`, `RTRIM`, `TRIM`, and `DIRECT_TEXT`.
+- Added support for function expressions in `SELECT` projections and `WHERE` predicates
+  (for example `LOWER(TEXT(div)) LIKE '%foo%'` and `POSITION('x' IN TEXT(div)) > 0`).
+- Added parser/evaluator tests for LIKE, string functions, DIRECT_TEXT behavior, and PROJECT regression coverage.
+- Added dedicated test suite block `test_string_sql.cpp` with parser + evaluator + PROJECT semantics checks.
 - Restored `EXISTS(axis [WHERE expr])` predicate support in parser, AST, executor, and validation.
 - Added predicate tests for `EXISTS(child)`, `EXISTS(child WHERE tag = ...)`, and same-node matching behavior.
 - Added `FLATTEN_EXTRACT(tag) AS (alias: expr, ...)` projection support with expression mapping:
@@ -17,12 +48,20 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
   `PROJECT(tag) AS (alias: expr, ...)`.
 
 ### Changed
+- `PROJECT(...)`/`FLATTEN_EXTRACT(...)` expressions now support nested SQL string functions, literals,
+  and alias references in `alias: expression` mappings.
+- `DIRECT_TEXT(tag)` now uses strict immediate-text extraction (descendant text is excluded).
+- Updated language metadata (`SHOW FUNCTIONS`, `SHOW OPERATORS`, `DESCRIBE language`) to include LIKE and new string functions.
+- Bumped project version to `1.5.0`.
 - Updated CLI and tutorial docs to document `EXISTS(...)` syntax, supported axes (`self|parent|child|ancestor|descendant`), and inner `WHERE` semantics.
 - Updated docs and language metadata (`SHOW FUNCTIONS` / `DESCRIBE language`) to include `FLATTEN_EXTRACT` usage.
 - Updated docs and language metadata to prefer `PROJECT(...)`; `FLATTEN_EXTRACT(...)` remains a compatibility alias.
 - Rebranded user-facing CLI/documentation name to MarkQL while keeping internal `xsql` namespace and APIs unchanged.
 - REPL prompt is now `markql> `, and the default CLI binary output is now `markql` (with `xsql` compatibility binary still generated).
 - REPL history recall now places the cursor at end-of-line by default when navigating with Up/Down.
+
+### Deprecated
+- `HAS_DIRECT_TEXT` remains supported, but `DIRECT_TEXT(tag) LIKE '%...%'` is the preferred SQL-style form.
 
 ## [1.4.0] - 2026-02-07
 Includes major changes first landed between 2026-01-12 and 2026-02-07.

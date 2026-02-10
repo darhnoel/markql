@@ -32,6 +32,8 @@ class Parser {
   bool parse_expr(Expr& out);
   bool parse_and_expr(Expr& out);
   bool parse_cmp_expr(Expr& out);
+  bool parse_scalar_expr(ScalarExpr& out);
+  bool parse_scalar_function(const std::string& function_name, size_t start_pos, ScalarExpr& out);
   bool parse_operand(Operand& operand);
   bool parse_value_list(ValueList& values);
   bool parse_string_list(ValueList& values);

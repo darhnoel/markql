@@ -30,7 +30,7 @@ Think of it as:
 - `SELECT <tag or projected fields>`
 - `FROM <html source>`
 - `WHERE <filters>`
-- optional `LIMIT`, `TO LIST`, `TO TABLE`, `TO CSV`, `TO PARQUET`
+- optional `LIMIT`, `TO LIST`, `TO TABLE`, `TO CSV`, `TO PARQUET`, `TO JSON`, `TO NDJSON`
 
 ## CLI Setup
 
@@ -95,7 +95,9 @@ SELECT a FROM document AS d WHERE d.id = 'login';
 Basic operators:
 - `=`
 - `<>` / `!=`
+- `<`, `<=`, `>`, `>=`
 - `IN (...)`
+- `LIKE` (`%` any sequence, `_` one character)
 - `IS NULL` / `IS NOT NULL`
 - `~` regex
 - `CONTAINS`, `CONTAINS ALL`, `CONTAINS ANY` (attributes)
@@ -107,11 +109,33 @@ Examples:
 SELECT div FROM doc WHERE id = 'main';
 SELECT a FROM doc WHERE href IN ('/a','/b');
 SELECT a FROM doc WHERE href ~ '.*\.pdf$';
+SELECT div FROM doc WHERE text LIKE '%coupon%';
+SELECT div FROM doc WHERE POSITION('coupon' IN LOWER(text)) > 0;
 SELECT div FROM doc WHERE attributes IS NULL;
 SELECT div FROM doc WHERE div HAS_DIRECT_TEXT 'buy now';
 SELECT div FROM doc WHERE EXISTS(child);
 SELECT div FROM doc WHERE EXISTS(child WHERE tag = 'h2');
 ```
+
+SQL-style direct text form (preferred over `HAS_DIRECT_TEXT`):
+```sql
+SELECT div FROM doc WHERE DIRECT_TEXT(div) LIKE '%buy now%';
+```
+
+Current behavior note:
+- `LIKE` matching is ASCII case-insensitive in this release.
+
+Reserved keywords used by these features:
+- `LIKE`
+- `CONCAT`
+- `SUBSTRING` / `SUBSTR`
+- `LENGTH` / `CHAR_LENGTH`
+- `POSITION` / `LOCATE`
+- `REPLACE`
+- `LOWER` / `UPPER`
+- `LTRIM` / `RTRIM`
+- `DIRECT_TEXT`
+- `CASE` / `WHEN` / `THEN` / `ELSE` / `END`
 
 ## Hierarchy (Axes)
 
@@ -159,11 +183,38 @@ SELECT inner_html(div) FROM doc WHERE id = 'card';
 SELECT raw_inner_html(div) FROM doc WHERE id = 'card';
 SELECT trim(inner_html(div)) FROM doc WHERE id = 'card';
 SELECT text(div) FROM doc WHERE attributes.class = 'summary';
+SELECT lower(replace(trim(text(div)), ' ', '-')) AS slug FROM doc WHERE attributes.class = 'summary';
 ```
 
 Notes:
 - `TEXT()` and `INNER_HTML()` require a `WHERE` with a non-tag filter.
 - `INNER_HTML()` is minified by default; use `RAW_INNER_HTML()` for raw spacing.
+- `LENGTH()/CHAR_LENGTH()` currently count UTF-8 bytes.
+
+## SQL String Functions
+
+Available in `SELECT`, `WHERE`, and inside `PROJECT(...)` expressions:
+- `CONCAT(a, b, ...)`
+- `SUBSTRING(str, start, len)` and `SUBSTR(...)`
+- `LENGTH(str)` and `CHAR_LENGTH(str)` (UTF-8 byte length)
+- `POSITION(substr IN str)` and `LOCATE(substr, str[, start])`
+- `REPLACE(str, from, to)`
+- `LOWER(str)`, `UPPER(str)`
+- `LTRIM(str)`, `RTRIM(str)`, `TRIM(str)`
+- `DIRECT_TEXT(tag)`
+
+Examples:
+```sql
+SELECT CONCAT(attributes.class, '-x') AS label
+FROM doc
+WHERE tag = 'div';
+```
+
+```sql
+SELECT SUBSTRING(TRIM(TEXT(div)), 1, 10) AS preview
+FROM doc
+WHERE attributes.id = 'card';
+```
 
 ## FLATTEN_TEXT / FLATTEN
 
@@ -192,7 +243,14 @@ Common mistakes:
 Supported expression forms:
 - `TEXT(tag WHERE <predicate>)`
 - `ATTR(tag, attr WHERE <predicate>)`
+- `TEXT(..., <n>)` / `ATTR(..., <n>)` for 1-based stable selection
+- `FIRST_TEXT(...)`, `LAST_TEXT(...)`, `FIRST_ATTR(...)`, `LAST_ATTR(...)`
 - `COALESCE(expr1, expr2, ...)`
+- `DIRECT_TEXT(tag [WHERE <predicate>])`
+- `CASE WHEN <boolean_expr> THEN <value_expr> [ELSE <value_expr>] END`
+- SQL string functions (for example `LOWER(REPLACE(TRIM(TEXT(h2)), ' ', '-'))`)
+- Alias references to previous fields in the same `AS (...)` block
+- Top-level comparisons on expressions (for example `POSITION('coupon' IN LOWER(TEXT(li))) > 0`)
 
 Example:
 ```sql
@@ -216,6 +274,7 @@ Notes:
 - `AS (...)` is required and must use `alias: expression`.
 - `COALESCE` returns the first non-empty extracted value.
 - Use `HAS_DIRECT_TEXT` as an operator (`td HAS_DIRECT_TEXT '2025'`), not as a field.
+- Selector indexes are 1-based (`TEXT(..., 2)` is the second match). Out-of-range indexes return `NULL`.
 - `FLATTEN_EXTRACT(...)` is kept as a compatibility alias.
 
 ## Output Modes
@@ -239,6 +298,13 @@ SELECT table FROM doc WHERE id = 'stats' TO TABLE(EXPORT='stats.csv');
 SELECT a.href, TEXT(a) FROM doc WHERE href IS NOT NULL TO CSV('links.csv');
 SELECT * FROM doc TO PARQUET('nodes.parquet');
 ```
+
+### TO JSON / TO NDJSON
+```sql
+SELECT a.href, TEXT(a) FROM doc WHERE href IS NOT NULL TO JSON('links.json');
+SELECT a.href, TEXT(a) FROM doc WHERE href IS NOT NULL TO NDJSON('links.ndjson');
+```
+Both also accept empty destination (`TO JSON()` / `TO NDJSON()`) to stream to stdout.
 
 ## REPL Workflow
 

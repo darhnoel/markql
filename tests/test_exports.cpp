@@ -2,6 +2,8 @@
 #include "test_utils.h"
 
 #include <filesystem>
+#include <iostream>
+#include <sstream>
 
 #include "export/export_sinks.h"
 
@@ -111,6 +113,74 @@ void test_table_export_requires_single_table() {
   expect_true(threw, "table export requires single table");
 }
 
+void test_json_export_integration() {
+  std::string html =
+      "<a href='x'>He said \"hi\"</a>"
+      "<a href='y'>line1\nline2</a>";
+  auto path = std::filesystem::temp_directory_path() / "xsql_json_integration_test.json";
+  std::string query =
+      "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL TO JSON(\"" + path.string() + "\")";
+  auto result = run_query(html, query);
+  std::string error;
+  bool ok = xsql::cli::export_result(result, error);
+  expect_true(ok, "json export integration ok");
+  expect_true(error.empty(), "json export integration no error");
+  std::string content = read_file_to_string(path);
+  std::filesystem::remove(path);
+  std::string expected =
+      "[{\"href\":\"x\",\"text\":\"He said \\\"hi\\\"\"},"
+      "{\"href\":\"y\",\"text\":\"line1\\nline2\"}]\n";
+  expect_true(content == expected, "json export integration content");
+}
+
+void test_ndjson_export_integration() {
+  std::string html =
+      "<a href='x'>One</a>"
+      "<a href='y'>Two</a>";
+  auto path = std::filesystem::temp_directory_path() / "xsql_ndjson_integration_test.ndjson";
+  std::string query =
+      "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL TO NDJSON(\"" + path.string() + "\")";
+  auto result = run_query(html, query);
+  std::string error;
+  bool ok = xsql::cli::export_result(result, error);
+  expect_true(ok, "ndjson export integration ok");
+  expect_true(error.empty(), "ndjson export integration no error");
+  std::string content = read_file_to_string(path);
+  std::filesystem::remove(path);
+  std::string expected =
+      "{\"href\":\"x\",\"text\":\"One\"}\n"
+      "{\"href\":\"y\",\"text\":\"Two\"}\n";
+  expect_true(content == expected, "ndjson export integration content");
+}
+
+void test_json_ndjson_stdout_fallback() {
+  std::string html = "<a href='x'>One</a>";
+  {
+    std::string query = "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL TO JSON()";
+    auto result = run_query(html, query);
+    std::ostringstream captured;
+    auto* old = std::cout.rdbuf(captured.rdbuf());
+    std::string error;
+    bool ok = xsql::cli::export_result(result, error);
+    std::cout.rdbuf(old);
+    expect_true(ok, "json stdout export ok");
+    expect_true(error.empty(), "json stdout export no error");
+    expect_true(captured.str() == "[{\"href\":\"x\",\"text\":\"One\"}]\n", "json stdout export content");
+  }
+  {
+    std::string query = "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL TO NDJSON()";
+    auto result = run_query(html, query);
+    std::ostringstream captured;
+    auto* old = std::cout.rdbuf(captured.rdbuf());
+    std::string error;
+    bool ok = xsql::cli::export_result(result, error);
+    std::cout.rdbuf(old);
+    expect_true(ok, "ndjson stdout export ok");
+    expect_true(error.empty(), "ndjson stdout export no error");
+    expect_true(captured.str() == "{\"href\":\"x\",\"text\":\"One\"}\n", "ndjson stdout export content");
+  }
+}
+
 #ifdef XSQL_USE_ARROW
 void test_parquet_export_smoke() {
   std::string html = "<div id='x'>Hi</div>";
@@ -138,6 +208,9 @@ void register_export_tests(std::vector<TestCase>& tests) {
   tests.push_back({"table_csv_export_integration", test_table_csv_export_integration});
   tests.push_back({"table_csv_export_header_off", test_table_csv_export_header_off});
   tests.push_back({"table_export_requires_single_table", test_table_export_requires_single_table});
+  tests.push_back({"json_export_integration", test_json_export_integration});
+  tests.push_back({"ndjson_export_integration", test_ndjson_export_integration});
+  tests.push_back({"json_ndjson_stdout_fallback", test_json_ndjson_stdout_fallback});
 #ifdef XSQL_USE_ARROW
   tests.push_back({"parquet_export_smoke", test_parquet_export_smoke});
 #endif

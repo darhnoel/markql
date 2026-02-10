@@ -278,6 +278,7 @@ bool apply_repl_settings(const ReplSettings& settings,
   if (settings.max_rows.has_value()) {
     max_rows = *settings.max_rows;
   }
+  editor.set_keyword_color(config.color && config.highlight);
   return true;
 }
 

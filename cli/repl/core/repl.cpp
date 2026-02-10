@@ -56,7 +56,7 @@ int run_repl(ReplConfig& config) {
                                       : "markql (vim:edit)  > ";
   LineEditor editor(history_max_entries, prompt_normal, 8);
   editor.set_mode_prompts(prompt_vim_normal, 21, prompt_vim_insert, 21);
-  editor.set_keyword_color(config.color);
+  editor.set_keyword_color(config.color && config.highlight);
   editor.set_cont_prompt("", 0);
   CommandRegistry registry;
   register_default_commands(registry);
@@ -192,8 +192,10 @@ int run_repl(ReplConfig& config) {
         if (!xsql::cli::export_result(result, export_error)) {
           throw std::runtime_error(export_error);
         }
-        std::cout << "Wrote " << export_kind_label(result.export_sink.kind)
-                  << ": " << result.export_sink.path << std::endl;
+        if (!result.export_sink.path.empty()) {
+          std::cout << "Wrote " << export_kind_label(result.export_sink.kind)
+                    << ": " << result.export_sink.path << std::endl;
+        }
         editor.reset_render_state();
         continue;
       }
