@@ -139,7 +139,9 @@ Filters (`WHERE ...`) operators shown in the guide:
 
 - `=`
 - `<>` and `!=`
+- `<`, `<=`, `>`, `>=`
 - `IN (...)`
+- `LIKE` (`%` for any sequence, `_` for one char)
 - `IS NULL` and `IS NOT NULL`
 - `~` (regex)
 - `CONTAINS`, `CONTAINS ALL`, `CONTAINS ANY`
@@ -152,11 +154,21 @@ Examples:
 SELECT div FROM doc WHERE id = 'main';
 SELECT a FROM doc WHERE href IN ('/login', '/signup');
 SELECT a FROM doc WHERE href ~ '.*\.pdf$';
+SELECT div FROM doc WHERE text LIKE '%coupon%';
+SELECT div FROM doc WHERE POSITION('coupon' IN LOWER(text)) > 0;
 SELECT div FROM doc WHERE attributes IS NULL;
 SELECT div FROM doc WHERE div HAS_DIRECT_TEXT 'buy now';
 SELECT div FROM doc WHERE EXISTS(child);
 SELECT div FROM doc WHERE EXISTS(child WHERE tag = 'h2');
 ```
+
+Preferred SQL-style equivalent for direct text matching:
+```sql
+SELECT div FROM doc WHERE DIRECT_TEXT(div) LIKE '%buy now%';
+```
+
+Current behavior note:
+- `LIKE` matching is ASCII case-insensitive in this release.
 
 Hierarchy axes (relationship filters):
 
@@ -414,6 +426,10 @@ Supported expression forms:
 - `TEXT(tag WHERE <predicate>)`
 - `ATTR(tag, attr WHERE <predicate>)`
 - `COALESCE(expr1, expr2, ...)`
+- `DIRECT_TEXT(tag [WHERE <predicate>])`
+- SQL string functions such as `LOWER`, `REPLACE`, `SUBSTRING`, `CONCAT`, `POSITION`
+- Alias references to previously defined fields in the same `AS (...)`
+- Top-level comparisons on expressions (for example `POSITION('coupon' IN LOWER(TEXT(li))) > 0`)
 
 Example:
 ```sql
@@ -437,6 +453,19 @@ Important syntax details:
 - `AS (...)` is required and must use `alias: expression`.
 - `HAS_DIRECT_TEXT` is an operator form (`td HAS_DIRECT_TEXT '2025'`), not a projected field.
 - `FLATTEN_EXTRACT(...)` is supported as a compatibility alias.
+- `LENGTH()/CHAR_LENGTH()` currently count UTF-8 bytes.
+
+**SQL string function example**
+```sql
+SELECT li.node_id,
+PROJECT(li) AS (
+  title: TRIM(TEXT(h2)),
+  slug: LOWER(REPLACE(title, ' ', '-')),
+  score_pos: POSITION('score' IN LOWER(TEXT(li)))
+)
+FROM doc
+WHERE EXISTS(descendant WHERE tag = 'h2');
+```
 
 **Recipe: flatten generic values (FLATTEN)**
 ```sql

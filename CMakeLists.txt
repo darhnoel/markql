@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(markql VERSION 1.4.0 LANGUAGES CXX)
+project(markql VERSION 1.5.0 LANGUAGES CXX)
 
 option(XSQL_BUILD_CLI "Build the MarkQL CLI" ON)
 option(XSQL_BUILD_TESTS "Build tests" ON)
@@ -199,6 +199,7 @@ if (XSQL_BUILD_TESTS)
     tests/test_guardrails.cpp
     tests/test_meta_commands.cpp
     tests/test_cli_utils.cpp
+    tests/test_string_sql.cpp
     cli/repl/core/line_editor.cpp
     cli/repl/ui/autocomplete.cpp
     cli/repl/state/history.cpp
@@ -355,6 +356,20 @@ if (XSQL_BUILD_TESTS)
     flatten_extract_has_direct_text_predicate
     flatten_extract_requires_as_pairs
     flatten_extract_alias_compatibility
+    parse_like_predicate
+    parse_position_with_in
+    parse_project_nested_string_functions
+    parse_legacy_has_direct_text
+    parse_scoped_selector_inside_text
+    eval_like_wildcards
+    eval_string_functions_in_select
+    eval_length_byte_semantics
+    eval_position_found_and_not_found
+    eval_direct_text_excludes_descendants
+    project_missing_match_null_and_coalesce
+    project_selector_scope_and_first_match
+    project_top_level_comparison_expression
+    regression_canonical_project_query
   )
   if (XSQL_ENABLE_KHMER_NUMBER)
     list(APPEND XSQL_TESTS

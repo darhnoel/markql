@@ -45,6 +45,7 @@ enum class TokenType {
   KeywordFragments,
   KeywordContains,
   KeywordHasDirectText,
+  KeywordLike,
   KeywordAll,
   KeywordAny,
   KeywordIs,
@@ -60,6 +61,10 @@ enum class TokenType {
   KeywordOperators,
   Equal,
   NotEqual,
+  Greater,
+  GreaterEqual,
+  Less,
+  LessEqual,
   RegexMatch
 };
 

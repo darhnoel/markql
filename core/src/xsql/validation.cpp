@@ -17,6 +17,7 @@ bool has_non_tag_self_predicate(const Expr& expr) {
   if (std::holds_alternative<CompareExpr>(expr)) {
     const auto& cmp = std::get<CompareExpr>(expr);
     if (cmp.op == CompareExpr::Op::HasDirectText) return true;
+    if (cmp.lhs_expr.has_value() && cmp.lhs_expr->kind != ScalarExpr::Kind::Operand) return true;
     return !(cmp.lhs.axis == Operand::Axis::Self && cmp.lhs.field_kind == Operand::FieldKind::Tag);
   }
   if (std::holds_alternative<std::shared_ptr<ExistsExpr>>(expr)) {
@@ -101,7 +102,7 @@ bool scan_descendant_filter(const Expr& expr,
 bool is_projection_query(const Query& query) {
   for (const auto& item : query.select_items) {
     if (item.flatten_text || item.flatten_extract || item.field.has_value() ||
-        item.aggregate != Query::SelectItem::Aggregate::None) {
+        item.expr_projection || item.aggregate != Query::SelectItem::Aggregate::None) {
       return true;
     }
   }
@@ -257,7 +258,13 @@ void validate_projection(const Query& query) {
   std::optional<bool> inner_html_raw;
   for (const auto& item : query.select_items) {
     if (!item.field.has_value() && !item.flatten_text && !item.flatten_extract) {
+      if (item.expr_projection) {
+        continue;
+      }
       throw std::runtime_error("Cannot mix tag-only and projected fields in SELECT");
+    }
+    if (item.expr_projection) {
+      continue;
     }
     if (tag.empty()) {
       tag = item.tag;
@@ -338,7 +345,11 @@ void validate_qualifiers(const Query& query) {
   std::function<void(const Expr&)> visit = [&](const Expr& expr) {
     if (std::holds_alternative<CompareExpr>(expr)) {
       const auto& cmp = std::get<CompareExpr>(expr);
-      if (!is_allowed(cmp.lhs.qualifier)) {
+      if (cmp.lhs_expr.has_value() && cmp.lhs_expr->kind == ScalarExpr::Kind::Operand) {
+        if (!is_allowed(cmp.lhs_expr->operand.qualifier)) {
+          throw std::runtime_error("Unknown qualifier: " + *cmp.lhs_expr->operand.qualifier);
+        }
+      } else if (!is_allowed(cmp.lhs.qualifier)) {
         throw std::runtime_error("Unknown qualifier: " + *cmp.lhs.qualifier);
       }
       return;
@@ -382,10 +393,18 @@ void validate_predicates(const Query& query) {
   std::function<void(const Expr&)> visit = [&](const Expr& expr) {
     if (std::holds_alternative<CompareExpr>(expr)) {
       const auto& cmp = std::get<CompareExpr>(expr);
+      const Operand* lhs_operand = nullptr;
+      if (cmp.lhs_expr.has_value() && cmp.lhs_expr->kind == ScalarExpr::Kind::Operand) {
+        lhs_operand = &cmp.lhs_expr->operand;
+      } else if (cmp.lhs_expr.has_value()) {
+        lhs_operand = nullptr;
+      } else {
+        lhs_operand = &cmp.lhs;
+      }
       if (cmp.op == CompareExpr::Op::Contains ||
           cmp.op == CompareExpr::Op::ContainsAll ||
           cmp.op == CompareExpr::Op::ContainsAny) {
-        if (cmp.lhs.field_kind != Operand::FieldKind::Attribute) {
+        if (lhs_operand == nullptr || lhs_operand->field_kind != Operand::FieldKind::Attribute) {
           throw std::runtime_error("CONTAINS supports only attributes");
         }
         if (cmp.op == CompareExpr::Op::Contains && cmp.rhs.values.size() != 1) {
@@ -397,16 +416,17 @@ void validate_predicates(const Query& query) {
         }
       }
       if (cmp.op == CompareExpr::Op::HasDirectText) {
-        if (cmp.lhs.axis != Operand::Axis::Self ||
-            cmp.lhs.field_kind != Operand::FieldKind::Tag ||
-            cmp.lhs.attribute.empty()) {
+        if (lhs_operand == nullptr ||
+            lhs_operand->axis != Operand::Axis::Self ||
+            lhs_operand->field_kind != Operand::FieldKind::Tag ||
+            lhs_operand->attribute.empty()) {
           throw std::runtime_error("HAS_DIRECT_TEXT expects a tag identifier");
         }
         if (cmp.rhs.values.size() != 1) {
           throw std::runtime_error("HAS_DIRECT_TEXT expects a single string literal");
         }
       }
-      if (cmp.lhs.field_kind == Operand::FieldKind::AttributesMap) {
+      if (lhs_operand != nullptr && lhs_operand->field_kind == Operand::FieldKind::AttributesMap) {
         if (cmp.op != CompareExpr::Op::IsNull && cmp.op != CompareExpr::Op::IsNotNull) {
           throw std::runtime_error("attributes supports only IS NULL or IS NOT NULL");
         }

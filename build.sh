@@ -26,4 +26,4 @@ if [[ -n "${VCPKG_ROOT:-}" ]]; then
 fi
 
 cmake "${cmake_args[@]}"
-cmake --build build
+cmake --build build -j4

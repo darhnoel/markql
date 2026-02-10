@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <regex>
+#include <vector>
 
 #include "../util/string_util.h"
 #include "../xsql/xsql_internal.h"
@@ -74,6 +75,94 @@ std::optional<int64_t> parse_int64(const std::string& value) {
   }
 }
 
+struct ScalarValue {
+  enum class Kind { Null, String, Number } kind = Kind::Null;
+  std::string string_value;
+  int64_t number_value = 0;
+};
+
+ScalarValue make_null() { return ScalarValue{}; }
+
+ScalarValue make_string(std::string value) {
+  ScalarValue out;
+  out.kind = ScalarValue::Kind::String;
+  out.string_value = std::move(value);
+  return out;
+}
+
+ScalarValue make_number(int64_t value) {
+  ScalarValue out;
+  out.kind = ScalarValue::Kind::Number;
+  out.number_value = value;
+  return out;
+}
+
+bool is_null(const ScalarValue& value) { return value.kind == ScalarValue::Kind::Null; }
+
+std::string to_string_value(const ScalarValue& value) {
+  if (value.kind == ScalarValue::Kind::Number) {
+    return std::to_string(value.number_value);
+  }
+  return value.string_value;
+}
+
+std::optional<int64_t> to_int64_value(const ScalarValue& value) {
+  if (value.kind == ScalarValue::Kind::Number) return value.number_value;
+  if (value.kind == ScalarValue::Kind::String) return parse_int64(value.string_value);
+  return std::nullopt;
+}
+
+bool values_equal(const ScalarValue& left, const ScalarValue& right) {
+  if (is_null(left) || is_null(right)) return false;
+  auto lnum = to_int64_value(left);
+  auto rnum = to_int64_value(right);
+  if (lnum.has_value() && rnum.has_value()) return *lnum == *rnum;
+  return to_string_value(left) == to_string_value(right);
+}
+
+bool values_less(const ScalarValue& left, const ScalarValue& right) {
+  if (is_null(left) || is_null(right)) return false;
+  auto lnum = to_int64_value(left);
+  auto rnum = to_int64_value(right);
+  if (lnum.has_value() && rnum.has_value()) return *lnum < *rnum;
+  return to_string_value(left) < to_string_value(right);
+}
+
+// WHY: a small iterative matcher avoids regex setup cost for frequent LIKE filters.
+bool like_match_ci(const std::string& text, const std::string& pattern) {
+  std::string s = util::to_lower(text);
+  std::string p = util::to_lower(pattern);
+  size_t si = 0;
+  size_t pi = 0;
+  size_t star = std::string::npos;
+  size_t match = 0;
+  while (si < s.size()) {
+    if (pi < p.size() && (p[pi] == '_' || p[pi] == s[si])) {
+      ++si;
+      ++pi;
+      continue;
+    }
+    if (pi < p.size() && p[pi] == '%') {
+      star = pi++;
+      match = si;
+      continue;
+    }
+    if (star != std::string::npos) {
+      pi = star + 1;
+      si = ++match;
+      continue;
+    }
+    return false;
+  }
+  while (pi < p.size() && p[pi] == '%') ++pi;
+  return pi == p.size();
+}
+
+ScalarValue eval_scalar_expr_impl(const ScalarExpr& expr,
+                                  const HtmlDocument& doc,
+                                  const std::vector<std::vector<int64_t>>& children,
+                                  const HtmlNode& node);
+
 int64_t sibling_pos_for_node(const HtmlDocument& doc,
                              const std::vector<std::vector<int64_t>>& children,
                              const HtmlNode& node) {
@@ -104,6 +193,10 @@ bool match_position_value(int64_t pos,
   auto target = parse_int64(values.front());
   if (!target.has_value()) return false;
   if (op == CompareExpr::Op::NotEq) return pos != *target;
+  if (op == CompareExpr::Op::Lt) return pos < *target;
+  if (op == CompareExpr::Op::Lte) return pos <= *target;
+  if (op == CompareExpr::Op::Gt) return pos > *target;
+  if (op == CompareExpr::Op::Gte) return pos >= *target;
   return pos == *target;
 }
 
@@ -172,6 +265,10 @@ bool match_field(const HtmlNode& node,
       return false;
     }
     if (op == CompareExpr::Op::NotEq) return node.id != *target;
+    if (op == CompareExpr::Op::Lt) return node.id < *target;
+    if (op == CompareExpr::Op::Lte) return node.id <= *target;
+    if (op == CompareExpr::Op::Gt) return node.id > *target;
+    if (op == CompareExpr::Op::Gte) return node.id >= *target;
     return node.id == *target;
   }
   if (field_kind == Operand::FieldKind::ParentId) {
@@ -187,6 +284,10 @@ bool match_field(const HtmlNode& node,
       return false;
     }
     if (op == CompareExpr::Op::NotEq) return *node.parent_id != *target;
+    if (op == CompareExpr::Op::Lt) return *node.parent_id < *target;
+    if (op == CompareExpr::Op::Lte) return *node.parent_id <= *target;
+    if (op == CompareExpr::Op::Gt) return *node.parent_id > *target;
+    if (op == CompareExpr::Op::Gte) return *node.parent_id >= *target;
     return *node.parent_id == *target;
   }
   if (field_kind == Operand::FieldKind::MaxDepth ||
@@ -205,6 +306,10 @@ bool match_field(const HtmlNode& node,
       return false;
     }
     if (op == CompareExpr::Op::NotEq) return field_value != *target;
+    if (op == CompareExpr::Op::Lt) return field_value < *target;
+    if (op == CompareExpr::Op::Lte) return field_value <= *target;
+    if (op == CompareExpr::Op::Gt) return field_value > *target;
+    if (op == CompareExpr::Op::Gte) return field_value >= *target;
     return field_value == *target;
   }
   if (field_kind == Operand::FieldKind::Attribute) {
@@ -245,6 +350,11 @@ bool match_field(const HtmlNode& node,
       }
       return it->second != values.front();
     }
+    if (op == CompareExpr::Op::Like) {
+      auto it = node.attributes.find(attr);
+      if (it == node.attributes.end()) return false;
+      return like_match_ci(it->second, values.front());
+    }
     return match_attribute(node, attr, values, is_in);
   }
   if (field_kind == Operand::FieldKind::Tag) {
@@ -267,7 +377,12 @@ bool match_field(const HtmlNode& node,
       }
       return false;
     }
+    if (op == CompareExpr::Op::Like) return like_match_ci(node.tag, values.front());
     if (op == CompareExpr::Op::NotEq) return node.tag != util::to_lower(values.front());
+    if (op == CompareExpr::Op::Lt) return node.tag < util::to_lower(values.front());
+    if (op == CompareExpr::Op::Lte) return node.tag <= util::to_lower(values.front());
+    if (op == CompareExpr::Op::Gt) return node.tag > util::to_lower(values.front());
+    if (op == CompareExpr::Op::Gte) return node.tag >= util::to_lower(values.front());
     return node.tag == util::to_lower(values.front());
   }
   if (op == CompareExpr::Op::Regex) {
@@ -279,7 +394,12 @@ bool match_field(const HtmlNode& node,
     }
   }
   if (is_in) return string_in_list(node.text, values);
+  if (op == CompareExpr::Op::Like) return like_match_ci(node.text, values.front());
   if (op == CompareExpr::Op::NotEq) return node.text != values.front();
+  if (op == CompareExpr::Op::Lt) return node.text < values.front();
+  if (op == CompareExpr::Op::Lte) return node.text <= values.front();
+  if (op == CompareExpr::Op::Gt) return node.text > values.front();
+  if (op == CompareExpr::Op::Gte) return node.text >= values.front();
   return node.text == values.front();
 }
 
@@ -542,6 +662,210 @@ bool axis_has_any_node(const HtmlDocument& doc,
   return has_descendant_any(children, node);
 }
 
+std::vector<const HtmlNode*> axis_nodes(const HtmlDocument& doc,
+                                        const std::vector<std::vector<int64_t>>& children,
+                                        const HtmlNode& node,
+                                        Operand::Axis axis) {
+  std::vector<const HtmlNode*> out;
+  if (axis == Operand::Axis::Self) {
+    out.push_back(&node);
+    return out;
+  }
+  if (axis == Operand::Axis::Parent) {
+    if (node.parent_id.has_value()) {
+      out.push_back(&doc.nodes.at(static_cast<size_t>(*node.parent_id)));
+    }
+    return out;
+  }
+  if (axis == Operand::Axis::Child) {
+    for (int64_t id : children.at(static_cast<size_t>(node.id))) {
+      out.push_back(&doc.nodes.at(static_cast<size_t>(id)));
+    }
+    return out;
+  }
+  if (axis == Operand::Axis::Ancestor) {
+    const HtmlNode* current = &node;
+    while (current->parent_id.has_value()) {
+      const HtmlNode& parent = doc.nodes.at(static_cast<size_t>(*current->parent_id));
+      out.push_back(&parent);
+      current = &parent;
+    }
+    return out;
+  }
+  std::vector<int64_t> stack;
+  stack.insert(stack.end(),
+               children.at(static_cast<size_t>(node.id)).begin(),
+               children.at(static_cast<size_t>(node.id)).end());
+  while (!stack.empty()) {
+    int64_t id = stack.back();
+    stack.pop_back();
+    const HtmlNode& child = doc.nodes.at(static_cast<size_t>(id));
+    out.push_back(&child);
+    const auto& next = children.at(static_cast<size_t>(id));
+    stack.insert(stack.end(), next.begin(), next.end());
+  }
+  return out;
+}
+
+ScalarValue value_from_operand(const Operand& operand,
+                               const HtmlDocument& doc,
+                               const std::vector<std::vector<int64_t>>& children,
+                               const HtmlNode& node) {
+  std::vector<const HtmlNode*> candidates = axis_nodes(doc, children, node, operand.axis);
+  for (const HtmlNode* candidate : candidates) {
+    if (candidate == nullptr) continue;
+    switch (operand.field_kind) {
+      case Operand::FieldKind::Attribute: {
+        auto it = candidate->attributes.find(operand.attribute);
+        if (it != candidate->attributes.end()) return make_string(it->second);
+        break;
+      }
+      case Operand::FieldKind::Tag:
+        return make_string(candidate->tag);
+      case Operand::FieldKind::Text:
+        return make_string(candidate->text);
+      case Operand::FieldKind::NodeId:
+        return make_number(candidate->id);
+      case Operand::FieldKind::ParentId:
+        if (candidate->parent_id.has_value()) return make_number(*candidate->parent_id);
+        break;
+      case Operand::FieldKind::SiblingPos:
+        return make_number(sibling_pos_for_node(doc, children, *candidate));
+      case Operand::FieldKind::MaxDepth:
+        return make_number(candidate->max_depth);
+      case Operand::FieldKind::DocOrder:
+        return make_number(candidate->doc_order);
+      case Operand::FieldKind::AttributesMap:
+        break;
+    }
+  }
+  return make_null();
+}
+
+ScalarValue eval_scalar_expr_impl(const ScalarExpr& expr,
+                                  const HtmlDocument& doc,
+                                  const std::vector<std::vector<int64_t>>& children,
+                                  const HtmlNode& node) {
+  switch (expr.kind) {
+    case ScalarExpr::Kind::NullLiteral:
+      return make_null();
+    case ScalarExpr::Kind::StringLiteral:
+      return make_string(expr.string_value);
+    case ScalarExpr::Kind::NumberLiteral:
+      return make_number(expr.number_value);
+    case ScalarExpr::Kind::Operand:
+      return value_from_operand(expr.operand, doc, children, node);
+    case ScalarExpr::Kind::FunctionCall:
+      break;
+  }
+
+  std::string fn = util::to_upper(expr.function_name);
+  std::vector<ScalarValue> args;
+  args.reserve(expr.args.size());
+  for (const auto& arg : expr.args) {
+    args.push_back(eval_scalar_expr_impl(arg, doc, children, node));
+  }
+
+  if (fn == "COALESCE") {
+    for (const auto& value : args) {
+      if (!is_null(value)) return value;
+    }
+    return make_null();
+  }
+  if (fn == "CONCAT") {
+    std::string out;
+    for (const auto& value : args) {
+      if (is_null(value)) return make_null();
+      out += to_string_value(value);
+    }
+    return make_string(out);
+  }
+  if (fn == "LOWER" || fn == "UPPER") {
+    if (args.size() != 1 || is_null(args[0])) return make_null();
+    if (fn == "LOWER") return make_string(util::to_lower(to_string_value(args[0])));
+    return make_string(util::to_upper(to_string_value(args[0])));
+  }
+  if (fn == "TRIM" || fn == "LTRIM" || fn == "RTRIM") {
+    if (args.size() != 1 || is_null(args[0])) return make_null();
+    std::string value = to_string_value(args[0]);
+    if (fn == "TRIM") return make_string(util::trim_ws(value));
+    if (fn == "LTRIM") {
+      size_t i = 0;
+      while (i < value.size() && std::isspace(static_cast<unsigned char>(value[i]))) ++i;
+      return make_string(value.substr(i));
+    }
+    size_t end = value.size();
+    while (end > 0 && std::isspace(static_cast<unsigned char>(value[end - 1]))) --end;
+    return make_string(value.substr(0, end));
+  }
+  if (fn == "REPLACE") {
+    if (args.size() != 3 || is_null(args[0]) || is_null(args[1]) || is_null(args[2])) return make_null();
+    std::string text = to_string_value(args[0]);
+    std::string from = to_string_value(args[1]);
+    std::string to = to_string_value(args[2]);
+    if (from.empty()) return make_string(text);
+    size_t pos = 0;
+    while ((pos = text.find(from, pos)) != std::string::npos) {
+      text.replace(pos, from.size(), to);
+      pos += to.size();
+    }
+    return make_string(text);
+  }
+  if (fn == "LENGTH" || fn == "CHAR_LENGTH") {
+    if (args.size() != 1 || is_null(args[0])) return make_null();
+    return make_number(static_cast<int64_t>(to_string_value(args[0]).size()));
+  }
+  if (fn == "SUBSTRING" || fn == "SUBSTR") {
+    if (args.size() < 2 || args.size() > 3 || is_null(args[0]) || is_null(args[1])) return make_null();
+    std::string text = to_string_value(args[0]);
+    auto start = to_int64_value(args[1]);
+    if (!start.has_value()) return make_null();
+    int64_t from = std::max<int64_t>(1, *start) - 1;
+    if (static_cast<size_t>(from) >= text.size()) return make_string("");
+    if (args.size() == 2 || is_null(args[2])) return make_string(text.substr(static_cast<size_t>(from)));
+    auto len = to_int64_value(args[2]);
+    if (!len.has_value() || *len <= 0) return make_string("");
+    return make_string(text.substr(static_cast<size_t>(from), static_cast<size_t>(*len)));
+  }
+  if (fn == "POSITION") {
+    if (args.size() != 2 || is_null(args[0]) || is_null(args[1])) return make_null();
+    std::string needle = to_string_value(args[0]);
+    std::string haystack = to_string_value(args[1]);
+    size_t pos = haystack.find(needle);
+    if (pos == std::string::npos) return make_number(0);
+    return make_number(static_cast<int64_t>(pos + 1));
+  }
+  if (fn == "LOCATE") {
+    if (args.size() < 2 || args.size() > 3 || is_null(args[0]) || is_null(args[1])) return make_null();
+    std::string needle = to_string_value(args[0]);
+    std::string haystack = to_string_value(args[1]);
+    size_t start = 0;
+    if (args.size() == 3 && !is_null(args[2])) {
+      auto parsed = to_int64_value(args[2]);
+      if (!parsed.has_value()) return make_null();
+      if (*parsed > 1) start = static_cast<size_t>(*parsed - 1);
+    }
+    size_t pos = haystack.find(needle, start);
+    if (pos == std::string::npos) return make_number(0);
+    return make_number(static_cast<int64_t>(pos + 1));
+  }
+  if (fn == "TEXT" || fn == "DIRECT_TEXT" || fn == "ATTR") {
+    if ((fn == "TEXT" || fn == "DIRECT_TEXT") && args.size() != 1) return make_null();
+    if (fn == "ATTR" && args.size() != 2) return make_null();
+    if (args.empty() || is_null(args[0])) return make_null();
+    std::string tag = util::to_lower(to_string_value(args[0]));
+    if (node.tag != tag) return make_null();
+    if (fn == "TEXT") return make_string(node.text);
+    if (fn == "DIRECT_TEXT") return make_string(xsql_internal::extract_direct_text_strict(node.inner_html));
+    if (is_null(args[1])) return make_null();
+    std::string attr = util::to_lower(to_string_value(args[1]));
+    auto it = node.attributes.find(attr);
+    if (it == node.attributes.end()) return make_null();
+    return make_string(it->second);
+  }
+  return make_null();
+}
+
 bool eval_exists(const ExistsExpr& exists,
                  const HtmlDocument& doc,
                  const std::vector<std::vector<int64_t>>& children,
@@ -608,6 +932,83 @@ bool eval_expr(const Expr& expr,
     const auto& cmp = std::get<CompareExpr>(expr);
     std::vector<std::string> values = cmp.rhs.values;
     bool is_in = cmp.op == CompareExpr::Op::In;
+    bool lhs_is_operand = cmp.lhs_expr.has_value() && cmp.lhs_expr->kind == ScalarExpr::Kind::Operand;
+    bool legacy_op = cmp.op == CompareExpr::Op::Eq ||
+                     cmp.op == CompareExpr::Op::In ||
+                     cmp.op == CompareExpr::Op::NotEq ||
+                     cmp.op == CompareExpr::Op::Lt ||
+                     cmp.op == CompareExpr::Op::Lte ||
+                     cmp.op == CompareExpr::Op::Gt ||
+                     cmp.op == CompareExpr::Op::Gte ||
+                     cmp.op == CompareExpr::Op::Regex ||
+                     cmp.op == CompareExpr::Op::Like ||
+                     cmp.op == CompareExpr::Op::Contains ||
+                     cmp.op == CompareExpr::Op::ContainsAll ||
+                     cmp.op == CompareExpr::Op::ContainsAny ||
+                     cmp.op == CompareExpr::Op::HasDirectText ||
+                     cmp.op == CompareExpr::Op::IsNull ||
+                     cmp.op == CompareExpr::Op::IsNotNull;
+    bool can_use_legacy = lhs_is_operand && legacy_op &&
+                          (cmp.op == CompareExpr::Op::IsNull ||
+                           cmp.op == CompareExpr::Op::IsNotNull ||
+                           cmp.op == CompareExpr::Op::HasDirectText ||
+                           !values.empty());
+    if (!can_use_legacy && cmp.lhs_expr.has_value()) {
+      ScalarValue lhs_value = eval_scalar_expr_impl(*cmp.lhs_expr, doc, children, node);
+      if (cmp.op == CompareExpr::Op::IsNull) return is_null(lhs_value);
+      if (cmp.op == CompareExpr::Op::IsNotNull) return !is_null(lhs_value);
+      if (cmp.op == CompareExpr::Op::In) {
+        if (is_null(lhs_value)) return false;
+        for (const auto& rhs_expr : cmp.rhs_expr_list) {
+          ScalarValue rhs_value = eval_scalar_expr_impl(rhs_expr, doc, children, node);
+          if (values_equal(lhs_value, rhs_value)) return true;
+        }
+        return false;
+      }
+      ScalarValue rhs_value = cmp.rhs_expr.has_value()
+                                  ? eval_scalar_expr_impl(*cmp.rhs_expr, doc, children, node)
+                                  : make_null();
+      if (cmp.op == CompareExpr::Op::Eq) return values_equal(lhs_value, rhs_value);
+      if (cmp.op == CompareExpr::Op::NotEq) return !values_equal(lhs_value, rhs_value);
+      if (cmp.op == CompareExpr::Op::Lt) return values_less(lhs_value, rhs_value);
+      if (cmp.op == CompareExpr::Op::Lte) return values_less(lhs_value, rhs_value) || values_equal(lhs_value, rhs_value);
+      if (cmp.op == CompareExpr::Op::Gt) return values_less(rhs_value, lhs_value);
+      if (cmp.op == CompareExpr::Op::Gte) return values_less(rhs_value, lhs_value) || values_equal(lhs_value, rhs_value);
+      if (cmp.op == CompareExpr::Op::Like) {
+        if (is_null(lhs_value) || is_null(rhs_value)) return false;
+        return like_match_ci(to_string_value(lhs_value), to_string_value(rhs_value));
+      }
+      if (cmp.op == CompareExpr::Op::Regex) {
+        if (is_null(lhs_value) || is_null(rhs_value)) return false;
+        try {
+          std::regex re(to_string_value(rhs_value), std::regex::ECMAScript);
+          return std::regex_search(to_string_value(lhs_value), re);
+        } catch (const std::regex_error&) {
+          return false;
+        }
+      }
+      if (cmp.op == CompareExpr::Op::Contains ||
+          cmp.op == CompareExpr::Op::ContainsAll ||
+          cmp.op == CompareExpr::Op::ContainsAny) {
+        if (is_null(lhs_value)) return false;
+        std::vector<std::string> rhs_values;
+        for (const auto& rhs_expr : cmp.rhs_expr_list) {
+          ScalarValue value = eval_scalar_expr_impl(rhs_expr, doc, children, node);
+          if (is_null(value)) return false;
+          rhs_values.push_back(to_string_value(value));
+        }
+        if (rhs_values.empty()) {
+          if (!cmp.rhs_expr.has_value()) return false;
+          ScalarValue value = eval_scalar_expr_impl(*cmp.rhs_expr, doc, children, node);
+          if (is_null(value)) return false;
+          rhs_values.push_back(to_string_value(value));
+        }
+        if (cmp.op == CompareExpr::Op::Contains) return contains_ci(to_string_value(lhs_value), rhs_values.front());
+        if (cmp.op == CompareExpr::Op::ContainsAll) return contains_all_ci(to_string_value(lhs_value), rhs_values);
+        return contains_any_ci(to_string_value(lhs_value), rhs_values);
+      }
+    }
+
     if (cmp.op == CompareExpr::Op::HasDirectText) {
       if (node.tag != cmp.lhs.attribute) return false;
       std::string direct = xsql_internal::extract_direct_text(node.inner_html);

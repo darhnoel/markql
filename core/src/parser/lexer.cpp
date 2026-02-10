@@ -51,11 +51,25 @@ Token Lexer::next() {
       return Token{TokenType::NotEqual, "!=", pos_ - 2};
     }
   }
+  if (c == '>') {
+    if (pos_ + 1 < input_.size() && input_[pos_ + 1] == '=') {
+      pos_ += 2;
+      return Token{TokenType::GreaterEqual, ">=", pos_ - 2};
+    }
+    ++pos_;
+    return Token{TokenType::Greater, ">", pos_ - 1};
+  }
   if (c == '<') {
     if (pos_ + 1 < input_.size() && input_[pos_ + 1] == '>') {
       pos_ += 2;
       return Token{TokenType::NotEqual, "<>", pos_ - 2};
     }
+    if (pos_ + 1 < input_.size() && input_[pos_ + 1] == '=') {
+      pos_ += 2;
+      return Token{TokenType::LessEqual, "<=", pos_ - 2};
+    }
+    ++pos_;
+    return Token{TokenType::Less, "<", pos_ - 1};
   }
   if (c == '~') {
     ++pos_;
@@ -122,6 +136,7 @@ Token Lexer::lex_identifier_or_keyword() {
   if (upper == "FRAGMENTS") return Token{TokenType::KeywordFragments, out, start};
   if (upper == "CONTAINS") return Token{TokenType::KeywordContains, out, start};
   if (upper == "HAS_DIRECT_TEXT") return Token{TokenType::KeywordHasDirectText, out, start};
+  if (upper == "LIKE") return Token{TokenType::KeywordLike, out, start};
   if (upper == "ALL") return Token{TokenType::KeywordAll, out, start};
   if (upper == "ANY") return Token{TokenType::KeywordAny, out, start};
   if (upper == "IS") return Token{TokenType::KeywordIs, out, start};

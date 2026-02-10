@@ -56,12 +56,43 @@ bool Parser::parse_exclude_list(std::vector<std::string>& fields) {
 }
 
 bool Parser::parse_flatten_extract_expr(Query::SelectItem::FlattenExtractExpr& expr) {
+  if (current_.type == TokenType::String) {
+    expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::StringLiteral;
+    expr.string_value = current_.text;
+    expr.span = Span{current_.pos, current_.pos + current_.text.size()};
+    advance();
+    return true;
+  }
+  if (current_.type == TokenType::Number) {
+    expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::NumberLiteral;
+    try {
+      expr.number_value = std::stoll(current_.text);
+    } catch (...) {
+      return set_error("Invalid numeric literal");
+    }
+    expr.span = Span{current_.pos, current_.pos + current_.text.size()};
+    advance();
+    return true;
+  }
+  if (current_.type == TokenType::KeywordNull) {
+    expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::NullLiteral;
+    expr.span = Span{current_.pos, current_.pos + 4};
+    advance();
+    return true;
+  }
   if (current_.type != TokenType::Identifier) {
-    return set_error("Expected TEXT(), ATTR(), or COALESCE() expression");
+    return set_error("Expected expression inside PROJECT/FLATTEN_EXTRACT");
   }
   size_t start = current_.pos;
+  std::string ident = current_.text;
   std::string fn = to_upper(current_.text);
   advance();
+  if (current_.type != TokenType::LParen) {
+    expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::AliasRef;
+    expr.alias_ref = ident;
+    expr.span = Span{start, current_.pos};
+    return true;
+  }
 
   if (fn == "TEXT") {
     if (!consume(TokenType::LParen, "Expected ( after TEXT")) return false;
@@ -78,6 +109,29 @@ bool Parser::parse_flatten_extract_expr(Query::SelectItem::FlattenExtractExpr& e
       expr.where = where_expr;
     }
     if (!consume(TokenType::RParen, "Expected ) after TEXT expression")) return false;
+    expr.span = Span{start, current_.pos};
+    return true;
+  }
+
+  if (fn == "DIRECT_TEXT") {
+    if (!consume(TokenType::LParen, "Expected ( after DIRECT_TEXT")) return false;
+    if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
+      return set_error("Expected tag identifier inside DIRECT_TEXT()");
+    }
+    expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::FunctionCall;
+    expr.function_name = "DIRECT_TEXT";
+    Query::SelectItem::FlattenExtractExpr tag_expr;
+    tag_expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::StringLiteral;
+    tag_expr.string_value = to_lower(current_.text);
+    expr.args.push_back(std::move(tag_expr));
+    advance();
+    if (current_.type == TokenType::KeywordWhere) {
+      advance();
+      Expr where_expr;
+      if (!parse_expr(where_expr)) return false;
+      expr.where = where_expr;
+    }
+    if (!consume(TokenType::RParen, "Expected ) after DIRECT_TEXT expression")) return false;
     expr.span = Span{start, current_.pos};
     return true;
   }
@@ -127,7 +181,31 @@ bool Parser::parse_flatten_extract_expr(Query::SelectItem::FlattenExtractExpr& e
     return true;
   }
 
-  return set_error("Expected TEXT(), ATTR(), or COALESCE() expression");
+  expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::FunctionCall;
+  expr.function_name = fn;
+  if (!consume(TokenType::LParen, "Expected ( after function name")) return false;
+  if (fn == "POSITION") {
+    Query::SelectItem::FlattenExtractExpr needle;
+    if (!parse_flatten_extract_expr(needle)) return false;
+    expr.args.push_back(std::move(needle));
+    if (!consume(TokenType::KeywordIn, "Expected IN inside POSITION(substr IN str)")) return false;
+    Query::SelectItem::FlattenExtractExpr haystack;
+    if (!parse_flatten_extract_expr(haystack)) return false;
+    expr.args.push_back(std::move(haystack));
+  } else if (current_.type != TokenType::RParen) {
+    Query::SelectItem::FlattenExtractExpr arg;
+    if (!parse_flatten_extract_expr(arg)) return false;
+    expr.args.push_back(std::move(arg));
+    while (current_.type == TokenType::Comma) {
+      advance();
+      Query::SelectItem::FlattenExtractExpr next_arg;
+      if (!parse_flatten_extract_expr(next_arg)) return false;
+      expr.args.push_back(std::move(next_arg));
+    }
+  }
+  if (!consume(TokenType::RParen, "Expected ) after function arguments")) return false;
+  expr.span = Span{start, current_.pos};
+  return true;
 }
 
 bool Parser::parse_flatten_extract_alias_expr_pairs(Query::SelectItem& item) {
@@ -145,6 +223,31 @@ bool Parser::parse_flatten_extract_alias_expr_pairs(Query::SelectItem& item) {
     }
     Query::SelectItem::FlattenExtractExpr expr;
     if (!parse_flatten_extract_expr(expr)) return false;
+    while (current_.type == TokenType::Equal ||
+           current_.type == TokenType::NotEqual ||
+           current_.type == TokenType::Less ||
+           current_.type == TokenType::LessEqual ||
+           current_.type == TokenType::Greater ||
+           current_.type == TokenType::GreaterEqual ||
+           current_.type == TokenType::KeywordLike) {
+      Query::SelectItem::FlattenExtractExpr rhs;
+      std::string op;
+      if (current_.type == TokenType::Equal) op = "__CMP_EQ";
+      else if (current_.type == TokenType::NotEqual) op = "__CMP_NE";
+      else if (current_.type == TokenType::Less) op = "__CMP_LT";
+      else if (current_.type == TokenType::LessEqual) op = "__CMP_LE";
+      else if (current_.type == TokenType::Greater) op = "__CMP_GT";
+      else if (current_.type == TokenType::GreaterEqual) op = "__CMP_GE";
+      else op = "__CMP_LIKE";
+      advance();
+      if (!parse_flatten_extract_expr(rhs)) return false;
+      Query::SelectItem::FlattenExtractExpr cmp_expr;
+      cmp_expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::FunctionCall;
+      cmp_expr.function_name = op;
+      cmp_expr.args.push_back(std::move(expr));
+      cmp_expr.args.push_back(std::move(rhs));
+      expr = std::move(cmp_expr);
+    }
     item.flatten_extract_exprs.push_back(std::move(expr));
     if (current_.type == TokenType::Comma) {
       advance();
@@ -464,6 +567,43 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
     items.push_back(item);
     saw_field = true;
     return true;
+  }
+  if ((current_.type == TokenType::Identifier || current_.type == TokenType::KeywordTable) &&
+      peek().type == TokenType::LParen) {
+    std::string fn = to_upper(current_.text);
+    const bool scalar_fn =
+        fn == "CONCAT" || fn == "SUBSTRING" || fn == "SUBSTR" ||
+        fn == "LENGTH" || fn == "CHAR_LENGTH" || fn == "POSITION" ||
+        fn == "LOCATE" || fn == "REPLACE" || fn == "LOWER" ||
+        fn == "UPPER" || fn == "LTRIM" || fn == "RTRIM" ||
+        fn == "TRIM" || fn == "DIRECT_TEXT" || fn == "COALESCE" ||
+        fn == "ATTR";
+    if (scalar_fn) {
+      Query::SelectItem item;
+      size_t start = current_.pos;
+      ScalarExpr expr;
+      if (!parse_scalar_expr(expr)) return false;
+      item.expr_projection = true;
+      item.expr = expr;
+      std::string column = "expr";
+      if (expr.kind == ScalarExpr::Kind::FunctionCall && !expr.function_name.empty()) {
+        column = to_lower(expr.function_name);
+      }
+      if (current_.type == TokenType::KeywordAs) {
+        advance();
+        if (current_.type != TokenType::Identifier) {
+          return set_error("Expected alias identifier after AS");
+        }
+        column = current_.text;
+        advance();
+      }
+      item.field = column;
+      item.tag = "*";
+      item.span = Span{start, current_.pos};
+      items.push_back(item);
+      saw_field = true;
+      return true;
+    }
   }
   if (current_.type == TokenType::Star) {
     Query::SelectItem item;
