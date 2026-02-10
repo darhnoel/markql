@@ -114,8 +114,10 @@ int main(int argc, char** argv) {
       if (!xsql::cli::export_result(result, export_error)) {
         throw std::runtime_error(export_error);
       }
-      std::cout << "Wrote " << export_kind_label(result.export_sink.kind)
-                << ": " << result.export_sink.path << std::endl;
+      if (!result.export_sink.path.empty()) {
+        std::cout << "Wrote " << export_kind_label(result.export_sink.kind)
+                  << ": " << result.export_sink.path << std::endl;
+      }
       return 0;
     }
 

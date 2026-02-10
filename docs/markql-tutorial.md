@@ -87,7 +87,7 @@ FROM <source>
 [WHERE <expr>]
 [ORDER BY <field> [ASC|DESC][, ...]]
 [LIMIT <number>]
-[TO LIST() | TO TABLE(...) | TO CSV('file.csv') | TO PARQUET('file.parquet')];
+[TO LIST() | TO TABLE(...) | TO CSV('file.csv') | TO PARQUET('file.parquet') | TO JSON(['file.json']) | TO NDJSON(['file.ndjson'])];
 ```
 
 `ORDER BY` is supported. In current runtime behavior, ordering is applied by:
@@ -425,8 +425,11 @@ Use `PROJECT` when positional flattening is too fragile and you want explicit fi
 Supported expression forms:
 - `TEXT(tag WHERE <predicate>)`
 - `ATTR(tag, attr WHERE <predicate>)`
+- `TEXT(..., <n>)` / `ATTR(..., <n>)` for 1-based stable selection
+- `FIRST_TEXT(...)`, `LAST_TEXT(...)`, `FIRST_ATTR(...)`, `LAST_ATTR(...)`
 - `COALESCE(expr1, expr2, ...)`
 - `DIRECT_TEXT(tag [WHERE <predicate>])`
+- `CASE WHEN <boolean_expr> THEN <value_expr> [ELSE <value_expr>] END`
 - SQL string functions such as `LOWER`, `REPLACE`, `SUBSTRING`, `CONCAT`, `POSITION`
 - Alias references to previously defined fields in the same `AS (...)`
 - Top-level comparisons on expressions (for example `POSITION('coupon' IN LOWER(TEXT(li))) > 0`)
@@ -453,6 +456,7 @@ Important syntax details:
 - `AS (...)` is required and must use `alias: expression`.
 - `HAS_DIRECT_TEXT` is an operator form (`td HAS_DIRECT_TEXT '2025'`), not a projected field.
 - `FLATTEN_EXTRACT(...)` is supported as a compatibility alias.
+- Selector indexes are 1-based. If index is out of range, the expression returns `NULL`.
 - `LENGTH()/CHAR_LENGTH()` currently count UTF-8 bytes.
 
 **SQL string function example**
@@ -480,6 +484,19 @@ SELECT a.href, TEXT(a)
 FROM doc
 WHERE href IS NOT NULL
 TO CSV('links.csv');
+```
+
+**Recipe: export row objects to JSON / NDJSON**
+```sql
+SELECT a.href, TEXT(a)
+FROM doc
+WHERE href IS NOT NULL
+TO JSON('links.json');
+
+SELECT a.href, TEXT(a)
+FROM doc
+WHERE href IS NOT NULL
+TO NDJSON('links.ndjson');
 ```
 
 **Recipe: export the full node table to Parquet**

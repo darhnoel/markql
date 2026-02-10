@@ -113,7 +113,7 @@ struct Query {
     DescribeLanguage
   } kind = Kind::Select;
   struct ExportSink {
-    enum class Kind { None, Csv, Parquet } kind = Kind::None;
+    enum class Kind { None, Csv, Parquet, Json, Ndjson } kind = Kind::None;
     std::string path;
     Span span;
   };
@@ -124,15 +124,32 @@ struct Query {
   };
   struct SelectItem {
     struct FlattenExtractExpr {
-      enum class Kind { Text, Attr, Coalesce, FunctionCall, StringLiteral, NumberLiteral, NullLiteral, AliasRef } kind = Kind::Text;
+      enum class Kind {
+        Text,
+        Attr,
+        Coalesce,
+        FunctionCall,
+        StringLiteral,
+        NumberLiteral,
+        NullLiteral,
+        AliasRef,
+        OperandRef,
+        CaseWhen
+      } kind = Kind::Text;
       std::string tag;
       std::optional<std::string> attribute;
       std::optional<Expr> where;
+      std::optional<int64_t> selector_index;
+      bool selector_last = false;
       std::vector<FlattenExtractExpr> args;
       std::string function_name;
       std::string string_value;
       int64_t number_value = 0;
       std::string alias_ref;
+      Operand operand;
+      std::vector<Expr> case_when_conditions;
+      std::vector<FlattenExtractExpr> case_when_values;
+      std::shared_ptr<FlattenExtractExpr> case_else;
       Span span;
     };
     enum class Aggregate { None, Count, Summarize, Tfidf } aggregate = Aggregate::None;
@@ -157,6 +174,7 @@ struct Query {
     std::vector<std::string> flatten_extract_aliases;
     std::vector<FlattenExtractExpr> flatten_extract_exprs;
     std::optional<ScalarExpr> expr;
+    std::optional<FlattenExtractExpr> project_expr;
     Span span;
   };
   std::vector<SelectItem> select_items;

@@ -12,6 +12,7 @@
 #include "repl/core/line_editor.h"
 #include "repl/plugin_manager.h"
 #include "repl/core/repl.h"
+#include "repl/ui/sql_keywords.h"
 
 namespace {
 
@@ -149,10 +150,28 @@ static void test_summarize_content_max_tokens() {
   expect_true(output.find("gamma") == std::string::npos, "output should not include token 'gamma'");
 }
 
+static void test_sql_keyword_catalog_includes_new_tokens() {
+  expect_true(xsql::cli::is_sql_keyword_token("case"), "CASE should be highlighted as keyword");
+  expect_true(xsql::cli::is_sql_keyword_token("WHEN"), "WHEN should be highlighted as keyword");
+  expect_true(xsql::cli::is_sql_keyword_token("ndjson"), "NDJSON should be highlighted as keyword");
+  expect_true(!xsql::cli::is_sql_keyword_token("first_text"),
+              "FIRST_TEXT is a function-like identifier, not a reserved keyword");
+  expect_true(!xsql::cli::is_sql_keyword_token("doc"),
+              "doc should be treated as a source name, not a reserved keyword");
+  expect_true(!xsql::cli::is_sql_keyword_token("document"),
+              "document should be treated as a source name, not a reserved keyword");
+  expect_true(!xsql::cli::is_sql_keyword_token("table"),
+              "table should not be highlighted as a reserved SQL keyword");
+  expect_true(!xsql::cli::is_sql_keyword_token("view"),
+              "view names should not be highlighted as reserved keywords");
+}
+
 void register_repl_tests(std::vector<TestCase>& tests) {
   tests.push_back({"summarize_content_basic", test_summarize_content_basic});
   tests.push_back({"summarize_content_khmer_requires_plugin",
                    test_summarize_content_khmer_requires_plugin});
   tests.push_back({"summarize_content_max_tokens",
                    test_summarize_content_max_tokens});
+  tests.push_back({"sql_keyword_catalog_includes_new_tokens",
+                   test_sql_keyword_catalog_includes_new_tokens});
 }

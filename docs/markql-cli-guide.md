@@ -30,7 +30,7 @@ Think of it as:
 - `SELECT <tag or projected fields>`
 - `FROM <html source>`
 - `WHERE <filters>`
-- optional `LIMIT`, `TO LIST`, `TO TABLE`, `TO CSV`, `TO PARQUET`
+- optional `LIMIT`, `TO LIST`, `TO TABLE`, `TO CSV`, `TO PARQUET`, `TO JSON`, `TO NDJSON`
 
 ## CLI Setup
 
@@ -135,6 +135,7 @@ Reserved keywords used by these features:
 - `LOWER` / `UPPER`
 - `LTRIM` / `RTRIM`
 - `DIRECT_TEXT`
+- `CASE` / `WHEN` / `THEN` / `ELSE` / `END`
 
 ## Hierarchy (Axes)
 
@@ -242,8 +243,11 @@ Common mistakes:
 Supported expression forms:
 - `TEXT(tag WHERE <predicate>)`
 - `ATTR(tag, attr WHERE <predicate>)`
+- `TEXT(..., <n>)` / `ATTR(..., <n>)` for 1-based stable selection
+- `FIRST_TEXT(...)`, `LAST_TEXT(...)`, `FIRST_ATTR(...)`, `LAST_ATTR(...)`
 - `COALESCE(expr1, expr2, ...)`
 - `DIRECT_TEXT(tag [WHERE <predicate>])`
+- `CASE WHEN <boolean_expr> THEN <value_expr> [ELSE <value_expr>] END`
 - SQL string functions (for example `LOWER(REPLACE(TRIM(TEXT(h2)), ' ', '-'))`)
 - Alias references to previous fields in the same `AS (...)` block
 - Top-level comparisons on expressions (for example `POSITION('coupon' IN LOWER(TEXT(li))) > 0`)
@@ -270,6 +274,7 @@ Notes:
 - `AS (...)` is required and must use `alias: expression`.
 - `COALESCE` returns the first non-empty extracted value.
 - Use `HAS_DIRECT_TEXT` as an operator (`td HAS_DIRECT_TEXT '2025'`), not as a field.
+- Selector indexes are 1-based (`TEXT(..., 2)` is the second match). Out-of-range indexes return `NULL`.
 - `FLATTEN_EXTRACT(...)` is kept as a compatibility alias.
 
 ## Output Modes
@@ -293,6 +298,13 @@ SELECT table FROM doc WHERE id = 'stats' TO TABLE(EXPORT='stats.csv');
 SELECT a.href, TEXT(a) FROM doc WHERE href IS NOT NULL TO CSV('links.csv');
 SELECT * FROM doc TO PARQUET('nodes.parquet');
 ```
+
+### TO JSON / TO NDJSON
+```sql
+SELECT a.href, TEXT(a) FROM doc WHERE href IS NOT NULL TO JSON('links.json');
+SELECT a.href, TEXT(a) FROM doc WHERE href IS NOT NULL TO NDJSON('links.ndjson');
+```
+Both also accept empty destination (`TO JSON()` / `TO NDJSON()`) to stream to stdout.
 
 ## REPL Workflow
 

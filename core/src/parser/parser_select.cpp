@@ -80,69 +80,146 @@ bool Parser::parse_flatten_extract_expr(Query::SelectItem::FlattenExtractExpr& e
     advance();
     return true;
   }
-  if (current_.type != TokenType::Identifier) {
-    return set_error("Expected expression inside PROJECT/FLATTEN_EXTRACT");
-  }
-  size_t start = current_.pos;
-  std::string ident = current_.text;
-  std::string fn = to_upper(current_.text);
-  advance();
-  if (current_.type != TokenType::LParen) {
-    expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::AliasRef;
-    expr.alias_ref = ident;
+  if (current_.type == TokenType::KeywordCase) {
+    size_t start = current_.pos;
+    advance();
+    expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::CaseWhen;
+    while (current_.type == TokenType::KeywordWhen) {
+      advance();
+      Expr when_expr;
+      if (!parse_expr(when_expr)) return false;
+      if (!consume(TokenType::KeywordThen, "Expected THEN in CASE expression")) return false;
+      Query::SelectItem::FlattenExtractExpr then_expr;
+      if (!parse_flatten_extract_expr(then_expr)) return false;
+      expr.case_when_conditions.push_back(std::move(when_expr));
+      expr.case_when_values.push_back(std::move(then_expr));
+    }
+    if (expr.case_when_values.empty()) {
+      return set_error("CASE expression requires at least one WHEN ... THEN pair");
+    }
+    if (current_.type == TokenType::KeywordElse) {
+      advance();
+      auto else_expr = std::make_shared<Query::SelectItem::FlattenExtractExpr>();
+      if (!parse_flatten_extract_expr(*else_expr)) return false;
+      expr.case_else = std::move(else_expr);
+    }
+    if (!consume(TokenType::KeywordEnd, "Expected END to close CASE expression")) return false;
     expr.span = Span{start, current_.pos};
     return true;
   }
+  if (current_.type != TokenType::Identifier) {
+    return set_error("Expected expression inside PROJECT/FLATTEN_EXTRACT");
+  }
+  auto parse_selector_position = [&](Query::SelectItem::FlattenExtractExpr& target,
+                                     const char* func_name) -> bool {
+    if (current_.type != TokenType::Comma) return true;
+    advance();
+    if (current_.type == TokenType::Number) {
+      try {
+        int64_t index = std::stoll(current_.text);
+        if (index < 1) return set_error(std::string(func_name) + " index must be >= 1");
+        target.selector_index = index;
+      } catch (...) {
+        return set_error(std::string("Invalid ") + func_name + " index");
+      }
+      advance();
+      return true;
+    }
+    if (current_.type == TokenType::Identifier) {
+      std::string pos = to_upper(current_.text);
+      if (pos == "FIRST") {
+        target.selector_index = 1;
+        advance();
+        return true;
+      }
+      if (pos == "LAST") {
+        target.selector_last = true;
+        advance();
+        return true;
+      }
+    }
+    return set_error(std::string("Expected numeric index, FIRST, or LAST in ") + func_name);
+  };
 
-  if (fn == "TEXT") {
-    if (!consume(TokenType::LParen, "Expected ( after TEXT")) return false;
+  size_t start = current_.pos;
+  std::string ident = current_.text;
+  std::string fn = to_upper(current_.text);
+  if (peek().type != TokenType::LParen) {
+    bool operand_like =
+        peek().type == TokenType::Dot ||
+        fn == "ATTRIBUTES" ||
+        fn == "TAG" ||
+        fn == "TEXT" ||
+        fn == "NODE_ID" ||
+        fn == "PARENT_ID" ||
+        fn == "SIBLING_POS" ||
+        fn == "MAX_DEPTH" ||
+        fn == "DOC_ORDER" ||
+        fn == "PARENT" ||
+        fn == "CHILD" ||
+        fn == "ANCESTOR" ||
+        fn == "DESCENDANT";
+    if (operand_like) {
+      Operand operand;
+      if (!parse_operand(operand)) return false;
+      expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::OperandRef;
+      expr.operand = std::move(operand);
+      expr.span = expr.operand.span;
+      return true;
+    }
+    expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::AliasRef;
+    expr.alias_ref = ident;
+    expr.span = Span{start, current_.pos + current_.text.size()};
+    advance();
+    return true;
+  }
+
+  if (fn == "TEXT" || fn == "DIRECT_TEXT" || fn == "FIRST_TEXT" || fn == "LAST_TEXT") {
+    advance();
+    if (!consume(TokenType::LParen, "Expected ( after TEXT function")) return false;
     if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
       return set_error("Expected tag identifier inside TEXT()");
     }
-    expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::Text;
-    expr.tag = current_.text;
+    std::string tag = to_lower(current_.text);
     advance();
+    if (fn == "DIRECT_TEXT") {
+      expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::FunctionCall;
+      expr.function_name = "DIRECT_TEXT";
+      Query::SelectItem::FlattenExtractExpr tag_expr;
+      tag_expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::StringLiteral;
+      tag_expr.string_value = tag;
+      expr.args.push_back(std::move(tag_expr));
+    } else {
+      expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::Text;
+      expr.tag = tag;
+    }
     if (current_.type == TokenType::KeywordWhere) {
       advance();
       Expr where_expr;
       if (!parse_expr(where_expr)) return false;
-      expr.where = where_expr;
+      expr.where = std::move(where_expr);
+    }
+    if (!parse_selector_position(expr, "TEXT()")) return false;
+    if (fn == "FIRST_TEXT") {
+      expr.selector_index = 1;
+      expr.selector_last = false;
+    } else if (fn == "LAST_TEXT") {
+      expr.selector_index.reset();
+      expr.selector_last = true;
     }
     if (!consume(TokenType::RParen, "Expected ) after TEXT expression")) return false;
     expr.span = Span{start, current_.pos};
     return true;
   }
 
-  if (fn == "DIRECT_TEXT") {
-    if (!consume(TokenType::LParen, "Expected ( after DIRECT_TEXT")) return false;
-    if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
-      return set_error("Expected tag identifier inside DIRECT_TEXT()");
-    }
-    expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::FunctionCall;
-    expr.function_name = "DIRECT_TEXT";
-    Query::SelectItem::FlattenExtractExpr tag_expr;
-    tag_expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::StringLiteral;
-    tag_expr.string_value = to_lower(current_.text);
-    expr.args.push_back(std::move(tag_expr));
+  if (fn == "ATTR" || fn == "FIRST_ATTR" || fn == "LAST_ATTR") {
     advance();
-    if (current_.type == TokenType::KeywordWhere) {
-      advance();
-      Expr where_expr;
-      if (!parse_expr(where_expr)) return false;
-      expr.where = where_expr;
-    }
-    if (!consume(TokenType::RParen, "Expected ) after DIRECT_TEXT expression")) return false;
-    expr.span = Span{start, current_.pos};
-    return true;
-  }
-
-  if (fn == "ATTR") {
     if (!consume(TokenType::LParen, "Expected ( after ATTR")) return false;
     if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
       return set_error("Expected tag identifier inside ATTR()");
     }
     expr.kind = Query::SelectItem::FlattenExtractExpr::Kind::Attr;
-    expr.tag = current_.text;
+    expr.tag = to_lower(current_.text);
     advance();
     if (!consume(TokenType::Comma, "Expected , after tag in ATTR()")) return false;
     if (current_.type != TokenType::Identifier) {
@@ -154,12 +231,22 @@ bool Parser::parse_flatten_extract_expr(Query::SelectItem::FlattenExtractExpr& e
       advance();
       Expr where_expr;
       if (!parse_expr(where_expr)) return false;
-      expr.where = where_expr;
+      expr.where = std::move(where_expr);
+    }
+    if (!parse_selector_position(expr, "ATTR()")) return false;
+    if (fn == "FIRST_ATTR") {
+      expr.selector_index = 1;
+      expr.selector_last = false;
+    } else if (fn == "LAST_ATTR") {
+      expr.selector_index.reset();
+      expr.selector_last = true;
     }
     if (!consume(TokenType::RParen, "Expected ) after ATTR expression")) return false;
     expr.span = Span{start, current_.pos};
     return true;
   }
+
+  advance();
 
   if (fn == "COALESCE") {
     if (!consume(TokenType::LParen, "Expected ( after COALESCE")) return false;
@@ -564,6 +651,43 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
     item.span = Span{start, current_.pos + current_.text.size()};
     advance();
     if (!consume(TokenType::RParen, "Expected ) after COUNT argument")) return false;
+    items.push_back(item);
+    saw_field = true;
+    return true;
+  }
+  if (current_.type == TokenType::KeywordCase ||
+      ((current_.type == TokenType::Identifier || current_.type == TokenType::KeywordTable) &&
+       peek().type == TokenType::LParen &&
+       (to_upper(current_.text) == "FIRST_TEXT" ||
+        to_upper(current_.text) == "LAST_TEXT" ||
+        to_upper(current_.text) == "FIRST_ATTR" ||
+        to_upper(current_.text) == "LAST_ATTR"))) {
+    Query::SelectItem item;
+    size_t start = current_.pos;
+    Query::SelectItem::FlattenExtractExpr project_expr;
+    if (!parse_flatten_extract_expr(project_expr)) return false;
+    item.expr_projection = true;
+    item.project_expr = std::move(project_expr);
+    std::string column = "expr";
+    if (item.project_expr.has_value()) {
+      if (item.project_expr->kind == Query::SelectItem::FlattenExtractExpr::Kind::CaseWhen) {
+        column = "case";
+      } else if (item.project_expr->kind == Query::SelectItem::FlattenExtractExpr::Kind::FunctionCall &&
+                 !item.project_expr->function_name.empty()) {
+        column = to_lower(item.project_expr->function_name);
+      }
+    }
+    if (current_.type == TokenType::KeywordAs) {
+      advance();
+      if (current_.type != TokenType::Identifier) {
+        return set_error("Expected alias identifier after AS");
+      }
+      column = current_.text;
+      advance();
+    }
+    item.field = column;
+    item.tag = "*";
+    item.span = Span{start, current_.pos};
     items.push_back(item);
     saw_field = true;
     return true;

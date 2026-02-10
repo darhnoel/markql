@@ -7,6 +7,28 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-02-10
+
+### Added
+- Added `CASE WHEN ... THEN ... [ELSE ...] END` expressions for:
+  - `SELECT` expression projections
+  - `PROJECT(...) AS (alias: expr, ...)` mappings
+- Added stable selector picking for scoped extraction:
+  - `TEXT(..., n)` / `ATTR(..., n)` with 1-based indexes
+  - `FIRST_TEXT(...)`, `LAST_TEXT(...)`, `FIRST_ATTR(...)`, `LAST_ATTR(...)`
+- Added `TO JSON(...)` export sink (single JSON array of row objects).
+- Added `TO NDJSON(...)` export sink (one JSON object per line).
+- Added stdout export fallback for JSON sinks via `TO JSON()` / `TO NDJSON()`.
+- Added parser/runtime/export tests for:
+  - CASE parsing and evaluation
+  - selector index semantics (first/nth/last and out-of-range nulls)
+  - JSON/NDJSON file output and stdout fallback
+
+### Changed
+- Updated `SHOW FUNCTIONS` / `DESCRIBE language` metadata for CASE, selector helpers, and JSON sinks.
+- Updated CLI help/autocomplete and docs to include JSON/NDJSON export and CASE/selectors.
+- Bumped project version to `1.6.0`.
+
 ## [1.5.0] - 2026-02-10
 
 ### Added

@@ -371,17 +371,35 @@ void validate_qualifiers(const Query& query) {
   }
   std::function<void(const Query::SelectItem::FlattenExtractExpr&)> visit_extract =
       [&](const Query::SelectItem::FlattenExtractExpr& expr) {
+        if (expr.kind == Query::SelectItem::FlattenExtractExpr::Kind::OperandRef) {
+          if (!is_allowed(expr.operand.qualifier)) {
+            throw std::runtime_error("Unknown qualifier: " + *expr.operand.qualifier);
+          }
+        }
         if (expr.where.has_value()) {
           visit(*expr.where);
+        }
+        for (const auto& when_expr : expr.case_when_conditions) {
+          visit(when_expr);
+        }
+        for (const auto& then_expr : expr.case_when_values) {
+          visit_extract(then_expr);
+        }
+        if (expr.case_else != nullptr) {
+          visit_extract(*expr.case_else);
         }
         for (const auto& arg : expr.args) {
           visit_extract(arg);
         }
       };
   for (const auto& item : query.select_items) {
-    if (!item.flatten_extract) continue;
-    for (const auto& expr : item.flatten_extract_exprs) {
-      visit_extract(expr);
+    if (item.flatten_extract) {
+      for (const auto& expr : item.flatten_extract_exprs) {
+        visit_extract(expr);
+      }
+    }
+    if (item.project_expr.has_value()) {
+      visit_extract(*item.project_expr);
     }
   }
 }
@@ -460,14 +478,27 @@ void validate_predicates(const Query& query) {
         if (expr.where.has_value()) {
           visit(*expr.where);
         }
+        for (const auto& when_expr : expr.case_when_conditions) {
+          visit(when_expr);
+        }
+        for (const auto& then_expr : expr.case_when_values) {
+          visit_extract(then_expr);
+        }
+        if (expr.case_else != nullptr) {
+          visit_extract(*expr.case_else);
+        }
         for (const auto& arg : expr.args) {
           visit_extract(arg);
         }
       };
   for (const auto& item : query.select_items) {
-    if (!item.flatten_extract) continue;
-    for (const auto& expr : item.flatten_extract_exprs) {
-      visit_extract(expr);
+    if (item.flatten_extract) {
+      for (const auto& expr : item.flatten_extract_exprs) {
+        visit_extract(expr);
+      }
+    }
+    if (item.project_expr.has_value()) {
+      visit_extract(*item.project_expr);
     }
   }
 }
@@ -544,7 +575,9 @@ void validate_export_sink(const Query& query) {
   if (query.to_list) {
     throw std::runtime_error("TO LIST() cannot be combined with export sinks");
   }
-  if (query.export_sink->path.empty()) {
+  if ((query.export_sink->kind == Query::ExportSink::Kind::Csv ||
+       query.export_sink->kind == Query::ExportSink::Kind::Parquet) &&
+      query.export_sink->path.empty()) {
     throw std::runtime_error("Export path cannot be empty");
   }
 }

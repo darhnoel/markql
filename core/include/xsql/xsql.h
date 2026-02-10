@@ -34,7 +34,7 @@ struct QueryResult {
     /// Describes an export target so the CLI can write files without re-parsing the query.
     /// MUST use Kind::None to indicate no export and MUST carry a valid path otherwise.
     /// Inputs are kind/path; side effects occur when the CLI performs the write.
-    enum class Kind { None, Csv, Parquet } kind = Kind::None;
+    enum class Kind { None, Csv, Parquet, Json, Ndjson } kind = Kind::None;
     // WHY: defaulting to None prevents accidental file writes when a sink is not specified.
     std::string path;
   };

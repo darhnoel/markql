@@ -1,6 +1,9 @@
+#include <cctype>
 #include <cstdlib>
 #include <iostream>
+#include <sstream>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "test_harness.h"
@@ -28,6 +31,26 @@ void register_string_sql_tests(std::vector<TestCase>& tests);
 void register_khmer_number_tests(std::vector<TestCase>& tests);
 #endif
 
+namespace {
+
+std::unordered_set<std::string> parse_skip_list_from_env() {
+  std::unordered_set<std::string> out;
+  const char* raw = std::getenv("XSQL_TEST_SKIP");
+  if (!raw || !*raw) return out;
+  std::istringstream iss(raw);
+  std::string token;
+  while (std::getline(iss, token, ',')) {
+    size_t start = 0;
+    while (start < token.size() && std::isspace(static_cast<unsigned char>(token[start]))) ++start;
+    size_t end = token.size();
+    while (end > start && std::isspace(static_cast<unsigned char>(token[end - 1]))) --end;
+    if (end > start) out.insert(token.substr(start, end - start));
+  }
+  return out;
+}
+
+}  // namespace
+
 int main(int argc, char** argv) {
   std::vector<TestCase> tests;
   tests.reserve(64);
@@ -54,8 +77,14 @@ int main(int argc, char** argv) {
   register_khmer_number_tests(tests);
 #endif
 
+  const auto skip_tests = parse_skip_list_from_env();
+
   if (argc > 1) {
     std::string target = argv[1];
+    if (skip_tests.find(target) != skip_tests.end()) {
+      std::cout << "SKIPPED: " << target << std::endl;
+      return EXIT_SUCCESS;
+    }
     for (const auto& test : tests) {
       if (target == test.name) {
         int failures = run_test(test);
@@ -70,5 +99,18 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  return run_all_tests(tests);
+  if (skip_tests.empty()) {
+    return run_all_tests(tests);
+  }
+
+  std::vector<TestCase> filtered;
+  filtered.reserve(tests.size());
+  for (const auto& test : tests) {
+    if (skip_tests.find(test.name) != skip_tests.end()) {
+      std::cout << "SKIPPED: " << test.name << std::endl;
+      continue;
+    }
+    filtered.push_back(test);
+  }
+  return run_all_tests(filtered);
 }

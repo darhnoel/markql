@@ -35,6 +35,22 @@ void test_parse_scoped_selector_inside_text() {
   expect_true(parsed.query.has_value(), "parse scoped selector inside TEXT()");
 }
 
+void test_parse_case_expression_in_select() {
+  auto parsed = xsql::parse_query(
+      "SELECT CASE WHEN attributes.id IS NULL THEN 'no_id' ELSE attributes.id END AS id_status "
+      "FROM document WHERE tag = 'div'");
+  expect_true(parsed.query.has_value(), "parse CASE expression in SELECT");
+}
+
+void test_parse_nested_case_expression() {
+  auto parsed = xsql::parse_query(
+      "SELECT CASE WHEN attributes.id IS NULL THEN "
+      "CASE WHEN tag = 'div' THEN 'div_missing' ELSE 'missing' END "
+      "ELSE attributes.id END AS id_status "
+      "FROM document WHERE tag IN ('div', 'span')");
+  expect_true(parsed.query.has_value(), "parse nested CASE expression");
+}
+
 void test_eval_like_wildcards() {
   std::string html = "<div>abc</div><div>axc</div><div>zzz</div>";
   auto percent = run_query(html, "SELECT div FROM document WHERE text LIKE '%c'");
@@ -89,6 +105,80 @@ void test_eval_direct_text_excludes_descendants() {
       "<div><span>Top</span></div>";
   auto result = run_query(html, "SELECT div FROM document WHERE DIRECT_TEXT(div) LIKE '%Top%'");
   expect_eq(result.rows.size(), 1, "direct_text excludes descendant text");
+}
+
+void test_eval_case_expression_select_and_null_else() {
+  std::string html =
+      "<div id='a'>A</div>"
+      "<div>B</div>";
+  auto result = run_query(
+      html,
+      "SELECT CASE WHEN attributes.id IS NULL THEN 'no_id' ELSE attributes.id END AS id_status "
+      "FROM document WHERE tag = 'div' ORDER BY node_id ASC");
+  expect_eq(result.rows.size(), 2, "case select row count");
+  if (result.rows.size() >= 2) {
+    expect_true(result.rows[0].computed_fields["id_status"] == "a", "case select row1");
+    expect_true(result.rows[1].computed_fields["id_status"] == "no_id", "case select row2");
+  }
+
+  auto null_result = run_query(
+      html,
+      "SELECT CASE WHEN attributes.id = 'z' THEN 'match' END AS maybe_match "
+      "FROM document WHERE tag = 'div' ORDER BY node_id ASC");
+  expect_eq(null_result.rows.size(), 2, "case without else row count");
+  if (null_result.rows.size() >= 2) {
+    expect_true(
+        null_result.rows[0].computed_fields.find("maybe_match") == null_result.rows[0].computed_fields.end(),
+        "case without else row1 null");
+    expect_true(
+        null_result.rows[1].computed_fields.find("maybe_match") == null_result.rows[1].computed_fields.end(),
+        "case without else row2 null");
+  }
+}
+
+void test_project_case_and_selector_positions() {
+  std::string html =
+      "<ul>"
+      "<li>"
+      "<span class='price'>10</span>"
+      "<span class='price'>20</span>"
+      "<span class='price'>30</span>"
+      "<a href='first.pdf'>first</a>"
+      "<a href='second.pdf'>second</a>"
+      "</li>"
+      "<li>"
+      "<span class='price'>40</span>"
+      "<span class='price'>50</span>"
+      "<a href='only.pdf'>only</a>"
+      "</li>"
+      "</ul>";
+
+  auto result = run_query(
+      html,
+      "SELECT li.node_id, PROJECT(li) AS ("
+      "bucket: CASE WHEN EXISTS(child WHERE tag = 'a') THEN 'has_link' ELSE 'none' END,"
+      "second_price: TEXT(span WHERE attributes.class = 'price', 2),"
+      "last_price: LAST_TEXT(span WHERE attributes.class = 'price'),"
+      "second_href: ATTR(a, href, 2),"
+      "last_href: LAST_ATTR(a, href)"
+      ") "
+      "FROM document WHERE tag = 'li' ORDER BY node_id ASC");
+
+  expect_eq(result.rows.size(), 2, "project selector position row count");
+  if (result.rows.size() >= 2) {
+    expect_true(result.rows[0].computed_fields["bucket"] == "has_link", "project case row1");
+    expect_true(result.rows[0].computed_fields["second_price"] == "20", "text nth row1");
+    expect_true(result.rows[0].computed_fields["last_price"] == "30", "last_text row1");
+    expect_true(result.rows[0].computed_fields["second_href"] == "second.pdf", "attr nth row1");
+    expect_true(result.rows[0].computed_fields["last_href"] == "second.pdf", "last_attr row1");
+
+    expect_true(result.rows[1].computed_fields["second_price"] == "50", "text nth row2");
+    expect_true(result.rows[1].computed_fields["last_price"] == "50", "last_text row2");
+    expect_true(
+        result.rows[1].computed_fields.find("second_href") == result.rows[1].computed_fields.end(),
+        "attr nth out of range returns null");
+    expect_true(result.rows[1].computed_fields["last_href"] == "only.pdf", "last_attr row2");
+  }
 }
 
 void test_project_missing_match_null_and_coalesce() {
@@ -183,11 +273,15 @@ void register_string_sql_tests(std::vector<TestCase>& tests) {
   tests.push_back({"parse_project_nested_string_functions", test_parse_project_nested_string_functions});
   tests.push_back({"parse_legacy_has_direct_text", test_parse_legacy_has_direct_text});
   tests.push_back({"parse_scoped_selector_inside_text", test_parse_scoped_selector_inside_text});
+  tests.push_back({"parse_case_expression_in_select", test_parse_case_expression_in_select});
+  tests.push_back({"parse_nested_case_expression", test_parse_nested_case_expression});
   tests.push_back({"eval_like_wildcards", test_eval_like_wildcards});
   tests.push_back({"eval_string_functions_in_select", test_eval_string_functions_in_select});
   tests.push_back({"eval_length_byte_semantics", test_eval_length_byte_semantics});
   tests.push_back({"eval_position_found_and_not_found", test_eval_position_found_and_not_found});
   tests.push_back({"eval_direct_text_excludes_descendants", test_eval_direct_text_excludes_descendants});
+  tests.push_back({"eval_case_expression_select_and_null_else", test_eval_case_expression_select_and_null_else});
+  tests.push_back({"project_case_and_selector_positions", test_project_case_and_selector_positions});
   tests.push_back({"project_missing_match_null_and_coalesce", test_project_missing_match_null_and_coalesce});
   tests.push_back({"project_selector_scope_and_first_match", test_project_selector_scope_and_first_match});
   tests.push_back({"project_top_level_comparison_expression", test_project_top_level_comparison_expression});

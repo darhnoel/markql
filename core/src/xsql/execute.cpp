@@ -263,6 +263,8 @@ std::optional<std::string> selector_value(
     const std::string& tag,
     const std::optional<std::string>& attr,
     const std::optional<Expr>& where,
+    const std::optional<int64_t>& selector_index,
+    bool selector_last,
     bool direct_text,
     const HtmlNode& base_node,
     const HtmlDocument& doc,
@@ -271,25 +273,129 @@ std::optional<std::string> selector_value(
   scope_nodes.reserve(32);
   collect_row_scope_nodes(children, base_node.id, scope_nodes);
   const std::string extract_tag = util::to_lower(tag);
+  int64_t seen = 0;
+  std::optional<std::string> last_value;
+  int64_t target = selector_index.value_or(1);
   for (int64_t id : scope_nodes) {
     const HtmlNode& node = doc.nodes.at(static_cast<size_t>(id));
     if (node.tag != extract_tag) continue;
     if (where.has_value() && !executor_internal::eval_expr(*where, doc, children, node)) {
       continue;
     }
+    std::optional<std::string> value;
     if (attr.has_value()) {
       auto it = node.attributes.find(*attr);
       if (it == node.attributes.end() || it->second.empty()) continue;
-      return it->second;
+      value = it->second;
+    } else if (direct_text) {
+      std::string direct = util::trim_ws(xsql_internal::extract_direct_text_strict(node.inner_html));
+      if (direct.empty()) continue;
+      value = std::move(direct);
+    } else {
+      std::string text = normalized_extract_text(node);
+      if (text.empty()) continue;
+      value = std::move(text);
     }
-    if (direct_text) {
-      std::string value = util::trim_ws(xsql_internal::extract_direct_text_strict(node.inner_html));
-      if (value.empty()) continue;
-      return value;
+    if (!value.has_value()) continue;
+    if (selector_last) {
+      last_value = std::move(value);
+      continue;
     }
-    std::string value = normalized_extract_text(node);
-    if (value.empty()) continue;
-    return value;
+    ++seen;
+    if (seen == target) return value;
+  }
+  if (selector_last) return last_value;
+  return std::nullopt;
+}
+
+int64_t sibling_pos_for_projection(const HtmlDocument& doc,
+                                   const std::vector<std::vector<int64_t>>& children,
+                                   const HtmlNode& node) {
+  if (!node.parent_id.has_value()) return 1;
+  const auto& siblings = children.at(static_cast<size_t>(*node.parent_id));
+  for (size_t i = 0; i < siblings.size(); ++i) {
+    if (siblings[i] == node.id) return static_cast<int64_t>(i + 1);
+  }
+  return 1;
+}
+
+std::vector<const HtmlNode*> projection_axis_nodes(const HtmlDocument& doc,
+                                                   const std::vector<std::vector<int64_t>>& children,
+                                                   const HtmlNode& node,
+                                                   Operand::Axis axis) {
+  std::vector<const HtmlNode*> out;
+  if (axis == Operand::Axis::Self) {
+    out.push_back(&node);
+    return out;
+  }
+  if (axis == Operand::Axis::Parent) {
+    if (node.parent_id.has_value()) {
+      out.push_back(&doc.nodes.at(static_cast<size_t>(*node.parent_id)));
+    }
+    return out;
+  }
+  if (axis == Operand::Axis::Child) {
+    for (int64_t id : children.at(static_cast<size_t>(node.id))) {
+      out.push_back(&doc.nodes.at(static_cast<size_t>(id)));
+    }
+    return out;
+  }
+  if (axis == Operand::Axis::Ancestor) {
+    const HtmlNode* current = &node;
+    while (current->parent_id.has_value()) {
+      const HtmlNode& parent = doc.nodes.at(static_cast<size_t>(*current->parent_id));
+      out.push_back(&parent);
+      current = &parent;
+    }
+    return out;
+  }
+  std::vector<int64_t> stack;
+  stack.insert(stack.end(),
+               children.at(static_cast<size_t>(node.id)).begin(),
+               children.at(static_cast<size_t>(node.id)).end());
+  while (!stack.empty()) {
+    int64_t id = stack.back();
+    stack.pop_back();
+    const HtmlNode& child = doc.nodes.at(static_cast<size_t>(id));
+    out.push_back(&child);
+    const auto& next = children.at(static_cast<size_t>(id));
+    stack.insert(stack.end(), next.begin(), next.end());
+  }
+  return out;
+}
+
+std::optional<std::string> projection_operand_value(const Operand& operand,
+                                                    const HtmlNode& base_node,
+                                                    const HtmlDocument& doc,
+                                                    const std::vector<std::vector<int64_t>>& children) {
+  std::vector<const HtmlNode*> candidates =
+      projection_axis_nodes(doc, children, base_node, operand.axis);
+  for (const HtmlNode* candidate : candidates) {
+    if (candidate == nullptr) continue;
+    switch (operand.field_kind) {
+      case Operand::FieldKind::Attribute: {
+        auto it = candidate->attributes.find(operand.attribute);
+        if (it != candidate->attributes.end()) return it->second;
+        break;
+      }
+      case Operand::FieldKind::Tag:
+        return candidate->tag;
+      case Operand::FieldKind::Text:
+        return candidate->text;
+      case Operand::FieldKind::NodeId:
+        return std::to_string(candidate->id);
+      case Operand::FieldKind::ParentId:
+        if (candidate->parent_id.has_value()) return std::to_string(*candidate->parent_id);
+        break;
+      case Operand::FieldKind::SiblingPos:
+        return std::to_string(sibling_pos_for_projection(doc, children, *candidate));
+      case Operand::FieldKind::MaxDepth:
+        return std::to_string(candidate->max_depth);
+      case Operand::FieldKind::DocOrder:
+        return std::to_string(candidate->doc_order);
+      case Operand::FieldKind::AttributesMap:
+        break;
+    }
   }
   return std::nullopt;
 }
@@ -316,6 +422,19 @@ std::optional<std::string> eval_flatten_extract_expr(
     if (it == bindings.end()) return std::nullopt;
     return it->second;
   }
+  if (expr.kind == ExtractKind::OperandRef) {
+    return projection_operand_value(expr.operand, base_node, doc, children);
+  }
+  if (expr.kind == ExtractKind::CaseWhen) {
+    for (size_t i = 0; i < expr.case_when_conditions.size() && i < expr.case_when_values.size(); ++i) {
+      if (!executor_internal::eval_expr(expr.case_when_conditions[i], doc, children, base_node)) continue;
+      return eval_flatten_extract_expr(expr.case_when_values[i], base_node, doc, children, bindings);
+    }
+    if (expr.case_else != nullptr) {
+      return eval_flatten_extract_expr(*expr.case_else, base_node, doc, children, bindings);
+    }
+    return std::nullopt;
+  }
 
   if (expr.kind == ExtractKind::Coalesce) {
     for (const auto& arg : expr.args) {
@@ -329,10 +448,12 @@ std::optional<std::string> eval_flatten_extract_expr(
   }
 
   if (expr.kind == ExtractKind::Text) {
-    return selector_value(expr.tag, std::nullopt, expr.where, false, base_node, doc, children);
+    return selector_value(expr.tag, std::nullopt, expr.where, expr.selector_index, expr.selector_last,
+                          false, base_node, doc, children);
   }
   if (expr.kind == ExtractKind::Attr) {
-    return selector_value(expr.tag, expr.attribute, expr.where, false, base_node, doc, children);
+    return selector_value(expr.tag, expr.attribute, expr.where, expr.selector_index, expr.selector_last,
+                          false, base_node, doc, children);
   }
 
   if (expr.kind == ExtractKind::FunctionCall) {
@@ -344,15 +465,18 @@ std::optional<std::string> eval_flatten_extract_expr(
     }
     if (fn == "TEXT") {
       if (args.size() != 1 || !args[0].has_value()) return std::nullopt;
-      return selector_value(*args[0], std::nullopt, expr.where, false, base_node, doc, children);
+      return selector_value(*args[0], std::nullopt, expr.where, expr.selector_index, expr.selector_last,
+                            false, base_node, doc, children);
     }
     if (fn == "DIRECT_TEXT") {
       if (args.size() != 1 || !args[0].has_value()) return std::nullopt;
-      return selector_value(*args[0], std::nullopt, expr.where, true, base_node, doc, children);
+      return selector_value(*args[0], std::nullopt, expr.where, expr.selector_index, expr.selector_last,
+                            true, base_node, doc, children);
     }
     if (fn == "ATTR") {
       if (args.size() != 2 || !args[0].has_value() || !args[1].has_value()) return std::nullopt;
-      return selector_value(*args[0], util::to_lower(*args[1]), expr.where, false, base_node, doc, children);
+      return selector_value(*args[0], util::to_lower(*args[1]), expr.where, expr.selector_index, expr.selector_last,
+                            false, base_node, doc, children);
     }
     if (fn == "CONCAT") {
       std::string out;
@@ -693,6 +817,10 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
           {
               {"text(tag)", "string", "Text content of a tag"},
               {"direct_text(tag)", "string", "Immediate text content of a tag"},
+              {"first_text(tag WHERE ...)", "string", "First scoped TEXT match (alias of TEXT(..., 1))"},
+              {"last_text(tag WHERE ...)", "string", "Last scoped TEXT match"},
+              {"first_attr(tag, attr WHERE ...)", "string", "First scoped ATTR match"},
+              {"last_attr(tag, attr WHERE ...)", "string", "Last scoped ATTR match"},
               {"concat(a, b, ...)", "string", "Concatenate strings; NULL if any arg is NULL"},
               {"substring(str, start, len)", "string", "1-based substring"},
               {"substr(str, start, len)", "string", "Alias of substring"},
@@ -706,6 +834,7 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
               {"ltrim(str)", "string", "Trim left whitespace"},
               {"rtrim(str)", "string", "Trim right whitespace"},
               {"coalesce(a, b, ...)", "scalar", "First non-NULL value"},
+              {"case when ... then ... else ... end", "scalar", "Conditional expression"},
               {"inner_html(tag[, depth])", "string", "Minified HTML inside a tag"},
               {"raw_inner_html(tag[, depth])", "string", "Raw inner HTML without minification"},
               {"flatten_text(tag[, depth])", "string[]", "Flatten descendant text at depth into columns"},
@@ -778,6 +907,8 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
                "Select table tags only"},
               {"output", "TO CSV", "TO CSV('file.csv')", "Export result"},
               {"output", "TO PARQUET", "TO PARQUET('file.parquet')", "Export result"},
+              {"output", "TO JSON", "TO JSON(['file.json'])", "Export rows as a JSON array"},
+              {"output", "TO NDJSON", "TO NDJSON(['file.ndjson'])", "Export rows as newline-delimited JSON"},
               {"source", "document", "FROM document", "Active input in REPL"},
               {"source", "alias", "FROM doc", "Alias for document"},
               {"source", "path", "FROM 'file.html'", "Local file"},
@@ -807,8 +938,14 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
               {"function", "length", "length(str)", "UTF-8 byte length"},
               {"function", "position", "position(substr IN str)", "1-based; 0 if not found"},
               {"function", "replace", "replace(str, from, to)", "Substring replacement"},
-              {"function", "case", "lower/upper(str)", "Case conversion"},
+              {"function", "case expression",
+               "CASE WHEN <expr> THEN <value> [ELSE <value>] END",
+               "Evaluates WHEN clauses top-to-bottom"},
               {"function", "trim family", "ltrim/rtrim/trim(str)", "Whitespace trimming"},
+              {"function", "first_text", "first_text(tag WHERE ...)", "First scoped text match"},
+              {"function", "last_text", "last_text(tag WHERE ...)", "Last scoped text match"},
+              {"function", "first_attr", "first_attr(tag, attr WHERE ...)", "First scoped attr match"},
+              {"function", "last_attr", "last_attr(tag, attr WHERE ...)", "Last scoped attr match"},
               {"function", "project",
                "project(tag) AS (alias: expr, ...)",
                "Expressions: TEXT/ATTR/DIRECT_TEXT/COALESCE plus SQL string functions"},
@@ -932,6 +1069,10 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
       out.export_sink.kind = QueryResult::ExportSink::Kind::Csv;
     } else if (sink.kind == Query::ExportSink::Kind::Parquet) {
       out.export_sink.kind = QueryResult::ExportSink::Kind::Parquet;
+    } else if (sink.kind == Query::ExportSink::Kind::Json) {
+      out.export_sink.kind = QueryResult::ExportSink::Kind::Json;
+    } else if (sink.kind == Query::ExportSink::Kind::Ndjson) {
+      out.export_sink.kind = QueryResult::ExportSink::Kind::Ndjson;
     }
     out.export_sink.path = sink.path;
   }
@@ -1255,7 +1396,15 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
     row.max_depth = node.max_depth;
     row.doc_order = node.doc_order;
     for (const auto& item : query.select_items) {
-      if (!item.expr_projection || !item.expr.has_value() || !item.field.has_value()) continue;
+      if (!item.expr_projection || !item.field.has_value()) continue;
+      if (item.project_expr.has_value()) {
+        std::optional<std::string> value =
+            eval_flatten_extract_expr(*item.project_expr, node, doc, children, row.computed_fields);
+        if (!value.has_value()) continue;
+        row.computed_fields[*item.field] = *value;
+        continue;
+      }
+      if (!item.expr.has_value()) continue;
       ScalarProjectionValue value = eval_select_scalar_expr(*item.expr, node);
       if (projection_is_null(value)) continue;
       row.computed_fields[*item.field] = projection_to_string(value);
