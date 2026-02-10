@@ -602,8 +602,10 @@ Helpful REPL commands listed in the guide:
 - `.help`
 - `.load <path|url> [--alias <name>]`
 - `.mode duckbox|json|plain`
+- `.set colnames raw|normalize`
 - `.display_mode more|less`
 - `.max_rows <n|inf>`
+- `DESCRIBE LAST`
 - `.summarize [doc|alias|path|url]`
 - `.reload_config`
 - `.quit`
@@ -738,6 +740,10 @@ Yes. A string literal can be a URL source: `FROM 'https://example.com'`.
 
 **How do I test a query quickly without scrolling forever?**  
 Add `LIMIT` early: `... LIMIT 5;`. Also consider `.max_rows` in REPL for display control.
+
+**Why does output show `data_id` instead of `data-id`?**  
+MarkQL normalizes output column names by default for tool compatibility (`data-id` -> `data_id`).  
+Use `.set colnames raw` to keep raw names, and `DESCRIBE LAST` to inspect the `raw_name -> output_name` mapping of the previous query.
 
 **Why does `TEXT(div)` fail unless I add `WHERE`?**  
 Because `TEXT()` (and `INNER_HTML()`) require a `WHERE` clause with a non-tag filter. Add something like `WHERE id = 'card'` or `WHERE attributes.class = 'summary'`.

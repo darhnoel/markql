@@ -527,54 +527,58 @@ bool build_show_inputs_result(const std::vector<std::string>& sources,
   return true;
 }
 
-std::string build_json(const xsql::QueryResult& result) {
+std::string build_json(const xsql::QueryResult& result, xsql::ColumnNameMode colname_mode) {
 #ifdef XSQL_USE_NLOHMANN_JSON
   using nlohmann::json;
-  std::vector<std::string> columns = result.columns;
-  if (columns.empty()) {
-    columns = {"node_id", "tag", "attributes", "parent_id", "max_depth", "doc_order"};
+  std::vector<std::string> raw_columns = result.columns;
+  if (raw_columns.empty()) {
+    raw_columns = {"node_id", "tag", "attributes", "parent_id", "max_depth", "doc_order"};
   }
+  std::vector<xsql::ColumnNameMapping> schema =
+      xsql::build_column_name_map(raw_columns, colname_mode);
   json out = json::array();
   for (const auto& row : result.rows) {
     json obj = json::object();
-    for (const auto& field : columns) {
-      if (field == "node_id") {
-        obj[field] = row.node_id;
-      } else if (field == "count") {
-        obj[field] = row.node_id;
-      } else if (field == "tag") {
-        obj[field] = row.tag;
-      } else if (field == "text") {
-        obj[field] = row.text;
-      } else if (field == "inner_html") {
-        obj[field] = row.inner_html;
-      } else if (field == "parent_id") {
-        obj[field] = row.parent_id.has_value() ? json(*row.parent_id) : json(nullptr);
-      } else if (field == "max_depth") {
-        obj[field] = row.max_depth;
-      } else if (field == "doc_order") {
-        obj[field] = row.doc_order;
-      } else if (field == "source_uri") {
-        obj[field] = row.source_uri;
-      } else if (field == "attributes") {
+    for (const auto& entry : schema) {
+      const std::string& raw_field = entry.raw_name;
+      const std::string& output_field = entry.output_name;
+      if (raw_field == "node_id") {
+        obj[output_field] = row.node_id;
+      } else if (raw_field == "count") {
+        obj[output_field] = row.node_id;
+      } else if (raw_field == "tag") {
+        obj[output_field] = row.tag;
+      } else if (raw_field == "text") {
+        obj[output_field] = row.text;
+      } else if (raw_field == "inner_html") {
+        obj[output_field] = row.inner_html;
+      } else if (raw_field == "parent_id") {
+        obj[output_field] = row.parent_id.has_value() ? json(*row.parent_id) : json(nullptr);
+      } else if (raw_field == "max_depth") {
+        obj[output_field] = row.max_depth;
+      } else if (raw_field == "doc_order") {
+        obj[output_field] = row.doc_order;
+      } else if (raw_field == "source_uri") {
+        obj[output_field] = row.source_uri;
+      } else if (raw_field == "attributes") {
         json attrs = json::object();
         for (const auto& kv : row.attributes) {
           attrs[kv.first] = kv.second;
         }
-        obj[field] = attrs;
-      } else if (field == "terms_score") {
+        obj[output_field] = attrs;
+      } else if (raw_field == "terms_score") {
         json scores = json::object();
         for (const auto& kv : row.term_scores) {
           scores[kv.first] = kv.second;
         }
-        obj[field] = scores;
+        obj[output_field] = scores;
       } else {
-        auto computed = row.computed_fields.find(field);
+        auto computed = row.computed_fields.find(raw_field);
         if (computed != row.computed_fields.end()) {
-          obj[field] = computed->second;
+          obj[output_field] = computed->second;
         } else {
-          auto it = row.attributes.find(field);
-          obj[field] = (it != row.attributes.end()) ? json(it->second) : json(nullptr);
+          auto it = row.attributes.find(raw_field);
+          obj[output_field] = (it != row.attributes.end()) ? json(it->second) : json(nullptr);
         }
       }
     }
@@ -582,21 +586,22 @@ std::string build_json(const xsql::QueryResult& result) {
   }
   return out.dump(2);
 #else
-  std::vector<std::string> columns = result.columns;
-  if (columns.empty()) {
-    columns = {"node_id", "tag", "attributes", "parent_id", "max_depth", "doc_order"};
+  std::vector<std::string> raw_columns = result.columns;
+  if (raw_columns.empty()) {
+    raw_columns = {"node_id", "tag", "attributes", "parent_id", "max_depth", "doc_order"};
   }
+  std::vector<xsql::ColumnNameMapping> schema =
+      xsql::build_column_name_map(raw_columns, colname_mode);
   std::ostringstream oss;
   oss << "[";
   for (size_t i = 0; i < result.rows.size(); ++i) {
     const auto& row = result.rows[i];
     if (i > 0) oss << ",";
     oss << "{";
-    for (size_t c = 0; c < columns.size(); ++c) {
+    for (size_t c = 0; c < schema.size(); ++c) {
       if (c > 0) oss << ",";
-      const auto& field = columns[c];
-      oss << "\"" << json_escape(field) << "\":";
-      print_field(oss, field, row);
+      oss << "\"" << json_escape(schema[c].output_name) << "\":";
+      print_field(oss, schema[c].raw_name, row);
     }
     oss << "}";
   }
@@ -605,14 +610,16 @@ std::string build_json(const xsql::QueryResult& result) {
 #endif
 }
 
-std::string build_json_list(const xsql::QueryResult& result) {
+std::string build_json_list(const xsql::QueryResult& result, xsql::ColumnNameMode colname_mode) {
 #ifdef XSQL_USE_NLOHMANN_JSON
   using nlohmann::json;
-  std::vector<std::string> columns = result.columns;
-  if (columns.size() != 1) {
+  std::vector<std::string> raw_columns = result.columns;
+  if (raw_columns.size() != 1) {
     throw std::runtime_error("TO LIST() requires a single projected column");
   }
-  const std::string& field = columns[0];
+  std::vector<xsql::ColumnNameMapping> schema =
+      xsql::build_column_name_map(raw_columns, colname_mode);
+  const std::string& field = schema[0].raw_name;
   json out = json::array();
   for (const auto& row : result.rows) {
     if (field == "node_id") {
@@ -651,11 +658,13 @@ std::string build_json_list(const xsql::QueryResult& result) {
   }
   return out.dump(2);
 #else
-  std::vector<std::string> columns = result.columns;
-  if (columns.size() != 1) {
+  std::vector<std::string> raw_columns = result.columns;
+  if (raw_columns.size() != 1) {
     throw std::runtime_error("TO LIST() requires a single projected column");
   }
-  const std::string& field = columns[0];
+  std::vector<xsql::ColumnNameMapping> schema =
+      xsql::build_column_name_map(raw_columns, colname_mode);
+  const std::string& field = schema[0].raw_name;
   std::ostringstream oss;
   oss << "[";
   for (size_t i = 0; i < result.rows.size(); ++i) {

@@ -10,7 +10,7 @@ namespace xsql::cli {
 AutoCompleter::AutoCompleter() {
   keywords_ = markql_completion_keywords();
   commands_ = {
-      ".help", ".load", ".mode", ".display_mode", ".max_rows", ".reload_config",
+      ".help", ".load", ".mode", ".set", ".display_mode", ".max_rows", ".reload_config",
       ".summarize", ".summarize_content",
       ".plugin", ".quit", ".q",
       ":help", ":load", ":quit", ":exit"

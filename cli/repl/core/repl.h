@@ -3,6 +3,8 @@
 #include <optional>
 #include <string>
 
+#include "xsql/column_names.h"
+
 namespace xsql::cli {
 
 /// Holds a source reference and optional cached HTML for REPL sessions.
@@ -21,6 +23,7 @@ struct ReplConfig {
   bool highlight = true;
   bool display_full = true;
   std::string output_mode = "duckbox";
+  xsql::ColumnNameMode colname_mode = xsql::ColumnNameMode::Normalize;
   int timeout_ms = 5000;
 };
 

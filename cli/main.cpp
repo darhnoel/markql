@@ -43,6 +43,7 @@ int main(int argc, char** argv) {
   bool highlight = options.highlight;
   bool display_full = options.display_mode_set ? options.display_full : false;
   int timeout_ms = options.timeout_ms;
+  const xsql::ColumnNameMode colname_mode = xsql::ColumnNameMode::Normalize;
 
   // WHY: reject unknown modes to avoid silently changing output contracts.
   if (output_mode != "duckbox" && output_mode != "json" && output_mode != "plain") {
@@ -111,7 +112,7 @@ int main(int argc, char** argv) {
 
     if (result.export_sink.kind != xsql::QueryResult::ExportSink::Kind::None) {
       std::string export_error;
-      if (!xsql::cli::export_result(result, export_error)) {
+      if (!xsql::cli::export_result(result, export_error, colname_mode)) {
         throw std::runtime_error(export_error);
       }
       if (!result.export_sink.path.empty()) {
@@ -145,10 +146,11 @@ int main(int argc, char** argv) {
         options.max_rows = 40;
         options.highlight = highlight;
         options.is_tty = color;
+        options.colname_mode = colname_mode;
         std::cout << xsql::render::render_duckbox(result, options) << std::endl;
         std::cout << "Rows: " << count_result_rows(result) << std::endl;
       } else {
-        std::string json_out = build_json_list(result);
+        std::string json_out = build_json_list(result, colname_mode);
         if (display_full) {
           std::cout << colorize_json(json_out, color) << std::endl;
         } else {
@@ -158,8 +160,11 @@ int main(int argc, char** argv) {
         std::cout << "Rows: " << count_result_rows(result) << std::endl;
       }
     } else {
-      std::string json_out = result.to_table ? build_table_json(result)
-                            : (result.to_list ? build_json_list(result) : build_json(result));
+      std::string json_out =
+          result.to_table
+              ? build_table_json(result)
+              : (result.to_list ? build_json_list(result, colname_mode)
+                                : build_json(result, colname_mode));
       if (output_mode == "plain") {
         std::cout << json_out << std::endl;
       } else if (display_full) {

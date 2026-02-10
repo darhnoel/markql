@@ -138,13 +138,12 @@ std::string json_escape(const std::string& value) {
 
 void write_json_row(std::ostream& out,
                     const xsql::QueryResultRow& row,
-                    const std::vector<std::string>& columns) {
+                    const std::vector<xsql::ColumnNameMapping>& schema) {
   out << "{";
-  for (size_t i = 0; i < columns.size(); ++i) {
+  for (size_t i = 0; i < schema.size(); ++i) {
     if (i > 0) out << ",";
-    const std::string& column = columns[i];
-    out << "\"" << json_escape(column) << "\":";
-    CellValue cell = field_value(row, column);
+    out << "\"" << json_escape(schema[i].output_name) << "\":";
+    CellValue cell = field_value(row, schema[i].raw_name);
     if (cell.is_null) {
       out << "null";
     } else {
@@ -166,26 +165,35 @@ bool validate_rectangular(const xsql::QueryResult& result, std::string& error) {
   return true;
 }
 
+std::vector<xsql::ColumnNameMapping> result_schema(const xsql::QueryResult& result,
+                                                   xsql::ColumnNameMode colname_mode) {
+  return xsql::build_column_name_map(result.columns, colname_mode);
+}
+
 }  // namespace
 
 static std::vector<std::string> table_columns(const xsql::QueryResult::TableResult& table);
 
-bool write_csv(const xsql::QueryResult& result, const std::string& path, std::string& error) {
+bool write_csv(const xsql::QueryResult& result,
+               const std::string& path,
+               std::string& error,
+               xsql::ColumnNameMode colname_mode) {
   if (!validate_rectangular(result, error)) return false;
+  std::vector<xsql::ColumnNameMapping> schema = result_schema(result, colname_mode);
   std::ofstream out(path, std::ios::binary);
   if (!out) {
     error = "Failed to open file for writing: " + path;
     return false;
   }
-  for (size_t i = 0; i < result.columns.size(); ++i) {
+  for (size_t i = 0; i < schema.size(); ++i) {
     if (i > 0) out << ",";
-    out << csv_escape(result.columns[i]);
+    out << csv_escape(schema[i].output_name);
   }
   out << "\n";
   for (const auto& row : result.rows) {
-    for (size_t i = 0; i < result.columns.size(); ++i) {
+    for (size_t i = 0; i < schema.size(); ++i) {
       if (i > 0) out << ",";
-      CellValue cell = field_value(row, result.columns[i]);
+      CellValue cell = field_value(row, schema[i].raw_name);
       const std::string& value = cell.is_null ? "" : cell.value;
       out << csv_escape(value);
     }
@@ -194,8 +202,12 @@ bool write_csv(const xsql::QueryResult& result, const std::string& path, std::st
   return true;
 }
 
-bool write_json(const xsql::QueryResult& result, const std::string& path, std::string& error) {
+bool write_json(const xsql::QueryResult& result,
+                const std::string& path,
+                std::string& error,
+                xsql::ColumnNameMode colname_mode) {
   if (!validate_rectangular(result, error)) return false;
+  std::vector<xsql::ColumnNameMapping> schema = result_schema(result, colname_mode);
   std::ofstream file;
   std::ostream* out = &std::cout;
   if (!path.empty()) {
@@ -212,14 +224,18 @@ bool write_json(const xsql::QueryResult& result, const std::string& path, std::s
   for (const auto& row : result.rows) {
     if (!first) *out << ",";
     first = false;
-    write_json_row(*out, row, result.columns);
+    write_json_row(*out, row, schema);
   }
   *out << "]\n";
   return true;
 }
 
-bool write_ndjson(const xsql::QueryResult& result, const std::string& path, std::string& error) {
+bool write_ndjson(const xsql::QueryResult& result,
+                  const std::string& path,
+                  std::string& error,
+                  xsql::ColumnNameMode colname_mode) {
   if (!validate_rectangular(result, error)) return false;
+  std::vector<xsql::ColumnNameMapping> schema = result_schema(result, colname_mode);
   std::ofstream file;
   std::ostream* out = &std::cout;
   if (!path.empty()) {
@@ -231,7 +247,7 @@ bool write_ndjson(const xsql::QueryResult& result, const std::string& path, std:
     out = &file;
   }
   for (const auto& row : result.rows) {
-    write_json_row(*out, row, result.columns);
+    write_json_row(*out, row, schema);
     *out << "\n";
   }
   return true;
@@ -281,17 +297,21 @@ static std::vector<std::string> table_columns(const xsql::QueryResult::TableResu
   return cols;
 }
 
-bool write_parquet(const xsql::QueryResult& result, const std::string& path, std::string& error) {
+bool write_parquet(const xsql::QueryResult& result,
+                   const std::string& path,
+                   std::string& error,
+                   xsql::ColumnNameMode colname_mode) {
   if (!validate_rectangular(result, error)) return false;
+  std::vector<xsql::ColumnNameMapping> col_schema = result_schema(result, colname_mode);
 #ifdef XSQL_USE_ARROW
   std::vector<std::shared_ptr<arrow::ArrayBuilder>> builders;
-  builders.reserve(result.columns.size());
-  for (size_t i = 0; i < result.columns.size(); ++i) {
+  builders.reserve(col_schema.size());
+  for (size_t i = 0; i < col_schema.size(); ++i) {
     builders.push_back(std::make_shared<arrow::StringBuilder>());
   }
   for (const auto& row : result.rows) {
-    for (size_t i = 0; i < result.columns.size(); ++i) {
-      CellValue cell = field_value(row, result.columns[i]);
+    for (size_t i = 0; i < col_schema.size(); ++i) {
+      CellValue cell = field_value(row, col_schema[i].raw_name);
       auto builder = std::static_pointer_cast<arrow::StringBuilder>(builders[i]);
       if (cell.is_null) {
         auto st = builder->AppendNull();
@@ -310,10 +330,10 @@ bool write_parquet(const xsql::QueryResult& result, const std::string& path, std
   }
   std::vector<std::shared_ptr<arrow::Field>> fields;
   std::vector<std::shared_ptr<arrow::Array>> arrays;
-  fields.reserve(result.columns.size());
-  arrays.reserve(result.columns.size());
-  for (size_t i = 0; i < result.columns.size(); ++i) {
-    fields.push_back(arrow::field(result.columns[i], arrow::utf8(), true));
+  fields.reserve(col_schema.size());
+  arrays.reserve(col_schema.size());
+  for (size_t i = 0; i < col_schema.size(); ++i) {
+    fields.push_back(arrow::field(col_schema[i].output_name, arrow::utf8(), true));
     auto builder = std::static_pointer_cast<arrow::StringBuilder>(builders[i]);
     std::shared_ptr<arrow::Array> array;
     auto st = builder->Finish(&array);
@@ -323,8 +343,8 @@ bool write_parquet(const xsql::QueryResult& result, const std::string& path, std
     }
     arrays.push_back(array);
   }
-  auto schema = arrow::schema(fields);
-  auto table = arrow::Table::Make(schema, arrays);
+  auto arrow_schema = arrow::schema(fields);
+  auto table = arrow::Table::Make(arrow_schema, arrays);
   auto output_res = arrow::io::FileOutputStream::Open(path);
   if (!output_res.ok()) {
     error = output_res.status().ToString();
@@ -340,6 +360,7 @@ bool write_parquet(const xsql::QueryResult& result, const std::string& path, std
 #else
   (void)result;
   (void)path;
+  (void)colname_mode;
   error = "TO PARQUET requires Apache Arrow feature";
   return false;
 #endif
@@ -414,7 +435,9 @@ bool write_table_parquet(const xsql::QueryResult::TableResult& table,
 #endif
 }
 
-bool export_result(const xsql::QueryResult& result, std::string& error) {
+bool export_result(const xsql::QueryResult& result,
+                   std::string& error,
+                   xsql::ColumnNameMode colname_mode) {
   if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::None) {
     return false;
   }
@@ -437,16 +460,16 @@ bool export_result(const xsql::QueryResult& result, std::string& error) {
     }
   }
   if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Csv) {
-    return write_csv(result, result.export_sink.path, error);
+    return write_csv(result, result.export_sink.path, error, colname_mode);
   }
   if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Parquet) {
-    return write_parquet(result, result.export_sink.path, error);
+    return write_parquet(result, result.export_sink.path, error, colname_mode);
   }
   if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Json) {
-    return write_json(result, result.export_sink.path, error);
+    return write_json(result, result.export_sink.path, error, colname_mode);
   }
   if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Ndjson) {
-    return write_ndjson(result, result.export_sink.path, error);
+    return write_ndjson(result, result.export_sink.path, error, colname_mode);
   }
   error = "Unknown export sink";
   return false;

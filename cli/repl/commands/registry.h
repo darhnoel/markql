@@ -8,6 +8,7 @@
 
 #include "repl/core/repl.h"
 #include "repl/core/line_editor.h"
+#include "xsql/column_names.h"
 
 namespace xsql::cli {
 
@@ -21,6 +22,7 @@ struct CommandContext {
   std::string& last_full_output;
   bool& display_full;
   size_t& max_rows;
+  std::vector<xsql::ColumnNameMapping>& last_schema_map;
   PluginManager& plugin_manager;
 };
 

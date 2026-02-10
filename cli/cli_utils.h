@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "ast.h"
+#include "xsql/column_names.h"
 #include "xsql/xsql.h"
 
 namespace xsql::cli {
@@ -73,11 +74,13 @@ std::optional<QuerySource> parse_query_source(const std::string& query);
 /// Serializes full query rows into JSON objects for CLI output modes.
 /// MUST preserve column ordering semantics and MUST escape content correctly.
 /// Inputs are QueryResult rows; outputs are JSON text with no side effects.
-std::string build_json(const xsql::QueryResult& result);
+std::string build_json(const xsql::QueryResult& result,
+                       xsql::ColumnNameMode colname_mode = xsql::ColumnNameMode::Normalize);
 /// Serializes a single-column result into a JSON list.
 /// MUST enforce single-column output and MUST represent NULLs explicitly.
 /// Inputs are QueryResult rows; outputs are JSON list text with no side effects.
-std::string build_json_list(const xsql::QueryResult& result);
+std::string build_json_list(const xsql::QueryResult& result,
+                            xsql::ColumnNameMode colname_mode = xsql::ColumnNameMode::Normalize);
 /// Serializes table extraction output into JSON arrays.
 /// MUST preserve row ordering and MUST keep cells as string values.
 /// Inputs are table results; outputs are JSON text with no side effects.

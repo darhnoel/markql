@@ -13,6 +13,7 @@ CommandHandler make_help_command() {
     std::cout << "  .help                 Show this help\n";
     std::cout << "  .load <path|url> [--alias <name>]  Load input (or :load)\n";
     std::cout << "  .mode duckbox|json|plain  Set output mode\n";
+    std::cout << "  .set colnames raw|normalize  Set output column naming mode\n";
     std::cout << "  .display_mode more|less   Control truncation\n";
     std::cout << "  .max_rows <n|inf>        Set duckbox max rows (inf = no limit)\n";
     std::cout << "  .reload_config           Reload REPL config\n";
@@ -30,7 +31,7 @@ CommandHandler make_help_command() {
     std::cout << "  .summarize_content [doc|alias|path|url] [--lang <code>] [--max_tokens <n>]\n"
                  "    Summarize text content\n";
     std::cout << "  SHOW INPUT(S) / SHOW FUNCTIONS / SHOW AXES / SHOW OPERATORS\n"
-                 "  DESCRIBE DOC / DESCRIBE LANGUAGE\n";
+                 "  DESCRIBE DOC / DESCRIBE LANGUAGE / DESCRIBE LAST\n";
     std::cout << "  Query export: TO CSV('file.csv') / TO PARQUET('file.parquet') / "
                  "TO JSON('file.json') / TO NDJSON('file.ndjson')\n";
     std::cout << "  Editor modes: Esc toggles normal <-> vim:normal; i/a/I/A/o/O in vim mode\n";

@@ -298,6 +298,8 @@ SELECT table FROM doc WHERE id = 'stats' TO TABLE(EXPORT='stats.csv');
 SELECT a.href, TEXT(a) FROM doc WHERE href IS NOT NULL TO CSV('links.csv');
 SELECT * FROM doc TO PARQUET('nodes.parquet');
 ```
+By default, exported column names are normalized to identifier-safe names
+(for example `data-id` -> `data_id`).
 
 ### TO JSON / TO NDJSON
 ```sql
@@ -312,11 +314,18 @@ Useful commands:
 - `.help`
 - `.load <path|url> [--alias <name>]`
 - `.mode duckbox|json|plain`
+- `.set colnames raw|normalize`
 - `.display_mode more|less`
 - `.max_rows <n|inf>`
+- `DESCRIBE LAST`
 - `.summarize [doc|alias|path|url]`
 - `.reload_config`
 - `.quit`
+
+Column-name modes:
+- `normalize` (default): use identifier-safe output headers/keys.
+- `raw`: keep original projected names.
+- `DESCRIBE LAST`: show `raw_name` and `output_name` for the previous query.
 
 Vim navigation mode:
 - Default editor mode is normal.

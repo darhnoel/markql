@@ -11,6 +11,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "xsql/column_names.h"
+
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -243,7 +245,15 @@ std::string build_separator(const std::vector<size_t>& widths,
 }  // namespace
 
 std::string render_duckbox(const xsql::QueryResult& result, const DuckboxOptions& options) {
-  std::vector<std::string> columns = result.columns.empty() ? default_columns() : result.columns;
+  std::vector<std::string> raw_columns =
+      result.columns.empty() ? default_columns() : result.columns;
+  std::vector<xsql::ColumnNameMapping> schema =
+      xsql::build_column_name_map(raw_columns, options.colname_mode);
+  std::vector<std::string> columns;
+  columns.reserve(schema.size());
+  for (const auto& item : schema) {
+    columns.push_back(item.output_name);
+  }
   size_t max_rows = options.max_rows == 0 ? result.rows.size() : options.max_rows;
   size_t rows_to_render = std::min(result.rows.size(), max_rows);
   size_t max_width = options.max_width == 0 ? detect_terminal_width() : options.max_width;
@@ -255,8 +265,8 @@ std::string render_duckbox(const xsql::QueryResult& result, const DuckboxOptions
     const auto& row = result.rows[i];
     std::vector<std::string> cells;
     cells.reserve(columns.size());
-    for (const auto& col : columns) {
-      cells.push_back(sanitize_cell(field_value(row, col)));
+    for (size_t c = 0; c < schema.size(); ++c) {
+      cells.push_back(sanitize_cell(field_value(row, schema[c].raw_name)));
     }
     table_rows.push_back(std::move(cells));
   }

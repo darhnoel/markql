@@ -13,6 +13,7 @@ struct ReplSettings {
   std::optional<size_t> history_max_entries;
   std::optional<std::string> history_path;
   std::optional<std::string> output_mode;
+  std::optional<std::string> colname_mode;
   std::optional<std::string> editor_mode;
   std::optional<bool> highlight;
   std::optional<bool> display_full;
