@@ -3,6 +3,7 @@
 Practical, end-to-end extraction walk-throughs for developers in the field.
 
 - [Field Hunting Playbook](field-hunting-playbook.md)
+- [GitHub Contributions Calendar](github-contributions-calendar.md)
 
 Use these when:
 
