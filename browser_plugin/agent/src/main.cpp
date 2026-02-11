@@ -53,7 +53,7 @@ class SnapshotCache {
  public:
   struct Entry {
     std::string sha256;
-    std::string html;
+    std::shared_ptr<const xsql::ParsedDocumentHandle> prepared;
     std::chrono::steady_clock::time_point last_access;
   };
 
@@ -61,18 +61,30 @@ class SnapshotCache {
 
   Entry get_or_insert(const std::string& html) {
     const std::string digest = xsql::agent::sha256::digest_hex(html);
+    {
+      std::lock_guard<std::mutex> lock(mu_);
+      auto it = entries_.find(digest);
+      const auto now = std::chrono::steady_clock::now();
+      if (it != entries_.end()) {
+        it->second.last_access = now;
+        return it->second;
+      }
+    }
+
+    std::shared_ptr<const xsql::ParsedDocumentHandle> prepared =
+        xsql::prepare_document(html, "document");
+
     std::lock_guard<std::mutex> lock(mu_);
-    auto it = entries_.find(digest);
     const auto now = std::chrono::steady_clock::now();
+    auto it = entries_.find(digest);
     if (it != entries_.end()) {
       it->second.last_access = now;
       return it->second;
     }
-
     if (entries_.size() >= max_entries_) {
       evict_lru();
     }
-    Entry entry{digest, html, now};
+    Entry entry{digest, std::move(prepared), now};
     entries_[digest] = entry;
     return entry;
   }
@@ -97,14 +109,14 @@ class SnapshotCache {
 class IXsqlExecutor {
  public:
   virtual ~IXsqlExecutor() = default;
-  virtual ExecutionOutcome execute(const std::string& html,
+  virtual ExecutionOutcome execute(const std::shared_ptr<const xsql::ParsedDocumentHandle>& prepared,
                                    const std::string& query,
                                    int timeout_ms) = 0;
 };
 
 class CoreExecutor final : public IXsqlExecutor {
  public:
-  ExecutionOutcome execute(const std::string& html,
+  ExecutionOutcome execute(const std::shared_ptr<const xsql::ParsedDocumentHandle>& prepared,
                            const std::string& query,
                            int timeout_ms) override {
     if (timeout_ms <= 0) {
@@ -114,11 +126,11 @@ class CoreExecutor final : public IXsqlExecutor {
     std::promise<ExecutionOutcome> promise;
     std::future<ExecutionOutcome> future = promise.get_future();
 
-    std::thread worker([html, query, p = std::move(promise)]() mutable {
+    std::thread worker([prepared, query, p = std::move(promise)]() mutable {
       ExecutionOutcome outcome;
       try {
         outcome.ok = true;
-        outcome.result = xsql::execute_query_from_document(html, query);
+        outcome.result = xsql::execute_query_from_prepared_document(prepared, query);
       } catch (const std::exception& ex) {
         outcome.ok = false;
         outcome.error_message = ex.what();
@@ -454,8 +466,16 @@ int main() {
       return;
     }
 
-    const auto snapshot = cache.get_or_insert(html);
-    const ExecutionOutcome execution = executor.execute(snapshot.html, query, options.timeout_ms);
+    SnapshotCache::Entry snapshot;
+    try {
+      snapshot = cache.get_or_insert(html);
+    } catch (const std::exception& ex) {
+      const json error = build_error(elapsed_ms(started_at), "QUERY_ERROR", ex.what());
+      write_json(res, 200, error);
+      return;
+    }
+
+    const ExecutionOutcome execution = executor.execute(snapshot.prepared, query, options.timeout_ms);
     if (!execution.ok) {
       const std::string code = execution.timed_out ? "TIMEOUT" : "QUERY_ERROR";
       const json error = build_error(elapsed_ms(started_at), code, execution.error_message);

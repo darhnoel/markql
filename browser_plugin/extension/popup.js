@@ -20,16 +20,20 @@ const SQL_FUNCTIONS = new Set([
 ]);
 
 const ui = {
+  tokenCompact: document.getElementById("tokenCompact"),
+  tokenEditor: document.getElementById("tokenEditor"),
   tokenInput: document.getElementById("tokenInput"),
   saveTokenBtn: document.getElementById("saveTokenBtn"),
+  cancelTokenBtn: document.getElementById("cancelTokenBtn"),
+  editTokenBtn: document.getElementById("editTokenBtn"),
   tokenHelp: document.getElementById("tokenHelp"),
   queryInput: document.getElementById("queryInput"),
   maxRowsInput: document.getElementById("maxRowsInput"),
   timeoutInput: document.getElementById("timeoutInput"),
   captureBtn: document.getElementById("captureBtn"),
   runBtn: document.getElementById("runBtn"),
-  recaptureBtn: document.getElementById("recaptureBtn"),
   copyCsvBtn: document.getElementById("copyCsvBtn"),
+  copyJsonBtn: document.getElementById("copyJsonBtn"),
   statusLine: document.getElementById("statusLine"),
   resultsHead: document.querySelector("#resultsTable thead"),
   resultsBody: document.querySelector("#resultsTable tbody")
@@ -215,11 +219,6 @@ function insertAtCaret(text) {
   selection.addRange(range);
 }
 
-function selectedScope() {
-  const selected = document.querySelector("input[name='scope']:checked");
-  return selected && selected.value === "full" ? "full" : "main";
-}
-
 function status(text) {
   ui.statusLine.textContent = text;
 }
@@ -251,6 +250,17 @@ function buildCsv(columns, rows) {
     lines.push(row.map((value) => csvEscape(value)).join(","));
   }
   return lines.join("\n");
+}
+
+function buildJson(columns, rows) {
+  const objects = rows.map((row) => {
+    const obj = {};
+    for (let i = 0; i < columns.length; i += 1) {
+      obj[columns[i].name] = i < row.length ? row[i] : null;
+    }
+    return obj;
+  });
+  return JSON.stringify(objects, null, 2);
 }
 
 function renderResults(result) {
@@ -306,7 +316,7 @@ async function captureSnapshot(force = false) {
   const response = await chrome.runtime.sendMessage({
     type: "captureSnapshot",
     tabId: tab.id,
-    scope: selectedScope()
+    scope: "main"
   });
 
   if (!response || !response.ok || typeof response.html !== "string") {
@@ -315,7 +325,7 @@ async function captureSnapshot(force = false) {
 
   snapshotHtml = response.html;
   await saveSnapshotToSession(snapshotHtml);
-  status(`Captured ${response.size_bytes} bytes (${response.scope}, ${response.source}).`);
+  status(`Captured ${response.size_bytes} bytes.`);
   return snapshotHtml;
 }
 
@@ -386,14 +396,48 @@ async function copyCsv() {
   status(`Copied CSV (${lastResult.rows.length} rows).`);
 }
 
+async function copyJson() {
+  if (!lastResult || !Array.isArray(lastResult.columns) || !Array.isArray(lastResult.rows)) {
+    throw new Error("No query result to export");
+  }
+  const json = buildJson(lastResult.columns, lastResult.rows);
+  await navigator.clipboard.writeText(json);
+  status(`Copied JSON (${lastResult.rows.length} rows).`);
+}
+
+function setTokenEditorVisible(visible) {
+  ui.tokenEditor.classList.toggle("hidden", !visible);
+  if (visible) {
+    ui.tokenInput.focus();
+  }
+}
+
+function updateTokenUi() {
+  const hasToken = !!ui.tokenInput.value.trim();
+  const editorVisible = !ui.tokenEditor.classList.contains("hidden");
+
+  ui.tokenCompact.classList.toggle("hidden", !hasToken || editorVisible);
+  ui.cancelTokenBtn.classList.toggle("hidden", !hasToken);
+
+  if (!hasToken) {
+    ui.tokenHelp.textContent = "Start MarkQL agent and copy token from terminal output.";
+  } else if (editorVisible) {
+    ui.tokenHelp.textContent = "Paste a new token and save.";
+  } else {
+    ui.tokenHelp.textContent = "";
+  }
+}
+
 async function saveToken() {
   const token = ui.tokenInput.value.trim();
   await chrome.storage.local.set({ [STORAGE_KEY_TOKEN]: token });
   if (!token) {
-    ui.tokenHelp.textContent = "Start MarkQL agent and copy token from terminal output.";
+    setTokenEditorVisible(true);
+    updateTokenUi();
     return;
   }
-  ui.tokenHelp.textContent = "Token saved.";
+  setTokenEditorVisible(false);
+  updateTokenUi();
   status("Token saved.");
 }
 
@@ -435,9 +479,9 @@ async function restoreSettings() {
     status("Ready.");
   }
 
-  if (!ui.tokenInput.value.trim()) {
-    ui.tokenHelp.textContent = "Start MarkQL agent and copy token from terminal output.";
-  }
+  const hasToken = !!ui.tokenInput.value.trim();
+  setTokenEditorVisible(!hasToken);
+  updateTokenUi();
   renderQueryHighlight();
 }
 
@@ -445,24 +489,40 @@ async function guarded(action) {
   try {
     ui.captureBtn.disabled = true;
     ui.runBtn.disabled = true;
-    ui.recaptureBtn.disabled = true;
     ui.copyCsvBtn.disabled = true;
+    ui.copyJsonBtn.disabled = true;
+    ui.saveTokenBtn.disabled = true;
+    ui.cancelTokenBtn.disabled = true;
+    ui.editTokenBtn.disabled = true;
     await action();
   } catch (err) {
     status(`Error: ${err && err.message ? err.message : String(err)}`);
   } finally {
     ui.captureBtn.disabled = false;
     ui.runBtn.disabled = false;
-    ui.recaptureBtn.disabled = false;
     ui.copyCsvBtn.disabled = false;
+    ui.copyJsonBtn.disabled = false;
+    ui.saveTokenBtn.disabled = false;
+    ui.cancelTokenBtn.disabled = false;
+    ui.editTokenBtn.disabled = false;
   }
 }
 
 ui.saveTokenBtn.addEventListener("click", () => guarded(saveToken));
-ui.captureBtn.addEventListener("click", () => guarded(() => captureSnapshot(false)));
-ui.recaptureBtn.addEventListener("click", () => guarded(() => captureSnapshot(true)));
+ui.editTokenBtn.addEventListener("click", () => {
+  setTokenEditorVisible(true);
+  updateTokenUi();
+});
+ui.cancelTokenBtn.addEventListener("click", () => {
+  if (ui.tokenInput.value.trim()) {
+    setTokenEditorVisible(false);
+  }
+  updateTokenUi();
+});
+ui.captureBtn.addEventListener("click", () => guarded(() => captureSnapshot(true)));
 ui.runBtn.addEventListener("click", () => guarded(runQuery));
 ui.copyCsvBtn.addEventListener("click", () => guarded(copyCsv));
+ui.copyJsonBtn.addEventListener("click", () => guarded(copyJson));
 ui.queryInput.addEventListener("input", () => renderQueryHighlight(true));
 ui.queryInput.addEventListener("keydown", (event) => {
   if (event.key === "Tab") {

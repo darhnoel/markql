@@ -15,6 +15,12 @@
 
 namespace xsql {
 
+struct ParsedDocumentHandle {
+  HtmlDocument doc;
+  std::string html;
+  std::string source_uri;
+};
+
 namespace {
 
 struct FragmentSource {
@@ -1506,6 +1512,34 @@ QueryResult execute_query_from_html(const std::string& html,
 /// Inputs are HTML/query; outputs are QueryResult with no side effects.
 QueryResult execute_query_from_document(const std::string& html, const std::string& query) {
   return execute_query_from_html(html, "document", query);
+}
+
+std::shared_ptr<const ParsedDocumentHandle> prepare_document(const std::string& html,
+                                                             const std::string& source_uri) {
+  auto prepared = std::make_shared<ParsedDocumentHandle>();
+  prepared->doc = parse_html(html);
+  prepared->html = html;
+  prepared->source_uri = source_uri.empty() ? "document" : source_uri;
+  return prepared;
+}
+
+QueryResult execute_query_from_prepared_document(const std::shared_ptr<const ParsedDocumentHandle>& prepared,
+                                                 const std::string& query) {
+  if (prepared == nullptr) {
+    throw std::runtime_error("Prepared document handle is null");
+  }
+  auto parsed = parse_query(query);
+  if (!parsed.query.has_value()) {
+    throw std::runtime_error("Query parse error: " + parsed.error->message);
+  }
+  validate_query(*parsed.query);
+  if (parsed.query->kind != Query::Kind::Select) {
+    return execute_meta_query(*parsed.query, prepared->source_uri);
+  }
+  if (parsed.query->source.kind == Source::Kind::Document) {
+    return execute_query_ast(*parsed.query, prepared->doc, prepared->source_uri);
+  }
+  return execute_query_with_source(*parsed.query, prepared->html, prepared->source_uri);
 }
 
 /// Executes a query over a file and uses the path as source label.

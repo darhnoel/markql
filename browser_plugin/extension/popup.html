@@ -9,21 +9,25 @@
   <body>
     <main class="app">
       <section class="panel">
-        <h1>MarkQL Browser Plugin</h1>
-        <label class="field">
-          <span>Agent Token</span>
-          <input id="tokenInput" type="password" placeholder="Paste token from MarkQL agent terminal" />
-        </label>
-        <button id="saveTokenBtn" class="secondary">Save Token</button>
+        <div id="tokenCompact" class="token-compact hidden">
+          <span class="label">Agent Token</span>
+          <span class="token-state">Saved</span>
+          <button id="editTokenBtn" class="secondary">Update Token</button>
+        </div>
+        <div id="tokenEditor" class="token-editor">
+          <label class="field compact-field">
+            <span>Agent Token</span>
+            <input id="tokenInput" type="password" placeholder="Paste token from MarkQL agent terminal" />
+          </label>
+          <div class="token-actions">
+            <button id="saveTokenBtn" class="secondary">Save Token</button>
+            <button id="cancelTokenBtn" class="secondary hidden">Cancel</button>
+          </div>
+        </div>
         <p id="tokenHelp" class="hint"></p>
       </section>
 
       <section class="panel">
-        <div class="row">
-          <span class="label">Capture Scope</span>
-          <label><input type="radio" name="scope" value="main" checked /> Main</label>
-          <label><input type="radio" name="scope" value="full" /> Full Page</label>
-        </div>
         <label class="field">
           <span>MarkQL Query</span>
           <div class="sql-editor">
@@ -51,8 +55,8 @@
         <div class="actions">
           <button id="captureBtn">Capture</button>
           <button id="runBtn">Run</button>
-          <button id="recaptureBtn" class="secondary">Recapture</button>
           <button id="copyCsvBtn" class="secondary">Copy CSV</button>
+          <button id="copyJsonBtn" class="secondary">Copy JSON</button>
         </div>
       </section>
 

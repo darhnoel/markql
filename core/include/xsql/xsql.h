@@ -1,12 +1,15 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 namespace xsql {
+
+struct ParsedDocumentHandle;
 
 /// Represents a single materialized row so callers can format or export results consistently.
 /// MUST keep fields aligned with the executor/output contract to avoid schema drift.
@@ -62,6 +65,12 @@ struct QueryResult {
 /// MUST receive valid HTML and MUST treat the input as immutable.
 /// Inputs are HTML/query; failures throw exceptions and side effects are none.
 QueryResult execute_query_from_document(const std::string& html, const std::string& query);
+/// Parses HTML once and returns a reusable handle for repeated query execution.
+std::shared_ptr<const ParsedDocumentHandle> prepare_document(const std::string& html,
+                                                             const std::string& source_uri = "document");
+/// Executes a query using a prepared document handle.
+QueryResult execute_query_from_prepared_document(const std::shared_ptr<const ParsedDocumentHandle>& prepared,
+                                                 const std::string& query);
 /// Executes a query over a file path and loads the file contents internally.
 /// MUST read from disk and MUST report errors via exceptions on IO failures.
 /// Inputs are path/query; side effects include file reads and thrown errors.
