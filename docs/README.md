@@ -2,6 +2,7 @@
 
 - Book (chapter path): [book/SUMMARY.md](book/SUMMARY.md)
 - Verify book examples: [verify_examples.sh](verify_examples.sh)
+- Case studies: [case-studies/README.md](case-studies/README.md)
 - Book-style draft: [markql-book.md](markql-book.md)
 - Tutorial: [markql-tutorial.md](markql-tutorial.md)
 - CLI guide: [markql-cli-guide.md](markql-cli-guide.md)
