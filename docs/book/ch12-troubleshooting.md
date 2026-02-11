@@ -1,5 +1,8 @@
 # Chapter 12: Troubleshooting
 
+## TL;DR
+Most MarkQL failures map cleanly to one stage: parse, row filter, field extraction, or sink. Diagnose by stage, not by random query edits.
+
 ## What is troubleshooting in MarkQL?
 Troubleshooting in MarkQL is a staged diagnosis process: isolate parse errors, isolate row-filter errors, isolate supplier-selection errors, and then validate output sink constraints. Because MarkQL is explicit, error messages usually point to stage boundaries.
 
@@ -88,14 +91,14 @@ In this build, `ORDER BY` supports core row fields. Sorting by expression-like p
 Observed outputs (trimmed):
 - `SHOW FUNCTIONS` includes `project(tag)`, `flatten(tag[, depth])`, `coalesce`, `case`.
 - `SHOW AXES` includes `parent`, `child`, `ancestor`, `descendant`.
-- `SHOW OPERATORS` includes `LIKE`, `IN`, `IS NULL`, `HAS_DIRECT_TEXT`, and logical operators.
+- `SHOW OPERATORS` includes `LIKE`, `IN`, `IS NULL`, `HAS_DIRECT_TEXT` (legacy shorthand), and logical operators.
 
 ## Listing 12-4: Corrective rewrite pattern
 
 <!-- VERIFY: ch12-listing-6 -->
 ```bash
 ./build/markql --mode plain --color=disabled \
-  --query "SELECT section.node_id, PROJECT(section) AS (title: TEXT(h3), stop_text: TEXT(span WHERE span HAS_DIRECT_TEXT 'stop')) FROM doc WHERE tag='section' AND EXISTS(descendant WHERE tag='span' AND text LIKE '%stop%') ORDER BY node_id;" \
+  --query "SELECT section.node_id, PROJECT(section) AS (title: TEXT(h3), stop_text: TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%')) FROM doc WHERE tag='section' AND EXISTS(descendant WHERE tag='span' AND text LIKE '%stop%') ORDER BY node_id;" \
   --input docs/fixtures/basic.html
 ```
 
@@ -119,3 +122,12 @@ Before
 After
   identify stage -> apply stage-specific fix -> verify
 ```
+
+## Common mistakes
+- Editing multiple clauses before confirming the failing stage.  
+  Fix: isolate one stage and rerun with a minimal query.
+- Treating error text as noise.  
+  Fix: read it as a boundary hint (grammar vs semantics vs capability).
+
+## Chapter takeaway
+MarkQL errors are most useful when you read them as stage-level diagnostics.

@@ -1,5 +1,8 @@
 # Chapter 10: NULL and Stability
 
+## TL;DR
+Nulls are normal in extraction. Stability comes from explicit null policy (`COALESCE`, `CASE`) and deliberate row gating.
+
 ## What is NULL stability in MarkQL?
 NULL stability is the practice of designing field extraction so missing suppliers are expected, controlled, and documented rather than treated as random failures. In MarkQL, nulls are a normal part of stage-2 evaluation.
 
@@ -98,3 +101,12 @@ Before
 After
   missing supplier -> NULL -> COALESCE/CASE policy
 ```
+
+## Common mistakes
+- Treating every null as an engine bug.  
+  Fix: first confirm whether the supplier node is optional by design.
+- Encoding row requirements as field fallbacks.  
+  Fix: if row must have value, enforce it in outer `WHERE`.
+
+## Chapter takeaway
+A stable extractor does not avoid nulls; it gives them clear semantics.

@@ -1,143 +1,303 @@
-# Chapter 1: Why MarkQL
+# MarkQL in One Chapter
+*From brittle scraping scripts to readable, reproducible extraction.*
 
-## What is MarkQL?
-MarkQL is a SQL-shaped query language for HTML DOM data where each DOM node is treated as a row in a stream, and selectors, predicates, and extraction functions operate on that row stream with explicit scope rules. In concrete terms, `FROM doc` means “iterate nodes”, `WHERE` means “keep or discard rows”, and projection functions such as `TEXT`, `ATTR`, `FLATTEN`, and `PROJECT` mean “materialize values from each kept row”.
+## TL;DR
+MarkQL lets you query HTML as rows instead of manually walking DOM trees in code. You write what data you want, and MarkQL handles traversal and extraction rules in one place. Start by finding stable rows, then compute columns from those rows.
 
-MarkQL matters because scraping pipelines usually fail in predictable ways: fragile class selectors, unclear scope semantics, and unstable output schema. MarkQL addresses those pains by making traversal and extraction explicit. You can write structure-aware filters (`EXISTS(descendant WHERE ...)`) and then turn each kept row into a stable shape (`PROJECT(base) AS (...)`) with deliberate fallback logic (`COALESCE`, `CASE`).
+If this feels different from your usual scraping workflow, that is expected. Most people first learn scraping as a sequence of imperative steps. MarkQL asks you to express intent first: row criteria, then field criteria. After a few runs, that shift usually makes query behavior easier to predict.
 
-This can feel unfamiliar at first because it asks you to think in *stages* instead of in one selector expression. Most users initially expect extraction predicates to filter rows directly. With practice, the model becomes natural: first choose rows, then compute fields. Once that click happens, debugging gets dramatically faster.
+## The pain: why scraping breaks
+If you have done scraping in Python, JavaScript, or any browser automation stack, you already know the failure pattern:
+- the selector worked yesterday,
+- frontend changed one wrapper `<div>` or class,
+- your extraction returns empty strings or wrong rows,
+- then you spend an hour stepping through traversal code and patching conditionals.
 
-> ### Note: The prerequisite mental model is “row stream, not text blob”
-> If you treat HTML as one giant text blob, every query feels like substring guessing. MarkQL deliberately avoids that. It parses nodes, keeps node identity (`node_id`, `parent_id`, `doc_order`), and evaluates predicates against row metadata and axis-relative nodes. This is why a MarkQL query can explain itself: you can inspect which rows were kept, then inspect how each field was selected. That observability is the core tradeoff.
+The painful part is not just “DOM changed.” The painful part is where your logic lives.
+A lot of scraping code mixes three jobs together:
+1. finding candidate blocks,
+2. traversing to nested nodes,
+3. shaping output schema.
 
-## Rules
-- A query always starts with row production: `FROM <source>`.
-- Outer `WHERE` decides whether a row exists in output at all.
-- Projection expressions decide values for rows that already survived.
-- Prefer structural predicates (`EXISTS`, axes) before brittle class-name matching.
-- Keep early queries small with `LIMIT` so you can verify assumptions quickly.
+When those three jobs are spread across imperative glue code, every small page change can trigger a large debugging session. You are not just fixing one selector; you are re-checking loops, index assumptions, optional branches, and post-processing rules.
 
-## Scope
-The first scope in MarkQL is the **row scope**: the current row node and its metadata.
+That is why scraping feels fragile: your extraction intent is buried inside orchestration code.
 
-```text
-row stream from doc
-  -> row #0 (html)
-  -> row #1 (body)
-  -> row #2 (main)
-  -> ...
+A practical way to say this: when extraction logic is spread across traversal code, every selector change forces you to re-read control flow. When extraction logic is centralized, selector changes usually affect one query clause rather than a full pipeline.
+
+## The paradigm shift: “How” vs “What”
+Traditional scraping often looks like this:
+- Declarative selectors (`.select(...)`, XPath, CSS)
+- Imperative orchestration (`for` loops, `if` branches, fallback logic, mutation)
+
+MarkQL shifts the center of gravity:
+- Keep extraction declarative as long as possible
+- Put row filtering and field computation directly in the query
+- Keep traversal intent visible in one place
+
+In plain words:
+- **Old style**: “How do I walk this tree and build rows?”
+- **MarkQL style**: “What rows do I want, and what columns do I compute for each row?”
+
+This can feel unfamiliar in the first few queries, especially if you are used to writing loops first and extraction second. That is normal. Once you separate row selection from field computation, the query becomes easier to read, review, and fix.
+
+That one shift reduces cognitive load. You can review and debug extraction as a query contract instead of reverse-engineering control flow.
+
+The core tradeoff is simple and useful: you give up some ad-hoc flexibility in exchange for clearer semantics. In scraping work, that trade is often worth it because maintainability and reproducibility matter more than quick one-off hacks.
+
+## Side-by-side comparison
+### Traditional extraction code
+```python
+cards = soup.select("section")
+rows = []
+for card in cards:
+    if card.get("data-kind") != "flight":
+        continue
+
+    h3 = card.select_one("h3")
+    spans = card.select("span")
+
+    stop_text = None
+    price = None
+    for sp in spans:
+        t = sp.get_text(" ", strip=True)
+        if "stop" in t.lower():
+            stop_text = t
+        if sp.get("role") == "text":
+            price = t
+
+    rows.append({
+        "title": h3.get_text(strip=True) if h3 else None,
+        "stops": stop_text,
+        "price": price,
+    })
 ```
 
-The second scope is **expression scope**, used during extraction on a kept row.
-
-```text
-kept row node N
-  -> evaluate each SELECT / PROJECT expression for N
-  -> expression may inspect N, N.parent, N.child, N.descendant
-```
-
-## Listing 1-1: Start by seeing rows, not guessed values
-Fixture: `docs/fixtures/basic.html`
-
-```html
-<main id="content">
-  <nav>
-    <a href="/home" rel="nav">Home</a>
-    <a href="/about" rel="nav">About</a>
-  </nav>
-</main>
-```
-
-Query:
-
+### MarkQL query
 ```sql
-SELECT * FROM doc LIMIT 3;
+SELECT section.node_id,
+PROJECT(section) AS (
+  title: TEXT(h3),
+  stops: TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%'),
+  price: TEXT(span WHERE attributes.role = 'text')
+)
+FROM doc
+WHERE attributes.data-kind = 'flight'
+ORDER BY node_id;
 ```
 
-<!-- VERIFY: ch01-listing-1 -->
+The important difference is not fewer lines. The important difference is clarity:
+- row inclusion is explicit (`WHERE attributes.data-kind = 'flight'`)
+- each output field has explicit supplier logic
+- output shape is declared where extraction happens
+
+That clarity becomes concrete when you debug. If output rows are wrong, inspect outer `WHERE`. If columns are wrong, inspect field expressions in `PROJECT`. The query itself separates those concerns, so the debugging path is shorter and less ambiguous.
+
+## The killer feature: stable schema extraction with `PROJECT`
+The fastest “aha” in MarkQL is `PROJECT(...)`.
+
+`PROJECT` says:
+- “For each row I keep, compute these named fields.”
+
+That sounds small, but it solves a big problem: schema drift.
+In exploratory extraction, `FLATTEN` is great and fast. But when rows differ (optional nodes, missing blocks), flattened columns can shift meaning. `PROJECT` lets you pin each column to a field expression, so your schema stays understandable.
+
+You can still use `FLATTEN` for discovery. But for extraction you want to maintain, `PROJECT` is usually the bridge from “it works on my sample” to “it keeps working next month.”
+
+In other words, `PROJECT` makes the extraction contract explicit. Each field is named, each value source is documented by expression, and optional data can be handled with deliberate defaults. That explicitness is what makes handoff and review easier across a team.
+
+## Beginner mental model
+Think of a page as a table of nodes.
+
+1. `FROM doc` gives you rows (nodes).
+2. `WHERE` keeps rows you care about.
+3. `PROJECT` (or fields) computes columns for each kept row.
+
+```text
+HTML page
+   |
+   v
+[table of nodes]
+   |
+   |  WHERE (keep rows)
+   v
+[rows you care about]
+   |
+   |  PROJECT/TEXT/ATTR (compute columns)
+   v
+[result table]
+```
+
+Light teaser for what comes next in the book:
+- Outer `WHERE` decides if a row exists.
+- Field expressions decide what value each column gets for that row.
+
+That two-step split is the core of reliable MarkQL queries.
+
+> ### Note: one row, then many field decisions
+> A useful picture is: “one row enters, several field expressions run.”  
+> The row is either kept or dropped once. Field expressions then compute values independently for that kept row.  
+> This is why one field can be `NULL` while other fields in the same row are valid.
+
+## Try it in 60 seconds
+Use fixture: `docs/fixtures/basic.html`
+
+### a) Show me the rows
+Query idea: inspect the first 5 nodes so you can see actual structure.
+
+<!-- VERIFY: ch01-try-01 -->
 ```bash
 ./build/markql --mode plain --color=disabled \
-  --query "SELECT * FROM doc LIMIT 3;" \
+  --query "SELECT * FROM doc LIMIT 5;" \
   --input docs/fixtures/basic.html
 ```
 
-Observed output (trimmed):
+Observed output:
 
 ```json
 [
-  {"node_id":0,"tag":"html","parent_id":null,...},
-  {"node_id":1,"tag":"body","parent_id":0,...},
-  {"node_id":2,"tag":"main","parent_id":1,...}
+  {
+    "attributes": {},
+    "doc_order": 0,
+    "max_depth": 5,
+    "node_id": 0,
+    "parent_id": null,
+    "tag": "html"
+  },
+  {
+    "attributes": {},
+    "doc_order": 1,
+    "max_depth": 4,
+    "node_id": 1,
+    "parent_id": 0,
+    "tag": "body"
+  },
+  {
+    "attributes": {"id": "content"},
+    "doc_order": 2,
+    "max_depth": 3,
+    "node_id": 2,
+    "parent_id": 1,
+    "tag": "main"
+  },
+  {
+    "attributes": {"id": "nav"},
+    "doc_order": 3,
+    "max_depth": 1,
+    "node_id": 3,
+    "parent_id": 2,
+    "tag": "nav"
+  },
+  {
+    "attributes": {"href": "/home", "rel": "nav"},
+    "doc_order": 4,
+    "max_depth": 0,
+    "node_id": 4,
+    "parent_id": 3,
+    "tag": "a"
+  }
 ]
 ```
 
-This listing is intentionally boring. In MarkQL, boring first queries are a feature. They give you a factual map of row identity and traversal order before you write logic. Most extraction bugs start when users skip this map and jump directly to assumptions.
+This command is your structural sanity check. Before choosing any extraction strategy, confirm what the parser actually produced: tags, ids, parent relations, and document order. Most downstream mistakes get cheaper to fix if this step is done first.
 
-The second reason this listing matters is confidence. When you can see row metadata directly, you can reason about `parent`, `descendant`, and `EXISTS` behavior from evidence rather than guesswork. This chapter’s core thesis is that MarkQL is predictable because it is explicit.
+### b) Extract something real
+Query idea: keep only flight sections and compute title, stops, and price.
 
-## Listing 1-2: A deliberate failure (`Expected FROM`)
-Naive query:
-
-```sql
-select div(data-id) as data_id from doc;
-```
-
-<!-- VERIFY: ch01-listing-2-fail -->
+<!-- VERIFY: ch01-try-02 -->
 ```bash
-# EXPECT_FAIL: Expected FROM
 ./build/markql --mode plain --color=disabled \
-  --query "select div(data-id) as data_id from doc;" \
+  --query "SELECT section.node_id, PROJECT(section) AS (title: TEXT(h3), stops: TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%'), price: TEXT(span WHERE attributes.role = 'text')) FROM doc WHERE attributes.data-kind = 'flight' ORDER BY node_id;" \
   --input docs/fixtures/basic.html
 ```
 
-Observed error:
-
-```text
-Error: Query parse error: Expected FROM
-```
-
-Why this fails: current MarkQL grammar does not support SQL `AS` aliasing in that form. The parser reads tokens and expects a valid `SELECT ... FROM ...` projection grammar. When it sees unsupported shape, it recovers at the `FROM` checkpoint and reports the nearest expectation.
-
-Fix by using supported projection forms.
-
-## Listing 1-3: Correct row-oriented extraction flow
-Query:
-
-```sql
-SELECT a FROM doc WHERE href IS NOT NULL ORDER BY node_id;
-```
-
-<!-- VERIFY: ch01-listing-3 -->
-```bash
-./build/markql --mode plain --color=disabled \
-  --query "SELECT a FROM doc WHERE href IS NOT NULL ORDER BY node_id;" \
-  --input docs/fixtures/basic.html
-```
-
-Observed output (trimmed):
+Observed output:
 
 ```json
 [
-  {"node_id":4,"tag":"a","attributes":{"href":"/home","rel":"nav"},...},
-  {"node_id":5,"tag":"a","attributes":{"href":"/about","rel":"nav"},...}
+  {
+    "node_id": 6,
+    "price": "¥12,300",
+    "stops": "1 stop",
+    "title": "Tokyo"
+  },
+  {
+    "node_id": 11,
+    "price": "¥8,500",
+    "stops": "nonstop",
+    "title": "Osaka"
+  }
 ]
 ```
 
-Now the narrative should feel concrete: we started with rows, then filtered rows, then inspected resulting rows. That progression is not ceremony; it is the foundation for everything in later chapters. When we introduce `PROJECT`, you will still be using this same logic, only with richer field expressions.
+This output shows a complete extraction contract in a small form:
+- row gate: only sections with `data-kind='flight'`
+- field logic: `title`, `stops`, `price`
+- stable shape: each row has the same named columns
 
-## Before/after diagram: from guessing to staged reasoning
+As chapters progress, syntax becomes richer, but this flow does not change.
 
-```text
-Before (typical scraping guess)
-  "I need text that looks like price"
-      |
-      v
-  fragile selector + trial/error
+## Common beginner mistakes
+### Mistake 1: jumping straight to extraction without stable rows
+Bad query:
+```sql
+SELECT TEXT(section) FROM doc;
 ```
+What goes wrong:
+- fails with extraction guard (`requires a WHERE clause`), or
+- if rewritten loosely, you still don’t know which rows you meant.
 
-```text
-After (MarkQL staged loop)
-  row map -> row filter -> field extraction -> export
+Fix:
+```sql
+SELECT TEXT(section)
+FROM doc
+WHERE attributes.data-kind = 'flight';
 ```
+Start with explicit row scope first.
 
-By the end of this book, that second loop should feel as routine as writing a `SELECT ... WHERE ...` in a relational database.
+### Mistake 2: mixing row filtering with field selection
+Bad query pattern:
+```sql
+SELECT section.node_id,
+PROJECT(section) AS (
+  stop_text: TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%')
+)
+FROM doc
+WHERE tag = 'section';
+```
+Then expecting only stop rows.
+
+What goes wrong:
+- rows without matching supplier stay in output with `stop_text = NULL`.
+
+Fix (if row must have stop text):
+```sql
+SELECT section.node_id,
+PROJECT(section) AS (
+  stop_text: TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%')
+)
+FROM doc
+WHERE tag = 'section'
+  AND EXISTS(descendant WHERE tag = 'span' AND text LIKE '%stop%');
+```
+Outer `WHERE` controls row existence. Field expressions control value sourcing.
+
+Why this matters operationally: if your pipeline expects “only rows with stop text,” stage-1 filtering must encode that requirement. If you leave it in field selection only, you get silent null rows rather than explicit exclusion.
+
+### Mistake 3: trying to build schema with ad-hoc flattening too early
+Bad pattern:
+- rely on positional flattened columns before understanding optional nodes.
+
+What goes wrong:
+- columns drift when one row is missing a node.
+
+Fix:
+- use `FLATTEN` for quick discovery,
+- switch to `PROJECT` for stable named columns.
+
+## Closing
+Good extraction is not about writing clever selectors. It is about making intent obvious and repeatable: which rows, which fields, which fallbacks.
+
+MarkQL gives you a path from “I can scrape this page today” to “we can maintain this extractor next quarter.”
+
+**Sticky line:** first lock the rows, then compute the columns. That one habit will save you the most debugging time in MarkQL.

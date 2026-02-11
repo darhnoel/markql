@@ -1,5 +1,8 @@
 # Chapter 6: Axes and EXISTS
 
+## TL;DR
+Axes describe structural scope, and `EXISTS` turns structural facts into row-filter decisions. Use them when class names are unstable.
+
 ## What are axes and `EXISTS`?
 Axes (`parent`, `child`, `ancestor`, `descendant`) define structural traversal relative to the current row. `EXISTS(axis WHERE ...)` asks whether at least one node in that axis scope satisfies a predicate.
 
@@ -101,3 +104,12 @@ Before
 After
   EXISTS(descendant WHERE tag='span' AND ...)
 ```
+
+## Common mistakes
+- Reading `EXISTS(descendant ...)` as global document search.  
+  Fix: interpret it relative to the current row.
+- Using `child` when the target may be nested deeper.  
+  Fix: switch to `descendant` when depth can vary.
+
+## Chapter takeaway
+Axes plus `EXISTS` are how you encode robust structural rules instead of brittle selector trivia.

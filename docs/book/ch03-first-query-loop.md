@@ -1,5 +1,8 @@
 # Chapter 3: First Query Loop
 
+## TL;DR
+Use a repeatable loop: inspect rows, narrow rows, extract one value, then scale to a full schema. This sequence is faster than writing one big query and guessing where it failed.
+
 ## What is the first query loop?
 The first query loop is a repeatable debugging routine for unfamiliar HTML: map rows, constrain rows, extract one field, then scale to full schema. It is a workflow pattern, not syntax. The syntax is simple; the discipline is what prevents wasted hours.
 
@@ -133,3 +136,12 @@ After
   C extract one value
   D scale to full schema
 ```
+
+## Common mistakes
+- Skipping row inspection and starting with full extraction.  
+  Fix: begin with `SELECT * ... LIMIT ...`.
+- Changing multiple parts of a query at once.  
+  Fix: adjust one checkpoint at a time and verify.
+
+## Chapter takeaway
+The first query loop is not training wheels; it is the fastest path to reliable extraction on unfamiliar HTML.

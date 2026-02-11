@@ -1,5 +1,8 @@
 # Chapter 9: PROJECT
 
+## TL;DR
+`PROJECT` is the schema contract of MarkQL: explicit field names, explicit supplier logic, predictable null behavior, and stable extraction intent.
+
 ## What is `PROJECT`?
 `PROJECT(base_tag) AS (field: expr, ...)` is MarkQL’s schema-construction operator. It evaluates named expressions for each kept row, with each expression scoped under the row node selected by `base_tag`. In practical terms, `PROJECT` is where you stop “collecting text” and start “defining a contract.”
 
@@ -43,9 +46,9 @@ Stage 2: field evaluation
 ```text
 R = current kept row (e.g., <section data-kind='flight'>)
 
-TEXT(span WHERE span HAS_DIRECT_TEXT 'stop')
+TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%')
   candidates under R: all span descendants
-  predicate filter: HAS_DIRECT_TEXT 'stop'
+  predicate filter: DIRECT_TEXT(span) LIKE '%stop%'
   chosen supplier: first matching candidate (unless FIRST/LAST/index overrides)
   returned value: text(supplier) or NULL
 ```
@@ -59,7 +62,7 @@ Query:
 SELECT section.node_id,
 PROJECT(section) AS (
   title: TEXT(h3),
-  stops: TEXT(span WHERE span HAS_DIRECT_TEXT 'stop'),
+  stops: TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%'),
   price: TEXT(span WHERE attributes.role = 'text')
 )
 FROM doc
@@ -70,7 +73,7 @@ ORDER BY node_id;
 <!-- VERIFY: ch09-listing-1 -->
 ```bash
 ./build/markql --mode plain --color=disabled \
-  --query "SELECT section.node_id, PROJECT(section) AS (title: TEXT(h3), stops: TEXT(span WHERE span HAS_DIRECT_TEXT 'stop'), price: TEXT(span WHERE attributes.role = 'text')) FROM doc WHERE tag = 'section' ORDER BY node_id;" \
+  --query "SELECT section.node_id, PROJECT(section) AS (title: TEXT(h3), stops: TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%'), price: TEXT(span WHERE attributes.role = 'text')) FROM doc WHERE tag = 'section' ORDER BY node_id;" \
   --input docs/fixtures/basic.html
 ```
 
@@ -101,7 +104,7 @@ Query:
 SELECT section.node_id,
 PROJECT(section) AS (
   title: TEXT(h3),
-  stop_text: TEXT(span WHERE span HAS_DIRECT_TEXT 'stop')
+  stop_text: TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%')
 )
 FROM doc
 WHERE tag = 'section'
@@ -112,7 +115,7 @@ ORDER BY node_id;
 <!-- VERIFY: ch09-listing-2 -->
 ```bash
 ./build/markql --mode plain --color=disabled \
-  --query "SELECT section.node_id, PROJECT(section) AS (title: TEXT(h3), stop_text: TEXT(span WHERE span HAS_DIRECT_TEXT 'stop')) FROM doc WHERE tag = 'section' AND EXISTS(descendant WHERE tag = 'span' AND text LIKE '%stop%') ORDER BY node_id;" \
+  --query "SELECT section.node_id, PROJECT(section) AS (title: TEXT(h3), stop_text: TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%')) FROM doc WHERE tag = 'section' AND EXISTS(descendant WHERE tag = 'span' AND text LIKE '%stop%') ORDER BY node_id;" \
   --input docs/fixtures/basic.html
 ```
 
@@ -261,3 +264,12 @@ After (correct)
 If you keep only one sentence from this chapter, keep this one:
 
 **MarkQL extraction correctness is mostly scope correctness, and scope correctness starts with separating stage 1 and stage 2.**
+
+## Common mistakes
+- Writing field predicates when the real requirement is row inclusion.  
+  Fix: move that condition to outer `WHERE` with `EXISTS(...)` if needed.
+- Assuming repeated tags pick the “right one” automatically.  
+  Fix: use `FIRST/LAST/index` explicitly.
+
+## Chapter takeaway
+`PROJECT` turns extraction from a best-effort traversal into an explicit, maintainable data contract.

@@ -157,7 +157,7 @@ Filters (`WHERE ...`) operators shown in the guide:
 - `IS NULL` and `IS NOT NULL`
 - `~` (regex)
 - `CONTAINS`, `CONTAINS ALL`, `CONTAINS ANY`
-- `HAS_DIRECT_TEXT`
+- `HAS_DIRECT_TEXT` (legacy operator shorthand)
 - `EXISTS(axis [WHERE expr])`
 
 Examples:
@@ -169,7 +169,7 @@ SELECT a FROM doc WHERE href ~ '.*\.pdf$';
 SELECT div FROM doc WHERE text LIKE '%coupon%';
 SELECT div FROM doc WHERE POSITION('coupon' IN LOWER(text)) > 0;
 SELECT div FROM doc WHERE attributes IS NULL;
-SELECT div FROM doc WHERE div HAS_DIRECT_TEXT 'buy now';
+SELECT div FROM doc WHERE DIRECT_TEXT(div) LIKE '%buy now%';
 SELECT div FROM doc WHERE EXISTS(child);
 SELECT div FROM doc WHERE EXISTS(child WHERE tag = 'h2');
 ```
@@ -466,7 +466,8 @@ WHERE EXISTS(child WHERE tag = 'td');
 
 Important syntax details:
 - `AS (...)` is required and must use `alias: expression`.
-- `HAS_DIRECT_TEXT` is an operator form (`td HAS_DIRECT_TEXT '2025'`), not a projected field.
+- Prefer `DIRECT_TEXT(td) LIKE '%2025%'` for direct-text filtering.
+- `HAS_DIRECT_TEXT` remains available as operator shorthand (`td HAS_DIRECT_TEXT '2025'`).
 - `FLATTEN_EXTRACT(...)` is supported as a compatibility alias.
 - Selector indexes are 1-based. If index is out of range, the expression returns `NULL`.
 - `LENGTH()/CHAR_LENGTH()` currently count UTF-8 bytes.

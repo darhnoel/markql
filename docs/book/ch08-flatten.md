@@ -1,5 +1,8 @@
 # Chapter 8: FLATTEN
 
+## TL;DR
+`FLATTEN` is the fastest way to explore hierarchical text as columns, but it is not a long-term schema guarantee.
+
 ## What is `FLATTEN`?
 `FLATTEN(tag[, depth])` is an extraction shortcut that maps ordered descendant text slices into output columns. It is designed for quick structure discovery and early prototyping when strict per-column supplier logic is not yet needed.
 
@@ -102,3 +105,12 @@ Before
 After
   PROJECT -> explicit suppliers, stable semantics
 ```
+
+## Common mistakes
+- Treating flatten column positions as permanent schema contracts.  
+  Fix: migrate to `PROJECT` once exploration is done.
+- Flattening overly broad row sets.  
+  Fix: constrain rows before flattening to reduce noise.
+
+## Chapter takeaway
+Use `FLATTEN` to discover structure quickly, then encode production schema with `PROJECT`.

@@ -33,7 +33,7 @@ SELECT
   li.node_id,
   PROJECT(li) AS (
     city:  TEXT(h3),
-    stops: TEXT(span WHERE span HAS_DIRECT_TEXT 'stop'),
+    stops: TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%'),
     price: TEXT(span WHERE attributes.role = 'text')
   )
 FROM doc
@@ -133,13 +133,13 @@ Pick a match (default: first in document order)
 Return TEXT(h3) = "Tokyo"
 ```
 
-### Field 2: `stops: TEXT(span WHERE span HAS_DIRECT_TEXT 'stop')`
+### Field 2: `stops: TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%')`
 
 ```
 Candidates = row scope nodes with tag=span
           = [span("1 stop"), span("2 hr"), span("30 min"), span("$463")]
 
-Apply predicate: HAS_DIRECT_TEXT 'stop'
+Apply predicate: DIRECT_TEXT(span) LIKE '%stop%'
 Matches   = [span("1 stop")]   (maybe also "nonstop" depending on rule)
 Pick one  = span("1 stop")
 Return    = "1 stop"
@@ -174,7 +174,7 @@ Consider two queries that look similar.
 ```
 SELECT li.node_id,
 PROJECT(li) AS (
-  stop_text: TEXT(span WHERE span HAS_DIRECT_TEXT 'stop')
+  stop_text: TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%')
 )
 FROM doc
 WHERE tag='li';
@@ -202,11 +202,11 @@ li#3  stop_text="nonstop"
 ```
 SELECT li.node_id,
 PROJECT(li) AS (
-  stop_text: TEXT(span WHERE span HAS_DIRECT_TEXT 'stop')
+  stop_text: TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%')
 )
 FROM doc
 WHERE tag='li'
-  AND EXISTS(descendant WHERE tag='span' AND span HAS_DIRECT_TEXT 'stop');
+  AND EXISTS(descendant WHERE tag='span' AND DIRECT_TEXT(span) LIKE '%stop%');
 ```
 
 Interpretation:
@@ -349,18 +349,18 @@ Example:
 
 ```sql
 PROJECT(li) AS (
-  first_stop: FIRST_TEXT(span WHERE span HAS_DIRECT_TEXT 'stop'),
-  last_stop:  LAST_TEXT(span WHERE span HAS_DIRECT_TEXT 'stop'),
-  second_hr:  TEXT(span WHERE span HAS_DIRECT_TEXT 'hr', 2)
+  first_stop: FIRST_TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%'),
+  last_stop:  LAST_TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%'),
+  second_hr:  TEXT(span WHERE DIRECT_TEXT(span) LIKE '%hr%', 2)
 )
 ```
 
 ---
 
-## 10) `HAS_DIRECT_TEXT` and string matching
+## 10) Direct text matching
 
-- `HAS_DIRECT_TEXT` is kept for compatibility.
-- It is treated as shorthand for direct-text matching (`DIRECT_TEXT(...) LIKE '%...%'` style behavior).
+- Preferred form: `DIRECT_TEXT(tag) LIKE '%...%'`.
+- `HAS_DIRECT_TEXT` is kept for compatibility as shorthand.
 - Current LIKE/contains matching in execution is case-insensitive.
 
 ---

@@ -113,7 +113,7 @@ Basic operators:
 - `IS NULL` / `IS NOT NULL`
 - `~` regex
 - `CONTAINS`, `CONTAINS ALL`, `CONTAINS ANY` (attributes)
-- `HAS_DIRECT_TEXT`
+- `HAS_DIRECT_TEXT` (legacy operator shorthand)
 - `EXISTS(axis [WHERE expr])`
 
 Examples:
@@ -124,7 +124,7 @@ SELECT a FROM doc WHERE href ~ '.*\.pdf$';
 SELECT div FROM doc WHERE text LIKE '%coupon%';
 SELECT div FROM doc WHERE POSITION('coupon' IN LOWER(text)) > 0;
 SELECT div FROM doc WHERE attributes IS NULL;
-SELECT div FROM doc WHERE div HAS_DIRECT_TEXT 'buy now';
+SELECT div FROM doc WHERE DIRECT_TEXT(div) LIKE '%buy now%';
 SELECT div FROM doc WHERE EXISTS(child);
 SELECT div FROM doc WHERE EXISTS(child WHERE tag = 'h2');
 ```
@@ -285,7 +285,8 @@ WHERE EXISTS(child WHERE tag = 'td');
 Notes:
 - `AS (...)` is required and must use `alias: expression`.
 - `COALESCE` returns the first non-NULL, non-blank extracted value.
-- Use `HAS_DIRECT_TEXT` as an operator (`td HAS_DIRECT_TEXT '2025'`), not as a field.
+- Prefer `DIRECT_TEXT(td) LIKE '%2025%'` as the default direct-text filter form.
+- `HAS_DIRECT_TEXT` remains available as operator shorthand (`td HAS_DIRECT_TEXT '2025'`).
 - Selector indexes are 1-based (`TEXT(..., 2)` is the second match). Out-of-range indexes return `NULL`.
 - `FLATTEN_EXTRACT(...)` is kept as a compatibility alias.
 - Fields are evaluated left-to-right; later aliases can reference earlier ones.

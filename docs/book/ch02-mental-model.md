@@ -1,5 +1,8 @@
 # Chapter 2: Mental Model
 
+## TL;DR
+MarkQL runs in two stages: outer `WHERE` decides which rows exist, and field expressions decide which values those rows carry. If you separate those two decisions while reading a query, most confusion disappears.
+
 ## What is the MarkQL mental model?
 The MarkQL mental model is: “A query is a two-stage computation over a DOM row stream.” Stage 1 filters which nodes survive as output rows. Stage 2 computes values for each surviving row using scoped field expressions. This two-stage model is the semantic center of the language.
 
@@ -77,7 +80,7 @@ Query:
 SELECT section.node_id,
 PROJECT(section) AS (
   title: TEXT(h3),
-  stop_text: TEXT(span WHERE span HAS_DIRECT_TEXT 'stop')
+  stop_text: TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%')
 )
 FROM doc
 WHERE tag = 'section'
@@ -87,7 +90,7 @@ ORDER BY node_id;
 <!-- VERIFY: ch02-listing-2 -->
 ```bash
 ./build/markql --mode plain --color=disabled \
-  --query "SELECT section.node_id, PROJECT(section) AS (title: TEXT(h3), stop_text: TEXT(span WHERE span HAS_DIRECT_TEXT 'stop')) FROM doc WHERE tag = 'section' ORDER BY node_id;" \
+  --query "SELECT section.node_id, PROJECT(section) AS (title: TEXT(h3), stop_text: TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%')) FROM doc WHERE tag = 'section' ORDER BY node_id;" \
   --input docs/fixtures/basic.html
 ```
 
@@ -158,3 +161,12 @@ After (actual semantics)
 ```
 
 Keep this chapter’s model active as you read the rest of the book. It is not one chapter’s concept; it is the language’s operating system.
+
+## Common mistakes
+- Treating field predicates as row filters.  
+  Fix: move row requirements into outer `WHERE`, usually with `EXISTS(...)`.
+- Assuming `NULL` means row removal.  
+  Fix: remember `NULL` is a field-level outcome unless stage 1 dropped the row.
+
+## Chapter takeaway
+When output looks wrong, ask two questions in order: “Did the right rows survive?” and “Did each field pick the right supplier?”

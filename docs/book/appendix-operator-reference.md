@@ -1,5 +1,8 @@
 # Appendix B: Operator Reference
 
+## TL;DR
+This is the quick lookup for predicate operators. Prefer this list when you need exact spellings and current behavior.
+
 You can always inspect live support with:
 
 ```bash
@@ -14,7 +17,7 @@ Current operators in this build:
 - `LIKE` SQL wildcard (`%`, `_`)
 - `CONTAINS`, `CONTAINS ALL`, `CONTAINS ANY`
 - `IS NULL`, `IS NOT NULL`
-- `HAS_DIRECT_TEXT`
+- `HAS_DIRECT_TEXT` (legacy shorthand; prefer `DIRECT_TEXT(tag) LIKE '%...%'`)
 - `~` regex match
 - `AND`, `OR`
 

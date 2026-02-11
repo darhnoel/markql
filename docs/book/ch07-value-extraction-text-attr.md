@@ -1,5 +1,8 @@
 # Chapter 7: Value Extraction with TEXT and ATTR
 
+## TL;DR
+Extraction functions answer “which value do I take from this kept row?” They do not decide whether a row exists.
+
 ## What are `TEXT`, `DIRECT_TEXT`, and `ATTR`?
 These are stage-2 value extraction functions. `TEXT(tag ...)` returns text from a selected supplier node, `DIRECT_TEXT(tag)` returns immediate text children only, and `ATTR(tag, name ...)` returns an attribute value from a selected supplier node.
 
@@ -114,3 +117,12 @@ Before
 After
   row R fixed -> supplier S selected -> value extracted
 ```
+
+## Common mistakes
+- Treating extraction failures as row-filter failures.  
+  Fix: debug row scope and supplier scope separately.
+- Ignoring `DIRECT_TEXT` when nested text pollutes matches.  
+  Fix: use `DIRECT_TEXT` for immediate-text conditions.
+
+## Chapter takeaway
+Reliable extraction comes from explicit supplier logic, not from hoping one selector fits every row variation.

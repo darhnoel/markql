@@ -1,5 +1,8 @@
 # Chapter 5: Row Filtering with WHERE
 
+## TL;DR
+`WHERE` is the row gate. If row filtering is wrong, no extraction function can rescue the result.
+
 ## What is `WHERE` in MarkQL?
 `WHERE` is the stage-1 row filter. It runs on each candidate row from `FROM` and decides whether that row survives into the output. In MarkQL, this is the single place where row existence is decided.
 
@@ -116,3 +119,12 @@ Before
 After
   LOWER(attr) LIKE '%x%'  (supported and explicit)
 ```
+
+## Common mistakes
+- Using field logic to compensate for weak row filters.  
+  Fix: make row inclusion criteria explicit first.
+- Assuming all text-like checks should use `CONTAINS`.  
+  Fix: use the operator forms supported by current implementation (`LIKE`, attribute `CONTAINS`, etc.).
+
+## Chapter takeaway
+Treat outer `WHERE` as your primary correctness boundary for every query.

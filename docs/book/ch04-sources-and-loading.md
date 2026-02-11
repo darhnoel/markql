@@ -1,5 +1,8 @@
 # Chapter 4: Sources and Loading
 
+## TL;DR
+Source choice controls reproducibility. Use stable sources while developing queries, then switch inputs deliberately for production workflows.
+
 ## What are MarkQL sources?
 A MarkQL source is the input root that supplies the row stream. `doc` is the canonical parsed input source in CLI runs, but MarkQL also supports file/URL string sources, `RAW(...)` inline HTML, and `FRAGMENTS(...)` when you need multiple top-level roots.
 
@@ -145,3 +148,12 @@ Before
 After
   freeze source -> iterate query -> verify outputs
 ```
+
+## Common mistakes
+- Debugging query semantics against constantly changing live HTML.  
+  Fix: reproduce with local fixtures or `RAW(...)`.
+- Forgetting that extraction guard rules still apply with `RAW(...)`.  
+  Fix: keep explicit row narrowing in outer `WHERE`.
+
+## Chapter takeaway
+Good extraction starts before query syntax: choose input sources that make behavior repeatable.

@@ -1,5 +1,8 @@
 # Appendix A: Grammar Notes
 
+## TL;DR
+Use this appendix as a compact syntax map while reading chapters. It summarizes forms that appear in verified examples.
+
 This appendix summarizes practical grammar shapes used in the book.
 
 ## Core query

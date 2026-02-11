@@ -1,5 +1,8 @@
 # Appendix C: Function Reference
 
+## TL;DR
+This appendix is a function checklist, not a tutorial. Pair it with chapter examples when you need behavioral context.
+
 You can inspect the runtime list with:
 
 ```bash

@@ -1,5 +1,8 @@
 # Chapter 11: Output and Export
 
+## TL;DR
+MarkQL result semantics stay the same across sinks; only serialization format changes. Pick the sink that matches your downstream workflow.
+
 ## What are output sinks in MarkQL?
 Output sinks are query targets that serialize result rows: `TO LIST()`, `TO CSV(...)`, `TO JSON(...)`, and `TO NDJSON(...)`. They are not just convenience features; they define interoperability boundaries with downstream tools.
 
@@ -112,3 +115,12 @@ Before
 After
   extract + sink in one query contract
 ```
+
+## Common mistakes
+- Choosing `TO LIST()` for multi-column output.  
+  Fix: use `CSV`, `JSON`, or `NDJSON` for table-shaped results.
+- Deferring sink choices until late pipeline stages.  
+  Fix: declare sink intent early so shape assumptions stay explicit.
+
+## Chapter takeaway
+Output is part of the extraction contract, not an afterthought.
