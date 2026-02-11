@@ -32,6 +32,18 @@ Think of it as:
 - `WHERE <filters>`
 - optional `LIMIT`, `TO LIST`, `TO TABLE`, `TO CSV`, `TO PARQUET`, `TO JSON`, `TO NDJSON`
 
+For `PROJECT(...)`, keep this exact mental model:
+- `PROJECT(base_tag)` chooses row candidates by tag (`PROJECT(document)` behaves like all tags).
+- Outer `WHERE` filters those row candidates.
+- Field predicates inside `PROJECT(... AS (...))` choose which row-scoped node provides each field value.
+- Row scope for field extraction is the row node plus its descendants.
+
+Short version:
+> PROJECT picks candidates, outer WHERE filters rows, field WHERE picks values.
+
+Deep explanation:
+- [MarkQL deep dive](markql-deep-dive.md)
+
 ## CLI Setup
 
 Build:
@@ -272,10 +284,11 @@ WHERE EXISTS(child WHERE tag = 'td');
 
 Notes:
 - `AS (...)` is required and must use `alias: expression`.
-- `COALESCE` returns the first non-empty extracted value.
+- `COALESCE` returns the first non-NULL, non-blank extracted value.
 - Use `HAS_DIRECT_TEXT` as an operator (`td HAS_DIRECT_TEXT '2025'`), not as a field.
 - Selector indexes are 1-based (`TEXT(..., 2)` is the second match). Out-of-range indexes return `NULL`.
 - `FLATTEN_EXTRACT(...)` is kept as a compatibility alias.
+- Fields are evaluated left-to-right; later aliases can reference earlier ones.
 
 ## Output Modes
 

@@ -59,6 +59,18 @@ A query is the same mental flow you already know from SQL:
 - `TO ...` controls output format (list, table extraction, CSV, Parquet).
 - `LIMIT` keeps output small while you explore.
 
+When you use `PROJECT(...)`, apply this model:
+- `PROJECT(base_tag)` chooses row candidates by tag (`PROJECT(document)` behaves like all tags).
+- Outer `WHERE` filters those candidates.
+- Field predicates in `PROJECT(... AS (...))` choose which row-scoped node supplies each field value.
+- Row scope for field extraction is row node + descendants.
+
+Short version:
+> PROJECT picks candidates, outer WHERE filters rows, field WHERE picks values.
+
+If you want the full execution walk-through with diagrams:
+- [MarkQL deep dive](markql-deep-dive.md)
+
 Start with a broad query:
 
 ```sql
@@ -458,6 +470,7 @@ Important syntax details:
 - `FLATTEN_EXTRACT(...)` is supported as a compatibility alias.
 - Selector indexes are 1-based. If index is out of range, the expression returns `NULL`.
 - `LENGTH()/CHAR_LENGTH()` currently count UTF-8 bytes.
+- `PROJECT` field expressions are evaluated left-to-right, so later aliases can reference earlier aliases.
 
 **SQL string function example**
 ```sql

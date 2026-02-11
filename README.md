@@ -71,8 +71,11 @@ Python package/tests (optional):
 
 ## Documentation
 
+- Book (chapter path + verified examples): [docs/book/SUMMARY.md](docs/book/SUMMARY.md)
+- Book-style draft: [docs/markql-book.md](docs/markql-book.md)
 - Tutorial: [docs/markql-tutorial.md](docs/markql-tutorial.md)
 - CLI guide (intro to advanced): [docs/markql-cli-guide.md](docs/markql-cli-guide.md)
+- Deep dive (execution model): [docs/markql-deep-dive.md](docs/markql-deep-dive.md)
 - Syntax diagrams and generator: [docs/README.md](docs/README.md)
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 
