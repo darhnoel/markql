@@ -324,6 +324,7 @@ CommandHandler make_summarize_content_command() {
         options.max_rows = ctx.max_rows;
         options.highlight = ctx.config.highlight;
         options.is_tty = ctx.config.color;
+        options.colname_mode = ctx.config.colname_mode;
         std::cout << xsql::render::render_duckbox(result, options) << std::endl;
       } else {
         std::ostringstream out;

@@ -8,6 +8,8 @@
 #include "test_harness.h"
 
 #include "repl/commands/registry.h"
+#include "repl/commands/describe_last_command.h"
+#include "repl/commands/set_command.h"
 #include "repl/commands/summarize_content_command.h"
 #include "repl/core/line_editor.h"
 #include "repl/plugin_manager.h"
@@ -51,6 +53,7 @@ static void test_summarize_content_basic() {
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
+  std::vector<xsql::ColumnNameMapping> last_schema_map;
 
   xsql::cli::CommandRegistry registry;
   xsql::cli::PluginManager plugin_manager(registry);
@@ -62,6 +65,7 @@ static void test_summarize_content_basic() {
       last_full_output,
       display_full,
       max_rows,
+      last_schema_map,
       plugin_manager,
   };
 
@@ -88,6 +92,7 @@ static void test_summarize_content_khmer_requires_plugin() {
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
+  std::vector<xsql::ColumnNameMapping> last_schema_map;
 
   xsql::cli::CommandRegistry registry;
   xsql::cli::PluginManager plugin_manager(registry);
@@ -99,6 +104,7 @@ static void test_summarize_content_khmer_requires_plugin() {
       last_full_output,
       display_full,
       max_rows,
+      last_schema_map,
       plugin_manager,
   };
 
@@ -127,6 +133,7 @@ static void test_summarize_content_max_tokens() {
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
+  std::vector<xsql::ColumnNameMapping> last_schema_map;
 
   xsql::cli::CommandRegistry registry;
   xsql::cli::PluginManager plugin_manager(registry);
@@ -138,6 +145,7 @@ static void test_summarize_content_max_tokens() {
       last_full_output,
       display_full,
       max_rows,
+      last_schema_map,
       plugin_manager,
   };
 
@@ -166,6 +174,76 @@ static void test_sql_keyword_catalog_includes_new_tokens() {
               "view names should not be highlighted as reserved keywords");
 }
 
+static void test_set_colnames_command() {
+  StreamCapture capture(std::cout);
+  xsql::cli::ReplConfig config;
+  config.output_mode = "duckbox";
+  config.color = false;
+  config.highlight = false;
+  xsql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
+  std::string active_alias = "doc";
+  std::string last_full_output;
+  bool display_full = true;
+  size_t max_rows = 40;
+  std::vector<xsql::ColumnNameMapping> last_schema_map;
+  xsql::cli::CommandRegistry registry;
+  xsql::cli::PluginManager plugin_manager(registry);
+  xsql::cli::CommandContext ctx{
+      config,
+      editor,
+      sources,
+      active_alias,
+      last_full_output,
+      display_full,
+      max_rows,
+      last_schema_map,
+      plugin_manager,
+  };
+  auto handler = xsql::cli::make_set_command();
+  bool handled = handler(".set colnames raw", ctx);
+  expect_true(handled, "set command handles colnames raw");
+  expect_true(config.colname_mode == xsql::ColumnNameMode::Raw, "set command updates mode");
+}
+
+static void test_describe_last_command_outputs_map() {
+  StreamCapture capture(std::cout);
+  xsql::cli::ReplConfig config;
+  config.output_mode = "duckbox";
+  config.color = false;
+  config.highlight = false;
+  xsql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
+  std::string active_alias = "doc";
+  std::string last_full_output;
+  bool display_full = true;
+  size_t max_rows = 40;
+  std::vector<xsql::ColumnNameMapping> last_schema_map = {
+      {"data-id", "data_id"},
+      {"data_id", "data_id__2"},
+  };
+  xsql::cli::CommandRegistry registry;
+  xsql::cli::PluginManager plugin_manager(registry);
+  xsql::cli::CommandContext ctx{
+      config,
+      editor,
+      sources,
+      active_alias,
+      last_full_output,
+      display_full,
+      max_rows,
+      last_schema_map,
+      plugin_manager,
+  };
+  auto handler = xsql::cli::make_describe_last_command();
+  bool handled = handler("DESCRIBE LAST;", ctx);
+  expect_true(handled, "describe last command handles statement");
+  std::string output = capture.str();
+  expect_true(output.find("raw_name") != std::string::npos, "describe last header");
+  expect_true(output.find("data-id") != std::string::npos, "describe last raw value");
+  expect_true(output.find("data_id__2") != std::string::npos, "describe last output value");
+}
+
 void register_repl_tests(std::vector<TestCase>& tests) {
   tests.push_back({"summarize_content_basic", test_summarize_content_basic});
   tests.push_back({"summarize_content_khmer_requires_plugin",
@@ -174,4 +252,6 @@ void register_repl_tests(std::vector<TestCase>& tests) {
                    test_summarize_content_max_tokens});
   tests.push_back({"sql_keyword_catalog_includes_new_tokens",
                    test_sql_keyword_catalog_includes_new_tokens});
+  tests.push_back({"set_colnames_command", test_set_colnames_command});
+  tests.push_back({"describe_last_command_outputs_map", test_describe_last_command_outputs_map});
 }

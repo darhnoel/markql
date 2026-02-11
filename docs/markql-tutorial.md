@@ -59,6 +59,18 @@ A query is the same mental flow you already know from SQL:
 - `TO ...` controls output format (list, table extraction, CSV, Parquet).
 - `LIMIT` keeps output small while you explore.
 
+When you use `PROJECT(...)`, apply this model:
+- `PROJECT(base_tag)` chooses row candidates by tag (`PROJECT(document)` behaves like all tags).
+- Outer `WHERE` filters those candidates.
+- Field predicates in `PROJECT(... AS (...))` choose which row-scoped node supplies each field value.
+- Row scope for field extraction is row node + descendants.
+
+Short version:
+> PROJECT picks candidates, outer WHERE filters rows, field WHERE picks values.
+
+If you want the full execution walk-through with diagrams:
+- [MarkQL deep dive](markql-deep-dive.md)
+
 Start with a broad query:
 
 ```sql
@@ -145,7 +157,7 @@ Filters (`WHERE ...`) operators shown in the guide:
 - `IS NULL` and `IS NOT NULL`
 - `~` (regex)
 - `CONTAINS`, `CONTAINS ALL`, `CONTAINS ANY`
-- `HAS_DIRECT_TEXT`
+- `HAS_DIRECT_TEXT` (legacy operator shorthand)
 - `EXISTS(axis [WHERE expr])`
 
 Examples:
@@ -157,7 +169,7 @@ SELECT a FROM doc WHERE href ~ '.*\.pdf$';
 SELECT div FROM doc WHERE text LIKE '%coupon%';
 SELECT div FROM doc WHERE POSITION('coupon' IN LOWER(text)) > 0;
 SELECT div FROM doc WHERE attributes IS NULL;
-SELECT div FROM doc WHERE div HAS_DIRECT_TEXT 'buy now';
+SELECT div FROM doc WHERE DIRECT_TEXT(div) LIKE '%buy now%';
 SELECT div FROM doc WHERE EXISTS(child);
 SELECT div FROM doc WHERE EXISTS(child WHERE tag = 'h2');
 ```
@@ -454,10 +466,12 @@ WHERE EXISTS(child WHERE tag = 'td');
 
 Important syntax details:
 - `AS (...)` is required and must use `alias: expression`.
-- `HAS_DIRECT_TEXT` is an operator form (`td HAS_DIRECT_TEXT '2025'`), not a projected field.
+- Prefer `DIRECT_TEXT(td) LIKE '%2025%'` for direct-text filtering.
+- `HAS_DIRECT_TEXT` remains available as operator shorthand (`td HAS_DIRECT_TEXT '2025'`).
 - `FLATTEN_EXTRACT(...)` is supported as a compatibility alias.
 - Selector indexes are 1-based. If index is out of range, the expression returns `NULL`.
 - `LENGTH()/CHAR_LENGTH()` currently count UTF-8 bytes.
+- `PROJECT` field expressions are evaluated left-to-right, so later aliases can reference earlier aliases.
 
 **SQL string function example**
 ```sql
@@ -602,8 +616,10 @@ Helpful REPL commands listed in the guide:
 - `.help`
 - `.load <path|url> [--alias <name>]`
 - `.mode duckbox|json|plain`
+- `.set colnames raw|normalize`
 - `.display_mode more|less`
 - `.max_rows <n|inf>`
+- `DESCRIBE LAST`
 - `.summarize [doc|alias|path|url]`
 - `.reload_config`
 - `.quit`
@@ -738,6 +754,10 @@ Yes. A string literal can be a URL source: `FROM 'https://example.com'`.
 
 **How do I test a query quickly without scrolling forever?**  
 Add `LIMIT` early: `... LIMIT 5;`. Also consider `.max_rows` in REPL for display control.
+
+**Why does output show `data_id` instead of `data-id`?**  
+MarkQL normalizes output column names by default for tool compatibility (`data-id` -> `data_id`).  
+Use `.set colnames raw` to keep raw names, and `DESCRIBE LAST` to inspect the `raw_name -> output_name` mapping of the previous query.
 
 **Why does `TEXT(div)` fail unless I add `WHERE`?**  
 Because `TEXT()` (and `INNER_HTML()`) require a `WHERE` clause with a non-tag filter. Add something like `WHERE id = 'card'` or `WHERE attributes.class = 'summary'`.

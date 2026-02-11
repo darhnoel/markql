@@ -80,6 +80,7 @@ CommandHandler make_summarize_command() {
         options.max_rows = ctx.max_rows;
         options.highlight = ctx.config.highlight;
         options.is_tty = ctx.config.color;
+        options.colname_mode = ctx.config.colname_mode;
         std::cout << xsql::render::render_duckbox(result, options) << std::endl;
       } else {
         std::string json_out = build_summary_json(summary);

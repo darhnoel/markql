@@ -338,6 +338,10 @@ bool Parser::parse_flatten_extract_alias_expr_pairs(Query::SelectItem& item) {
     item.flatten_extract_exprs.push_back(std::move(expr));
     if (current_.type == TokenType::Comma) {
       advance();
+      if (current_.type == TokenType::RParen) {
+        advance();
+        break;
+      }
       continue;
     }
     if (current_.type == TokenType::RParen) {

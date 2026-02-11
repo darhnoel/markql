@@ -37,6 +37,7 @@ int run_repl(ReplConfig& config) {
   bool display_full = config.display_full;
   size_t max_rows = 40;
   std::vector<std::string> last_sources;
+  std::vector<xsql::ColumnNameMapping> last_schema_map;
   std::string line;
 
   if (!isatty(fileno(stdout))) {
@@ -69,6 +70,7 @@ int run_repl(ReplConfig& config) {
       last_full_output,
       display_full,
       max_rows,
+      last_schema_map,
       plugin_manager,
   };
 
@@ -187,9 +189,10 @@ int run_repl(ReplConfig& config) {
         last_sources = collect_source_uris(result);
         apply_source_uri_policy(result, last_sources);
       }
+      last_schema_map = xsql::build_column_name_map(result.columns, config.colname_mode);
       if (result.export_sink.kind != xsql::QueryResult::ExportSink::Kind::None) {
         std::string export_error;
-        if (!xsql::cli::export_result(result, export_error)) {
+        if (!xsql::cli::export_result(result, export_error, config.colname_mode)) {
           throw std::runtime_error(export_error);
         }
         if (!result.export_sink.path.empty()) {
@@ -223,10 +226,11 @@ int run_repl(ReplConfig& config) {
           options.max_rows = max_rows;
           options.highlight = config.highlight;
           options.is_tty = config.color;
+          options.colname_mode = config.colname_mode;
           std::cout << xsql::render::render_duckbox(result, options) << std::endl;
           std::cout << "Rows: " << count_result_rows(result) << std::endl;
         } else {
-          std::string json_out = build_json_list(result);
+          std::string json_out = build_json_list(result, config.colname_mode);
           last_full_output = json_out;
           if (display_full) {
             std::cout << colorize_json(json_out, config.color) << std::endl;
@@ -237,8 +241,11 @@ int run_repl(ReplConfig& config) {
           std::cout << "Rows: " << count_result_rows(result) << std::endl;
         }
       } else {
-        std::string json_out = result.to_table ? build_table_json(result)
-                              : (result.to_list ? build_json_list(result) : build_json(result));
+        std::string json_out =
+            result.to_table
+                ? build_table_json(result)
+                : (result.to_list ? build_json_list(result, config.colname_mode)
+                                  : build_json(result, config.colname_mode));
         last_full_output = json_out;
         if (config.output_mode == "plain") {
           std::cout << json_out << std::endl;

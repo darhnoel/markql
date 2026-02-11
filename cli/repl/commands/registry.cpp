@@ -1,12 +1,14 @@
 #include "registry.h"
 
 #include "display_mode_command.h"
+#include "describe_last_command.h"
 #include "help_command.h"
 #include "load_command.h"
 #include "max_rows_command.h"
 #include "mode_command.h"
 #include "plugin_command.h"
 #include "reload_config_command.h"
+#include "set_command.h"
 #ifdef XSQL_ENABLE_KHMER_NUMBER
 #include "khmer_number_command.h"
 #endif
@@ -30,6 +32,8 @@ bool CommandRegistry::try_handle(const std::string& line, CommandContext& ctx) c
 
 void register_default_commands(CommandRegistry& registry) {
   registry.add(make_help_command());
+  registry.add(make_set_command());
+  registry.add(make_describe_last_command());
   registry.add(make_display_mode_command());
   registry.add(make_mode_command());
   registry.add(make_max_rows_command());

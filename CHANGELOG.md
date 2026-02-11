@@ -7,6 +7,25 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-02-10
+
+### Added
+- Added deterministic output column normalization for result schemas, including:
+  - `normalize_colname(...)` helper with SQL-friendly identifier rules
+  - collision suffixing (`name`, `name__2`, `name__3`, ...)
+- Added REPL setting `.set colnames raw|normalize` (default: `normalize`).
+- Added `DESCRIBE LAST` in REPL to show the last raw-to-output column name mapping.
+- Added tests for column-name normalization rules, collisions, duckbox headers, CSV headers, and JSON key behavior.
+
+### Changed
+- Result headers now default to normalized identifier-safe names in:
+  - REPL duckbox rendering
+  - CSV export headers
+  - JSON/NDJSON keys
+  - Parquet field names
+- Raw mode now keeps original column names (`.set colnames raw`) while preserving deterministic collision suffixing.
+- Bumped project version to `1.7.0`.
+
 ## [1.6.0] - 2026-02-10
 
 ### Added

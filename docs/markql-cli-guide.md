@@ -32,6 +32,18 @@ Think of it as:
 - `WHERE <filters>`
 - optional `LIMIT`, `TO LIST`, `TO TABLE`, `TO CSV`, `TO PARQUET`, `TO JSON`, `TO NDJSON`
 
+For `PROJECT(...)`, keep this exact mental model:
+- `PROJECT(base_tag)` chooses row candidates by tag (`PROJECT(document)` behaves like all tags).
+- Outer `WHERE` filters those row candidates.
+- Field predicates inside `PROJECT(... AS (...))` choose which row-scoped node provides each field value.
+- Row scope for field extraction is the row node plus its descendants.
+
+Short version:
+> PROJECT picks candidates, outer WHERE filters rows, field WHERE picks values.
+
+Deep explanation:
+- [MarkQL deep dive](markql-deep-dive.md)
+
 ## CLI Setup
 
 Build:
@@ -101,7 +113,7 @@ Basic operators:
 - `IS NULL` / `IS NOT NULL`
 - `~` regex
 - `CONTAINS`, `CONTAINS ALL`, `CONTAINS ANY` (attributes)
-- `HAS_DIRECT_TEXT`
+- `HAS_DIRECT_TEXT` (legacy operator shorthand)
 - `EXISTS(axis [WHERE expr])`
 
 Examples:
@@ -112,7 +124,7 @@ SELECT a FROM doc WHERE href ~ '.*\.pdf$';
 SELECT div FROM doc WHERE text LIKE '%coupon%';
 SELECT div FROM doc WHERE POSITION('coupon' IN LOWER(text)) > 0;
 SELECT div FROM doc WHERE attributes IS NULL;
-SELECT div FROM doc WHERE div HAS_DIRECT_TEXT 'buy now';
+SELECT div FROM doc WHERE DIRECT_TEXT(div) LIKE '%buy now%';
 SELECT div FROM doc WHERE EXISTS(child);
 SELECT div FROM doc WHERE EXISTS(child WHERE tag = 'h2');
 ```
@@ -272,10 +284,12 @@ WHERE EXISTS(child WHERE tag = 'td');
 
 Notes:
 - `AS (...)` is required and must use `alias: expression`.
-- `COALESCE` returns the first non-empty extracted value.
-- Use `HAS_DIRECT_TEXT` as an operator (`td HAS_DIRECT_TEXT '2025'`), not as a field.
+- `COALESCE` returns the first non-NULL, non-blank extracted value.
+- Prefer `DIRECT_TEXT(td) LIKE '%2025%'` as the default direct-text filter form.
+- `HAS_DIRECT_TEXT` remains available as operator shorthand (`td HAS_DIRECT_TEXT '2025'`).
 - Selector indexes are 1-based (`TEXT(..., 2)` is the second match). Out-of-range indexes return `NULL`.
 - `FLATTEN_EXTRACT(...)` is kept as a compatibility alias.
+- Fields are evaluated left-to-right; later aliases can reference earlier ones.
 
 ## Output Modes
 
@@ -298,6 +312,8 @@ SELECT table FROM doc WHERE id = 'stats' TO TABLE(EXPORT='stats.csv');
 SELECT a.href, TEXT(a) FROM doc WHERE href IS NOT NULL TO CSV('links.csv');
 SELECT * FROM doc TO PARQUET('nodes.parquet');
 ```
+By default, exported column names are normalized to identifier-safe names
+(for example `data-id` -> `data_id`).
 
 ### TO JSON / TO NDJSON
 ```sql
@@ -312,11 +328,18 @@ Useful commands:
 - `.help`
 - `.load <path|url> [--alias <name>]`
 - `.mode duckbox|json|plain`
+- `.set colnames raw|normalize`
 - `.display_mode more|less`
 - `.max_rows <n|inf>`
+- `DESCRIBE LAST`
 - `.summarize [doc|alias|path|url]`
 - `.reload_config`
 - `.quit`
+
+Column-name modes:
+- `normalize` (default): use identifier-safe output headers/keys.
+- `raw`: keep original projected names.
+- `DESCRIBE LAST`: show `raw_name` and `output_name` for the previous query.
 
 Vim navigation mode:
 - Default editor mode is normal.

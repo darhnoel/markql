@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(markql VERSION 1.6.0 LANGUAGES CXX)
+project(markql VERSION 1.7.0 LANGUAGES CXX)
 
 option(XSQL_BUILD_CLI "Build the MarkQL CLI" ON)
 option(XSQL_BUILD_TESTS "Build tests" ON)
@@ -35,6 +35,7 @@ add_library(xsql_core
   core/src/util/string_util.cpp
   core/src/xsql/execute.cpp
   core/src/xsql/io.cpp
+  core/src/xsql/column_names.cpp
   core/src/xsql/validation.cpp
   core/src/xsql/result_builder.cpp
   core/src/xsql/table_extract.cpp
@@ -135,6 +136,8 @@ if (XSQL_BUILD_CLI)
     cli/repl/config.cpp
     cli/repl/commands/registry.cpp
     cli/repl/commands/help_command.cpp
+    cli/repl/commands/set_command.cpp
+    cli/repl/commands/describe_last_command.cpp
     cli/repl/commands/display_mode_command.cpp
     cli/repl/commands/mode_command.cpp
     cli/repl/commands/max_rows_command.cpp
@@ -207,6 +210,7 @@ if (XSQL_BUILD_TESTS)
     tests/test_meta_commands.cpp
     tests/test_cli_utils.cpp
     tests/test_string_sql.cpp
+    tests/test_column_names.cpp
     cli/repl/core/line_editor.cpp
     cli/repl/ui/autocomplete.cpp
     cli/repl/ui/sql_keywords.cpp
@@ -218,6 +222,8 @@ if (XSQL_BUILD_TESTS)
     cli/repl/config.cpp
     cli/repl/commands/registry.cpp
     cli/repl/commands/help_command.cpp
+    cli/repl/commands/set_command.cpp
+    cli/repl/commands/describe_last_command.cpp
     cli/repl/commands/display_mode_command.cpp
     cli/repl/commands/mode_command.cpp
     cli/repl/commands/max_rows_command.cpp
@@ -349,6 +355,8 @@ if (XSQL_BUILD_TESTS)
     summarize_content_basic
     summarize_content_khmer_requires_plugin
     summarize_content_max_tokens
+    set_colnames_command
+    describe_last_command_outputs_map
     parse_show_describe
     execute_describe_doc
     show_functions_output
@@ -385,6 +393,13 @@ if (XSQL_BUILD_TESTS)
     project_selector_scope_and_first_match
     project_top_level_comparison_expression
     regression_canonical_project_query
+    normalize_colname_examples
+    normalize_colname_collision_suffixing
+    duckbox_uses_normalized_headers_by_default
+    duckbox_raw_mode_keeps_raw_header
+    csv_header_normalized_default
+    csv_header_raw_mode
+    json_keys_follow_colname_mode
   )
   if (XSQL_ENABLE_KHMER_NUMBER)
     list(APPEND XSQL_TESTS

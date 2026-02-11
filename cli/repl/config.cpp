@@ -218,6 +218,21 @@ bool load_repl_config(const std::string& path, ReplSettings& out, std::string& e
         return false;
       }
       out.output_mode = parsed;
+    } else if (full_key == "repl.colnames") {
+      std::string parsed = parse_string_value(value, ok);
+      if (!ok) {
+        error = "Invalid repl.colnames at line " + std::to_string(line_no);
+        return false;
+      }
+      std::string lower;
+      lower.reserve(parsed.size());
+      for (unsigned char c : parsed) lower.push_back(static_cast<char>(std::tolower(c)));
+      if (lower != "raw" && lower != "normalize") {
+        error = "Invalid repl.colnames value at line " + std::to_string(line_no) +
+                " (expected raw|normalize)";
+        return false;
+      }
+      out.colname_mode = lower;
     } else if (full_key == "repl.editor_mode") {
       std::string parsed = parse_string_value(value, ok);
       if (!ok) {
@@ -261,6 +276,11 @@ bool apply_repl_settings(const ReplSettings& settings,
   }
   if (settings.output_mode.has_value()) {
     config.output_mode = *settings.output_mode;
+  }
+  if (settings.colname_mode.has_value()) {
+    config.colname_mode = *settings.colname_mode == "raw"
+                              ? xsql::ColumnNameMode::Raw
+                              : xsql::ColumnNameMode::Normalize;
   }
   if (settings.editor_mode.has_value()) {
     if (*settings.editor_mode == "vim") {

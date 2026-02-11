@@ -35,6 +35,13 @@ void test_parse_scoped_selector_inside_text() {
   expect_true(parsed.query.has_value(), "parse scoped selector inside TEXT()");
 }
 
+void test_parse_project_trailing_comma() {
+  auto parsed = xsql::parse_query(
+      "SELECT PROJECT(li) AS (slug: LOWER(TEXT(h2)),) "
+      "FROM document WHERE tag = 'li'");
+  expect_true(parsed.query.has_value(), "parse PROJECT trailing comma");
+}
+
 void test_parse_case_expression_in_select() {
   auto parsed = xsql::parse_query(
       "SELECT CASE WHEN attributes.id IS NULL THEN 'no_id' ELSE attributes.id END AS id_status "
@@ -219,6 +226,23 @@ void test_project_selector_scope_and_first_match() {
   }
 }
 
+void test_project_trailing_comma_execution() {
+  std::string html =
+      "<ul>"
+      "<li><h2>A1</h2></li>"
+      "<li><h2>B1</h2></li>"
+      "</ul>";
+  auto result = run_query(
+      html,
+      "SELECT PROJECT(li) AS (title: TEXT(h2),) "
+      "FROM document WHERE tag = 'li' ORDER BY node_id ASC");
+  expect_eq(result.rows.size(), 2, "project trailing comma row count");
+  if (result.rows.size() >= 2) {
+    expect_true(result.rows[0].computed_fields["title"] == "A1", "project trailing comma row1");
+    expect_true(result.rows[1].computed_fields["title"] == "B1", "project trailing comma row2");
+  }
+}
+
 void test_project_top_level_comparison_expression() {
   std::string html =
       "<ul>"
@@ -273,6 +297,7 @@ void register_string_sql_tests(std::vector<TestCase>& tests) {
   tests.push_back({"parse_project_nested_string_functions", test_parse_project_nested_string_functions});
   tests.push_back({"parse_legacy_has_direct_text", test_parse_legacy_has_direct_text});
   tests.push_back({"parse_scoped_selector_inside_text", test_parse_scoped_selector_inside_text});
+  tests.push_back({"parse_project_trailing_comma", test_parse_project_trailing_comma});
   tests.push_back({"parse_case_expression_in_select", test_parse_case_expression_in_select});
   tests.push_back({"parse_nested_case_expression", test_parse_nested_case_expression});
   tests.push_back({"eval_like_wildcards", test_eval_like_wildcards});
@@ -284,6 +309,7 @@ void register_string_sql_tests(std::vector<TestCase>& tests) {
   tests.push_back({"project_case_and_selector_positions", test_project_case_and_selector_positions});
   tests.push_back({"project_missing_match_null_and_coalesce", test_project_missing_match_null_and_coalesce});
   tests.push_back({"project_selector_scope_and_first_match", test_project_selector_scope_and_first_match});
+  tests.push_back({"project_trailing_comma_execution", test_project_trailing_comma_execution});
   tests.push_back({"project_top_level_comparison_expression", test_project_top_level_comparison_expression});
   tests.push_back({"regression_canonical_project_query", test_regression_canonical_project_query});
 }

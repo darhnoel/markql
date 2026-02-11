@@ -1,0 +1,17 @@
+# MarkQL Book
+
+- [Chapter 1: Why MarkQL](ch01-why-markql.md)
+- [Chapter 2: Mental Model](ch02-mental-model.md)
+- [Chapter 3: First Query Loop](ch03-first-query-loop.md)
+- [Chapter 4: Sources and Loading](ch04-sources-and-loading.md)
+- [Chapter 5: Row Filtering with WHERE](ch05-row-filtering-where.md)
+- [Chapter 6: Axes and EXISTS](ch06-axes-and-exists.md)
+- [Chapter 7: Value Extraction with TEXT and ATTR](ch07-value-extraction-text-attr.md)
+- [Chapter 8: FLATTEN](ch08-flatten.md)
+- [Chapter 9: PROJECT](ch09-project.md)
+- [Chapter 10: NULL and Stability](ch10-null-and-stability.md)
+- [Chapter 11: Output and Export](ch11-output-and-export.md)
+- [Chapter 12: Troubleshooting](ch12-troubleshooting.md)
+- [Appendix A: Grammar Notes](appendix-grammar.md)
+- [Appendix B: Operator Reference](appendix-operator-reference.md)
+- [Appendix C: Function Reference](appendix-function-reference.md)

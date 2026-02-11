@@ -255,6 +255,7 @@ static void test_khmer_command_to_words() {
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
+  std::vector<xsql::ColumnNameMapping> last_schema_map;
 
   xsql::cli::CommandRegistry registry;
   xsql::cli::PluginManager plugin_manager(registry);
@@ -266,6 +267,7 @@ static void test_khmer_command_to_words() {
       last_full_output,
       display_full,
       max_rows,
+      last_schema_map,
       plugin_manager,
   };
 
@@ -291,6 +293,7 @@ static void test_khmer_command_compact() {
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
+  std::vector<xsql::ColumnNameMapping> last_schema_map;
 
   xsql::cli::CommandRegistry registry;
   xsql::cli::PluginManager plugin_manager(registry);
@@ -302,6 +305,7 @@ static void test_khmer_command_compact() {
       last_full_output,
       display_full,
       max_rows,
+      last_schema_map,
       plugin_manager,
   };
 
@@ -327,6 +331,7 @@ static void test_khmer_command_numerals() {
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
+  std::vector<xsql::ColumnNameMapping> last_schema_map;
 
   xsql::cli::CommandRegistry registry;
   xsql::cli::PluginManager plugin_manager(registry);
@@ -338,6 +343,7 @@ static void test_khmer_command_numerals() {
       last_full_output,
       display_full,
       max_rows,
+      last_schema_map,
       plugin_manager,
   };
 
@@ -363,6 +369,7 @@ static void test_khmer_command_to_number_numerals() {
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
+  std::vector<xsql::ColumnNameMapping> last_schema_map;
 
   xsql::cli::CommandRegistry registry;
   xsql::cli::PluginManager plugin_manager(registry);
@@ -374,6 +381,7 @@ static void test_khmer_command_to_number_numerals() {
       last_full_output,
       display_full,
       max_rows,
+      last_schema_map,
       plugin_manager,
   };
 
