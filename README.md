@@ -73,7 +73,7 @@ Python package/tests (optional):
 
 - Book (chapter path + verified examples): [docs/book/SUMMARY.md](docs/book/SUMMARY.md)
 - Canonical tutorial: [docs/markql-tutorial.md](docs/markql-tutorial.md)
-- Syntax diagrams and generator: [docs/README.md](docs/README.md)
+- Docs index: [docs/README.md](docs/README.md)
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 
 ## License
