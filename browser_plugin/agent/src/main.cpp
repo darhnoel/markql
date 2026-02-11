@@ -15,8 +15,8 @@
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 
+#include "markql/markql.h"
 #include "sha256.h"
-#include "xsql/xsql.h"
 
 namespace {
 
@@ -45,7 +45,7 @@ struct QueryResponse {
 struct ExecutionOutcome {
   bool ok = false;
   bool timed_out = false;
-  xsql::QueryResult result;
+  markql::QueryResult result;
   std::string error_message;
 };
 
@@ -53,7 +53,7 @@ class SnapshotCache {
  public:
   struct Entry {
     std::string sha256;
-    std::string html;
+    std::shared_ptr<const markql::ParsedDocumentHandle> prepared;
     std::chrono::steady_clock::time_point last_access;
   };
 
@@ -61,18 +61,30 @@ class SnapshotCache {
 
   Entry get_or_insert(const std::string& html) {
     const std::string digest = xsql::agent::sha256::digest_hex(html);
+    {
+      std::lock_guard<std::mutex> lock(mu_);
+      auto it = entries_.find(digest);
+      const auto now = std::chrono::steady_clock::now();
+      if (it != entries_.end()) {
+        it->second.last_access = now;
+        return it->second;
+      }
+    }
+
+    std::shared_ptr<const markql::ParsedDocumentHandle> prepared =
+        markql::prepare_document(html, "document");
+
     std::lock_guard<std::mutex> lock(mu_);
-    auto it = entries_.find(digest);
     const auto now = std::chrono::steady_clock::now();
+    auto it = entries_.find(digest);
     if (it != entries_.end()) {
       it->second.last_access = now;
       return it->second;
     }
-
     if (entries_.size() >= max_entries_) {
       evict_lru();
     }
-    Entry entry{digest, html, now};
+    Entry entry{digest, std::move(prepared), now};
     entries_[digest] = entry;
     return entry;
   }
@@ -97,14 +109,14 @@ class SnapshotCache {
 class IXsqlExecutor {
  public:
   virtual ~IXsqlExecutor() = default;
-  virtual ExecutionOutcome execute(const std::string& html,
+  virtual ExecutionOutcome execute(const std::shared_ptr<const markql::ParsedDocumentHandle>& prepared,
                                    const std::string& query,
                                    int timeout_ms) = 0;
 };
 
 class CoreExecutor final : public IXsqlExecutor {
  public:
-  ExecutionOutcome execute(const std::string& html,
+  ExecutionOutcome execute(const std::shared_ptr<const markql::ParsedDocumentHandle>& prepared,
                            const std::string& query,
                            int timeout_ms) override {
     if (timeout_ms <= 0) {
@@ -114,11 +126,11 @@ class CoreExecutor final : public IXsqlExecutor {
     std::promise<ExecutionOutcome> promise;
     std::future<ExecutionOutcome> future = promise.get_future();
 
-    std::thread worker([html, query, p = std::move(promise)]() mutable {
+    std::thread worker([prepared, query, p = std::move(promise)]() mutable {
       ExecutionOutcome outcome;
       try {
         outcome.ok = true;
-        outcome.result = xsql::execute_query_from_document(html, query);
+        outcome.result = markql::execute_query_from_prepared_document(prepared, query);
       } catch (const std::exception& ex) {
         outcome.ok = false;
         outcome.error_message = ex.what();
@@ -242,14 +254,14 @@ bool parse_request(const httplib::Request& req,
   return true;
 }
 
-std::vector<std::string> resolve_columns(const xsql::QueryResult& result) {
+std::vector<std::string> resolve_columns(const markql::QueryResult& result) {
   if (!result.columns.empty()) {
     return result.columns;
   }
   return {"node_id", "tag", "attributes", "parent_id", "max_depth", "doc_order"};
 }
 
-json value_for_field(const std::string& field, const xsql::QueryResultRow& row) {
+json value_for_field(const std::string& field, const markql::QueryResultRow& row) {
   if (field == "node_id" || field == "count") return row.node_id;
   if (field == "tag") return row.tag;
   if (field == "text") return row.text;
@@ -299,7 +311,7 @@ std::string infer_column_type(const std::string& field) {
   return "string";
 }
 
-QueryResponse map_row_result(const xsql::QueryResult& result, size_t max_rows) {
+QueryResponse map_row_result(const markql::QueryResult& result, size_t max_rows) {
   QueryResponse out;
   const std::vector<std::string> columns = resolve_columns(result);
 
@@ -321,7 +333,7 @@ QueryResponse map_row_result(const xsql::QueryResult& result, size_t max_rows) {
   return out;
 }
 
-QueryResponse map_list_result(const xsql::QueryResult& result, size_t max_rows) {
+QueryResponse map_list_result(const markql::QueryResult& result, size_t max_rows) {
   QueryResponse out;
   std::string field = "value";
   if (!result.columns.empty()) {
@@ -339,7 +351,7 @@ QueryResponse map_list_result(const xsql::QueryResult& result, size_t max_rows) 
   return out;
 }
 
-QueryResponse map_table_result(const xsql::QueryResult& result, size_t max_rows) {
+QueryResponse map_table_result(const markql::QueryResult& result, size_t max_rows) {
   QueryResponse out;
   if (result.tables.empty()) {
     return out;
@@ -404,7 +416,7 @@ QueryResponse map_table_result(const xsql::QueryResult& result, size_t max_rows)
   return out;
 }
 
-QueryResponse map_result(const xsql::QueryResult& result, size_t max_rows) {
+QueryResponse map_result(const markql::QueryResult& result, size_t max_rows) {
   if (result.to_table) {
     return map_table_result(result, max_rows);
   }
@@ -454,8 +466,16 @@ int main() {
       return;
     }
 
-    const auto snapshot = cache.get_or_insert(html);
-    const ExecutionOutcome execution = executor.execute(snapshot.html, query, options.timeout_ms);
+    SnapshotCache::Entry snapshot;
+    try {
+      snapshot = cache.get_or_insert(html);
+    } catch (const std::exception& ex) {
+      const json error = build_error(elapsed_ms(started_at), "QUERY_ERROR", ex.what());
+      write_json(res, 200, error);
+      return;
+    }
+
+    const ExecutionOutcome execution = executor.execute(snapshot.prepared, query, options.timeout_ms);
     if (!execution.ok) {
       const std::string code = execution.timed_out ? "TIMEOUT" : "QUERY_ERROR";
       const json error = build_error(elapsed_ms(started_at), code, execution.error_message);
