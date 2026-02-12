@@ -254,8 +254,10 @@ void validate_projection(const Query& query) {
     }
   }
   std::string tag;
-  std::optional<size_t> inner_html_depth;
   std::optional<bool> inner_html_raw;
+  enum class InnerHtmlDepthMode { Unset, Default, Numeric, Auto };
+  InnerHtmlDepthMode inner_html_depth_mode = InnerHtmlDepthMode::Unset;
+  std::optional<size_t> numeric_inner_html_depth;
   for (const auto& item : query.select_items) {
     if (!item.field.has_value() && !item.flatten_text && !item.flatten_extract) {
       if (item.expr_projection) {
@@ -289,13 +291,23 @@ void validate_projection(const Query& query) {
         throw std::runtime_error("INNER_HTML() and RAW_INNER_HTML() cannot be mixed in one SELECT");
       }
       inner_html_raw = item.raw_inner_html_function;
-      if (item.inner_html_depth.has_value()) {
-        if (inner_html_depth.has_value() && *inner_html_depth != *item.inner_html_depth) {
+      InnerHtmlDepthMode item_mode = InnerHtmlDepthMode::Default;
+      if (item.inner_html_auto_depth) {
+        item_mode = InnerHtmlDepthMode::Auto;
+      } else if (item.inner_html_depth.has_value()) {
+        item_mode = InnerHtmlDepthMode::Numeric;
+      }
+      if (inner_html_depth_mode == InnerHtmlDepthMode::Unset) {
+        inner_html_depth_mode = item_mode;
+      } else if (inner_html_depth_mode != item_mode) {
+        throw std::runtime_error("inner_html() depth must be consistent");
+      }
+      if (item_mode == InnerHtmlDepthMode::Numeric) {
+        if (!numeric_inner_html_depth.has_value()) {
+          numeric_inner_html_depth = item.inner_html_depth;
+        } else if (*numeric_inner_html_depth != *item.inner_html_depth) {
           throw std::runtime_error("inner_html() depth must be consistent");
         }
-        inner_html_depth = item.inner_html_depth;
-      } else if (inner_html_depth.has_value()) {
-        throw std::runtime_error("inner_html() depth must be consistent");
       }
     }
     if (field != "node_id" && field != "tag" && field != "text" &&

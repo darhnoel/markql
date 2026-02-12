@@ -76,4 +76,12 @@ std::optional<size_t> find_inner_html_depth(const Query& query) {
   return std::nullopt;
 }
 
+bool has_inner_html_auto_depth(const Query& query) {
+  for (const auto& item : query.select_items) {
+    if (!item.field.has_value() || *item.field != "inner_html") continue;
+    if (item.inner_html_auto_depth) return true;
+  }
+  return false;
+}
+
 }  // namespace xsql::xsql_internal

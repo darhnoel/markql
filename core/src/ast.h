@@ -162,6 +162,7 @@ struct Query {
     size_t tfidf_min_df = 1;
     size_t tfidf_max_df = 0;
     std::optional<size_t> inner_html_depth;
+    bool inner_html_auto_depth = false;
     bool inner_html_function = false;
     bool raw_inner_html_function = false;
     bool text_function = false;

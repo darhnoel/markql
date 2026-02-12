@@ -27,6 +27,10 @@ FROM <source>
 - Field projections: `SELECT a.href, a.tag FROM doc ...`
 - `FLATTEN(tag[, depth]) AS (c1, c2, ...)`
 - `PROJECT(tag) AS (alias: expr, ...)`
+- Extraction forms:
+  - `TEXT(tag)`
+  - `INNER_HTML(tag[, depth|MAX_DEPTH])`
+  - `RAW_INNER_HTML(tag[, depth|MAX_DEPTH])`
 
 ## Predicates
 - Boolean: `AND`, `OR`, parentheses
@@ -38,3 +42,8 @@ FROM <source>
 - `PROJECT` / `FLATTEN_EXTRACT` requires `AS (alias: expr, ...)`.
 - `FLATTEN_TEXT` / `FLATTEN` uses ordered descendant text slices.
 - `ORDER BY` currently supports core row fields.
+- `TEXT()/INNER_HTML()/RAW_INNER_HTML()` require an outer `WHERE`.
+- That `WHERE` must include a non-tag self predicate (not only `tag = ...`).
+- `INNER_HTML(tag)` default depth is `1`.
+- `INNER_HTML(tag, MAX_DEPTH)` uses each row's `max_depth` automatically.
+- In one `SELECT`, `INNER_HTML`/`RAW_INNER_HTML` depth mode must be consistent.

@@ -583,15 +583,20 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
       advance();
       if (current_.type == TokenType::Comma) {
         advance();
-        if (current_.type != TokenType::Number) {
-          return set_error("Expected numeric depth in inner_html()/raw_inner_html()");
+        if (current_.type == TokenType::Number) {
+          try {
+            item.inner_html_depth = static_cast<size_t>(std::stoull(current_.text));
+          } catch (...) {
+            return set_error("Invalid inner_html()/raw_inner_html() depth");
+          }
+          advance();
+        } else if (current_.type == TokenType::Identifier &&
+                   to_upper(current_.text) == "MAX_DEPTH") {
+          item.inner_html_auto_depth = true;
+          advance();
+        } else {
+          return set_error("Expected numeric depth or MAX_DEPTH in inner_html()/raw_inner_html()");
         }
-        try {
-          item.inner_html_depth = static_cast<size_t>(std::stoull(current_.text));
-        } catch (...) {
-          return set_error("Invalid inner_html()/raw_inner_html() depth");
-        }
-        advance();
       }
       if (!consume(TokenType::RParen, "Expected ) after inner_html/raw_inner_html argument")) return false;
       item.span = Span{inner_start, current_.pos};
@@ -778,15 +783,20 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
     advance();
     if (current_.type == TokenType::Comma) {
       advance();
-      if (current_.type != TokenType::Number) {
-        return set_error("Expected numeric depth in inner_html()/raw_inner_html()");
+      if (current_.type == TokenType::Number) {
+        try {
+          item.inner_html_depth = static_cast<size_t>(std::stoull(current_.text));
+        } catch (...) {
+          return set_error("Invalid inner_html()/raw_inner_html() depth");
+        }
+        advance();
+      } else if (current_.type == TokenType::Identifier &&
+                 to_upper(current_.text) == "MAX_DEPTH") {
+        item.inner_html_auto_depth = true;
+        advance();
+      } else {
+        return set_error("Expected numeric depth or MAX_DEPTH in inner_html()/raw_inner_html()");
       }
-      try {
-        item.inner_html_depth = static_cast<size_t>(std::stoull(current_.text));
-      } catch (...) {
-        return set_error("Invalid inner_html()/raw_inner_html() depth");
-      }
-      advance();
     }
     if (!consume(TokenType::RParen, "Expected ) after inner_html/raw_inner_html argument")) return false;
     item.span = Span{start, current_.pos};

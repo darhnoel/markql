@@ -153,6 +153,13 @@ Rows: 1
 
 The fix is not syntax decoration. It forces explicit extraction scope.
 
+Extraction function contract summary:
+
+- `TEXT()/INNER_HTML()/RAW_INNER_HTML()` require an outer `WHERE`.
+- The outer `WHERE` must include at least one non-tag self predicate.
+- `INNER_HTML(tag)` defaults to depth `1`.
+- `INNER_HTML(tag, MAX_DEPTH)` uses each row's `max_depth` automatically.
+
 ## Deliberate Failure: Row Filtering vs Field Selection
 
 **Listing 5: Naive row filter (keeps incomplete variant)**
