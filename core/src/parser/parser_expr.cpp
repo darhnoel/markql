@@ -2,6 +2,14 @@
 
 namespace xsql {
 
+namespace {
+
+bool is_tag_identifier_token(TokenType type) {
+  return type == TokenType::Identifier || type == TokenType::KeywordTable;
+}
+
+}  // namespace
+
 /// Parses an expression with OR precedence.
 /// MUST build BinaryExpr nodes in left-associative order.
 /// Inputs are tokens; outputs are Expr or errors.
@@ -62,7 +70,9 @@ bool Parser::parse_cmp_expr(Expr& out) {
     Token exists_token = current_;
     advance();
     if (!consume(TokenType::LParen, "Expected ( after EXISTS")) return false;
-    if (current_.type != TokenType::Identifier) return set_error("Expected axis name after EXISTS(");
+    if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordSelf) {
+      return set_error("Expected axis name after EXISTS(");
+    }
     Operand::Axis axis = Operand::Axis::Self;
     std::string axis_name = to_upper(current_.text);
     if (axis_name == "SELF") {
@@ -301,7 +311,16 @@ bool Parser::parse_scalar_expr(ScalarExpr& out) {
     advance();
     return true;
   }
-  if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
+  if (current_.type == TokenType::KeywordSelf && peek().type != TokenType::Dot) {
+    out.kind = ScalarExpr::Kind::SelfRef;
+    out.self_ref.span = Span{current_.pos, current_.pos + current_.text.size()};
+    out.span = out.self_ref.span;
+    advance();
+    return true;
+  }
+  if (current_.type != TokenType::Identifier &&
+      current_.type != TokenType::KeywordTable &&
+      current_.type != TokenType::KeywordSelf) {
     return set_error("Expected scalar expression");
   }
   Token ident = current_;
@@ -336,34 +355,78 @@ bool Parser::parse_scalar_function(const std::string& function_name, size_t star
     return true;
   }
 
-  if (function_name == "TEXT" || function_name == "DIRECT_TEXT") {
-    if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
-      return set_error("Expected tag identifier inside TEXT()/DIRECT_TEXT()");
+  if (function_name == "TEXT" ||
+      function_name == "DIRECT_TEXT" ||
+      function_name == "INNER_HTML" ||
+      function_name == "RAW_INNER_HTML") {
+    ScalarExpr node_or_tag_arg;
+    if (current_.type == TokenType::KeywordSelf) {
+      node_or_tag_arg.kind = ScalarExpr::Kind::SelfRef;
+      node_or_tag_arg.self_ref.span = Span{current_.pos, current_.pos + current_.text.size()};
+      node_or_tag_arg.span = node_or_tag_arg.self_ref.span;
+      advance();
+    } else if (is_tag_identifier_token(current_.type)) {
+      node_or_tag_arg.kind = ScalarExpr::Kind::StringLiteral;
+      node_or_tag_arg.string_value = to_lower(current_.text);
+      node_or_tag_arg.span = Span{current_.pos, current_.pos + current_.text.size()};
+      advance();
+    } else {
+      return set_error("Expected tag identifier or self inside extraction function");
     }
-    ScalarExpr tag_arg;
-    tag_arg.kind = ScalarExpr::Kind::StringLiteral;
-    tag_arg.string_value = to_lower(current_.text);
-    out.args.push_back(std::move(tag_arg));
-    advance();
-    if (!consume(TokenType::RParen, "Expected ) after TEXT()/DIRECT_TEXT()")) return false;
+    out.args.push_back(std::move(node_or_tag_arg));
+    if ((function_name == "INNER_HTML" || function_name == "RAW_INNER_HTML") &&
+        current_.type == TokenType::Comma) {
+      advance();
+      ScalarExpr depth_arg;
+      if (current_.type == TokenType::Number) {
+        depth_arg.kind = ScalarExpr::Kind::NumberLiteral;
+        try {
+          depth_arg.number_value = std::stoll(current_.text);
+        } catch (...) {
+          return set_error("Invalid numeric literal");
+        }
+        depth_arg.span = Span{current_.pos, current_.pos + current_.text.size()};
+        advance();
+      } else if (current_.type == TokenType::Identifier &&
+                 to_upper(current_.text) == "MAX_DEPTH") {
+        depth_arg.kind = ScalarExpr::Kind::Operand;
+        depth_arg.operand.axis = Operand::Axis::Self;
+        depth_arg.operand.field_kind = Operand::FieldKind::MaxDepth;
+        depth_arg.operand.span = Span{current_.pos, current_.pos + current_.text.size()};
+        depth_arg.span = depth_arg.operand.span;
+        advance();
+      } else {
+        return set_error("Expected numeric depth or MAX_DEPTH in inner_html()/raw_inner_html()");
+      }
+      out.args.push_back(std::move(depth_arg));
+    }
+    if (!consume(TokenType::RParen, "Expected ) after extraction function arguments")) return false;
     out.span = Span{start_pos, current_.pos};
     return true;
   }
 
   if (function_name == "ATTR") {
-    if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
-      return set_error("Expected tag identifier inside ATTR()");
+    ScalarExpr node_or_tag_arg;
+    if (current_.type == TokenType::KeywordSelf) {
+      node_or_tag_arg.kind = ScalarExpr::Kind::SelfRef;
+      node_or_tag_arg.self_ref.span = Span{current_.pos, current_.pos + current_.text.size()};
+      node_or_tag_arg.span = node_or_tag_arg.self_ref.span;
+      advance();
+    } else if (is_tag_identifier_token(current_.type)) {
+      node_or_tag_arg.kind = ScalarExpr::Kind::StringLiteral;
+      node_or_tag_arg.string_value = to_lower(current_.text);
+      node_or_tag_arg.span = Span{current_.pos, current_.pos + current_.text.size()};
+      advance();
+    } else {
+      return set_error("Expected tag identifier or self inside ATTR()");
     }
-    ScalarExpr tag_arg;
-    tag_arg.kind = ScalarExpr::Kind::StringLiteral;
-    tag_arg.string_value = to_lower(current_.text);
-    out.args.push_back(std::move(tag_arg));
-    advance();
-    if (!consume(TokenType::Comma, "Expected , after ATTR tag")) return false;
+    out.args.push_back(std::move(node_or_tag_arg));
+    if (!consume(TokenType::Comma, "Expected , after ATTR tag/node")) return false;
     if (current_.type != TokenType::Identifier) return set_error("Expected attribute identifier inside ATTR()");
     ScalarExpr attr_arg;
     attr_arg.kind = ScalarExpr::Kind::StringLiteral;
     attr_arg.string_value = to_lower(current_.text);
+    attr_arg.span = Span{current_.pos, current_.pos + current_.text.size()};
     out.args.push_back(std::move(attr_arg));
     advance();
     if (!consume(TokenType::RParen, "Expected ) after ATTR arguments")) return false;
@@ -391,7 +454,58 @@ bool Parser::parse_scalar_function(const std::string& function_name, size_t star
 /// MUST set axis/field_kind consistently with grammar.
 /// Inputs are tokens; outputs are Operand or errors.
 bool Parser::parse_operand(Operand& operand) {
-  if (current_.type != TokenType::Identifier) {
+  if (current_.type == TokenType::KeywordSelf) {
+    size_t self_pos = current_.pos;
+    advance();
+    if (current_.type != TokenType::Dot) {
+      return set_error(
+          "`self` refers to the current row node from FROM. Example: SELECT self.node_id, self.tag FROM doc");
+    }
+    advance();
+    if (current_.type != TokenType::Identifier) {
+      return set_error("Expected self.<field> where field is node_id, tag, parent_id, doc_order, sibling_pos, max_depth, attributes, or text");
+    }
+    std::string field = to_upper(current_.text);
+    operand.axis = Operand::Axis::Self;
+    operand.qualifier = "self";
+    if (field == "ATTRIBUTES") {
+      size_t attributes_pos = current_.pos;
+      advance();
+      if (current_.type == TokenType::Dot) {
+        advance();
+        if (current_.type != TokenType::Identifier) return set_error("Expected attribute name after self.attributes.");
+        operand.field_kind = Operand::FieldKind::Attribute;
+        operand.attribute = current_.text;
+        operand.span = Span{self_pos, current_.pos + current_.text.size()};
+        advance();
+        return true;
+      }
+      operand.field_kind = Operand::FieldKind::AttributesMap;
+      operand.span = Span{self_pos, attributes_pos + std::string("attributes").size()};
+      return true;
+    }
+    if (field == "TAG") {
+      operand.field_kind = Operand::FieldKind::Tag;
+    } else if (field == "TEXT") {
+      operand.field_kind = Operand::FieldKind::Text;
+    } else if (field == "NODE_ID") {
+      operand.field_kind = Operand::FieldKind::NodeId;
+    } else if (field == "PARENT_ID") {
+      operand.field_kind = Operand::FieldKind::ParentId;
+    } else if (field == "SIBLING_POS") {
+      operand.field_kind = Operand::FieldKind::SiblingPos;
+    } else if (field == "MAX_DEPTH") {
+      operand.field_kind = Operand::FieldKind::MaxDepth;
+    } else if (field == "DOC_ORDER") {
+      operand.field_kind = Operand::FieldKind::DocOrder;
+    } else {
+      return set_error("Expected self.<field> where field is node_id, tag, parent_id, doc_order, sibling_pos, max_depth, attributes, or text");
+    }
+    operand.span = Span{self_pos, current_.pos + current_.text.size()};
+    advance();
+    return true;
+  }
+  if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
     return set_error("Expected identifier");
   }
   if (to_upper(current_.text) == "ATTRIBUTES") {

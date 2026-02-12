@@ -26,8 +26,8 @@ bool is_combining_mark(uint32_t cp);
 /// Inputs are codepoints; outputs are boolean with no side effects.
 bool is_khmer_combining(uint32_t cp);
 
-/// Returns display width for a codepoint (currently 0 or 1).
-/// MUST treat combining marks as width 0.
+/// Returns display width for a codepoint (0, 1, or 2).
+/// MUST treat combining marks as width 0 and CJK/fullwidth as width 2.
 /// Inputs are codepoints; outputs are width with no side effects.
 int display_width(uint32_t cp);
 

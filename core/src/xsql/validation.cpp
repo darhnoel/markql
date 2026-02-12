@@ -348,6 +348,7 @@ void validate_qualifiers(const Query& query) {
 
   auto is_allowed = [&](const std::optional<std::string>& qualifier) -> bool {
     if (!qualifier.has_value()) return true;
+    if (util::to_lower(*qualifier) == "self") return true;
     if (query.source.alias.has_value() && *qualifier == *query.source.alias) return true;
     if (query.source.kind == Source::Kind::Document && *qualifier == "document") return true;
     if (sole_tag.has_value() && util::to_lower(*qualifier) == *sole_tag) return true;

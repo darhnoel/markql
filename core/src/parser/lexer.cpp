@@ -157,6 +157,7 @@ Token Lexer::lex_identifier_or_keyword() {
   if (upper == "FUNCTIONS") return Token{TokenType::KeywordFunctions, out, start};
   if (upper == "AXES") return Token{TokenType::KeywordAxes, out, start};
   if (upper == "OPERATORS") return Token{TokenType::KeywordOperators, out, start};
+  if (upper == "SELF") return Token{TokenType::KeywordSelf, out, start};
   return Token{TokenType::Identifier, out, start};
 }
 

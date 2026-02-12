@@ -28,6 +28,7 @@ void register_meta_command_tests(std::vector<TestCase>& tests);
 void register_cli_utils_tests(std::vector<TestCase>& tests);
 void register_string_sql_tests(std::vector<TestCase>& tests);
 void register_column_name_tests(std::vector<TestCase>& tests);
+void register_self_ref_tests(std::vector<TestCase>& tests);
 #ifdef XSQL_ENABLE_KHMER_NUMBER
 void register_khmer_number_tests(std::vector<TestCase>& tests);
 #endif
@@ -75,6 +76,7 @@ int main(int argc, char** argv) {
   register_cli_utils_tests(tests);
   register_string_sql_tests(tests);
   register_column_name_tests(tests);
+  register_self_ref_tests(tests);
 #ifdef XSQL_ENABLE_KHMER_NUMBER
   register_khmer_number_tests(tests);
 #endif

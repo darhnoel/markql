@@ -25,20 +25,26 @@ FROM <source>
 ## Projections
 - Tag rows: `SELECT div FROM doc ...`
 - Field projections: `SELECT a.href, a.tag FROM doc ...`
+- Current row projections: `SELECT self.node_id, self.tag FROM doc ...`
 - `FLATTEN(tag[, depth]) AS (c1, c2, ...)`
 - `PROJECT(tag) AS (alias: expr, ...)`
 - Extraction forms:
-  - `TEXT(tag)`
-  - `INNER_HTML(tag[, depth|MAX_DEPTH])`
-  - `RAW_INNER_HTML(tag[, depth|MAX_DEPTH])`
+  - `TEXT(tag|self)`
+  - `DIRECT_TEXT(tag|self)`
+  - `ATTR(tag|self, attr)`
+  - `INNER_HTML(tag|self[, depth|MAX_DEPTH])`
+  - `RAW_INNER_HTML(tag|self[, depth|MAX_DEPTH])`
 
 ## Predicates
 - Boolean: `AND`, `OR`, parentheses
 - Comparisons: `=`, `<>`, `<`, `<=`, `>`, `>=`, `LIKE`, `IN`, `IS NULL`, `IS NOT NULL`
 - Structural: `EXISTS(axis WHERE ...)`
 - Axes: `parent`, `child`, `ancestor`, `descendant`
+- Row-node self reference: `DIRECT_TEXT(self) LIKE '%needle%'`
 
 ## Notes on current behavior
+- `self` refers to the current node for the current row produced by `FROM`.
+- Inside axis scopes (for example `EXISTS(descendant WHERE ...)`), `self` is rebound to the node being evaluated in that scope.
 - `PROJECT` / `FLATTEN_EXTRACT` requires `AS (alias: expr, ...)`.
 - `FLATTEN_TEXT` / `FLATTEN` uses ordered descendant text slices.
 - `ORDER BY` currently supports core row fields.

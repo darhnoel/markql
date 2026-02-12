@@ -3,6 +3,29 @@
 ## TL;DR
 `WHERE` is the row gate. If row filtering is wrong, no extraction function can rescue the result.
 
+## Using `self` (the current row node)
+“`self` refers to the current node for the current row produced by FROM.”
+
+Use `self` when you want to inspect the current row node directly without guessing a supplier tag.
+
+```sql
+SELECT self.node_id, self.tag
+FROM doc
+LIMIT 5;
+```
+
+```sql
+SELECT self.node_id, self.tag, DIRECT_TEXT(self) AS dt
+FROM doc
+WHERE DIRECT_TEXT(self) LIKE '%some_substring%';
+```
+
+```sql
+SELECT self.node_id, self.tag
+FROM doc
+WHERE EXISTS(descendant WHERE DIRECT_TEXT(self) LIKE '%some_substring%');
+```
+
 ## What is `WHERE` in MarkQL?
 `WHERE` is the stage-1 row filter. It runs on each candidate row from `FROM` and decides whether that row survives into the output. In MarkQL, this is the single place where row existence is decided.
 

@@ -205,6 +205,7 @@ if (XSQL_BUILD_TESTS)
     tests/test_cli_utils.cpp
     tests/test_string_sql.cpp
     tests/test_column_names.cpp
+    tests/test_self_ref.cpp
     cli/repl/core/line_editor.cpp
     cli/repl/ui/autocomplete.cpp
     cli/repl/ui/sql_keywords.cpp

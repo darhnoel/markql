@@ -66,6 +66,7 @@ enum class TokenType {
   KeywordFunctions,
   KeywordAxes,
   KeywordOperators,
+  KeywordSelf,
   Equal,
   NotEqual,
   Greater,

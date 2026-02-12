@@ -43,9 +43,21 @@ struct Operand {
   Span span;
 };
 
+struct SelfRef {
+  Span span;
+};
+
 struct ScalarExpr {
-  enum class Kind { Operand, StringLiteral, NumberLiteral, NullLiteral, FunctionCall } kind = Kind::Operand;
+  enum class Kind {
+    Operand,
+    SelfRef,
+    StringLiteral,
+    NumberLiteral,
+    NullLiteral,
+    FunctionCall
+  } kind = Kind::Operand;
   Operand operand;
+  SelfRef self_ref;
   std::string string_value;
   int64_t number_value = 0;
   std::string function_name;

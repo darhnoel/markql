@@ -150,11 +150,65 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr, const Html
       }
       return make_null_projection();
     }
+    case ScalarExpr::Kind::SelfRef:
+      return make_null_projection();
     case ScalarExpr::Kind::FunctionCall:
       break;
   }
 
   std::string fn = util::to_upper(expr.function_name);
+  if (fn == "TEXT" || fn == "DIRECT_TEXT" || fn == "INNER_HTML" ||
+      fn == "RAW_INNER_HTML" || fn == "ATTR") {
+    if ((fn == "TEXT" || fn == "DIRECT_TEXT") && expr.args.size() != 1) {
+      return make_null_projection();
+    }
+    if ((fn == "INNER_HTML" || fn == "RAW_INNER_HTML") &&
+        (expr.args.empty() || expr.args.size() > 2)) {
+      return make_null_projection();
+    }
+    if (fn == "ATTR" && expr.args.size() != 2) {
+      return make_null_projection();
+    }
+    if (expr.args.empty()) return make_null_projection();
+
+    const HtmlNode* target = nullptr;
+    const ScalarExpr& first_arg = expr.args.front();
+    if (first_arg.kind == ScalarExpr::Kind::SelfRef) {
+      target = &node;
+    } else {
+      ScalarProjectionValue arg_value = eval_select_scalar_expr(first_arg, node);
+      if (projection_is_null(arg_value)) return make_null_projection();
+      std::string tag = util::to_lower(projection_to_string(arg_value));
+      if (node.tag != tag) return make_null_projection();
+      target = &node;
+    }
+    if (target == nullptr) return make_null_projection();
+
+    if (fn == "TEXT") return make_string_projection(target->text);
+    if (fn == "DIRECT_TEXT") {
+      return make_string_projection(xsql_internal::extract_direct_text_strict(target->inner_html));
+    }
+    if (fn == "ATTR") {
+      ScalarProjectionValue attr_value = eval_select_scalar_expr(expr.args[1], node);
+      if (projection_is_null(attr_value)) return make_null_projection();
+      std::string attr = util::to_lower(projection_to_string(attr_value));
+      auto it = target->attributes.find(attr);
+      if (it == target->attributes.end()) return make_null_projection();
+      return make_string_projection(it->second);
+    }
+
+    size_t depth = 1;
+    if (expr.args.size() == 2) {
+      ScalarProjectionValue depth_value = eval_select_scalar_expr(expr.args[1], node);
+      auto parsed = projection_to_int(depth_value);
+      if (!parsed.has_value() || *parsed < 0) return make_null_projection();
+      depth = static_cast<size_t>(*parsed);
+    }
+    std::string html = xsql_internal::limit_inner_html(target->inner_html, depth);
+    if (fn == "RAW_INNER_HTML") return make_string_projection(html);
+    return make_string_projection(util::minify_html(html));
+  }
+
   std::vector<ScalarProjectionValue> args;
   args.reserve(expr.args.size());
   for (const auto& arg : expr.args) {
@@ -241,20 +295,6 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr, const Html
     size_t pos = haystack.find(needle, start);
     if (pos == std::string::npos) return make_number_projection(0);
     return make_number_projection(static_cast<int64_t>(pos + 1));
-  }
-  if (fn == "TEXT" || fn == "DIRECT_TEXT" || fn == "ATTR") {
-    if ((fn == "TEXT" || fn == "DIRECT_TEXT") && args.size() != 1) return make_null_projection();
-    if (fn == "ATTR" && args.size() != 2) return make_null_projection();
-    if (args.empty() || projection_is_null(args[0])) return make_null_projection();
-    std::string tag = util::to_lower(projection_to_string(args[0]));
-    if (node.tag != tag) return make_null_projection();
-    if (fn == "TEXT") return make_string_projection(node.text);
-    if (fn == "DIRECT_TEXT") return make_string_projection(xsql_internal::extract_direct_text_strict(node.inner_html));
-    if (projection_is_null(args[1])) return make_null_projection();
-    std::string attr = util::to_lower(projection_to_string(args[1]));
-    auto it = node.attributes.find(attr);
-    if (it == node.attributes.end()) return make_null_projection();
-    return make_string_projection(it->second);
   }
   return make_null_projection();
 }
@@ -815,8 +855,8 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
       return build_meta_result(
           {"function", "returns", "description"},
           {
-              {"text(tag)", "string", "Text content of a tag"},
-              {"direct_text(tag)", "string", "Immediate text content of a tag"},
+              {"text(tag|self)", "string", "Text content of a tag or current row node"},
+              {"direct_text(tag|self)", "string", "Immediate text content of a tag or current row node"},
               {"first_text(tag WHERE ...)", "string", "First scoped TEXT match (alias of TEXT(..., 1))"},
               {"last_text(tag WHERE ...)", "string", "Last scoped TEXT match"},
               {"first_attr(tag, attr WHERE ...)", "string", "First scoped ATTR match"},
@@ -835,8 +875,8 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
               {"rtrim(str)", "string", "Trim right whitespace"},
               {"coalesce(a, b, ...)", "scalar", "First non-NULL value"},
               {"case when ... then ... else ... end", "scalar", "Conditional expression"},
-              {"inner_html(tag[, depth|MAX_DEPTH])", "string", "Minified HTML inside a tag"},
-              {"raw_inner_html(tag[, depth|MAX_DEPTH])", "string", "Raw inner HTML without minification"},
+              {"inner_html(tag|self[, depth|MAX_DEPTH])", "string", "Minified HTML inside a tag/current row node"},
+              {"raw_inner_html(tag|self[, depth|MAX_DEPTH])", "string", "Raw inner HTML without minification"},
               {"flatten_text(tag[, depth])", "string[]", "Flatten descendant text at depth into columns"},
               {"flatten(tag[, depth])", "string[]", "Alias of flatten_text"},
               {"project(tag)", "mixed[]", "Evaluate named extraction expressions per row"},
@@ -925,14 +965,14 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
               {"field", "parent_id", "parent_id", "int64 or null"},
               {"field", "sibling_pos", "sibling_pos", "1-based among siblings"},
               {"field", "source_uri", "source_uri", "Hidden unless multi-source"},
-              {"function", "text", "text(tag)", "Direct text content; requires WHERE"},
-              {"function", "inner_html", "inner_html(tag[, depth|MAX_DEPTH])",
+              {"function", "text", "text(tag|self)", "Direct text content; requires WHERE"},
+              {"function", "inner_html", "inner_html(tag|self[, depth|MAX_DEPTH])",
                "Minified inner HTML; depth defaults to 1; requires WHERE"},
-              {"function", "raw_inner_html", "raw_inner_html(tag[, depth|MAX_DEPTH])",
+              {"function", "raw_inner_html", "raw_inner_html(tag|self[, depth|MAX_DEPTH])",
                "Raw inner HTML (no minify); depth defaults to 1; requires WHERE"},
               {"function", "trim", "trim(text(...)) | trim(inner_html(...))",
                "Trim whitespace"},
-              {"function", "direct_text", "direct_text(tag)", "Immediate text children only"},
+              {"function", "direct_text", "direct_text(tag|self)", "Immediate text children only"},
               {"function", "concat", "concat(a, b, ...)", "NULL if any arg is NULL"},
               {"function", "substring", "substring(str, start, len)", "1-based slicing"},
               {"function", "length", "length(str)", "UTF-8 byte length"},

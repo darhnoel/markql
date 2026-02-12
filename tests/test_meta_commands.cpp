@@ -47,12 +47,12 @@ void test_show_functions_output() {
   bool saw_text = false;
   for (const auto& row : result.rows) {
     auto it = row.attributes.find("function");
-    if (it != row.attributes.end() && it->second == "text(tag)") {
+    if (it != row.attributes.end() && it->second == "text(tag|self)") {
       saw_text = true;
       break;
     }
   }
-  expect_true(saw_text, "SHOW FUNCTIONS lists text(tag)");
+  expect_true(saw_text, "SHOW FUNCTIONS lists text(tag|self)");
 }
 
 void test_describe_language_output() {
