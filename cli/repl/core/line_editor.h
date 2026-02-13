@@ -79,12 +79,16 @@ class LineEditor {
   History history_;
   std::string prompt_;
   size_t prompt_len_ = 0;
+  int prompt_extra_lines_ = 0;
   std::string normal_prompt_;
   size_t normal_prompt_len_ = 0;
+  int normal_prompt_extra_lines_ = 0;
   std::string vim_normal_prompt_;
   size_t vim_normal_prompt_len_ = 0;
+  int vim_normal_prompt_extra_lines_ = 0;
   std::string vim_insert_prompt_;
   size_t vim_insert_prompt_len_ = 0;
+  int vim_insert_prompt_extra_lines_ = 0;
   std::string cont_prompt_;
   size_t cont_prompt_len_ = 0;
   int last_render_lines_ = 1;

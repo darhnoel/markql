@@ -214,6 +214,7 @@ if (XSQL_BUILD_TESTS)
     tests/test_self_ref.cpp
     tests/test_vim_edit.cpp
     tests/test_vim_normal.cpp
+    tests/test_render.cpp
     cli/repl/core/vim_edit.cpp
     cli/repl/core/vim_normal.cpp
     cli/repl/core/line_editor.cpp

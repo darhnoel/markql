@@ -49,7 +49,7 @@ int run_repl(ReplConfig& config) {
 
   LineEditor editor(history_max_entries,
                     make_normal_repl_prompt(config.color),
-                    kPromptNormalVisibleLen);
+                    normal_prompt_visible_len());
   configure_repl_editor(editor, config.color, config.highlight);
   CommandRegistry registry;
   register_default_commands(registry);

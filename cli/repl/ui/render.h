@@ -11,6 +11,7 @@ namespace xsql::cli {
 int compute_render_lines(const std::string& buffer,
                          const std::string& prompt,
                          size_t prompt_len,
+                         int prompt_extra_lines,
                          const std::string& cont_prompt,
                          size_t cont_prompt_len,
                          int width);
@@ -22,6 +23,7 @@ int compute_cursor_line(const std::string& buffer,
                         size_t cursor,
                         const std::string& prompt,
                         size_t prompt_len,
+                        int prompt_extra_lines,
                         const std::string& cont_prompt,
                         size_t cont_prompt_len,
                         int width);

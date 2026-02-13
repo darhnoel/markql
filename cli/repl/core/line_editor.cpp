@@ -15,6 +15,14 @@ namespace xsql::cli {
 
 namespace {
 
+int count_prompt_extra_lines(const std::string& prompt) {
+  int lines = 0;
+  for (char c : prompt) {
+    if (c == '\n') ++lines;
+  }
+  return lines;
+}
+
 bool read_byte_with_timeout(char* out, int timeout_ms) {
   if (!out) return false;
   fd_set readfds;
@@ -34,8 +42,10 @@ LineEditor::LineEditor(size_t max_history, std::string prompt, size_t prompt_len
     : history_(max_history),
       prompt_(std::move(prompt)),
       prompt_len_(prompt_len),
+      prompt_extra_lines_(count_prompt_extra_lines(prompt_)),
       normal_prompt_(prompt_),
       normal_prompt_len_(prompt_len_),
+      normal_prompt_extra_lines_(prompt_extra_lines_),
       cont_prompt_(""),
       cont_prompt_len_(0),
       completer_(std::make_unique<AutoCompleter>()) {}
@@ -45,9 +55,11 @@ LineEditor::~LineEditor() = default;
 void LineEditor::set_prompt(std::string prompt, size_t prompt_len) {
   normal_prompt_ = std::move(prompt);
   normal_prompt_len_ = prompt_len;
+  normal_prompt_extra_lines_ = count_prompt_extra_lines(normal_prompt_);
   if (editor_mode_ == EditorMode::Normal) {
     prompt_ = normal_prompt_;
     prompt_len_ = normal_prompt_len_;
+    prompt_extra_lines_ = normal_prompt_extra_lines_;
   }
 }
 
@@ -66,8 +78,10 @@ void LineEditor::set_mode_prompts(std::string vim_normal_prompt,
                                   size_t vim_insert_prompt_len) {
   vim_normal_prompt_ = std::move(vim_normal_prompt);
   vim_normal_prompt_len_ = vim_normal_prompt_len;
+  vim_normal_prompt_extra_lines_ = count_prompt_extra_lines(vim_normal_prompt_);
   vim_insert_prompt_ = std::move(vim_insert_prompt);
   vim_insert_prompt_len_ = vim_insert_prompt_len;
+  vim_insert_prompt_extra_lines_ = count_prompt_extra_lines(vim_insert_prompt_);
 }
 
 void LineEditor::set_editor_mode(EditorMode mode) {
@@ -76,15 +90,18 @@ void LineEditor::set_editor_mode(EditorMode mode) {
   if (editor_mode_ == EditorMode::Normal) {
     prompt_ = normal_prompt_;
     prompt_len_ = normal_prompt_len_;
+    prompt_extra_lines_ = normal_prompt_extra_lines_;
     return;
   }
   if (!vim_insert_prompt_.empty()) {
     prompt_ = vim_insert_prompt_;
     prompt_len_ = vim_insert_prompt_len_;
+    prompt_extra_lines_ = vim_insert_prompt_extra_lines_;
     return;
   }
   prompt_ = normal_prompt_;
   prompt_len_ = normal_prompt_len_;
+  prompt_extra_lines_ = normal_prompt_extra_lines_;
 }
 
 void LineEditor::reset_render_state() {
@@ -175,24 +192,29 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
     if (editor_mode_ == EditorMode::Normal) {
       prompt_ = normal_prompt_;
       prompt_len_ = normal_prompt_len_;
+      prompt_extra_lines_ = normal_prompt_extra_lines_;
       return;
     }
     if (vim_insert_mode_) {
       if (!vim_insert_prompt_.empty()) {
         prompt_ = vim_insert_prompt_;
         prompt_len_ = vim_insert_prompt_len_;
+        prompt_extra_lines_ = vim_insert_prompt_extra_lines_;
       } else {
         prompt_ = normal_prompt_;
         prompt_len_ = normal_prompt_len_;
+        prompt_extra_lines_ = normal_prompt_extra_lines_;
       }
       return;
     }
     if (!vim_normal_prompt_.empty()) {
       prompt_ = vim_normal_prompt_;
       prompt_len_ = vim_normal_prompt_len_;
+      prompt_extra_lines_ = vim_normal_prompt_extra_lines_;
     } else {
       prompt_ = normal_prompt_;
       prompt_len_ = normal_prompt_len_;
+      prompt_extra_lines_ = normal_prompt_extra_lines_;
     }
   };
 
@@ -582,16 +604,17 @@ void LineEditor::redraw_line(const std::string& buffer, size_t cursor) {
   std::cout << prompt_;
   render_buffer(buffer, keyword_color_, cont_prompt_);
 
-  int end_line = compute_render_lines(buffer, prompt_, prompt_len_,
+  int end_line = compute_render_lines(buffer, prompt_, prompt_len_, prompt_extra_lines_,
                                       cont_prompt_, cont_prompt_len_, width) - 1;
-  int cursor_line = compute_cursor_line(buffer, cursor, prompt_, prompt_len_,
+  int cursor_line = compute_cursor_line(buffer, cursor, prompt_, prompt_len_, prompt_extra_lines_,
                                         cont_prompt_, cont_prompt_len_, width);
 
   int cursor_col = 0;
-  if (cursor_line > 0) {
+  int logical_cursor_line = cursor_line - prompt_extra_lines_;
+  if (logical_cursor_line > 0) {
     size_t line_start = 0;
     int line = 0;
-    while (line < cursor_line && line_start < buffer.size()) {
+    while (line < logical_cursor_line && line_start < buffer.size()) {
       size_t next = buffer.find('\n', line_start);
       if (next == std::string::npos) {
         line_start = buffer.size();
