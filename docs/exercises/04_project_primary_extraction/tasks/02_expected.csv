@@ -1,0 +1,4 @@
+node_id,city,stop_text,price_text
+2,Tokyo,1 stop,"¥12,300"
+11,Osaka,nonstop,"¥8,500"
+24,Seoul,2 stops,"¥14,200"

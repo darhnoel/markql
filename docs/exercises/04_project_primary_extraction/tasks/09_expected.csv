@@ -1,0 +1,4 @@
+node_id,city,summary,stop_text,price_text
+2,Tokyo,Morning direct,1 stop,"¥12,300"
+11,Osaka,Night route,nonstop,"¥8,500"
+24,Seoul,Weekend route,2 stops,"¥14,200"
