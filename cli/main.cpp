@@ -9,6 +9,7 @@
 #include "render/duckbox_renderer.h"
 #include "cli_args.h"
 #include "cli_utils.h"
+#include "explore/dom_explorer.h"
 #include "script_runner.h"
 #include "repl/core/repl.h"
 #include "ui/color.h"
@@ -23,6 +24,18 @@ int main(int argc, char** argv) {
   if (argc == 1) {
     print_startup_help(std::cout);
     return 0;
+  }
+  if (std::string(argv[1]) == "explore") {
+    if (argc == 3 && std::string(argv[2]) == "--help") {
+      std::cout << "Usage: markql explore <input.html>\n";
+      std::cout << "Keybindings: Up/Down move, Right/Enter expand, Left collapse, q quit.\n";
+      return 0;
+    }
+    if (argc != 3) {
+      std::cerr << "Usage: markql explore <input.html>\n";
+      return 2;
+    }
+    return run_dom_explorer_from_input(argv[2], std::cerr);
   }
 
   std::string arg_error;

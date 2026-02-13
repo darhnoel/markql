@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(markql VERSION 1.7.0 LANGUAGES CXX)
+project(markql VERSION 1.8.0 LANGUAGES CXX)
 
 option(XSQL_BUILD_CLI "Build the MarkQL CLI" ON)
 option(XSQL_BUILD_TESTS "Build tests" ON)
@@ -119,6 +119,8 @@ if (XSQL_BUILD_CLI)
     cli/main.cpp
     cli/cli_args.cpp
     cli/cli_utils.cpp
+    cli/explore/dom_explorer.cpp
+    cli/explore/inner_html_search.cpp
     cli/script_runner.cpp
     cli/repl/core/vim_edit.cpp
     cli/repl/core/vim_normal.cpp
@@ -139,6 +141,7 @@ if (XSQL_BUILD_CLI)
     cli/repl/commands/mode_command.cpp
     cli/repl/commands/max_rows_command.cpp
     cli/repl/commands/reload_config_command.cpp
+    cli/repl/commands/explore_command.cpp
     cli/repl/commands/summarize_command.cpp
     cli/repl/commands/load_command.cpp
     cli/repl/commands/plugin_command.cpp
@@ -215,6 +218,10 @@ if (XSQL_BUILD_TESTS)
     tests/test_vim_edit.cpp
     tests/test_vim_normal.cpp
     tests/test_render.cpp
+    tests/test_dom_explorer.cpp
+    cli/explore/dom_explorer.cpp
+    cli/explore/inner_html_search.cpp
+    tests/test_explore_search.cpp
     cli/repl/core/vim_edit.cpp
     cli/repl/core/vim_normal.cpp
     cli/repl/core/line_editor.cpp
@@ -234,6 +241,7 @@ if (XSQL_BUILD_TESTS)
     cli/repl/commands/mode_command.cpp
     cli/repl/commands/max_rows_command.cpp
     cli/repl/commands/reload_config_command.cpp
+    cli/repl/commands/explore_command.cpp
     cli/repl/commands/summarize_command.cpp
     cli/repl/commands/load_command.cpp
     cli/repl/commands/plugin_command.cpp
@@ -365,6 +373,8 @@ if (XSQL_BUILD_TESTS)
     summarize_content_max_tokens
     set_colnames_command
     describe_last_command_outputs_map
+    explore_command_uses_active_alias_by_default
+    explore_command_accepts_direct_target_and_alias_target
     parse_show_describe
     execute_describe_doc
     show_functions_output
@@ -442,6 +452,13 @@ if (XSQL_BUILD_TESTS)
     eval_inner_html_with_self
     eval_raw_inner_html_with_self
     select_mixing_tag_and_self_projection_still_errors
+    flatten_visible_tree_order_and_depth
+    render_attribute_lines_sorted_format
+    fuzzy_match_score_basic
+    fuzzy_search_orders_and_snippet
+    fuzzy_search_candidate_subset
+    fuzzy_search_prioritizes_word_level_match
+    make_inner_html_snippet_context
   )
   if (XSQL_ENABLE_KHMER_NUMBER)
     list(APPEND XSQL_TESTS

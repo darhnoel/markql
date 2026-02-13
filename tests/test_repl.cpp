@@ -9,6 +9,7 @@
 
 #include "repl/commands/registry.h"
 #include "repl/commands/describe_last_command.h"
+#include "repl/commands/explore_command.h"
 #include "repl/commands/set_command.h"
 #include "repl/commands/summarize_content_command.h"
 #include "repl/core/line_editor.h"
@@ -244,6 +245,75 @@ static void test_describe_last_command_outputs_map() {
   expect_true(output.find("data_id__2") != std::string::npos, "describe last output value");
 }
 
+static void test_explore_command_uses_active_alias_by_default() {
+  StreamCapture err_capture(std::cerr);
+  xsql::cli::ReplConfig config;
+  config.color = false;
+  xsql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
+  sources["doc"] = xsql::cli::LoadedSource{"docs/fixtures/basic.html", std::nullopt};
+  std::string active_alias = "doc";
+  std::string last_full_output;
+  bool display_full = true;
+  size_t max_rows = 40;
+  std::vector<xsql::ColumnNameMapping> last_schema_map;
+  xsql::cli::CommandRegistry registry;
+  xsql::cli::PluginManager plugin_manager(registry);
+  xsql::cli::CommandContext ctx{
+      config, editor, sources, active_alias, last_full_output,
+      display_full, max_rows, last_schema_map, plugin_manager,
+  };
+
+  std::string explored;
+  auto handler = xsql::cli::make_explore_command_with_runner(
+      [&](const std::string& input, std::ostream&) {
+        explored = input;
+        return 0;
+      });
+  bool handled = handler(".explore", ctx);
+  expect_true(handled, ".explore should be handled");
+  expect_true(explored == "docs/fixtures/basic.html",
+              ".explore default should use active alias source");
+  expect_true(err_capture.str().empty(), ".explore default should not print errors");
+}
+
+static void test_explore_command_accepts_direct_target_and_alias_target() {
+  xsql::cli::ReplConfig config;
+  config.color = false;
+  xsql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
+  sources["doc"] = xsql::cli::LoadedSource{"docs/fixtures/basic.html", std::nullopt};
+  sources["backup"] = xsql::cli::LoadedSource{"docs/fixtures/products.html", std::nullopt};
+  std::string active_alias = "doc";
+  std::string last_full_output;
+  bool display_full = true;
+  size_t max_rows = 40;
+  std::vector<xsql::ColumnNameMapping> last_schema_map;
+  xsql::cli::CommandRegistry registry;
+  xsql::cli::PluginManager plugin_manager(registry);
+  xsql::cli::CommandContext ctx{
+      config, editor, sources, active_alias, last_full_output,
+      display_full, max_rows, last_schema_map, plugin_manager,
+  };
+
+  std::vector<std::string> explored_targets;
+  auto handler = xsql::cli::make_explore_command_with_runner(
+      [&](const std::string& input, std::ostream&) {
+        explored_targets.push_back(input);
+        return 0;
+      });
+
+  bool handled_alias = handler(".explore backup", ctx);
+  bool handled_direct = handler(".explore https://example.com/page.html", ctx);
+  expect_true(handled_alias, ".explore <alias> should be handled");
+  expect_true(handled_direct, ".explore <direct target> should be handled");
+  expect_eq(explored_targets.size(), static_cast<size_t>(2), "explore runner call count");
+  expect_true(explored_targets[0] == "docs/fixtures/products.html",
+              ".explore alias should resolve to alias source");
+  expect_true(explored_targets[1] == "https://example.com/page.html",
+              ".explore direct should forward input");
+}
+
 void register_repl_tests(std::vector<TestCase>& tests) {
   tests.push_back({"summarize_content_basic", test_summarize_content_basic});
   tests.push_back({"summarize_content_khmer_requires_plugin",
@@ -254,4 +324,8 @@ void register_repl_tests(std::vector<TestCase>& tests) {
                    test_sql_keyword_catalog_includes_new_tokens});
   tests.push_back({"set_colnames_command", test_set_colnames_command});
   tests.push_back({"describe_last_command_outputs_map", test_describe_last_command_outputs_map});
+  tests.push_back({"explore_command_uses_active_alias_by_default",
+                   test_explore_command_uses_active_alias_by_default});
+  tests.push_back({"explore_command_accepts_direct_target_and_alias_target",
+                   test_explore_command_accepts_direct_target_and_alias_target});
 }

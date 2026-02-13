@@ -2,6 +2,7 @@
 
 #include "display_mode_command.h"
 #include "describe_last_command.h"
+#include "explore_command.h"
 #include "help_command.h"
 #include "load_command.h"
 #include "max_rows_command.h"
@@ -39,6 +40,7 @@ void register_default_commands(CommandRegistry& registry) {
   registry.add(make_max_rows_command());
   registry.add(make_reload_config_command());
   registry.add(make_plugin_command());
+  registry.add(make_explore_command());
 #ifdef XSQL_ENABLE_KHMER_NUMBER
   registry.add(make_khmer_number_command());
 #endif

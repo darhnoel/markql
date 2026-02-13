@@ -149,6 +149,52 @@ markql> /* block comment */
 markql>
 ```
 
+## DOM Explorer
+
+Use explore mode when you want to inspect DOM structure before writing queries:
+
+```bash
+./build/markql explore docs/fixtures/basic.html
+```
+
+From REPL:
+
+```text
+markql> .explore
+markql> .explore doc
+markql> .explore https://example.com/page.html
+```
+
+Keybindings:
+
+- `Up/Down`: move selection in the tree
+- `Right` or `Enter`: expand selected node
+- `Left`: collapse selected node
+- `/`: start fuzzy search on node `inner_html`
+- `n` / `N`: jump next/previous search match
+- `j` / `k`: scroll the `Inner HTML Head` pane down/up
+- `+` / `-`: zoom in/out the `Inner HTML Head` pane
+- `Enter`: keep current search results and leave search mode
+- `Esc`: cancel search mode and clear query
+- `q`: quit
+
+Search preview behavior:
+
+- When a fuzzy match is selected, `Inner HTML Head` auto-focuses around the match and color-highlights the matched term.
+- Use `j` / `k` to move around the nearby context after auto-focus.
+- Search input accepts UTF-8 text (for example Japanese and Khmer) and symbols like `-` / `_`.
+- Search execution is debounced while typing; auto-search starts at 2+ characters.
+- Press `Enter` to run immediately (including 1-character queries).
+
+Session behavior:
+
+- Explorer restores your last expanded nodes, selected node, search query, and zoom for the same input during the current MarkQL session.
+
+Layout:
+
+- Left pane: collapsed tree (`node_id tag` with compact attribute hints)
+- Right pane: boxed sections for `Node`, `Inner HTML Head` (formatted preview), and `Attributes`
+
 ## From Row Probe To Real Extraction
 
 **Listing 2: A minimal `PROJECT` extraction**

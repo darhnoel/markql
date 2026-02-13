@@ -7,4 +7,5 @@
 - Verify book examples: [verify_examples.sh](verify_examples.sh)
 - Verify exercises: [exercises/scripts/verify_exercises.sh](exercises/scripts/verify_exercises.sh)
 - Case studies: [case-studies/README.md](case-studies/README.md)
+- DOM Explorer quick usage: [markql-tutorial.md#dom-explorer](markql-tutorial.md#dom-explorer)
 - Changelog: [../CHANGELOG.md](../CHANGELOG.md)

@@ -14,6 +14,7 @@ void print_startup_help(std::ostream& os) {
   os << "  markql --query-file <file> [--input <path>]\n";
   os << "         [--continue-on-error] [--quiet]\n";
   os << "  markql --interactive [--input <path>]\n";
+  os << "  markql explore <input.html>\n";
   os << "  markql --mode duckbox|json|plain\n";
   os << "  markql --display_mode more|less\n";
   os << "  markql --highlight on|off\n";
@@ -41,6 +42,7 @@ void print_help(std::ostream& os) {
   os << "       markql --query-file <file> [--input <path>]\n";
   os << "              [--continue-on-error] [--quiet]\n";
   os << "       markql --interactive [--input <path>]\n";
+  os << "       markql explore <input.html>\n";
   os << "       markql --mode duckbox|json|plain\n";
   os << "       markql --display_mode more|less\n";
   os << "       markql --highlight on|off\n";
@@ -51,6 +53,8 @@ void print_help(std::ostream& os) {
   os << "Scripts and REPL input support SQL comments: -- ... and /* ... */.\n";
   os << "Use TO CSV('file.csv'), TO PARQUET('file.parquet'), TO JSON('file.json'), or\n"
         "TO NDJSON('file.ndjson') in queries to export.\n";
+  os << "Explore mode keybindings: Up/Down move, Right/Enter expand, Left collapse, / search, n/N next/prev, j/k scroll inner_html, +/- zoom inner_html, q quit.\n";
+  os << "Explore mode restores position/expansion per input within the current process session.\n";
   os << "Exit codes: 0=success, 1=parse/runtime error, 2=CLI/IO usage error.\n";
 }
 

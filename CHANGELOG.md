@@ -7,6 +7,34 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-02-13
+
+### Added
+- Added standalone DOM Explorer mode (`markql explore`) and REPL `.explore` command integration.
+- Added two-pane Explorer UI with collapsed DOM tree (left) and structured node detail panels (right).
+- Added Explorer search UX:
+  - boxed search bar
+  - fuzzy search over node `inner_html`
+  - UTF-8 search input support (including non-Latin scripts)
+  - match highlighting in `Inner HTML Head`
+  - `n`/`N` navigation across visible matches
+  - `j`/`k` scrolling inside `Inner HTML Head`
+- Added in-session Explorer state restore per input target (selection, expanded nodes, zoom, search, scroll).
+- Added unit tests for Explorer tree flattening, right-pane rendering, and search behavior/performance paths.
+
+### Changed
+- Improved Explorer rendering:
+  - boxed right-pane sections (`Node`, `Inner HTML Head`, `Attributes`)
+  - larger default vertical allocation to `Inner HTML Head`
+  - better ANSI-safe rendering for highlighted matches.
+- Improved fuzzy ranking quality by prioritizing word-level contiguous matches over weaker subsequence hits.
+- Improved Explorer search performance on large documents:
+  - prefix-result caching and candidate-restricted rescans
+  - reduced search-path allocations
+  - bounded match-window rendering for large inner-html blobs
+  - debounced live search with immediate `Enter` execution.
+- Bumped project version to `1.8.0`.
+
 ## [1.7.0] - 2026-02-10
 
 ### Added
