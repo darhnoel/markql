@@ -98,6 +98,48 @@ FROM 'https://example.com'
 FROM RAW('<div>...</div>')
 ```
 
+## Running Scripts
+
+You can run multiple statements from a `.sql` file:
+
+```bash
+./build/markql --query-file ./queries/report.sql --input docs/fixtures/basic.html
+```
+
+Script rules:
+
+- Statements are separated by `;`.
+- A trailing semicolon is allowed.
+- Empty statements are ignored.
+- By default execution stops on the first failing statement.
+- Use `--continue-on-error` to execute remaining statements.
+- Use `--quiet` to suppress `== stmt i/N ==` delimiters.
+
+Comments are standard SQL:
+
+- `-- line comment`
+- `/* block comment */`
+
+Example script:
+
+```sql
+-- summarize available functions
+SHOW FUNCTIONS;
+
+/* extract cards */
+SELECT section.node_id, section.tag
+FROM doc
+WHERE attributes.class CONTAINS 'result';
+```
+
+REPL comment-only input is a no-op:
+
+```text
+markql> -- just a comment
+markql> /* block comment */
+markql>
+```
+
 ## From Row Probe To Real Extraction
 
 **Listing 2: A minimal `PROJECT` extraction**

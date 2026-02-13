@@ -58,7 +58,7 @@ int run_repl(ReplConfig& config) {
   LineEditor editor(history_max_entries, prompt_normal, 8);
   editor.set_mode_prompts(prompt_vim_normal, 21, prompt_vim_insert, 21);
   editor.set_keyword_color(config.color && config.highlight);
-  editor.set_cont_prompt("", 0);
+  editor.set_cont_prompt("... ", 4);
   CommandRegistry registry;
   register_default_commands(registry);
   PluginManager plugin_manager(registry);
@@ -124,6 +124,22 @@ int run_repl(ReplConfig& config) {
       continue;
     }
     std::string query_text = trim_semicolon(line);
+    if (query_text.empty()) {
+      continue;
+    }
+    LexInspection inspection = inspect_sql_input(query_text);
+    if (inspection.has_error) {
+      auto [line_no, col_no] = line_col_from_offset(query_text, inspection.error_position);
+      if (config.color) std::cerr << kColor.red;
+      std::cerr << "Error: " << inspection.error_message
+                << " at line " << line_no << ", column " << col_no << std::endl;
+      if (config.color) std::cerr << kColor.reset;
+      editor.reset_render_state();
+      continue;
+    }
+    if (inspection.empty_after_comments) {
+      continue;
+    }
     query_text = rewrite_from_path_if_needed(query_text);
     editor.add_history(query_text);
     try {

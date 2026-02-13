@@ -119,6 +119,7 @@ if (XSQL_BUILD_CLI)
     cli/main.cpp
     cli/cli_args.cpp
     cli/cli_utils.cpp
+    cli/script_runner.cpp
     cli/repl/core/line_editor.cpp
     cli/repl/ui/autocomplete.cpp
     cli/repl/ui/sql_keywords.cpp
@@ -203,6 +204,9 @@ if (XSQL_BUILD_TESTS)
     tests/test_guardrails.cpp
     tests/test_meta_commands.cpp
     tests/test_cli_utils.cpp
+    tests/test_lexer_comments.cpp
+    tests/test_script_runner.cpp
+    tests/test_cli_args.cpp
     tests/test_string_sql.cpp
     tests/test_column_names.cpp
     tests/test_self_ref.cpp
@@ -229,7 +233,9 @@ if (XSQL_BUILD_TESTS)
     cli/repl/commands/plugin_install_command.cpp
     cli/repl/commands/plugin_registry.cpp
     cli/repl/commands/summarize_content_command.cpp
+    cli/cli_args.cpp
     cli/cli_utils.cpp
+    cli/script_runner.cpp
     cli/ui/color.cpp
     cli/export/export_sinks.cpp
     cli/render/duckbox_renderer.cpp
@@ -395,6 +401,40 @@ if (XSQL_BUILD_TESTS)
     csv_header_normalized_default
     csv_header_raw_mode
     json_keys_follow_colname_mode
+    inspect_sql_input_line_comment_only
+    inspect_sql_input_block_comment_only
+    inspect_sql_input_unterminated_block_comment
+    line_comment_before_tokens
+    line_comment_between_tokens
+    line_comment_at_eof
+    block_comment_single_line
+    block_comment_multi_line
+    unterminated_block_comment_error
+    comment_markers_inside_string_literals
+    query_without_comments_unchanged_behavior
+    split_script_ignores_empty_statements
+    split_script_with_comments
+    split_script_unterminated_block_comment
+    split_script_semicolon_and_comment_markers_inside_string_literals
+    run_script_multi_statement_delimiters
+    run_script_comments_and_empty_statements
+    run_script_stops_on_first_error_by_default
+    run_script_continue_on_error
+    run_script_quiet_suppresses_delimiter
+    utf8_validation_for_script_file_content
+    parse_cli_args_accepts_script_flags
+    parse_cli_args_rejects_missing_value
+    parse_cli_args_rejects_unknown_argument
+    parse_cli_args_rejects_query_and_query_file_together
+    parse_self_projection_and_where
+    parse_self_function_predicate
+    parse_self_text_attr_inner_html_functions
+    eval_direct_text_self_without_tag_guessing
+    eval_self_rebind_inside_exists_descendant
+    eval_text_and_attr_with_self
+    eval_inner_html_with_self
+    eval_raw_inner_html_with_self
+    select_mixing_tag_and_self_projection_still_errors
   )
   if (XSQL_ENABLE_KHMER_NUMBER)
     list(APPEND XSQL_TESTS

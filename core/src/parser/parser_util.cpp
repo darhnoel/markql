@@ -33,6 +33,10 @@ bool Parser::consume(TokenType type, const std::string& message) {
 /// MUST preserve the earliest error position for clarity.
 /// Inputs are error message; outputs are false with stored error.
 bool Parser::set_error(const std::string& message) {
+  if (current_.type == TokenType::Invalid && !current_.text.empty()) {
+    error_ = ParseError{current_.text, current_.pos};
+    return false;
+  }
   error_ = ParseError{message, current_.pos};
   return false;
 }

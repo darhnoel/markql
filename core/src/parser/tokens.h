@@ -20,6 +20,7 @@ enum class TokenType {
   Semicolon,
   Star,
   End,
+  Invalid,
   KeywordSelect,
   KeywordFrom,
   KeywordWhere,

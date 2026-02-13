@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "parser/lexer.h"
 #include "query_parser.h"
 #include "render/duckbox_renderer.h"
 #include "ui/color.h"
@@ -448,6 +449,76 @@ std::optional<QuerySource> parse_query_source(const std::string& query) {
     source.needs_input = !parsed.query->source.fragments_raw.has_value();
   }
   return source;
+}
+
+LexInspection inspect_sql_input(const std::string& query) {
+  LexInspection out;
+  xsql::Lexer lexer(query);
+  Token token = lexer.next();
+  if (token.type == TokenType::Invalid) {
+    out.has_error = true;
+    out.error_message = token.text;
+    out.error_position = token.pos;
+    return out;
+  }
+  out.empty_after_comments = token.type == TokenType::End;
+  return out;
+}
+
+std::pair<size_t, size_t> line_col_from_offset(const std::string& text, size_t offset) {
+  size_t clamped = std::min(offset, text.size());
+  size_t line = 1;
+  size_t col = 1;
+  for (size_t i = 0; i < clamped; ++i) {
+    if (text[i] == '\n') {
+      ++line;
+      col = 1;
+    } else {
+      ++col;
+    }
+  }
+  return {line, col};
+}
+
+bool is_valid_utf8(const std::string& text) {
+  size_t i = 0;
+  while (i < text.size()) {
+    unsigned char lead = static_cast<unsigned char>(text[i]);
+    if ((lead & 0x80) == 0) {
+      ++i;
+      continue;
+    }
+
+    size_t len = 0;
+    uint32_t cp = 0;
+    uint32_t min_cp = 0;
+    if ((lead & 0xE0) == 0xC0) {
+      len = 2;
+      cp = lead & 0x1F;
+      min_cp = 0x80;
+    } else if ((lead & 0xF0) == 0xE0) {
+      len = 3;
+      cp = lead & 0x0F;
+      min_cp = 0x800;
+    } else if ((lead & 0xF8) == 0xF0) {
+      len = 4;
+      cp = lead & 0x07;
+      min_cp = 0x10000;
+    } else {
+      return false;
+    }
+    if (i + len > text.size()) return false;
+    for (size_t j = 1; j < len; ++j) {
+      unsigned char c = static_cast<unsigned char>(text[i + j]);
+      if ((c & 0xC0) != 0x80) return false;
+      cp = (cp << 6) | (c & 0x3F);
+    }
+    if (cp < min_cp) return false;
+    if (cp > 0x10FFFF) return false;
+    if (cp >= 0xD800 && cp <= 0xDFFF) return false;
+    i += len;
+  }
+  return true;
 }
 
 std::vector<std::string> collect_source_uris(const xsql::QueryResult& result) {

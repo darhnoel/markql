@@ -12,6 +12,7 @@ void print_startup_help(std::ostream& os) {
   os << "Usage:\n";
   os << "  markql --query <query> [--input <path>]\n";
   os << "  markql --query-file <file> [--input <path>]\n";
+  os << "         [--continue-on-error] [--quiet]\n";
   os << "  markql --interactive [--input <path>]\n";
   os << "  markql --mode duckbox|json|plain\n";
   os << "  markql --display_mode more|less\n";
@@ -23,7 +24,9 @@ void print_startup_help(std::ostream& os) {
   os << "  - If --input is omitted, HTML is read from stdin.\n";
   os << "  - URLs are supported when libcurl is available.\n";
   os << "  - TO LIST() outputs a JSON list for a single projected column.\n";
-  os << "  - TO TABLE() extracts HTML tables into rows.\n\n";
+  os << "  - TO TABLE() extracts HTML tables into rows.\n";
+  os << "  - SQL comments are supported: -- line comments, /* block comments */.\n";
+  os << "  - Exit codes: 0=success, 1=parse/runtime error, 2=CLI/IO usage error.\n\n";
   os << "Examples:\n";
   os << "  markql --query \"SELECT table FROM doc\" --input ./data/index.html\n";
   os << "  markql --query \"SELECT link.href FROM doc WHERE attributes.rel = 'preload' TO LIST()\" --input ./data/index.html\n";
@@ -36,6 +39,7 @@ void print_startup_help(std::ostream& os) {
 void print_help(std::ostream& os) {
   os << "Usage: markql --query <query> [--input <path>]\n";
   os << "       markql --query-file <file> [--input <path>]\n";
+  os << "              [--continue-on-error] [--quiet]\n";
   os << "       markql --interactive [--input <path>]\n";
   os << "       markql --mode duckbox|json|plain\n";
   os << "       markql --display_mode more|less\n";
@@ -44,8 +48,10 @@ void print_help(std::ostream& os) {
   os << "       markql --color=disabled\n";
   os << "Legacy `xsql` command name remains available.\n";
   os << "If --input is omitted, HTML is read from stdin.\n";
+  os << "Scripts and REPL input support SQL comments: -- ... and /* ... */.\n";
   os << "Use TO CSV('file.csv'), TO PARQUET('file.parquet'), TO JSON('file.json'), or\n"
         "TO NDJSON('file.ndjson') in queries to export.\n";
+  os << "Exit codes: 0=success, 1=parse/runtime error, 2=CLI/IO usage error.\n";
 }
 
 /// Parses argv into typed options so main can dispatch consistently.
@@ -54,17 +60,37 @@ void print_help(std::ostream& os) {
 bool parse_cli_args(int argc, char** argv, CliOptions& options, std::string& error) {
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
-    if (arg == "--query" && i + 1 < argc) {
+    if (arg == "--query") {
+      if (i + 1 >= argc) {
+        error = "Missing value for --query";
+        return false;
+      }
       options.query = argv[++i];
-    } else if (arg == "--query-file" && i + 1 < argc) {
+    } else if (arg == "--query-file") {
+      if (i + 1 >= argc) {
+        error = "Missing value for --query-file";
+        return false;
+      }
       options.query_file = argv[++i];
-    } else if (arg == "--input" && i + 1 < argc) {
+    } else if (arg == "--input") {
+      if (i + 1 >= argc) {
+        error = "Missing value for --input";
+        return false;
+      }
       options.input = argv[++i];
     } else if (arg == "--interactive") {
       options.interactive = true;
-    } else if (arg == "--mode" && i + 1 < argc) {
+    } else if (arg == "--mode") {
+      if (i + 1 >= argc) {
+        error = "Missing value for --mode";
+        return false;
+      }
       options.output_mode = argv[++i];
-    } else if ((arg == "--display_mode" || arg == "--display-mode") && i + 1 < argc) {
+    } else if (arg == "--display_mode" || arg == "--display-mode") {
+      if (i + 1 >= argc) {
+        error = "Missing value for --display_mode";
+        return false;
+      }
       std::string value = argv[++i];
       if (value == "more") {
         options.display_full = true;
@@ -77,7 +103,11 @@ bool parse_cli_args(int argc, char** argv, CliOptions& options, std::string& err
         error = "Invalid --display_mode value (use more|less)";
         return false;
       }
-    } else if (arg == "--highlight" && i + 1 < argc) {
+    } else if (arg == "--highlight") {
+      if (i + 1 >= argc) {
+        error = "Missing value for --highlight";
+        return false;
+      }
       std::string value = argv[++i];
       if (value == "on") {
         options.highlight = true;
@@ -90,11 +120,26 @@ bool parse_cli_args(int argc, char** argv, CliOptions& options, std::string& err
       }
     } else if (arg == "--color=disabled") {
       options.color = false;
-    } else if (arg == "--timeout-ms" && i + 1 < argc) {
+    } else if (arg == "--timeout-ms") {
+      if (i + 1 >= argc) {
+        error = "Missing value for --timeout-ms";
+        return false;
+      }
       options.timeout_ms = std::stoi(argv[++i]);
     } else if (arg == "--help") {
       options.show_help = true;
+    } else if (arg == "--continue-on-error") {
+      options.continue_on_error = true;
+    } else if (arg == "--quiet") {
+      options.quiet = true;
+    } else {
+      error = "Unknown argument: " + arg;
+      return false;
     }
+  }
+  if (!options.query.empty() && !options.query_file.empty()) {
+    error = "Error: --query and --query-file are mutually exclusive";
+    return false;
   }
   return true;
 }

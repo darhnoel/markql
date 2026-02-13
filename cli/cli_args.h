@@ -20,6 +20,8 @@ struct CliOptions {
   bool display_mode_set = false;
   int timeout_ms = 5000;
   bool show_help = false;
+  bool continue_on_error = false;
+  bool quiet = false;
 };
 
 /// Prints the brief startup help shown when no arguments are provided.
