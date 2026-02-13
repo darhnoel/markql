@@ -144,6 +144,33 @@ void test_run_script_quiet_suppresses_delimiter() {
               "quiet mode suppresses delimiters");
 }
 
+void test_run_script_repl_style_multiline_two_selects() {
+  std::string script =
+      "SELECT section(node_id, tag)\n"
+      "FROM doc\n"
+      "WHERE tag = 'section';\n"
+      "\n"
+      "SELECT section(node_id, tag)\n"
+      "FROM doc\n"
+      "WHERE attributes.data-kind = 'flight'\n"
+      "ORDER BY node_id;";
+  std::ostringstream out;
+  std::ostringstream err;
+  std::vector<std::string> executed;
+  auto exec = [&](const std::string& statement) {
+    executed.push_back(statement);
+  };
+  xsql::cli::ScriptRunOptions options;
+  options.quiet = true;
+  int code = xsql::cli::run_sql_script(script, options, exec, out, err);
+  expect_eq(code, 0, "repl-style multiline buffer executes successfully");
+  expect_eq(executed.size(), static_cast<size_t>(2), "repl-style buffer executes both statements");
+  expect_true(executed[0].find("WHERE tag = 'section'") != std::string::npos,
+              "first statement preserved");
+  expect_true(executed[1].find("attributes.data-kind = 'flight'") != std::string::npos,
+              "second statement preserved");
+}
+
 void test_utf8_validation_for_script_file_content() {
   expect_true(xsql::cli::is_valid_utf8("SELECT div FROM document;"),
               "valid UTF-8 script is accepted");
@@ -166,5 +193,7 @@ void register_script_runner_tests(std::vector<TestCase>& tests) {
   tests.push_back({"run_script_stops_on_first_error_by_default", test_run_script_stops_on_first_error_by_default});
   tests.push_back({"run_script_continue_on_error", test_run_script_continue_on_error});
   tests.push_back({"run_script_quiet_suppresses_delimiter", test_run_script_quiet_suppresses_delimiter});
+  tests.push_back({"run_script_repl_style_multiline_two_selects",
+                   test_run_script_repl_style_multiline_two_selects});
   tests.push_back({"utf8_validation_for_script_file_content", test_utf8_validation_for_script_file_content});
 }

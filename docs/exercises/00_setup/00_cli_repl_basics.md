@@ -43,6 +43,8 @@ WHERE attributes.data-kind = 'flight'
 ORDER BY node_id;
 ```
 
+REPL also accepts a pasted multi-statement block when statements are separated by `;`.
+
 Exit REPL:
 
 ```text

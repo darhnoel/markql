@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include "cli_utils.h"
+#include "script_runner.h"
 #include "repl/config.h"
 #include "export/export_sinks.h"
 #include "render/duckbox_renderer.h"
@@ -98,6 +99,138 @@ int run_repl(ReplConfig& config) {
     }
   }
 
+  auto execute_and_render = [&](const std::string& raw_query) {
+    std::string query_text = rewrite_from_path_if_needed(raw_query);
+    xsql::QueryResult result;
+    auto source = parse_query_source(query_text);
+    if (source.has_value() && source->statement_kind != xsql::Query::Kind::Select) {
+      std::string active_source;
+      auto active_it = sources.find(active_alias);
+      if (active_it != sources.end()) {
+        active_source = active_it->second.source;
+      }
+      std::string meta_error;
+      if (source->statement_kind == xsql::Query::Kind::ShowInput) {
+        if (!build_show_input_result(active_source, result, meta_error)) {
+          throw std::runtime_error(meta_error);
+        }
+      } else if (source->statement_kind == xsql::Query::Kind::ShowInputs) {
+        if (!build_show_inputs_result(last_sources, active_source, result, meta_error)) {
+          throw std::runtime_error(meta_error);
+        }
+      } else {
+        result = xsql::execute_query_from_document("", query_text);
+      }
+    } else {
+      if (source.has_value() && source->kind == xsql::Source::Kind::Url) {
+        result = xsql::execute_query_from_url(source->value, query_text, config.timeout_ms);
+      } else if (source.has_value() && source->kind == xsql::Source::Kind::Path) {
+        result = xsql::execute_query_from_file(source->value, query_text);
+      } else if (source.has_value() && source->kind == xsql::Source::Kind::RawHtml) {
+        result = xsql::execute_query_from_document("", query_text);
+      } else if (source.has_value() && source->kind == xsql::Source::Kind::Fragments &&
+                 !source->needs_input) {
+        result = xsql::execute_query_from_document("", query_text);
+      } else {
+        std::string alias = active_alias;
+        if (source.has_value() && source->alias.has_value()) {
+          alias = *source->alias;
+        }
+        auto it = sources.find(alias);
+        if (it == sources.end() || it->second.source.empty()) {
+          if (config.color) std::cerr << kColor.red;
+          if (source.has_value() && source->alias.has_value()) {
+            std::cerr << "No input loaded for alias '" << alias
+                      << "'. Use .load <path|url> --alias " << alias << "." << std::endl;
+          } else {
+            std::cerr << "No input loaded. Use :load <path|url> or start with --input <path|url>."
+                      << std::endl;
+          }
+          if (config.color) std::cerr << kColor.reset;
+          return;
+        }
+        if (!it->second.html.has_value()) {
+          it->second.html = load_html_input(it->second.source, config.timeout_ms);
+        }
+        result = xsql::execute_query_from_document(*it->second.html, query_text);
+        if (!it->second.source.empty() &&
+            (!source.has_value() || source->kind == xsql::Source::Kind::Document)) {
+          for (auto& row : result.rows) {
+            row.source_uri = it->second.source;
+          }
+        }
+      }
+      last_sources = collect_source_uris(result);
+      apply_source_uri_policy(result, last_sources);
+    }
+    last_schema_map = xsql::build_column_name_map(result.columns, config.colname_mode);
+    if (result.export_sink.kind != xsql::QueryResult::ExportSink::Kind::None) {
+      std::string export_error;
+      if (!xsql::cli::export_result(result, export_error, config.colname_mode)) {
+        throw std::runtime_error(export_error);
+      }
+      if (!result.export_sink.path.empty()) {
+        std::cout << "Wrote " << export_kind_label(result.export_sink.kind)
+                  << ": " << result.export_sink.path << std::endl;
+      }
+      return;
+    }
+    if (config.output_mode == "duckbox") {
+      if (result.to_table) {
+        if (result.tables.empty()) {
+          std::cout << "(empty table)" << std::endl;
+          std::cout << "Rows: 0" << std::endl;
+        } else {
+          for (size_t i = 0; i < result.tables.size(); ++i) {
+            if (result.tables.size() > 1) {
+              std::cout << "Table node_id=" << result.tables[i].node_id << std::endl;
+            }
+            std::cout << render_table_duckbox(result.tables[i], result.table_has_header,
+                                              config.highlight, config.color, max_rows)
+                      << std::endl;
+            std::cout << "Rows: "
+                      << count_table_rows(result.tables[i], result.table_has_header)
+                      << std::endl;
+          }
+        }
+      } else if (!result.to_list) {
+        xsql::render::DuckboxOptions options;
+        options.max_width = 0;
+        options.max_rows = max_rows;
+        options.highlight = config.highlight;
+        options.is_tty = config.color;
+        options.colname_mode = config.colname_mode;
+        std::cout << xsql::render::render_duckbox(result, options) << std::endl;
+        std::cout << "Rows: " << count_result_rows(result) << std::endl;
+      } else {
+        std::string json_out = build_json_list(result, config.colname_mode);
+        last_full_output = json_out;
+        if (display_full) {
+          std::cout << colorize_json(json_out, config.color) << std::endl;
+        } else {
+          TruncateResult truncated = truncate_output(json_out, 10, 10);
+          std::cout << colorize_json(truncated.output, config.color) << std::endl;
+        }
+        std::cout << "Rows: " << count_result_rows(result) << std::endl;
+      }
+    } else {
+      std::string json_out =
+          result.to_table
+              ? build_table_json(result)
+              : (result.to_list ? build_json_list(result, config.colname_mode)
+                                : build_json(result, config.colname_mode));
+      last_full_output = json_out;
+      if (config.output_mode == "plain") {
+        std::cout << json_out << std::endl;
+      } else if (display_full) {
+        std::cout << colorize_json(json_out, config.color) << std::endl;
+      } else {
+        TruncateResult truncated = truncate_output(json_out, 10, 10);
+        std::cout << colorize_json(truncated.output, config.color) << std::endl;
+      }
+    }
+  };
+
   while (true) {
     if (!editor.read_line(line)) {
       break;
@@ -140,137 +273,31 @@ int run_repl(ReplConfig& config) {
     if (inspection.empty_after_comments) {
       continue;
     }
-    query_text = rewrite_from_path_if_needed(query_text);
     editor.add_history(query_text);
     try {
-      xsql::QueryResult result;
-      auto source = parse_query_source(query_text);
-      if (source.has_value() && source->statement_kind != xsql::Query::Kind::Select) {
-        std::string active_source;
-        auto active_it = sources.find(active_alias);
-        if (active_it != sources.end()) {
-          active_source = active_it->second.source;
-        }
-        std::string meta_error;
-        if (source->statement_kind == xsql::Query::Kind::ShowInput) {
-          if (!build_show_input_result(active_source, result, meta_error)) {
-            throw std::runtime_error(meta_error);
-          }
-        } else if (source->statement_kind == xsql::Query::Kind::ShowInputs) {
-          if (!build_show_inputs_result(last_sources, active_source, result, meta_error)) {
-            throw std::runtime_error(meta_error);
-          }
-        } else {
-          result = xsql::execute_query_from_document("", query_text);
-        }
-      } else {
-        if (source.has_value() && source->kind == xsql::Source::Kind::Url) {
-          result = xsql::execute_query_from_url(source->value, query_text, config.timeout_ms);
-        } else if (source.has_value() && source->kind == xsql::Source::Kind::Path) {
-          result = xsql::execute_query_from_file(source->value, query_text);
-        } else if (source.has_value() && source->kind == xsql::Source::Kind::RawHtml) {
-          result = xsql::execute_query_from_document("", query_text);
-        } else if (source.has_value() && source->kind == xsql::Source::Kind::Fragments &&
-                   !source->needs_input) {
-          result = xsql::execute_query_from_document("", query_text);
-        } else {
-          std::string alias = active_alias;
-          if (source.has_value() && source->alias.has_value()) {
-            alias = *source->alias;
-          }
-          auto it = sources.find(alias);
-          if (it == sources.end() || it->second.source.empty()) {
-            if (config.color) std::cerr << kColor.red;
-            if (source.has_value() && source->alias.has_value()) {
-              std::cerr << "No input loaded for alias '" << alias
-                        << "'. Use .load <path|url> --alias " << alias << "." << std::endl;
-            } else {
-              std::cerr << "No input loaded. Use :load <path|url> or start with --input <path|url>."
-                        << std::endl;
-            }
-            if (config.color) std::cerr << kColor.reset;
-            continue;
-          }
-          if (!it->second.html.has_value()) {
-            it->second.html = load_html_input(it->second.source, config.timeout_ms);
-          }
-          result = xsql::execute_query_from_document(*it->second.html, query_text);
-          if (!it->second.source.empty() &&
-              (!source.has_value() || source->kind == xsql::Source::Kind::Document)) {
-            for (auto& row : result.rows) {
-              row.source_uri = it->second.source;
-            }
-          }
-        }
-        last_sources = collect_source_uris(result);
-        apply_source_uri_policy(result, last_sources);
-      }
-      last_schema_map = xsql::build_column_name_map(result.columns, config.colname_mode);
-      if (result.export_sink.kind != xsql::QueryResult::ExportSink::Kind::None) {
-        std::string export_error;
-        if (!xsql::cli::export_result(result, export_error, config.colname_mode)) {
-          throw std::runtime_error(export_error);
-        }
-        if (!result.export_sink.path.empty()) {
-          std::cout << "Wrote " << export_kind_label(result.export_sink.kind)
-                    << ": " << result.export_sink.path << std::endl;
-        }
+      ScriptSplitResult split = split_sql_script(query_text);
+      if (split.error_message.has_value()) {
+        auto [line_no, col_no] = line_col_from_offset(query_text, split.error_position);
+        if (config.color) std::cerr << kColor.red;
+        std::cerr << "Error: " << *split.error_message
+                  << " at line " << line_no << ", column " << col_no << std::endl;
+        if (config.color) std::cerr << kColor.reset;
         editor.reset_render_state();
         continue;
       }
-      if (config.output_mode == "duckbox") {
-        if (result.to_table) {
-          if (result.tables.empty()) {
-            std::cout << "(empty table)" << std::endl;
-            std::cout << "Rows: 0" << std::endl;
-          } else {
-            for (size_t i = 0; i < result.tables.size(); ++i) {
-              if (result.tables.size() > 1) {
-                std::cout << "Table node_id=" << result.tables[i].node_id << std::endl;
-              }
-              std::cout << render_table_duckbox(result.tables[i], result.table_has_header,
-                                                config.highlight, config.color, max_rows)
-                        << std::endl;
-              std::cout << "Rows: "
-                        << count_table_rows(result.tables[i], result.table_has_header)
-                        << std::endl;
-            }
-          }
-        } else if (!result.to_list) {
-          xsql::render::DuckboxOptions options;
-          options.max_width = 0;
-          options.max_rows = max_rows;
-          options.highlight = config.highlight;
-          options.is_tty = config.color;
-          options.colname_mode = config.colname_mode;
-          std::cout << xsql::render::render_duckbox(result, options) << std::endl;
-          std::cout << "Rows: " << count_result_rows(result) << std::endl;
-        } else {
-          std::string json_out = build_json_list(result, config.colname_mode);
-          last_full_output = json_out;
-          if (display_full) {
-            std::cout << colorize_json(json_out, config.color) << std::endl;
-          } else {
-            TruncateResult truncated = truncate_output(json_out, 10, 10);
-            std::cout << colorize_json(truncated.output, config.color) << std::endl;
-          }
-          std::cout << "Rows: " << count_result_rows(result) << std::endl;
+
+      if (split.statements.size() > 1) {
+        ScriptRunOptions options;
+        options.quiet = true;
+        int code = run_sql_script(query_text, options, execute_and_render, std::cout, std::cerr);
+        if (code != 0) {
+          if (config.color) std::cerr << kColor.yellow;
+          std::cerr << "Tip: Check statement syntax around the reported statement index."
+                    << std::endl;
+          if (config.color) std::cerr << kColor.reset;
         }
       } else {
-        std::string json_out =
-            result.to_table
-                ? build_table_json(result)
-                : (result.to_list ? build_json_list(result, config.colname_mode)
-                                  : build_json(result, config.colname_mode));
-        last_full_output = json_out;
-        if (config.output_mode == "plain") {
-          std::cout << json_out << std::endl;
-        } else if (display_full) {
-          std::cout << colorize_json(json_out, config.color) << std::endl;
-        } else {
-          TruncateResult truncated = truncate_output(json_out, 10, 10);
-          std::cout << colorize_json(truncated.output, config.color) << std::endl;
-        }
+        execute_and_render(query_text);
       }
       editor.reset_render_state();
     } catch (const std::exception& ex) {
