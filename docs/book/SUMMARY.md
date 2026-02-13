@@ -5,7 +5,7 @@
 - [Chapter 3: First Query Loop](ch03-first-query-loop.md)
 - [Chapter 4: Sources and Loading](ch04-sources-and-loading.md)
 - [Chapter 5: Row Filtering with WHERE](ch05-row-filtering-where.md)
-- [Chapter 6: Axes and EXISTS](ch06-axes-and-exists.md)
+- [Chapter 6: Structural Row Filtering with EXISTS](ch06-structural-row-filtering-exists.md)
 - [Chapter 7: Value Extraction with TEXT and ATTR](ch07-value-extraction-text-attr.md)
 - [Chapter 8: FLATTEN](ch08-flatten.md)
 - [Chapter 9: PROJECT](ch09-project.md)

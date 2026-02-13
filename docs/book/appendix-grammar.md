@@ -25,6 +25,7 @@ FROM <source>
 ## Projections
 - Tag rows: `SELECT div FROM doc ...`
 - Field projections: `SELECT a.href, a.tag FROM doc ...`
+- Selector field-list projections: `SELECT a(href, tag) FROM doc ...`
 - Current row projections: `SELECT self.node_id, self.tag FROM doc ...`
 - `FLATTEN(tag[, depth]) AS (c1, c2, ...)`
 - `PROJECT(tag) AS (alias: expr, ...)`
@@ -34,6 +35,17 @@ FROM <source>
   - `ATTR(tag|self, attr)`
   - `INNER_HTML(tag|self[, depth|MAX_DEPTH])`
   - `RAW_INNER_HTML(tag|self[, depth|MAX_DEPTH])`
+
+`SELECT a(href, tag) ...` is the compact equivalent of selecting `a.href, a.tag`.
+
+Extraction semantics (important):
+
+- `TEXT(tag|self)` returns the node text value (aggregated text content for that node scope).
+- `DIRECT_TEXT(tag|self)` returns only direct text under that node and excludes nested-element text.
+- `INNER_HTML(tag|self[, depth|MAX_DEPTH])` returns minified inner HTML, with optional depth slicing.
+- `RAW_INNER_HTML(tag|self[, depth|MAX_DEPTH])` returns raw (non-minified) inner HTML, with optional depth slicing.
+- Only `INNER_HTML` / `RAW_INNER_HTML` use HTML depth parameters.
+- In `PROJECT(...)`, `TEXT(..., n|FIRST|LAST)` and `ATTR(..., n|FIRST|LAST)` use selector position, not depth.
 
 ## Predicates
 - Boolean: `AND`, `OR`, parentheses
@@ -51,5 +63,7 @@ FROM <source>
 - `TEXT()/INNER_HTML()/RAW_INNER_HTML()` require an outer `WHERE`.
 - That `WHERE` must include a non-tag self predicate (not only `tag = ...`).
 - `INNER_HTML(tag)` default depth is `1`.
+- `RAW_INNER_HTML(tag)` default depth is `1`.
 - `INNER_HTML(tag, MAX_DEPTH)` uses each row's `max_depth` automatically.
+- `RAW_INNER_HTML(tag, MAX_DEPTH)` uses each row's `max_depth` automatically.
 - In one `SELECT`, `INNER_HTML`/`RAW_INNER_HTML` depth mode must be consistent.

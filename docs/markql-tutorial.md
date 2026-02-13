@@ -60,7 +60,14 @@ Build:
 **Listing 1: Verify the CLI and inspect rows**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT section(node_id, tag) FROM doc WHERE attributes.class CONTAINS 'result' LIMIT 5;"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT section(node_id, tag)
+FROM doc
+WHERE attributes.class CONTAINS 'result'
+LIMIT 5;
+"
 ```
 
 Observed output:
@@ -103,7 +110,9 @@ FROM RAW('<div>...</div>')
 You can run multiple statements from a `.sql` file:
 
 ```bash
-./build/markql --query-file ./queries/report.sql --input docs/fixtures/basic.html
+./build/markql \
+  --query-file ./queries/report.sql \
+  --input docs/fixtures/basic.html
 ```
 
 Script rules:
@@ -145,7 +154,20 @@ markql>
 **Listing 2: A minimal `PROJECT` extraction**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT section.node_id, PROJECT(section) AS ( city: TEXT(h3), stops: TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%'), price_text: TEXT(span WHERE attributes.role = 'text') ) FROM doc WHERE attributes.class CONTAINS 'result' AND attributes.data-kind = 'flight' ORDER BY node_id;"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT section.node_id,
+       PROJECT(section) AS (
+         city: TEXT(h3),
+         stops: TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%'),
+         price_text: TEXT(span WHERE attributes.role = 'text')
+       )
+FROM doc
+WHERE attributes.class CONTAINS 'result'
+  AND attributes.data-kind = 'flight'
+ORDER BY node_id;
+"
 ```
 
 Observed output:
@@ -168,7 +190,12 @@ What happened:
 **Listing 3: Failing query**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT TEXT(div) FROM doc;"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT TEXT(div)
+FROM doc;
+"
 ```
 
 Observed error:
@@ -182,7 +209,13 @@ Why this fails: this branch requires extraction functions to run under a query-l
 **Listing 4: Corrected query**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT TEXT(p) FROM doc WHERE attributes.class CONTAINS 'summary';"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT TEXT(p)
+FROM doc
+WHERE attributes.class CONTAINS 'summary';
+"
 ```
 
 Observed output:
@@ -207,7 +240,18 @@ Extraction function contract summary:
 **Listing 5: Naive row filter (keeps incomplete variant)**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT section.node_id, PROJECT(section) AS ( name: TEXT(h3), price_text: TEXT(span WHERE attributes.role = 'text') ) FROM doc WHERE attributes.class CONTAINS 'result' ORDER BY node_id;"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT section.node_id,
+       PROJECT(section) AS (
+         name: TEXT(h3),
+         price_text: TEXT(span WHERE attributes.role = 'text')
+       )
+FROM doc
+WHERE attributes.class CONTAINS 'result'
+ORDER BY node_id;
+"
 ```
 
 Observed output:
@@ -225,7 +269,15 @@ Why this happens: outer `WHERE` admitted both flight and hotel cards. The hotel 
 **Listing 6: Corrected with row-quality guard**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT section.node_id FROM doc WHERE tag = 'section' AND EXISTS(descendant WHERE attributes.role = 'text') ORDER BY node_id;"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT section.node_id
+FROM doc
+WHERE tag = 'section'
+  AND EXISTS(descendant WHERE attributes.role = 'text')
+ORDER BY node_id;
+"
 ```
 
 Observed output:
@@ -246,7 +298,15 @@ This is the key pattern: use `EXISTS(...)` in outer `WHERE` to keep rows that ha
 **Listing 7: FLATTEN on semi-regular items**
 
 ```bash
-./build/markql --input docs/fixtures/products.html --query "SELECT li.node_id, FLATTEN(li) AS (name, summary, lang1, lang2) FROM doc WHERE attributes.class = 'item' ORDER BY node_id;"
+./build/markql \
+  --input docs/fixtures/products.html \
+  --query "
+SELECT li.node_id,
+       FLATTEN(li) AS (name, summary, lang1, lang2)
+FROM doc
+WHERE attributes.class = 'item'
+ORDER BY node_id;
+"
 ```
 
 Observed output:
@@ -268,7 +328,20 @@ Interpretation:
 **Listing 8: Stable mapping with PROJECT**
 
 ```bash
-./build/markql --input docs/fixtures/products.html --query "SELECT li.node_id, PROJECT(li) AS ( title: TEXT(h2), summary: TEXT(p), language_primary: FIRST_TEXT(span), language_secondary: LAST_TEXT(span) ) FROM doc WHERE attributes.class = 'item' ORDER BY node_id;"
+./build/markql \
+  --input docs/fixtures/products.html \
+  --query "
+SELECT li.node_id,
+       PROJECT(li) AS (
+         title: TEXT(h2),
+         summary: TEXT(p),
+         language_primary: FIRST_TEXT(span),
+         language_secondary: LAST_TEXT(span)
+       )
+FROM doc
+WHERE attributes.class = 'item'
+ORDER BY node_id;
+"
 ```
 
 Observed output:
@@ -303,7 +376,18 @@ Examples include:
 **Listing 9: Text normalization for numeric export**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT section.node_id, PROJECT(section) AS ( price_text: TEXT(span WHERE attributes.role = 'text'), price_num: TRIM(REPLACE(REPLACE(TEXT(span WHERE attributes.role = 'text'), '¥', ''), ',', '')) ) FROM doc WHERE attributes.data-kind = 'flight' ORDER BY node_id;"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT section.node_id,
+       PROJECT(section) AS (
+         price_text: TEXT(span WHERE attributes.role = 'text'),
+         price_num: TRIM(REPLACE(REPLACE(TEXT(span WHERE attributes.role = 'text'), '¥', ''), ',', ''))
+       )
+FROM doc
+WHERE attributes.data-kind = 'flight'
+ORDER BY node_id;
+"
 ```
 
 Observed output:
@@ -318,7 +402,17 @@ Rows: 2
 **Listing 10: CASE expression**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT CASE WHEN tag = 'section' THEN 'card' ELSE 'other' END FROM doc WHERE tag = 'section' LIMIT 2;"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT CASE
+         WHEN tag = 'section' THEN 'card'
+         ELSE 'other'
+       END
+FROM doc
+WHERE tag = 'section'
+LIMIT 2;
+"
 ```
 
 Observed output:
@@ -335,7 +429,15 @@ Rows: 2
 **Listing 11: JSON array**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT a(href, rel) FROM doc WHERE tag = 'a' ORDER BY node_id TO JSON();"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT a(href, rel)
+FROM doc
+WHERE tag = 'a'
+ORDER BY node_id
+TO JSON();
+"
 ```
 
 Observed output:
@@ -347,7 +449,15 @@ Observed output:
 **Listing 12: NDJSON (one object per line)**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT a(href, rel) FROM doc WHERE tag = 'a' ORDER BY node_id TO NDJSON();"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT a(href, rel)
+FROM doc
+WHERE tag = 'a'
+ORDER BY node_id
+TO NDJSON();
+"
 ```
 
 Observed output:
@@ -362,7 +472,14 @@ Observed output:
 **Listing 13: Querying inline HTML with `RAW(...)`**
 
 ```bash
-./build/markql --query "SELECT a(href) FROM RAW('<div><a href=\"/x\">X</a><a href=\"/y\">Y</a></div>') WHERE tag = 'a' ORDER BY node_id TO JSON();"
+./build/markql \
+  --query "
+SELECT a(href)
+FROM RAW('<div><a href=\"/x\">X</a><a href=\"/y\">Y</a></div>')
+WHERE tag = 'a'
+ORDER BY node_id
+TO JSON();
+"
 ```
 
 Observed output:

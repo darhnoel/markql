@@ -1,4 +1,4 @@
-# Chapter 6: Axes and EXISTS
+# Chapter 6: Structural Row Filtering with EXISTS
 
 ## TL;DR
 Axes describe structural scope, and `EXISTS` turns structural facts into row-filter decisions. Use them when class names are unstable.
