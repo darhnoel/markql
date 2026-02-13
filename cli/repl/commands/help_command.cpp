@@ -35,7 +35,7 @@ CommandHandler make_help_command() {
     std::cout << "  Query export: TO CSV('file.csv') / TO PARQUET('file.parquet') / "
                  "TO JSON('file.json') / TO NDJSON('file.ndjson')\n";
     std::cout << "  Editor modes: Esc toggles normal <-> vim:normal; i/a/I/A/o/O in vim mode\n";
-    std::cout << "    Vim normal keys: h/j/k/l, w/b/W/B, dw/db/dW/dB/d$, <n>w/<n>b, d<n>w/d<n>b, u(undo)\n";
+    std::cout << "    Vim normal keys: h/j/k/l, x/<n>x, w/b/W/B, dw/db/dW/dB/d$, <n>w/<n>b, d<n>w/d<n>b, u(undo)\n";
     std::cout << "  .quit / .q             Exit\n";
     return true;
   };

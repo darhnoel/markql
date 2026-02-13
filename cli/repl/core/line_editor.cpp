@@ -3,11 +3,13 @@
 #include <iostream>
 #include <sys/select.h>
 #include <unistd.h>
+#include <cctype>
 #include <vector>
 #include "repl/ui/autocomplete.h"
 #include "repl/ui/render.h"
 #include "repl/input/terminal.h"
 #include "repl/input/text_util.h"
+#include "repl/core/vim_normal.h"
 
 namespace xsql::cli {
 
@@ -158,116 +160,7 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
     redraw_line(buffer, cursor);
   };
 
-  size_t vim_prefix_count = 0;
-  bool vim_delete_pending = false;
-  size_t vim_delete_count = 0;
-  size_t vim_motion_count = 0;
-
-  auto clear_vim_command_state = [&]() {
-    vim_prefix_count = 0;
-    vim_delete_pending = false;
-    vim_delete_count = 0;
-    vim_motion_count = 0;
-  };
-
-  auto effective_count = [](size_t raw_count) -> size_t {
-    return raw_count == 0 ? 1 : raw_count;
-  };
-
-  enum class WordClass { Space, Keyword, Other };
-
-  auto is_space_cp = [](uint32_t cp) -> bool {
-    if (cp <= 0x7F) {
-      return std::isspace(static_cast<unsigned char>(cp)) != 0;
-    }
-    return cp == 0x00A0 || cp == 0x3000;
-  };
-
-  auto classify_cp = [&](uint32_t cp, bool big_word) -> WordClass {
-    if (is_space_cp(cp)) return WordClass::Space;
-    if (big_word) return WordClass::Keyword;
-    if (cp <= 0x7F) {
-      unsigned char c = static_cast<unsigned char>(cp);
-      if (std::isalnum(c) || c == '_') return WordClass::Keyword;
-      return WordClass::Other;
-    }
-    // WHY: treat non-ASCII scripts (e.g., Japanese) as word characters for Vim motions.
-    return WordClass::Keyword;
-  };
-
-  auto move_word_forward_once = [&](size_t pos, bool big_word) -> size_t {
-    if (pos >= buffer.size()) return buffer.size();
-    size_t i = pos;
-    size_t bytes = 0;
-    uint32_t cp = decode_utf8(buffer, i, &bytes);
-    WordClass cls = classify_cp(cp, big_word);
-    if (cls == WordClass::Space) {
-      while (i < buffer.size()) {
-        cp = decode_utf8(buffer, i, &bytes);
-        if (classify_cp(cp, big_word) != WordClass::Space) break;
-        i += bytes ? bytes : 1;
-      }
-      return i;
-    }
-    while (i < buffer.size()) {
-      cp = decode_utf8(buffer, i, &bytes);
-      if (classify_cp(cp, big_word) != cls) break;
-      i += bytes ? bytes : 1;
-    }
-    if (i < buffer.size()) {
-      cp = decode_utf8(buffer, i, &bytes);
-      if (classify_cp(cp, big_word) == WordClass::Space) {
-        while (i < buffer.size()) {
-          cp = decode_utf8(buffer, i, &bytes);
-          if (classify_cp(cp, big_word) != WordClass::Space) break;
-          i += bytes ? bytes : 1;
-        }
-      }
-    }
-    return i;
-  };
-
-  auto move_word_backward_once = [&](size_t pos, bool big_word) -> size_t {
-    if (pos == 0) return 0;
-    size_t i = prev_codepoint_start(buffer, pos);
-    size_t bytes = 0;
-    uint32_t cp = 0;
-    while (true) {
-      cp = decode_utf8(buffer, i, &bytes);
-      if (!is_space_cp(cp)) break;
-      if (i == 0) return 0;
-      i = prev_codepoint_start(buffer, i);
-    }
-    WordClass cls = classify_cp(cp, big_word);
-    while (i > 0) {
-      size_t prev = prev_codepoint_start(buffer, i);
-      uint32_t prev_cp = decode_utf8(buffer, prev, &bytes);
-      WordClass prev_cls = classify_cp(prev_cp, big_word);
-      if (prev_cls == WordClass::Space || prev_cls != cls) break;
-      i = prev;
-    }
-    return i;
-  };
-
-  auto move_word_forward_n = [&](size_t pos, size_t count, bool big_word) -> size_t {
-    size_t out = pos;
-    for (size_t i = 0; i < count; ++i) {
-      size_t next = move_word_forward_once(out, big_word);
-      if (next == out) break;
-      out = next;
-    }
-    return out;
-  };
-
-  auto move_word_backward_n = [&](size_t pos, size_t count, bool big_word) -> size_t {
-    size_t out = pos;
-    for (size_t i = 0; i < count; ++i) {
-      size_t prev = move_word_backward_once(out, big_word);
-      if (prev == out) break;
-      out = prev;
-    }
-    return out;
-  };
+  VimNormalState vim_state;
 
   auto erase_range = [&](size_t start, size_t end) {
     if (start >= end || start >= buffer.size()) return;
@@ -387,7 +280,7 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
   auto enter_insert_mode = [&]() {
     editor_mode_ = EditorMode::Vim;
     vim_insert_mode_ = true;
-    clear_vim_command_state();
+    vim_state.clear();
     apply_mode_prompt();
     redraw_line(buffer, cursor);
   };
@@ -395,7 +288,7 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
   auto enter_vim_normal_mode = [&]() {
     editor_mode_ = EditorMode::Vim;
     vim_insert_mode_ = false;
-    clear_vim_command_state();
+    vim_state.clear();
     apply_mode_prompt();
     redraw_line(buffer, cursor);
   };
@@ -403,163 +296,24 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
   auto enter_normal_mode = [&]() {
     editor_mode_ = EditorMode::Normal;
     vim_insert_mode_ = false;
-    clear_vim_command_state();
+    vim_state.clear();
     apply_mode_prompt();
     redraw_line(buffer, cursor);
   };
 
-  auto handle_vim_normal_key = [&](char key) {
-    if (key >= '0' && key <= '9') {
-      if (vim_delete_pending) {
-        vim_motion_count = vim_motion_count * 10 + static_cast<size_t>(key - '0');
-        return;
-      }
-      if (key == '0' && vim_prefix_count == 0) {
-        cursor = current_line_start();
-        redraw_line(buffer, cursor);
-        return;
-      }
-      vim_prefix_count = vim_prefix_count * 10 + static_cast<size_t>(key - '0');
-      return;
-    }
-
-    if (vim_delete_pending) {
-      size_t total = effective_count(vim_delete_count) * effective_count(vim_motion_count);
-      switch (key) {
-        case 'w':
-        case 'W': {
-          size_t end = move_word_forward_n(cursor, total, key == 'W');
-          erase_range(cursor, end);
-          break;
-        }
-        case 'b':
-        case 'B': {
-          size_t start = move_word_backward_n(cursor, total, key == 'B');
-          erase_range(start, cursor);
-          break;
-        }
-        case '$': {
-          erase_range(cursor, current_line_end());
-          break;
-        }
-        default:
-          break;
-      }
-      clear_vim_command_state();
-      return;
-    }
-
-    size_t count = effective_count(vim_prefix_count);
-    switch (key) {
-      case 'u':
-        apply_undo();
-        break;
-      case 'h':
-        for (size_t i = 0; i < count && cursor > 0; ++i) {
-          cursor = prev_codepoint_start(buffer, cursor);
-        }
-        redraw_line(buffer, cursor);
-        break;
-      case 'l':
-        for (size_t i = 0; i < count && cursor < buffer.size(); ++i) {
-          cursor = next_codepoint_start(buffer, cursor);
-        }
-        redraw_line(buffer, cursor);
-        break;
-      case 'k':
-        for (size_t i = 0; i < count; ++i) {
-          if (buffer.find('\n') != std::string::npos) {
-            move_up(false);
-          } else {
-            move_up(true);
-          }
-        }
-        break;
-      case 'j':
-        for (size_t i = 0; i < count; ++i) {
-          if (buffer.find('\n') != std::string::npos) {
-            move_down(false);
-          } else {
-            move_down(true);
-          }
-        }
-        break;
-      case 'w':
-      case 'W':
-        cursor = move_word_forward_n(cursor, count, key == 'W');
-        redraw_line(buffer, cursor);
-        break;
-      case 'b':
-      case 'B':
-        cursor = move_word_backward_n(cursor, count, key == 'B');
-        redraw_line(buffer, cursor);
-        break;
-      case 16:  // Ctrl-P
-        move_up(true);
-        break;
-      case 14:  // Ctrl-N
-        move_down(true);
-        break;
-      case 'd':
-        vim_delete_pending = true;
-        vim_delete_count = count;
-        vim_motion_count = 0;
-        vim_prefix_count = 0;
-        return;
-      case '0':
-        cursor = current_line_start();
-        redraw_line(buffer, cursor);
-        break;
-      case '$':
-        cursor = current_line_end();
-        redraw_line(buffer, cursor);
-        break;
-      case 'i':
-        enter_insert_mode();
-        break;
-      case 'a':
-        if (cursor < buffer.size()) {
-          cursor = next_codepoint_start(buffer, cursor);
-        }
-        enter_insert_mode();
-        break;
-      case 'I':
-        cursor = current_line_start();
-        enter_insert_mode();
-        break;
-      case 'A':
-        cursor = current_line_end();
-        enter_insert_mode();
-        break;
-      case 'o': {
-        if (buffer.empty()) {
-          enter_insert_mode();
-          break;
-        }
-        push_undo_current();
-        size_t line_end = current_line_end();
-        size_t insert_pos = (line_end < buffer.size()) ? line_end + 1 : line_end;
-        buffer.insert(buffer.begin() + static_cast<long>(insert_pos), '\n');
-        cursor = insert_pos + 1;
-        enter_insert_mode();
-        break;
-      }
-      case 'O': {
-        if (buffer.empty()) {
-          enter_insert_mode();
-          break;
-        }
-        push_undo_current();
-        size_t line_start = current_line_start();
-        buffer.insert(buffer.begin() + static_cast<long>(line_start), '\n');
-        cursor = line_start;
-        enter_insert_mode();
-        break;
-      }
-      default:
-        break;
-    }
-    vim_prefix_count = 0;
+  VimNormalContext vim_normal_ctx{
+      buffer,
+      cursor,
+      current_line_start,
+      current_line_end,
+      [&]() { redraw_line(buffer, cursor); },
+      [&](const std::string& prev_buffer, size_t prev_cursor) {
+        push_undo_snapshot(prev_buffer, prev_cursor);
+      },
+      apply_undo,
+      move_up,
+      move_down,
+      enter_insert_mode,
   };
 
   apply_mode_prompt();
@@ -612,7 +366,7 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
 
     if (editor_mode_ == EditorMode::Vim && !vim_insert_mode_ && c != 27) {
       flush_utf8_pending();
-      handle_vim_normal_key(c);
+      handle_vim_normal_key(c, vim_state, vim_normal_ctx);
       continue;
     }
 

@@ -120,6 +120,8 @@ if (XSQL_BUILD_CLI)
     cli/cli_args.cpp
     cli/cli_utils.cpp
     cli/script_runner.cpp
+    cli/repl/core/vim_edit.cpp
+    cli/repl/core/vim_normal.cpp
     cli/repl/core/line_editor.cpp
     cli/repl/ui/autocomplete.cpp
     cli/repl/ui/sql_keywords.cpp
@@ -210,6 +212,10 @@ if (XSQL_BUILD_TESTS)
     tests/test_string_sql.cpp
     tests/test_column_names.cpp
     tests/test_self_ref.cpp
+    tests/test_vim_edit.cpp
+    tests/test_vim_normal.cpp
+    cli/repl/core/vim_edit.cpp
+    cli/repl/core/vim_normal.cpp
     cli/repl/core/line_editor.cpp
     cli/repl/ui/autocomplete.cpp
     cli/repl/ui/sql_keywords.cpp

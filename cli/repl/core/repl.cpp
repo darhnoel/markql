@@ -17,6 +17,7 @@
 #include "render/duckbox_renderer.h"
 #include "ui/color.h"
 #include "repl/commands/registry.h"
+#include "repl/core/editor_setup.h"
 #include "repl/core/line_editor.h"
 #include "repl/plugin_manager.h"
 
@@ -46,20 +47,10 @@ int run_repl(ReplConfig& config) {
     config.highlight = false;
   }
 
-  std::string prompt_normal =
-      config.color ? (std::string(kColor.blue) + "markql> " + kColor.reset) : "markql> ";
-  std::string prompt_vim_normal = config.color
-                                      ? (std::string(kColor.blue) + "markql (vim:normal)> " +
-                                         kColor.reset)
-                                      : "markql (vim:normal)> ";
-  std::string prompt_vim_insert = config.color
-                                      ? (std::string(kColor.blue) + "markql (vim:edit)  > " +
-                                         kColor.reset)
-                                      : "markql (vim:edit)  > ";
-  LineEditor editor(history_max_entries, prompt_normal, 8);
-  editor.set_mode_prompts(prompt_vim_normal, 21, prompt_vim_insert, 21);
-  editor.set_keyword_color(config.color && config.highlight);
-  editor.set_cont_prompt("... ", 4);
+  LineEditor editor(history_max_entries,
+                    make_normal_repl_prompt(config.color),
+                    kPromptNormalVisibleLen);
+  configure_repl_editor(editor, config.color, config.highlight);
   CommandRegistry registry;
   register_default_commands(registry);
   PluginManager plugin_manager(registry);
