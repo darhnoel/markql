@@ -170,8 +170,10 @@ Keybindings:
 - `Up/Down`: move selection in the tree
 - `Right` or `Enter`: expand selected node
 - `Left`: collapse selected node
-- `/`: start fuzzy search on node `inner_html`
-- `n` / `N`: jump next/previous search match
+- `/`: start search on node content (default mode: exact, case-insensitive)
+- `m`: toggle search mode between exact and fuzzy
+- `n` / `N`: jump next/previous search match (auto-expands ancestor nodes to reveal hit)
+- `C`: collapse all expanded branches and clear search state
 - `j` / `k`: scroll the `Inner HTML Head` pane down/up
 - `+` / `-`: zoom in/out the `Inner HTML Head` pane
 - `Enter`: keep current search results and leave search mode
@@ -180,7 +182,19 @@ Keybindings:
 
 Search preview behavior:
 
-- When a fuzzy match is selected, `Inner HTML Head` auto-focuses around the match and color-highlights the matched term.
+- Exact mode uses contiguous case-insensitive matching.
+- Fuzzy mode uses case-insensitive ordered-character matching.
+- Search scopes are evaluated in this priority order:
+  - self attributes (`id`, `class`, `data-*`, key or value)
+  - self tag name and self direct text
+  - descendant content (`inner_html`)
+- Ranking is applied in this order:
+  - source priority (scopes above)
+  - match quality (`whole-word` > `word-start` > `other`)
+  - node depth (deeper/closer node first)
+  - earlier match position
+  - lower `node_id` (tie-break)
+- When a match is selected, `Inner HTML Head` auto-focuses around the match and color-highlights the matched term.
 - Use `j` / `k` to move around the nearby context after auto-focus.
 - Search input accepts UTF-8 text (for example Japanese and Khmer) and symbols like `-` / `_`.
 - Search execution is debounced while typing; auto-search starts at 2+ characters.
@@ -189,6 +203,7 @@ Search preview behavior:
 Session behavior:
 
 - Explorer restores your last expanded nodes, selected node, search query, and zoom for the same input during the current MarkQL session.
+- Explorer also restores the current search mode (exact or fuzzy) for that input.
 
 Layout:
 

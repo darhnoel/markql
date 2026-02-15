@@ -31,7 +31,12 @@ struct ExplorerSessionState {
   int inner_html_zoom_steps = 0;
   size_t inner_html_scroll = 0;
   std::string search_query;
+  InnerHtmlSearchMode search_match_mode = InnerHtmlSearchMode::Exact;
 };
+
+const char* search_mode_name(InnerHtmlSearchMode mode) {
+  return mode == InnerHtmlSearchMode::Fuzzy ? "fuzzy" : "exact";
+}
 
 std::unordered_map<std::string, ExplorerSessionState>& explorer_session_cache() {
   static std::unordered_map<std::string, ExplorerSessionState> cache;
@@ -764,6 +769,8 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
   }
   bool search_mode = false;
   std::string search_query = (cached_state != nullptr) ? cached_state->search_query : "";
+  InnerHtmlSearchMode search_match_mode =
+      (cached_state != nullptr) ? cached_state->search_match_mode : InnerHtmlSearchMode::Exact;
   std::vector<InnerHtmlSearchMatch> search_matches;
   std::unordered_set<int64_t> search_match_ids;
   std::unordered_map<int64_t, size_t> search_match_positions;
@@ -825,13 +832,17 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
     search_match_ids.clear();
     search_match_positions.clear();
     if (search_query.empty()) return;
+    auto cache_key_for = [&](const std::string& query_key) {
+      return std::string(search_mode_name(search_match_mode)) + "|" + query_key;
+    };
 
     auto cache_put = [&](const std::string& query_key, std::vector<InnerHtmlSearchMatch>&& value) {
       constexpr size_t kSearchCacheMaxEntries = 12;
-      auto it = search_cache.find(query_key);
+      std::string cache_key = cache_key_for(query_key);
+      auto it = search_cache.find(cache_key);
       if (it == search_cache.end()) {
-        search_cache.emplace(query_key, std::move(value));
-        search_cache_order.push_back(query_key);
+        search_cache.emplace(cache_key, std::move(value));
+        search_cache_order.push_back(cache_key);
         if (search_cache_order.size() > kSearchCacheMaxEntries) {
           std::string evict = search_cache_order.front();
           search_cache_order.erase(search_cache_order.begin());
@@ -842,14 +853,14 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
       }
     };
 
-    auto cache_hit = search_cache.find(search_query);
+    auto cache_hit = search_cache.find(cache_key_for(search_query));
     if (cache_hit != search_cache.end()) {
       search_matches = cache_hit->second;
     } else {
       const std::vector<InnerHtmlSearchMatch>* prefix_matches = nullptr;
       if (search_query.size() > 1) {
         for (size_t len = search_query.size() - 1; len > 0; --len) {
-          auto pit = search_cache.find(search_query.substr(0, len));
+          auto pit = search_cache.find(cache_key_for(search_query.substr(0, len)));
           if (pit != search_cache.end()) {
             prefix_matches = &pit->second;
             break;
@@ -871,18 +882,29 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
         candidate_ptr = &candidate_node_ids;
       }
 
-      search_matches = fuzzy_search_inner_html(doc,
-                                               search_query,
-                                               doc.nodes.size(),
-                                               false,
-                                               false,
-                                               candidate_ptr);
+      if (search_match_mode == InnerHtmlSearchMode::Fuzzy) {
+        search_matches = fuzzy_search_inner_html(doc,
+                                                 search_query,
+                                                 doc.nodes.size(),
+                                                 false,
+                                                 false,
+                                                 candidate_ptr);
+      } else {
+        search_matches = exact_search_inner_html(doc,
+                                                 search_query,
+                                                 doc.nodes.size(),
+                                                 false,
+                                                 false,
+                                                 candidate_ptr);
+      }
       cache_put(search_query, std::vector<InnerHtmlSearchMatch>(search_matches));
     }
 
     for (const auto& match : search_matches) {
       search_match_ids.insert(match.node_id);
-      search_match_positions[match.node_id] = match.position;
+      if (match.position_in_inner_html) {
+        search_match_positions[match.node_id] = match.position;
+      }
     }
   };
 
@@ -913,6 +935,66 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
     if (ch == 0) return;
     search_query.push_back(ch);
     mark_search_dirty();
+  };
+
+  auto nearest_visible_ancestor = [&](int64_t node_id) {
+    int64_t current = node_id;
+    size_t guard = 0;
+    while (current >= 0 && static_cast<size_t>(current) < doc.nodes.size() && guard < doc.nodes.size()) {
+      const auto& node = doc.nodes[static_cast<size_t>(current)];
+      if (!node.parent_id.has_value()) return current;
+      int64_t parent_id = *node.parent_id;
+      if (parent_id < 0 || static_cast<size_t>(parent_id) >= doc.nodes.size()) return current;
+      current = parent_id;
+      ++guard;
+    }
+    if (!roots.empty()) return roots.front();
+    return int64_t{0};
+  };
+
+  auto collapse_all_after_search = [&]() {
+    int64_t current_id = selected_node_id;
+    if (!visible.empty() && selected < visible.size()) {
+      current_id = visible[selected].node_id;
+    }
+
+    search_mode = false;
+    search_query.clear();
+    search_dirty = false;
+    refresh_search();
+
+    expanded.clear();
+    rebuild_visible();
+    if (!visible.empty()) {
+      int64_t anchor_id = nearest_visible_ancestor(current_id);
+      selected = find_visible_index_by_node_id(visible, anchor_id);
+      selected_node_id = visible[selected].node_id;
+    }
+    inner_html_scroll = 0;
+    inner_html_scroll_user_adjusted = false;
+  };
+
+  auto expand_ancestors_for_node = [&](int64_t node_id) {
+    int64_t current = node_id;
+    size_t guard = 0;
+    while (current >= 0 && static_cast<size_t>(current) < doc.nodes.size() &&
+           guard < doc.nodes.size()) {
+      const auto& node = doc.nodes[static_cast<size_t>(current)];
+      if (!node.parent_id.has_value()) break;
+      int64_t parent_id = *node.parent_id;
+      if (parent_id < 0 || static_cast<size_t>(parent_id) >= children.size()) break;
+      expanded.insert(parent_id);
+      current = parent_id;
+      ++guard;
+    }
+  };
+
+  auto toggle_search_match_mode = [&]() {
+    search_match_mode = (search_match_mode == InnerHtmlSearchMode::Exact)
+                            ? InnerHtmlSearchMode::Fuzzy
+                            : InnerHtmlSearchMode::Exact;
+    mark_search_dirty();
+    apply_search_now(true);
   };
 
   auto render = [&]() {
@@ -949,6 +1031,7 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
       }
     } else {
       std::vector<std::string> no_result_lines;
+      no_result_lines.push_back("mode: " + std::string(search_mode_name(search_match_mode)));
       no_result_lines.push_back("query: " + (search_query.empty() ? std::string("(empty)") : search_query));
       no_result_lines.push_back("no matches");
       right_lines = boxed_panel_lines("Search", no_result_lines, right_width, body_rows);
@@ -956,9 +1039,10 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
 
     std::cout << "\033[2J\033[H";
     std::string header =
-        "MarkQL DOM Explorer | / search | n/N next/prev | j/k scroll inner_html | +/- zoom | q quit";
+        "MarkQL DOM Explorer | / search | m mode(exact/fuzzy) | n/N next/prev | C collapse-all | j/k scroll inner_html | +/- zoom | q quit";
     std::cout << truncate_display_width(header, static_cast<size_t>(width)) << "\n";
     std::string search_line = "/" + search_query;
+    search_line += "  [" + std::string(search_mode_name(search_match_mode)) + "]";
     if (search_mode) search_line += " _";
     if (search_query.empty()) {
       search_line += "  (type / then text)";
@@ -1015,12 +1099,33 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
   };
 
   auto jump_search_result = [&](bool forward) {
-    if (visible.empty()) return;
-    if (forward) {
-      selected = (selected + 1) % visible.size();
-    } else {
-      selected = (selected == 0) ? (visible.size() - 1) : (selected - 1);
+    if (search_matches.empty()) return;
+
+    int64_t current_id = selected_node_id;
+    if (!visible.empty() && selected < visible.size()) {
+      current_id = visible[selected].node_id;
     }
+
+    size_t target_idx = forward ? 0 : (search_matches.size() - 1);
+    auto it = std::find_if(search_matches.begin(),
+                           search_matches.end(),
+                           [&](const InnerHtmlSearchMatch& match) {
+                             return match.node_id == current_id;
+                           });
+    if (it != search_matches.end()) {
+      size_t current_idx = static_cast<size_t>(it - search_matches.begin());
+      if (forward) {
+        target_idx = (current_idx + 1) % search_matches.size();
+      } else {
+        target_idx = (current_idx == 0) ? (search_matches.size() - 1) : (current_idx - 1);
+      }
+    }
+
+    int64_t target_id = search_matches[target_idx].node_id;
+    expand_ancestors_for_node(target_id);
+    rebuild_visible();
+    if (visible.empty()) return;
+    selected = find_visible_index_by_node_id(visible, target_id);
     selected_node_id = visible[selected].node_id;
     inner_html_scroll = 0;
     inner_html_scroll_user_adjusted = false;
@@ -1142,6 +1247,10 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
       case KeyEvent::Character:
         if (search_mode) {
           append_search_char(key.ch);
+        } else if (key.ch == 'C') {
+          collapse_all_after_search();
+        } else if (key.ch == 'm' || key.ch == 'M') {
+          toggle_search_match_mode();
         } else if (key.ch == 'j') {
           ++inner_html_scroll;
           inner_html_scroll_user_adjusted = true;
@@ -1196,6 +1305,7 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
   saved_state.inner_html_zoom_steps = inner_html_zoom_steps;
   saved_state.inner_html_scroll = inner_html_scroll;
   saved_state.search_query = search_query;
+  saved_state.search_match_mode = search_match_mode;
   session_cache[session_key] = std::move(saved_state);
 
   std::cout << "\033[2J\033[H" << std::flush;
