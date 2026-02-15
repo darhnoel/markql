@@ -107,6 +107,33 @@ void test_vim_normal_insert_commands_trigger_enter_insert() {
   expect_true(h.entered_insert, "i enters insert mode");
 }
 
+void test_vim_normal_sequence_dd_deletes_current_line() {
+  Harness h;
+  h.buffer = "one\ntwo\nthree";
+  h.cursor = 4;  // start of "two"
+  auto ctx = make_ctx(h);
+  xsql::cli::VimNormalState state;
+  xsql::cli::handle_vim_normal_key('d', state, ctx);
+  xsql::cli::handle_vim_normal_key('d', state, ctx);
+  expect_true(h.buffer == "one\nthree", "dd deletes current line");
+  expect_eq(h.cursor, static_cast<size_t>(4), "cursor moves to replacement line start");
+  expect_eq(h.undo_snapshots.size(), static_cast<size_t>(1), "dd records one undo snapshot");
+}
+
+void test_vim_normal_sequence_d2d_deletes_two_lines() {
+  Harness h;
+  h.buffer = "one\ntwo\nthree";
+  h.cursor = 0;
+  auto ctx = make_ctx(h);
+  xsql::cli::VimNormalState state;
+  xsql::cli::handle_vim_normal_key('d', state, ctx);
+  xsql::cli::handle_vim_normal_key('2', state, ctx);
+  xsql::cli::handle_vim_normal_key('d', state, ctx);
+  expect_true(h.buffer == "three", "d2d deletes two lines");
+  expect_eq(h.cursor, static_cast<size_t>(0), "cursor lands at remaining line start");
+  expect_eq(h.undo_snapshots.size(), static_cast<size_t>(1), "d2d records one undo snapshot");
+}
+
 }  // namespace
 
 void register_vim_normal_tests(std::vector<TestCase>& tests) {
@@ -118,4 +145,8 @@ void register_vim_normal_tests(std::vector<TestCase>& tests) {
                    test_vim_normal_jk_count_delegates_to_move_callbacks});
   tests.push_back({"vim_normal_insert_commands_trigger_enter_insert",
                    test_vim_normal_insert_commands_trigger_enter_insert});
+  tests.push_back({"vim_normal_sequence_dd_deletes_current_line",
+                   test_vim_normal_sequence_dd_deletes_current_line});
+  tests.push_back({"vim_normal_sequence_d2d_deletes_two_lines",
+                   test_vim_normal_sequence_d2d_deletes_two_lines});
 }

@@ -1,5 +1,7 @@
 #include "vim_normal.h"
 
+#include <algorithm>
+
 #include "vim_edit.h"
 #include "repl/input/text_util.h"
 
@@ -9,6 +11,41 @@ namespace {
 
 size_t effective_count(size_t raw_count) {
   return raw_count == 0 ? 1 : raw_count;
+}
+
+bool delete_vim_lines(std::string& buffer,
+                      size_t& cursor,
+                      size_t count,
+                      size_t current_line_start) {
+  if (buffer.empty()) return false;
+  size_t start = std::min(current_line_start, buffer.size());
+  size_t end = start;
+  size_t lines_to_delete = effective_count(count);
+  for (size_t i = 0; i < lines_to_delete && end < buffer.size(); ++i) {
+    size_t line_break = buffer.find('\n', end);
+    if (line_break == std::string::npos) {
+      end = buffer.size();
+      break;
+    }
+    end = line_break + 1;
+  }
+  if (end <= start) return false;
+
+  // WHY: deleting the last line should not leave a dangling separator-only tail.
+  if (end == buffer.size() && start > 0 && buffer[start - 1] == '\n') {
+    --start;
+  }
+
+  buffer.erase(start, end - start);
+  if (buffer.empty()) {
+    cursor = 0;
+    return true;
+  }
+
+  size_t anchor = std::min(start, buffer.size());
+  size_t prev_break = (anchor == 0) ? std::string::npos : buffer.rfind('\n', anchor - 1);
+  cursor = (prev_break == std::string::npos) ? 0 : prev_break + 1;
+  return true;
 }
 
 }  // namespace
@@ -39,7 +76,13 @@ bool handle_vim_normal_key(char key, VimNormalState& state, VimNormalContext& ct
     size_t total = effective_count(state.delete_count) * effective_count(state.motion_count);
     std::string prev_buffer = ctx.buffer;
     size_t prev_cursor = ctx.cursor;
-    if (delete_vim_motion(ctx.buffer, ctx.cursor, total, key, ctx.current_line_end())) {
+    bool changed = false;
+    if (key == 'd') {
+      changed = delete_vim_lines(ctx.buffer, ctx.cursor, total, ctx.current_line_start());
+    } else {
+      changed = delete_vim_motion(ctx.buffer, ctx.cursor, total, key, ctx.current_line_end());
+    }
+    if (changed) {
       ctx.push_undo_snapshot(prev_buffer, prev_cursor);
       ctx.redraw();
     }
