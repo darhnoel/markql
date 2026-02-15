@@ -393,6 +393,76 @@ std::vector<std::string> boxed_panel_lines(const std::string& title,
   return out;
 }
 
+std::vector<std::string> render_explorer_header_lines(size_t term_width,
+                                                      InnerHtmlSearchMode search_mode) {
+  if (term_width < 8) return {};
+
+  std::vector<std::string> out;
+  out.push_back(truncate_display_width(
+      "MarkQL DOM Explorer  |  mode: " + std::string(search_mode_name(search_mode)) + " search",
+      term_width));
+
+  struct HeaderItem {
+    std::string title;
+    std::string content;
+  };
+
+  std::vector<HeaderItem> items = {
+      {"Search", "/ text | m mode"},
+      {"Navigate", "n/N hits | arrows | Enter"},
+      {"Suggest", "G generate | y copy"},
+      {"View", "j/k scroll | +/- zoom"},
+      {"Reset", "C collapse-all"},
+      {"Quit", "q"},
+  };
+
+  struct PackedBox {
+    size_t width = 0;
+    std::vector<std::string> lines;
+  };
+
+  std::vector<PackedBox> boxes;
+  boxes.reserve(items.size());
+  for (const auto& item : items) {
+    size_t title_w = column_width(item.title, 0, item.title.size());
+    size_t content_w = column_width(item.content, 0, item.content.size());
+    size_t box_width = std::max<size_t>(14, std::max(title_w, content_w) + 4);
+    box_width = std::min(box_width, term_width);
+    boxes.push_back({box_width, boxed_panel_lines(item.title, {item.content}, box_width, 3)});
+  }
+
+  constexpr size_t kGap = 1;
+  std::vector<size_t> row_indices;
+  size_t row_used = 0;
+  auto flush_row = [&]() {
+    if (row_indices.empty()) return;
+    for (size_t line_idx = 0; line_idx < 3; ++line_idx) {
+      std::string line;
+      for (size_t i = 0; i < row_indices.size(); ++i) {
+        if (i > 0) line.append(kGap, ' ');
+        const auto& box = boxes[row_indices[i]];
+        if (line_idx < box.lines.size()) line += box.lines[line_idx];
+      }
+      out.push_back(truncate_display_width(line, term_width));
+    }
+    row_indices.clear();
+    row_used = 0;
+  };
+
+  // WHY: wrap instruction boxes by terminal width so each key group stays readable.
+  for (size_t i = 0; i < boxes.size(); ++i) {
+    size_t need = boxes[i].width + (row_indices.empty() ? 0 : kGap);
+    if (!row_indices.empty() && row_used + need > term_width) {
+      flush_row();
+    }
+    row_indices.push_back(i);
+    row_used += boxes[i].width + (row_indices.size() > 1 ? kGap : 0);
+  }
+  flush_row();
+
+  return out;
+}
+
 std::vector<std::string> render_right_pane_lines(const HtmlNode& node,
                                                  size_t pane_width,
                                                  size_t pane_rows,
@@ -1079,7 +1149,9 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
     int height = terminal_height();
     if (width < 40) width = 40;
     if (height < 8) height = 8;
-    constexpr size_t kHeaderRows = 1;
+    std::vector<std::string> header_lines =
+        render_explorer_header_lines(static_cast<size_t>(width), search_match_mode);
+    const size_t kHeaderRows = header_lines.size();
     constexpr size_t kSearchBarRows = 3;
     const size_t chrome_rows = kHeaderRows + kSearchBarRows;
     const size_t content_width = static_cast<size_t>(std::max(1, width - 3));
@@ -1154,9 +1226,9 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
     }
 
     std::cout << "\033[2J\033[H";
-    std::string header =
-        "MarkQL DOM Explorer | / search | m mode(exact/fuzzy) | n/N next/prev | G suggest | y copy suggestion | C collapse-all | j/k scroll inner_html | +/- zoom | q quit";
-    std::cout << truncate_display_width(header, static_cast<size_t>(width)) << "\n";
+    for (const auto& line : header_lines) {
+      std::cout << line << '\n';
+    }
     std::string search_line = "/" + search_query;
     search_line += "  [" + std::string(search_mode_name(search_match_mode)) + "]";
     if (search_mode) search_line += " _";
