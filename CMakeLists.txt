@@ -121,6 +121,7 @@ if (XSQL_BUILD_CLI)
     cli/cli_utils.cpp
     cli/explore/dom_explorer.cpp
     cli/explore/inner_html_search.cpp
+    cli/explore/markql_suggestor.cpp
     cli/script_runner.cpp
     cli/repl/core/vim_edit.cpp
     cli/repl/core/vim_normal.cpp
@@ -221,7 +222,9 @@ if (XSQL_BUILD_TESTS)
     tests/test_dom_explorer.cpp
     cli/explore/dom_explorer.cpp
     cli/explore/inner_html_search.cpp
+    cli/explore/markql_suggestor.cpp
     tests/test_explore_search.cpp
+    tests/test_markql_suggestor.cpp
     cli/repl/core/vim_edit.cpp
     cli/repl/core/vim_normal.cpp
     cli/repl/core/line_editor.cpp

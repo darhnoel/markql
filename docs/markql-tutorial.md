@@ -173,6 +173,8 @@ Keybindings:
 - `/`: start search on node content (default mode: exact, case-insensitive)
 - `m`: toggle search mode between exact and fuzzy
 - `n` / `N`: jump next/previous search match (auto-expands ancestor nodes to reveal hit)
+- `g` / `G`: generate MarkQL suggestion for current selected node
+- `y` / `Y`: copy suggested MarkQL to clipboard
 - `C`: collapse all expanded branches and clear search state
 - `j` / `k`: scroll the `Inner HTML Head` pane down/up
 - `+` / `-`: zoom in/out the `Inner HTML Head` pane
@@ -208,6 +210,7 @@ Session behavior:
 Layout:
 
 - Left pane: collapsed tree (`node_id tag` with compact attribute hints)
+- Left pane bottom: `Suggest` box with generated full MarkQL statement (manual trigger via `g`/`G`)
 - Right pane: boxed sections for `Node`, `Inner HTML Head` (formatted preview), and `Attributes`
 
 ## From Row Probe To Real Extraction

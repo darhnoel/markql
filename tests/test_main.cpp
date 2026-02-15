@@ -37,6 +37,7 @@ void register_vim_normal_tests(std::vector<TestCase>& tests);
 void register_render_tests(std::vector<TestCase>& tests);
 void register_dom_explorer_tests(std::vector<TestCase>& tests);
 void register_explore_search_tests(std::vector<TestCase>& tests);
+void register_markql_suggestor_tests(std::vector<TestCase>& tests);
 #ifdef XSQL_ENABLE_KHMER_NUMBER
 void register_khmer_number_tests(std::vector<TestCase>& tests);
 #endif
@@ -93,6 +94,7 @@ int main(int argc, char** argv) {
   register_render_tests(tests);
   register_dom_explorer_tests(tests);
   register_explore_search_tests(tests);
+  register_markql_suggestor_tests(tests);
 #ifdef XSQL_ENABLE_KHMER_NUMBER
   register_khmer_number_tests(tests);
 #endif

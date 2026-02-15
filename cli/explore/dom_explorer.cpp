@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <iostream>
 #include <optional>
+#include <sstream>
 #include <string_view>
 #include <unordered_map>
 #include <sys/ioctl.h>
@@ -14,6 +15,7 @@
 
 #include "cli_utils.h"
 #include "explore/inner_html_search.h"
+#include "explore/markql_suggestor.h"
 #include "repl/input/terminal.h"
 #include "repl/input/text_util.h"
 
@@ -36,6 +38,12 @@ struct ExplorerSessionState {
 
 const char* search_mode_name(InnerHtmlSearchMode mode) {
   return mode == InnerHtmlSearchMode::Fuzzy ? "fuzzy" : "exact";
+}
+
+const char* suggestion_strategy_name(MarkqlSuggestionStrategy strategy) {
+  if (strategy == MarkqlSuggestionStrategy::Project) return "PROJECT";
+  if (strategy == MarkqlSuggestionStrategy::Flatten) return "FLATTEN";
+  return "none";
 }
 
 std::unordered_map<std::string, ExplorerSessionState>& explorer_session_cache() {
@@ -176,6 +184,47 @@ std::string repeat_utf8(const std::string& token, size_t count) {
   out.reserve(token.size() * count);
   for (size_t i = 0; i < count; ++i) out += token;
   return out;
+}
+
+std::string base64_encode(std::string_view input) {
+  static constexpr char kBase64Table[] =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  std::string out;
+  out.reserve(((input.size() + 2) / 3) * 4);
+
+  size_t i = 0;
+  while (i + 2 < input.size()) {
+    unsigned char b0 = static_cast<unsigned char>(input[i++]);
+    unsigned char b1 = static_cast<unsigned char>(input[i++]);
+    unsigned char b2 = static_cast<unsigned char>(input[i++]);
+    out.push_back(kBase64Table[b0 >> 2]);
+    out.push_back(kBase64Table[((b0 & 0x03) << 4) | (b1 >> 4)]);
+    out.push_back(kBase64Table[((b1 & 0x0F) << 2) | (b2 >> 6)]);
+    out.push_back(kBase64Table[b2 & 0x3F]);
+  }
+
+  if (i < input.size()) {
+    unsigned char b0 = static_cast<unsigned char>(input[i++]);
+    out.push_back(kBase64Table[b0 >> 2]);
+    if (i < input.size()) {
+      unsigned char b1 = static_cast<unsigned char>(input[i++]);
+      out.push_back(kBase64Table[((b0 & 0x03) << 4) | (b1 >> 4)]);
+      out.push_back(kBase64Table[(b1 & 0x0F) << 2]);
+      out.push_back('=');
+    } else {
+      out.push_back(kBase64Table[(b0 & 0x03) << 4]);
+      out.push_back('=');
+      out.push_back('=');
+    }
+  }
+
+  return out;
+}
+
+void copy_to_clipboard_osc52(std::string_view text) {
+  // WHY: OSC52 works in many terminal emulators over SSH/TUI without platform-specific binaries.
+  std::string payload = base64_encode(text);
+  std::cout << "\033]52;c;" << payload << '\a';
 }
 
 std::string ascii_lower(std::string_view text) {
@@ -782,6 +831,8 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
   bool inner_html_scroll_user_adjusted = false;
   bool running = true;
   int64_t selected_node_id = visible[selected].node_id;
+  std::optional<MarkqlSuggestion> markql_suggestion = std::nullopt;
+  std::string markql_suggestion_status;
 
   auto ensure_selection_visible = [&](size_t body_rows) {
     if (visible.empty()) {
@@ -833,6 +884,7 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
     search_match_positions.clear();
     if (search_query.empty()) return;
     auto cache_key_for = [&](const std::string& query_key) {
+      // WHY: identical text queries in exact/fuzzy modes should not share cached rankings.
       return std::string(search_mode_name(search_match_mode)) + "|" + query_key;
     };
 
@@ -871,6 +923,7 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
       std::vector<int64_t> candidate_node_ids;
       const std::vector<int64_t>* candidate_ptr = nullptr;
       if (prefix_matches != nullptr) {
+        // WHY: narrowing to previous-prefix hits keeps interactive search responsive on large DOMs.
         if (prefix_matches->empty()) {
           cache_put(search_query, {});
           return;
@@ -903,6 +956,7 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
     for (const auto& match : search_matches) {
       search_match_ids.insert(match.node_id);
       if (match.position_in_inner_html) {
+        // WHY: right-pane auto-focus only makes sense when the match offset is in inner_html.
         search_match_positions[match.node_id] = match.position;
       }
     }
@@ -963,6 +1017,7 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
     search_dirty = false;
     refresh_search();
 
+    // WHY: collapse-all is treated as a "reset context" action after search navigation.
     expanded.clear();
     rebuild_visible();
     if (!visible.empty()) {
@@ -997,6 +1052,28 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
     apply_search_now(true);
   };
 
+  auto generate_markql_suggestion = [&]() {
+    if (visible.empty() || selected >= visible.size()) {
+      markql_suggestion = std::nullopt;
+      markql_suggestion_status = "No node selected.";
+      return;
+    }
+    int64_t target_id = visible[selected].node_id;
+    // WHY: suggestion is user-triggered so it reflects current context and avoids background churn.
+    markql_suggestion = suggest_markql_statement(doc, target_id);
+    markql_suggestion_status = "Generated. Press y to copy.";
+  };
+
+  auto copy_markql_suggestion = [&]() {
+    if (!markql_suggestion.has_value() || markql_suggestion->statement.empty()) {
+      markql_suggestion_status = "No suggestion yet. Press G first.";
+      return;
+    }
+    // WHY: keep copy as an explicit action to avoid surprising clipboard writes.
+    copy_to_clipboard_osc52(markql_suggestion->statement);
+    markql_suggestion_status = "Copied to clipboard.";
+  };
+
   auto render = [&]() {
     int width = terminal_width();
     int height = terminal_height();
@@ -1009,7 +1086,17 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
     const size_t left_width = content_width / 2;
     const size_t right_width = content_width - left_width;
     const size_t body_rows = static_cast<size_t>(std::max(1, height - static_cast<int>(chrome_rows)));
-    ensure_selection_visible(body_rows);
+    size_t suggest_rows = 0;
+    if (body_rows >= 10) {
+      // WHY: reserve a stable area for the suggestion while keeping enough tree rows to navigate.
+      suggest_rows = std::min<size_t>(9, std::max<size_t>(6, body_rows / 3));
+    }
+    size_t tree_rows = body_rows - suggest_rows;
+    if (tree_rows == 0) {
+      tree_rows = 1;
+      suggest_rows = (body_rows > 1) ? (body_rows - 1) : 0;
+    }
+    ensure_selection_visible(tree_rows);
 
     std::vector<std::string> right_lines;
     size_t max_inner_html_scroll = 0;
@@ -1037,9 +1124,34 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
       right_lines = boxed_panel_lines("Search", no_result_lines, right_width, body_rows);
     }
 
+    std::vector<std::string> suggestion_box;
+    if (suggest_rows > 0) {
+      std::vector<std::string> suggest_lines;
+      if (!markql_suggestion.has_value()) {
+        suggest_lines.push_back("Press G to generate MarkQL suggestion");
+        suggest_lines.push_back("for current selected node (y to copy)");
+      } else {
+        suggest_lines.push_back("strategy: " +
+                                std::string(suggestion_strategy_name(markql_suggestion->strategy)) +
+                                "  confidence: " + std::to_string(markql_suggestion->confidence));
+        if (!markql_suggestion->reason.empty()) {
+          suggest_lines.push_back("reason: " + markql_suggestion->reason);
+        }
+        if (!markql_suggestion_status.empty()) {
+          suggest_lines.push_back("status: " + markql_suggestion_status);
+        }
+        std::istringstream iss(markql_suggestion->statement);
+        std::string line;
+        while (std::getline(iss, line)) {
+          suggest_lines.push_back(line);
+        }
+      }
+      suggestion_box = boxed_panel_lines("Suggest", suggest_lines, left_width, suggest_rows);
+    }
+
     std::cout << "\033[2J\033[H";
     std::string header =
-        "MarkQL DOM Explorer | / search | m mode(exact/fuzzy) | n/N next/prev | C collapse-all | j/k scroll inner_html | +/- zoom | q quit";
+        "MarkQL DOM Explorer | / search | m mode(exact/fuzzy) | n/N next/prev | G suggest | y copy suggestion | C collapse-all | j/k scroll inner_html | +/- zoom | q quit";
     std::cout << truncate_display_width(header, static_cast<size_t>(width)) << "\n";
     std::string search_line = "/" + search_query;
     search_line += "  [" + std::string(search_mode_name(search_match_mode)) + "]";
@@ -1068,19 +1180,23 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
     for (size_t row = 0; row < body_rows; ++row) {
       std::string left_line;
       bool selected_row = false;
-      size_t idx = scroll_top + row;
-      if (idx < visible.size()) {
-        const auto& vr = visible[idx];
-        const HtmlNode& node = doc.nodes[static_cast<size_t>(vr.node_id)];
-        bool has_children = vr.node_id >= 0 &&
-                            static_cast<size_t>(vr.node_id) < children.size() &&
-                            !children[static_cast<size_t>(vr.node_id)].empty();
-        bool is_expanded = expanded.find(vr.node_id) != expanded.end();
-        selected_row = (idx == selected);
-        left_line = format_tree_row(node, vr.depth, has_children, is_expanded, idx == selected,
-                                    left_width);
-      } else if (row == 0 && !search_query.empty()) {
-        left_line = "(no matches)";
+      if (row < tree_rows) {
+        size_t idx = scroll_top + row;
+        if (idx < visible.size()) {
+          const auto& vr = visible[idx];
+          const HtmlNode& node = doc.nodes[static_cast<size_t>(vr.node_id)];
+          bool has_children = vr.node_id >= 0 &&
+                              static_cast<size_t>(vr.node_id) < children.size() &&
+                              !children[static_cast<size_t>(vr.node_id)].empty();
+          bool is_expanded = expanded.find(vr.node_id) != expanded.end();
+          selected_row = (idx == selected);
+          left_line = format_tree_row(node, vr.depth, has_children, is_expanded, idx == selected,
+                                      left_width);
+        } else if (row == 0 && !search_query.empty()) {
+          left_line = "(no matches)";
+        }
+      } else if (suggest_rows > 0 && row - tree_rows < suggestion_box.size()) {
+        left_line = suggestion_box[row - tree_rows];
       }
       std::string right_line;
       if (row < right_lines.size()) {
@@ -1122,6 +1238,7 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
     }
 
     int64_t target_id = search_matches[target_idx].node_id;
+    // WHY: ensure hit is visible even when ancestors are collapsed by expanding its full path.
     expand_ancestors_for_node(target_id);
     rebuild_visible();
     if (visible.empty()) return;
@@ -1247,6 +1364,11 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
       case KeyEvent::Character:
         if (search_mode) {
           append_search_char(key.ch);
+        } else if (key.ch == 'g' || key.ch == 'G') {
+          // WHY: manual trigger keeps suggestion generation predictable for power users.
+          generate_markql_suggestion();
+        } else if (key.ch == 'y' || key.ch == 'Y') {
+          copy_markql_suggestion();
         } else if (key.ch == 'C') {
           collapse_all_after_search();
         } else if (key.ch == 'm' || key.ch == 'M') {
