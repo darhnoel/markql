@@ -1087,9 +1087,13 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
     const size_t right_width = content_width - left_width;
     const size_t body_rows = static_cast<size_t>(std::max(1, height - static_cast<int>(chrome_rows)));
     size_t suggest_rows = 0;
-    if (body_rows >= 10) {
-      // WHY: reserve a stable area for the suggestion while keeping enough tree rows to navigate.
-      suggest_rows = std::min<size_t>(9, std::max<size_t>(6, body_rows / 3));
+    if (body_rows >= 9) {
+      // WHY: keep suggestion panel large enough to read full statements while preserving tree navigation.
+      suggest_rows = std::max<size_t>(3, body_rows / 3);
+      constexpr size_t kMinTreeRows = 5;
+      if (body_rows > kMinTreeRows && body_rows - suggest_rows < kMinTreeRows) {
+        suggest_rows = body_rows - kMinTreeRows;
+      }
     }
     size_t tree_rows = body_rows - suggest_rows;
     if (tree_rows == 0) {
