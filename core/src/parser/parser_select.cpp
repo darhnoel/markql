@@ -1,5 +1,7 @@
 #include "parser_internal.h"
 
+#include <limits>
+
 namespace xsql {
 
 /// Parses the SELECT projection list, enforcing projection rules.
@@ -107,7 +109,9 @@ bool Parser::parse_flatten_extract_expr(Query::SelectItem::FlattenExtractExpr& e
     expr.span = Span{start, current_.pos};
     return true;
   }
-  if (current_.type != TokenType::Identifier) {
+  if (current_.type != TokenType::Identifier &&
+      current_.type != TokenType::KeywordTable &&
+      current_.type != TokenType::KeywordSelf) {
     return set_error("Expected expression inside PROJECT/FLATTEN_EXTRACT");
   }
   auto parse_selector_position = [&](Query::SelectItem::FlattenExtractExpr& target,
@@ -155,6 +159,7 @@ bool Parser::parse_flatten_extract_expr(Query::SelectItem::FlattenExtractExpr& e
         fn == "SIBLING_POS" ||
         fn == "MAX_DEPTH" ||
         fn == "DOC_ORDER" ||
+        fn == "SELF" ||
         fn == "PARENT" ||
         fn == "CHILD" ||
         fn == "ANCESTOR" ||
@@ -382,6 +387,64 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
       saw_field = true;
       return true;
   }
+  if (current_.type == TokenType::KeywordSelf) {
+    Query::SelectItem item;
+    size_t start = current_.pos;
+    ScalarExpr expr;
+    if (!parse_scalar_expr(expr)) return false;
+    if (expr.kind != ScalarExpr::Kind::Operand ||
+        expr.operand.axis != Operand::Axis::Self ||
+        !expr.operand.qualifier.has_value() ||
+        to_lower(*expr.operand.qualifier) != "self") {
+      return set_error("Expected self.<field> in SELECT projection");
+    }
+    item.expr_projection = true;
+    item.expr = expr;
+    std::string column = "expr";
+    switch (expr.operand.field_kind) {
+      case Operand::FieldKind::NodeId:
+        column = "node_id";
+        break;
+      case Operand::FieldKind::Tag:
+        column = "tag";
+        break;
+      case Operand::FieldKind::ParentId:
+        column = "parent_id";
+        break;
+      case Operand::FieldKind::DocOrder:
+        column = "doc_order";
+        break;
+      case Operand::FieldKind::SiblingPos:
+        column = "sibling_pos";
+        break;
+      case Operand::FieldKind::MaxDepth:
+        column = "max_depth";
+        break;
+      case Operand::FieldKind::AttributesMap:
+        column = "attributes";
+        break;
+      case Operand::FieldKind::Text:
+        column = "text";
+        break;
+      case Operand::FieldKind::Attribute:
+        column = expr.operand.attribute;
+        break;
+    }
+    if (current_.type == TokenType::KeywordAs) {
+      advance();
+      if (current_.type != TokenType::Identifier) {
+        return set_error("Expected alias identifier after AS");
+      }
+      column = current_.text;
+      advance();
+    }
+    item.field = column;
+    item.tag = "*";
+    item.span = Span{start, current_.pos};
+    items.push_back(item);
+    saw_field = true;
+    return true;
+  }
   if (current_.type == TokenType::Identifier) {
     std::string fn = to_upper(current_.text);
     if (fn != "FLATTEN_TEXT" && fn != "FLATTEN") {
@@ -583,15 +646,20 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
       advance();
       if (current_.type == TokenType::Comma) {
         advance();
-        if (current_.type != TokenType::Number) {
-          return set_error("Expected numeric depth in inner_html()/raw_inner_html()");
+        if (current_.type == TokenType::Number) {
+          try {
+            item.inner_html_depth = static_cast<size_t>(std::stoull(current_.text));
+          } catch (...) {
+            return set_error("Invalid inner_html()/raw_inner_html() depth");
+          }
+          advance();
+        } else if (current_.type == TokenType::Identifier &&
+                   to_upper(current_.text) == "MAX_DEPTH") {
+          item.inner_html_auto_depth = true;
+          advance();
+        } else {
+          return set_error("Expected numeric depth or MAX_DEPTH in inner_html()/raw_inner_html()");
         }
-        try {
-          item.inner_html_depth = static_cast<size_t>(std::stoull(current_.text));
-        } catch (...) {
-          return set_error("Invalid inner_html()/raw_inner_html() depth");
-        }
-        advance();
       }
       if (!consume(TokenType::RParen, "Expected ) after inner_html/raw_inner_html argument")) return false;
       item.span = Span{inner_start, current_.pos};
@@ -749,10 +817,41 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
   size_t start = current_.pos;
   advance();
   if (to_upper(tag_token.text) == "TEXT" && current_.type == TokenType::LParen) {
+    advance();
+    if (current_.type == TokenType::KeywordSelf) {
+      Query::SelectItem item;
+      item.expr_projection = true;
+      item.field = "text";
+      item.tag = "*";
+      item.text_function = true;
+      ScalarExpr expr;
+      expr.kind = ScalarExpr::Kind::FunctionCall;
+      expr.function_name = "TEXT";
+      ScalarExpr arg;
+      arg.kind = ScalarExpr::Kind::SelfRef;
+      arg.self_ref.span = Span{current_.pos, current_.pos + current_.text.size()};
+      arg.span = arg.self_ref.span;
+      expr.args.push_back(std::move(arg));
+      advance();
+      if (!consume(TokenType::RParen, "Expected ) after text argument")) return false;
+      expr.span = Span{start, current_.pos};
+      item.expr = std::move(expr);
+      if (current_.type == TokenType::KeywordAs) {
+        advance();
+        if (current_.type != TokenType::Identifier) {
+          return set_error("Expected alias identifier after AS");
+        }
+        item.field = current_.text;
+        advance();
+      }
+      item.span = Span{start, current_.pos};
+      items.push_back(item);
+      saw_field = true;
+      return true;
+    }
     Query::SelectItem item;
     item.field = "text";
     item.text_function = true;
-    advance();
     if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
       return set_error("Expected tag identifier inside text()");
     }
@@ -766,11 +865,76 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
   }
   std::string fn_name = to_upper(tag_token.text);
   if ((fn_name == "INNER_HTML" || fn_name == "RAW_INNER_HTML") && current_.type == TokenType::LParen) {
+    advance();
+    if (current_.type == TokenType::KeywordSelf) {
+      Query::SelectItem item;
+      item.expr_projection = true;
+      item.field = "inner_html";
+      item.tag = "*";
+      item.inner_html_function = true;
+      item.raw_inner_html_function = (fn_name == "RAW_INNER_HTML");
+      ScalarExpr expr;
+      expr.kind = ScalarExpr::Kind::FunctionCall;
+      expr.function_name = fn_name;
+      ScalarExpr arg;
+      arg.kind = ScalarExpr::Kind::SelfRef;
+      arg.self_ref.span = Span{current_.pos, current_.pos + current_.text.size()};
+      arg.span = arg.self_ref.span;
+      expr.args.push_back(std::move(arg));
+      advance();
+      if (current_.type == TokenType::Comma) {
+        advance();
+        ScalarExpr depth_arg;
+        if (current_.type == TokenType::Number) {
+          depth_arg.kind = ScalarExpr::Kind::NumberLiteral;
+          try {
+            unsigned long long parsed = std::stoull(current_.text);
+            if (parsed > static_cast<unsigned long long>(std::numeric_limits<int64_t>::max())) {
+              return set_error("Invalid inner_html()/raw_inner_html() depth");
+            }
+            depth_arg.number_value = static_cast<int64_t>(parsed);
+          } catch (...) {
+            return set_error("Invalid inner_html()/raw_inner_html() depth");
+          }
+          depth_arg.span = Span{current_.pos, current_.pos + current_.text.size()};
+          advance();
+        } else if (current_.type == TokenType::Identifier &&
+                   to_upper(current_.text) == "MAX_DEPTH") {
+          depth_arg.kind = ScalarExpr::Kind::Operand;
+          depth_arg.operand.axis = Operand::Axis::Self;
+          depth_arg.operand.field_kind = Operand::FieldKind::MaxDepth;
+          depth_arg.operand.span = Span{current_.pos, current_.pos + current_.text.size()};
+          depth_arg.span = depth_arg.operand.span;
+          advance();
+          item.inner_html_auto_depth = true;
+        } else {
+          return set_error("Expected numeric depth or MAX_DEPTH in inner_html()/raw_inner_html()");
+        }
+        if (depth_arg.kind == ScalarExpr::Kind::NumberLiteral) {
+          item.inner_html_depth = static_cast<size_t>(depth_arg.number_value);
+        }
+        expr.args.push_back(std::move(depth_arg));
+      }
+      if (!consume(TokenType::RParen, "Expected ) after inner_html/raw_inner_html argument")) return false;
+      expr.span = Span{start, current_.pos};
+      item.expr = std::move(expr);
+      if (current_.type == TokenType::KeywordAs) {
+        advance();
+        if (current_.type != TokenType::Identifier) {
+          return set_error("Expected alias identifier after AS");
+        }
+        item.field = current_.text;
+        advance();
+      }
+      item.span = Span{start, current_.pos};
+      items.push_back(item);
+      saw_field = true;
+      return true;
+    }
     Query::SelectItem item;
     item.field = "inner_html";
     item.inner_html_function = true;
     item.raw_inner_html_function = (fn_name == "RAW_INNER_HTML");
-    advance();
     if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
       return set_error("Expected tag identifier inside inner_html()/raw_inner_html()");
     }
@@ -778,15 +942,20 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
     advance();
     if (current_.type == TokenType::Comma) {
       advance();
-      if (current_.type != TokenType::Number) {
-        return set_error("Expected numeric depth in inner_html()/raw_inner_html()");
+      if (current_.type == TokenType::Number) {
+        try {
+          item.inner_html_depth = static_cast<size_t>(std::stoull(current_.text));
+        } catch (...) {
+          return set_error("Invalid inner_html()/raw_inner_html() depth");
+        }
+        advance();
+      } else if (current_.type == TokenType::Identifier &&
+                 to_upper(current_.text) == "MAX_DEPTH") {
+        item.inner_html_auto_depth = true;
+        advance();
+      } else {
+        return set_error("Expected numeric depth or MAX_DEPTH in inner_html()/raw_inner_html()");
       }
-      try {
-        item.inner_html_depth = static_cast<size_t>(std::stoull(current_.text));
-      } catch (...) {
-        return set_error("Invalid inner_html()/raw_inner_html() depth");
-      }
-      advance();
     }
     if (!consume(TokenType::RParen, "Expected ) after inner_html/raw_inner_html argument")) return false;
     item.span = Span{start, current_.pos};

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(markql VERSION 1.7.0 LANGUAGES CXX)
+project(markql VERSION 1.8.0 LANGUAGES CXX)
 
 option(XSQL_BUILD_CLI "Build the MarkQL CLI" ON)
 option(XSQL_BUILD_TESTS "Build tests" ON)
@@ -125,6 +125,12 @@ if (XSQL_BUILD_CLI)
     cli/main.cpp
     cli/cli_args.cpp
     cli/cli_utils.cpp
+    cli/explore/dom_explorer.cpp
+    cli/explore/inner_html_search.cpp
+    cli/explore/markql_suggestor.cpp
+    cli/script_runner.cpp
+    cli/repl/core/vim_edit.cpp
+    cli/repl/core/vim_normal.cpp
     cli/repl/core/line_editor.cpp
     cli/repl/ui/autocomplete.cpp
     cli/repl/ui/sql_keywords.cpp
@@ -142,6 +148,7 @@ if (XSQL_BUILD_CLI)
     cli/repl/commands/mode_command.cpp
     cli/repl/commands/max_rows_command.cpp
     cli/repl/commands/reload_config_command.cpp
+    cli/repl/commands/explore_command.cpp
     cli/repl/commands/summarize_command.cpp
     cli/repl/commands/load_command.cpp
     cli/repl/commands/plugin_command.cpp
@@ -209,8 +216,23 @@ if (XSQL_BUILD_TESTS)
     tests/test_guardrails.cpp
     tests/test_meta_commands.cpp
     tests/test_cli_utils.cpp
+    tests/test_lexer_comments.cpp
+    tests/test_script_runner.cpp
+    tests/test_cli_args.cpp
     tests/test_string_sql.cpp
     tests/test_column_names.cpp
+    tests/test_self_ref.cpp
+    tests/test_vim_edit.cpp
+    tests/test_vim_normal.cpp
+    tests/test_render.cpp
+    tests/test_dom_explorer.cpp
+    cli/explore/dom_explorer.cpp
+    cli/explore/inner_html_search.cpp
+    cli/explore/markql_suggestor.cpp
+    tests/test_explore_search.cpp
+    tests/test_markql_suggestor.cpp
+    cli/repl/core/vim_edit.cpp
+    cli/repl/core/vim_normal.cpp
     cli/repl/core/line_editor.cpp
     cli/repl/ui/autocomplete.cpp
     cli/repl/ui/sql_keywords.cpp
@@ -228,13 +250,16 @@ if (XSQL_BUILD_TESTS)
     cli/repl/commands/mode_command.cpp
     cli/repl/commands/max_rows_command.cpp
     cli/repl/commands/reload_config_command.cpp
+    cli/repl/commands/explore_command.cpp
     cli/repl/commands/summarize_command.cpp
     cli/repl/commands/load_command.cpp
     cli/repl/commands/plugin_command.cpp
     cli/repl/commands/plugin_install_command.cpp
     cli/repl/commands/plugin_registry.cpp
     cli/repl/commands/summarize_content_command.cpp
+    cli/cli_args.cpp
     cli/cli_utils.cpp
+    cli/script_runner.cpp
     cli/ui/color.cpp
     cli/export/export_sinks.cpp
     cli/render/duckbox_renderer.cpp
@@ -357,6 +382,8 @@ if (XSQL_BUILD_TESTS)
     summarize_content_max_tokens
     set_colnames_command
     describe_last_command_outputs_map
+    explore_command_uses_active_alias_by_default
+    explore_command_accepts_direct_target_and_alias_target
     parse_show_describe
     execute_describe_doc
     show_functions_output
@@ -400,6 +427,47 @@ if (XSQL_BUILD_TESTS)
     csv_header_normalized_default
     csv_header_raw_mode
     json_keys_follow_colname_mode
+    inspect_sql_input_line_comment_only
+    inspect_sql_input_block_comment_only
+    inspect_sql_input_unterminated_block_comment
+    line_comment_before_tokens
+    line_comment_between_tokens
+    line_comment_at_eof
+    block_comment_single_line
+    block_comment_multi_line
+    unterminated_block_comment_error
+    comment_markers_inside_string_literals
+    query_without_comments_unchanged_behavior
+    split_script_ignores_empty_statements
+    split_script_with_comments
+    split_script_unterminated_block_comment
+    split_script_semicolon_and_comment_markers_inside_string_literals
+    run_script_multi_statement_delimiters
+    run_script_comments_and_empty_statements
+    run_script_stops_on_first_error_by_default
+    run_script_continue_on_error
+    run_script_quiet_suppresses_delimiter
+    utf8_validation_for_script_file_content
+    parse_cli_args_accepts_script_flags
+    parse_cli_args_rejects_missing_value
+    parse_cli_args_rejects_unknown_argument
+    parse_cli_args_rejects_query_and_query_file_together
+    parse_self_projection_and_where
+    parse_self_function_predicate
+    parse_self_text_attr_inner_html_functions
+    eval_direct_text_self_without_tag_guessing
+    eval_self_rebind_inside_exists_descendant
+    eval_text_and_attr_with_self
+    eval_inner_html_with_self
+    eval_raw_inner_html_with_self
+    select_mixing_tag_and_self_projection_still_errors
+    flatten_visible_tree_order_and_depth
+    render_attribute_lines_sorted_format
+    fuzzy_match_score_basic
+    fuzzy_search_orders_and_snippet
+    fuzzy_search_candidate_subset
+    fuzzy_search_prioritizes_word_level_match
+    make_inner_html_snippet_context
   )
   if (XSQL_ENABLE_KHMER_NUMBER)
     list(APPEND XSQL_TESTS

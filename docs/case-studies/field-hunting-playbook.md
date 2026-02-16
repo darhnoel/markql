@@ -57,7 +57,13 @@ Inside `PROJECT(row)`, each field resolves suppliers relative to that row. This 
 The first query should answer: “What cards am I actually selecting?”
 
 ```bash
-./build/markql --input docs/case-studies/fixtures/gold_offers_sample.html --query "SELECT div(node_id, tag, max_depth) FROM doc WHERE attributes.data-testid = 'offer';"
+./build/markql \
+  --input docs/case-studies/fixtures/gold_offers_sample.html \
+  --query "
+SELECT div(node_id, tag, max_depth)
+FROM doc
+WHERE attributes.data-testid = 'offer';
+"
 ```
 
 Observed output:
@@ -99,7 +105,17 @@ The practical question is not “can I match this node today?” but “how like
 The query below looks reasonable, but it does not enforce quote completeness:
 
 ```bash
-./build/markql --input docs/case-studies/fixtures/gold_offers_sample.html --query "SELECT div.node_id, PROJECT(div) AS ( vendor: FIRST_ATTR(img, alt WHERE attributes.src CONTAINS '/vendors/small/'), quote_text: TEXT(span WHERE attributes.class CONTAINS 'price-main') ) FROM doc WHERE attributes.data-testid = 'offer';"
+./build/markql \
+  --input docs/case-studies/fixtures/gold_offers_sample.html \
+  --query "
+SELECT div.node_id,
+       PROJECT(div) AS (
+         vendor: FIRST_ATTR(img, alt WHERE attributes.src CONTAINS '/vendors/small/'),
+         quote_text: TEXT(span WHERE attributes.class CONTAINS 'price-main')
+       )
+FROM doc
+WHERE attributes.data-testid = 'offer';
+"
 ```
 
 Observed output:
@@ -143,7 +159,9 @@ Query file:
 Run:
 
 ```bash
-./build/markql --input docs/case-studies/fixtures/gold_offers_sample.html --query "$(tr '\n' ' ' < docs/case-studies/queries/gold_offers_sample.sql)"
+./build/markql \
+  --input docs/case-studies/fixtures/gold_offers_sample.html \
+  --query-file docs/case-studies/queries/gold_offers_sample.sql
 ```
 
 Observed output (trimmed):

@@ -15,7 +15,7 @@ Goal: return one row per contribution cell with a canonical weekday string.
 ```bash
 ./build/markql \
   --input <your-github-profile-snapshot.html> \
-  --query "$(tr '\n' ' ' < docs/case-studies/queries/github_contributions_calendar.sql)"
+  --query-file docs/case-studies/queries/github_contributions_calendar.sql
 ```
 
 ## Invariants
@@ -49,3 +49,66 @@ Example row:
   "day": "Sunday"
 }
 ```
+
+## Traditional Scraping (BeautifulSoup)
+
+```python
+from bs4 import BeautifulSoup
+import json
+
+with open("github_profile.html", "r", encoding="utf-8") as f:
+    soup = BeautifulSoup(f, "html.parser")
+
+WEEKDAYS = [
+    "Sunday", "Monday", "Tuesday", "Wednesday",
+    "Thursday", "Friday", "Saturday",
+]
+
+def normalize_day(parent_text: str) -> str:
+    t = " ".join(parent_text.split())
+    for d in WEEKDAYS:
+        if t.startswith(d):
+            return d
+    return t
+
+rows = []
+for td in soup.find_all("td", id=lambda v: v and "contribution-day-component" in v):
+    parent_text = td.parent.get_text(" ", strip=True) if td.parent else ""
+    rows.append({
+        "data_ix": td.get("data-ix"),
+        "data_date": td.get("data-date"),
+        "data_level": td.get("data-level"),
+        "day": normalize_day(parent_text),
+    })
+
+print(json.dumps(rows, indent=2, ensure_ascii=False))
+```
+
+## MarkQL Equivalent
+
+```sql
+SELECT PROJECT(td) AS (
+  data_ix: ATTR(td, data-ix),
+  data_date: ATTR(td, data-date),
+  data_level: ATTR(td, data-level),
+  day: CASE
+    WHEN TRIM(parent.text) LIKE 'Sunday%' THEN 'Sunday'
+    WHEN TRIM(parent.text) LIKE 'Monday%' THEN 'Monday'
+    WHEN TRIM(parent.text) LIKE 'Tuesday%' THEN 'Tuesday'
+    WHEN TRIM(parent.text) LIKE 'Wednesday%' THEN 'Wednesday'
+    WHEN TRIM(parent.text) LIKE 'Thursday%' THEN 'Thursday'
+    WHEN TRIM(parent.text) LIKE 'Friday%' THEN 'Friday'
+    WHEN TRIM(parent.text) LIKE 'Saturday%' THEN 'Saturday'
+    ELSE TRIM(parent.text)
+  END
+)
+FROM doc
+WHERE tag = 'td'
+  AND id CONTAINS 'contribution-day-component';
+```
+
+Both versions enforce the same core logic:
+
+- Row filter: contribution `td` nodes only.
+- Field extraction: `data_ix`, `data_date`, `data_level`.
+- Day normalization: map noisy parent text to canonical weekday names.

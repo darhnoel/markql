@@ -33,10 +33,20 @@ class Lexer {
   /// MUST stop at the first non-digit to avoid consuming delimiters.
   /// Inputs are internal state; outputs are number tokens.
   Token lex_number();
-  /// Skips whitespace characters between tokens.
-  /// MUST treat all ASCII whitespace as separators.
+  /// Skips whitespace and SQL comments between tokens.
+  /// MUST treat comments only in normal lexing mode (never inside strings).
   /// Inputs are internal state; outputs are updated cursor positions.
-  void skip_ws();
+  void skip_ws_and_comments();
+  /// Returns and consumes one character while updating line/column counters.
+  /// MUST advance byte position by one and track newlines accurately.
+  char advance_char();
+  /// Returns true when a lexical error was recorded.
+  /// MUST remain sticky after the first lexical error.
+  bool has_error() const;
+  /// Creates a token with current location metadata.
+  Token make_token(TokenType type, const std::string& text, size_t start_pos) const;
+  /// Records the first lexical error for deferred reporting through tokens.
+  void set_error(const std::string& message, size_t position);
   /// Tests whether a character can start an identifier.
   /// MUST align with parser expectations for identifiers.
   /// Inputs are characters; outputs are booleans with no side effects.
@@ -52,6 +62,11 @@ class Lexer {
 
   const std::string& input_;
   size_t pos_ = 0;
+  size_t line_ = 1;
+  size_t col_ = 1;
+  bool has_error_ = false;
+  std::string error_message_;
+  size_t error_position_ = 0;
 };
 
 }  // namespace xsql

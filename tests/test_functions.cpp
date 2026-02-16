@@ -73,6 +73,16 @@ void test_inner_html_depth() {
   }
 }
 
+void test_inner_html_max_depth_auto() {
+  std::string html = "<div id='root'><span><b>Hi</b></span><em>There</em></div>";
+  auto result = run_query(html, "SELECT inner_html(div, max_depth) FROM document WHERE attributes.id = 'root'");
+  expect_eq(result.rows.size(), 1, "inner_html max_depth row count");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].inner_html == "<span><b>Hi</b></span><em>There</em>",
+                "inner_html max_depth content");
+  }
+}
+
 void test_trim_inner_html() {
   std::string html = "<li id='item'>\n  <a href=\"/x\">Link</a>\n</li>";
   auto result = run_query(html, "SELECT trim(inner_html(li)) FROM document WHERE attributes.id = 'item'");
@@ -259,6 +269,7 @@ void register_function_tests(std::vector<TestCase>& tests) {
   tests.push_back({"minify_html_preserves_protected_tags", test_minify_html_preserves_protected_tags});
   tests.push_back({"minify_html_preserves_script_style", test_minify_html_preserves_script_style});
   tests.push_back({"inner_html_depth", test_inner_html_depth});
+  tests.push_back({"inner_html_max_depth_auto", test_inner_html_max_depth_auto});
   tests.push_back({"trim_inner_html", test_trim_inner_html});
   tests.push_back({"trim_mixed_with_other_projection", test_trim_mixed_with_other_projection});
   tests.push_back({"inner_html_minified_by_default", test_inner_html_minified_by_default});

@@ -7,7 +7,49 @@ MarkQL is a C++20 SQL-style query engine for HTML. It treats HTML elements as ro
 Prerequisites:
 - CMake 3.16+
 - A C++20 compiler
+- Boost (multiprecision); set `-DXSQL_ENABLE_KHMER_NUMBER=OFF` to skip Boost
 - Optional dependencies: `libxml2`, `curl`, `nlohmann_json`, `arrow/parquet`
+
+Ubuntu/Debian/WSL (minimal packages):
+
+```bash
+sudo apt update
+sudo apt install -y \
+  git ca-certificates pkg-config \
+  build-essential cmake ninja-build \
+  libboost-dev
+```
+
+Optional feature packages:
+
+```bash
+sudo apt install -y libxml2-dev libcurl4-openssl-dev nlohmann-json3-dev
+```
+
+Arrow/Parquet packages (often missing on older distros):
+
+```bash
+sudo apt install -y libarrow-dev libparquet-dev
+```
+
+macOS (Homebrew):
+
+```bash
+xcode-select --install
+brew install cmake ninja pkg-config boost
+```
+
+Optional feature packages:
+
+```bash
+brew install libxml2 curl nlohmann-json
+```
+
+Arrow/Parquet:
+
+```bash
+brew install apache-arrow
+```
 
 Build (project default):
 
@@ -22,10 +64,13 @@ cmake -S . -B build \
   -DXSQL_WITH_LIBXML2=OFF \
   -DXSQL_WITH_CURL=OFF \
   -DXSQL_WITH_ARROW=OFF \
+  -DXSQL_WITH_NLOHMANN_JSON=OFF \
   -DXSQL_BUILD_AGENT=ON \
   -DXSQL_AGENT_FETCH_DEPS=ON
 cmake --build build
 ```
+
+To build without Boost, add `-DXSQL_ENABLE_KHMER_NUMBER=OFF`.
 
 Run one query:
 

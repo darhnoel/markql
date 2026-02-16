@@ -10,6 +10,15 @@
 
 namespace xsql::executor_internal {
 
+struct EvalContext {
+  const HtmlNode& current_row_node;
+};
+
+bool eval_expr_with_context(const Expr& expr,
+                            const HtmlDocument& doc,
+                            const std::vector<std::vector<int64_t>>& children,
+                            const EvalContext& context);
+
 namespace {
 
 /// Splits a string on ASCII whitespace into tokens.
@@ -161,7 +170,7 @@ bool like_match_ci(const std::string& text, const std::string& pattern) {
 ScalarValue eval_scalar_expr_impl(const ScalarExpr& expr,
                                   const HtmlDocument& doc,
                                   const std::vector<std::vector<int64_t>>& children,
-                                  const HtmlNode& node);
+                                  const EvalContext& context);
 
 int64_t sibling_pos_for_node(const HtmlDocument& doc,
                              const std::vector<std::vector<int64_t>>& children,
@@ -745,7 +754,8 @@ ScalarValue value_from_operand(const Operand& operand,
 ScalarValue eval_scalar_expr_impl(const ScalarExpr& expr,
                                   const HtmlDocument& doc,
                                   const std::vector<std::vector<int64_t>>& children,
-                                  const HtmlNode& node) {
+                                  const EvalContext& context) {
+  const HtmlNode& node = context.current_row_node;
   switch (expr.kind) {
     case ScalarExpr::Kind::NullLiteral:
       return make_null();
@@ -755,15 +765,69 @@ ScalarValue eval_scalar_expr_impl(const ScalarExpr& expr,
       return make_number(expr.number_value);
     case ScalarExpr::Kind::Operand:
       return value_from_operand(expr.operand, doc, children, node);
+    case ScalarExpr::Kind::SelfRef:
+      return make_null();
     case ScalarExpr::Kind::FunctionCall:
       break;
   }
 
   std::string fn = util::to_upper(expr.function_name);
+  if (fn == "TEXT" || fn == "DIRECT_TEXT" || fn == "INNER_HTML" ||
+      fn == "RAW_INNER_HTML" || fn == "ATTR") {
+    if ((fn == "TEXT" || fn == "DIRECT_TEXT") && expr.args.size() != 1) return make_null();
+    if ((fn == "INNER_HTML" || fn == "RAW_INNER_HTML") &&
+        (expr.args.empty() || expr.args.size() > 2)) {
+      return make_null();
+    }
+    if (fn == "ATTR" && expr.args.size() != 2) return make_null();
+    if (expr.args.empty()) return make_null();
+
+    const HtmlNode* target = nullptr;
+    const ScalarExpr& target_arg_expr = expr.args.front();
+    if (target_arg_expr.kind == ScalarExpr::Kind::SelfRef) {
+      target = &node;
+    } else {
+      ScalarValue target_value = eval_scalar_expr_impl(target_arg_expr, doc, children, context);
+      if (is_null(target_value)) return make_null();
+      std::string tag = util::to_lower(to_string_value(target_value));
+      if (node.tag != tag) return make_null();
+      target = &node;
+    }
+    if (target == nullptr) return make_null();
+
+    if (fn == "TEXT") return make_string(target->text);
+    if (fn == "DIRECT_TEXT") {
+      return make_string(xsql_internal::extract_direct_text_strict(target->inner_html));
+    }
+    if (fn == "ATTR") {
+      ScalarValue attr_value = eval_scalar_expr_impl(expr.args[1], doc, children, context);
+      if (is_null(attr_value)) return make_null();
+      std::string attr = util::to_lower(to_string_value(attr_value));
+      auto it = target->attributes.find(attr);
+      if (it == target->attributes.end()) return make_null();
+      return make_string(it->second);
+    }
+
+    size_t depth = 1;
+    bool has_depth = false;
+    if (expr.args.size() == 2) {
+      ScalarValue depth_value = eval_scalar_expr_impl(expr.args[1], doc, children, context);
+      if (is_null(depth_value)) return make_null();
+      auto parsed = to_int64_value(depth_value);
+      if (!parsed.has_value() || *parsed < 0) return make_null();
+      depth = static_cast<size_t>(*parsed);
+      has_depth = true;
+    }
+    size_t effective_depth = has_depth ? depth : 1;
+    std::string html = xsql_internal::limit_inner_html(target->inner_html, effective_depth);
+    if (fn == "RAW_INNER_HTML") return make_string(html);
+    return make_string(util::minify_html(html));
+  }
+
   std::vector<ScalarValue> args;
   args.reserve(expr.args.size());
   for (const auto& arg : expr.args) {
-    args.push_back(eval_scalar_expr_impl(arg, doc, children, node));
+    args.push_back(eval_scalar_expr_impl(arg, doc, children, context));
   }
 
   if (fn == "COALESCE") {
@@ -849,43 +913,30 @@ ScalarValue eval_scalar_expr_impl(const ScalarExpr& expr,
     if (pos == std::string::npos) return make_number(0);
     return make_number(static_cast<int64_t>(pos + 1));
   }
-  if (fn == "TEXT" || fn == "DIRECT_TEXT" || fn == "ATTR") {
-    if ((fn == "TEXT" || fn == "DIRECT_TEXT") && args.size() != 1) return make_null();
-    if (fn == "ATTR" && args.size() != 2) return make_null();
-    if (args.empty() || is_null(args[0])) return make_null();
-    std::string tag = util::to_lower(to_string_value(args[0]));
-    if (node.tag != tag) return make_null();
-    if (fn == "TEXT") return make_string(node.text);
-    if (fn == "DIRECT_TEXT") return make_string(xsql_internal::extract_direct_text_strict(node.inner_html));
-    if (is_null(args[1])) return make_null();
-    std::string attr = util::to_lower(to_string_value(args[1]));
-    auto it = node.attributes.find(attr);
-    if (it == node.attributes.end()) return make_null();
-    return make_string(it->second);
-  }
   return make_null();
 }
 
-bool eval_exists(const ExistsExpr& exists,
-                 const HtmlDocument& doc,
-                 const std::vector<std::vector<int64_t>>& children,
-                 const HtmlNode& node) {
+bool eval_exists_with_context(const ExistsExpr& exists,
+                              const HtmlDocument& doc,
+                              const std::vector<std::vector<int64_t>>& children,
+                              const EvalContext& context) {
+  const HtmlNode& node = context.current_row_node;
   if (!exists.where.has_value()) {
     return axis_has_any_node(doc, children, node, exists.axis);
   }
   const Expr& filter = *exists.where;
   if (exists.axis == Operand::Axis::Self) {
-    return eval_expr(filter, doc, children, node);
+    return eval_expr_with_context(filter, doc, children, EvalContext{node});
   }
   if (exists.axis == Operand::Axis::Parent) {
     if (!node.parent_id.has_value()) return false;
     const HtmlNode& parent = doc.nodes.at(static_cast<size_t>(*node.parent_id));
-    return eval_expr(filter, doc, children, parent);
+    return eval_expr_with_context(filter, doc, children, EvalContext{parent});
   }
   if (exists.axis == Operand::Axis::Child) {
     for (int64_t id : children.at(static_cast<size_t>(node.id))) {
       const HtmlNode& child = doc.nodes.at(static_cast<size_t>(id));
-      if (eval_expr(filter, doc, children, child)) return true;
+      if (eval_expr_with_context(filter, doc, children, EvalContext{child})) return true;
     }
     return false;
   }
@@ -893,7 +944,7 @@ bool eval_exists(const ExistsExpr& exists,
     const HtmlNode* current = &node;
     while (current->parent_id.has_value()) {
       const HtmlNode& parent = doc.nodes.at(static_cast<size_t>(*current->parent_id));
-      if (eval_expr(filter, doc, children, parent)) return true;
+      if (eval_expr_with_context(filter, doc, children, EvalContext{parent})) return true;
       current = &parent;
     }
     return false;
@@ -905,7 +956,7 @@ bool eval_exists(const ExistsExpr& exists,
     int64_t id = stack.back();
     stack.pop_back();
     const HtmlNode& child = doc.nodes.at(static_cast<size_t>(id));
-    if (eval_expr(filter, doc, children, child)) return true;
+    if (eval_expr_with_context(filter, doc, children, EvalContext{child})) return true;
     const auto& next = children.at(static_cast<size_t>(id));
     stack.insert(stack.end(), next.begin(), next.end());
   }
@@ -924,10 +975,11 @@ bool string_in_list(const std::string& value, const std::vector<std::string>& li
 /// Evaluates a boolean expression over the current node and document.
 /// MUST be deterministic and MUST honor axis/field semantics.
 /// Inputs are expr/doc/children/node; outputs are boolean with no side effects.
-bool eval_expr(const Expr& expr,
-               const HtmlDocument& doc,
-               const std::vector<std::vector<int64_t>>& children,
-               const HtmlNode& node) {
+bool eval_expr_with_context(const Expr& expr,
+                            const HtmlDocument& doc,
+                            const std::vector<std::vector<int64_t>>& children,
+                            const EvalContext& context) {
+  const HtmlNode& node = context.current_row_node;
   if (std::holds_alternative<CompareExpr>(expr)) {
     const auto& cmp = std::get<CompareExpr>(expr);
     std::vector<std::string> values = cmp.rhs.values;
@@ -954,19 +1006,19 @@ bool eval_expr(const Expr& expr,
                            cmp.op == CompareExpr::Op::HasDirectText ||
                            !values.empty());
     if (!can_use_legacy && cmp.lhs_expr.has_value()) {
-      ScalarValue lhs_value = eval_scalar_expr_impl(*cmp.lhs_expr, doc, children, node);
+      ScalarValue lhs_value = eval_scalar_expr_impl(*cmp.lhs_expr, doc, children, context);
       if (cmp.op == CompareExpr::Op::IsNull) return is_null(lhs_value);
       if (cmp.op == CompareExpr::Op::IsNotNull) return !is_null(lhs_value);
       if (cmp.op == CompareExpr::Op::In) {
         if (is_null(lhs_value)) return false;
         for (const auto& rhs_expr : cmp.rhs_expr_list) {
-          ScalarValue rhs_value = eval_scalar_expr_impl(rhs_expr, doc, children, node);
+          ScalarValue rhs_value = eval_scalar_expr_impl(rhs_expr, doc, children, context);
           if (values_equal(lhs_value, rhs_value)) return true;
         }
         return false;
       }
       ScalarValue rhs_value = cmp.rhs_expr.has_value()
-                                  ? eval_scalar_expr_impl(*cmp.rhs_expr, doc, children, node)
+                                  ? eval_scalar_expr_impl(*cmp.rhs_expr, doc, children, context)
                                   : make_null();
       if (cmp.op == CompareExpr::Op::Eq) return values_equal(lhs_value, rhs_value);
       if (cmp.op == CompareExpr::Op::NotEq) return !values_equal(lhs_value, rhs_value);
@@ -993,13 +1045,13 @@ bool eval_expr(const Expr& expr,
         if (is_null(lhs_value)) return false;
         std::vector<std::string> rhs_values;
         for (const auto& rhs_expr : cmp.rhs_expr_list) {
-          ScalarValue value = eval_scalar_expr_impl(rhs_expr, doc, children, node);
+          ScalarValue value = eval_scalar_expr_impl(rhs_expr, doc, children, context);
           if (is_null(value)) return false;
           rhs_values.push_back(to_string_value(value));
         }
         if (rhs_values.empty()) {
           if (!cmp.rhs_expr.has_value()) return false;
-          ScalarValue value = eval_scalar_expr_impl(*cmp.rhs_expr, doc, children, node);
+          ScalarValue value = eval_scalar_expr_impl(*cmp.rhs_expr, doc, children, context);
           if (is_null(value)) return false;
           rhs_values.push_back(to_string_value(value));
         }
@@ -1081,13 +1133,20 @@ bool eval_expr(const Expr& expr,
 
   if (std::holds_alternative<std::shared_ptr<ExistsExpr>>(expr)) {
     const auto& exists = *std::get<std::shared_ptr<ExistsExpr>>(expr);
-    return eval_exists(exists, doc, children, node);
+    return eval_exists_with_context(exists, doc, children, context);
   }
   const auto& bin = *std::get<std::shared_ptr<BinaryExpr>>(expr);
-  bool left = eval_expr(bin.left, doc, children, node);
-  bool right = eval_expr(bin.right, doc, children, node);
+  bool left = eval_expr_with_context(bin.left, doc, children, context);
+  bool right = eval_expr_with_context(bin.right, doc, children, context);
   if (bin.op == BinaryExpr::Op::And) return left && right;
   return left || right;
+}
+
+bool eval_expr(const Expr& expr,
+               const HtmlDocument& doc,
+               const std::vector<std::vector<int64_t>>& children,
+               const HtmlNode& node) {
+  return eval_expr_with_context(expr, doc, children, EvalContext{node});
 }
 
 /// Evaluates a boolean expression for FLATTEN_TEXT base node selection.
@@ -1101,12 +1160,12 @@ bool eval_expr_flatten_base(const Expr& expr,
     if (cmp.lhs.axis == Operand::Axis::Descendant) {
       return true;
     }
-    return eval_expr(expr, doc, children, node);
+    return eval_expr_with_context(expr, doc, children, EvalContext{node});
   }
 
   if (std::holds_alternative<std::shared_ptr<ExistsExpr>>(expr)) {
     const auto& exists = *std::get<std::shared_ptr<ExistsExpr>>(expr);
-    return eval_exists(exists, doc, children, node);
+    return eval_exists_with_context(exists, doc, children, EvalContext{node});
   }
   const auto& bin = *std::get<std::shared_ptr<BinaryExpr>>(expr);
   bool left = eval_expr_flatten_base(bin.left, doc, children, node);

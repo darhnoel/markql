@@ -52,3 +52,7 @@ plugins/playwright_fetch/node_modules/
 # Python cache
 __pycache__/
 *.pyc
+
+# Specs
+specs/*
+examples/*

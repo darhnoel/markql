@@ -48,6 +48,37 @@ void test_proportional_column_zero_source_len() {
   expect_eq(mapped, 2, "proportional_column clamps when source length is zero");
 }
 
+void test_column_width_cjk_wide() {
+  std::string text = "\xE6\x97\xA5\xE6\x9C\xAC""a";
+  size_t width = xsql::cli::column_width(text, 0, text.size());
+  expect_eq(width, 5, "column_width counts CJK as width 2");
+}
+
+void test_column_to_index_cjk_boundary() {
+  std::string text = "\xE6\x97\xA5\xE6\x9C\xAC""a";
+  size_t idx = xsql::cli::column_to_index(text, 0, text.size(), 4);
+  expect_eq(idx, static_cast<size_t>(6), "column_to_index maps display column to UTF-8 byte index");
+}
+
+void test_inspect_sql_input_line_comment_only() {
+  auto inspection = xsql::cli::inspect_sql_input("-- just comment");
+  expect_true(!inspection.has_error, "line-comment-only input has no lexer error");
+  expect_true(inspection.empty_after_comments, "line-comment-only input becomes empty");
+}
+
+void test_inspect_sql_input_block_comment_only() {
+  auto inspection = xsql::cli::inspect_sql_input("/* just comment */");
+  expect_true(!inspection.has_error, "block-comment-only input has no lexer error");
+  expect_true(inspection.empty_after_comments, "block-comment-only input becomes empty");
+}
+
+void test_inspect_sql_input_unterminated_block_comment() {
+  auto inspection = xsql::cli::inspect_sql_input("/* missing");
+  expect_true(inspection.has_error, "unterminated block comment is reported");
+  expect_true(inspection.error_message == "Unterminated block comment",
+              "unterminated block comment message is deterministic");
+}
+
 }  // namespace
 
 void register_cli_utils_tests(std::vector<TestCase>& tests) {
@@ -57,4 +88,10 @@ void register_cli_utils_tests(std::vector<TestCase>& tests) {
   tests.push_back({"proportional_column_end_maps_to_end", test_proportional_column_end_maps_to_end});
   tests.push_back({"proportional_column_scales_middle", test_proportional_column_scales_middle});
   tests.push_back({"proportional_column_zero_source_len", test_proportional_column_zero_source_len});
+  tests.push_back({"column_width_cjk_wide", test_column_width_cjk_wide});
+  tests.push_back({"column_to_index_cjk_boundary", test_column_to_index_cjk_boundary});
+  tests.push_back({"inspect_sql_input_line_comment_only", test_inspect_sql_input_line_comment_only});
+  tests.push_back({"inspect_sql_input_block_comment_only", test_inspect_sql_input_block_comment_only});
+  tests.push_back({"inspect_sql_input_unterminated_block_comment",
+                   test_inspect_sql_input_unterminated_block_comment});
 }

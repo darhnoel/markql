@@ -60,7 +60,14 @@ Build:
 **Listing 1: Verify the CLI and inspect rows**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT section(node_id, tag) FROM doc WHERE attributes.class CONTAINS 'result' LIMIT 5;"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT section(node_id, tag)
+FROM doc
+WHERE attributes.class CONTAINS 'result'
+LIMIT 5;
+"
 ```
 
 Observed output:
@@ -98,12 +105,133 @@ FROM 'https://example.com'
 FROM RAW('<div>...</div>')
 ```
 
+## Running Scripts
+
+You can run multiple statements from a `.sql` file:
+
+```bash
+./build/markql \
+  --query-file ./queries/report.sql \
+  --input docs/fixtures/basic.html
+```
+
+Script rules:
+
+- Statements are separated by `;`.
+- A trailing semicolon is allowed.
+- Empty statements are ignored.
+- By default execution stops on the first failing statement.
+- Use `--continue-on-error` to execute remaining statements.
+- Use `--quiet` to suppress `== stmt i/N ==` delimiters.
+
+Comments are standard SQL:
+
+- `-- line comment`
+- `/* block comment */`
+
+Example script:
+
+```sql
+-- summarize available functions
+SHOW FUNCTIONS;
+
+/* extract cards */
+SELECT section.node_id, section.tag
+FROM doc
+WHERE attributes.class CONTAINS 'result';
+```
+
+REPL comment-only input is a no-op:
+
+```text
+markql> -- just a comment
+markql> /* block comment */
+markql>
+```
+
+## DOM Explorer
+
+Use explore mode when you want to inspect DOM structure before writing queries:
+
+```bash
+./build/markql explore docs/fixtures/basic.html
+```
+
+From REPL:
+
+```text
+markql> .explore
+markql> .explore doc
+markql> .explore https://example.com/page.html
+```
+
+Keybindings:
+
+- `Up/Down`: move selection in the tree
+- `Right` or `Enter`: expand selected node
+- `Left`: collapse selected node
+- `/`: start search on node content (default mode: exact, case-insensitive)
+- `m`: toggle search mode between exact and fuzzy
+- `n` / `N`: jump next/previous search match (auto-expands ancestor nodes to reveal hit)
+- `g` / `G`: generate MarkQL suggestion for current selected node
+- `y` / `Y`: copy suggested MarkQL to clipboard
+- `C`: collapse all expanded branches and clear search state
+- `j` / `k`: scroll the `Inner HTML Head` pane down/up
+- `+` / `-`: zoom in/out the `Inner HTML Head` pane
+- `Enter`: keep current search results and leave search mode
+- `Esc`: cancel search mode and clear query
+- `q`: quit
+
+Search preview behavior:
+
+- Exact mode uses contiguous case-insensitive matching.
+- Fuzzy mode uses case-insensitive ordered-character matching.
+- Search scopes are evaluated in this priority order:
+  - self attributes (`id`, `class`, `data-*`, key or value)
+  - self tag name and self direct text
+  - descendant content (`inner_html`)
+- Ranking is applied in this order:
+  - source priority (scopes above)
+  - match quality (`whole-word` > `word-start` > `other`)
+  - node depth (deeper/closer node first)
+  - earlier match position
+  - lower `node_id` (tie-break)
+- When a match is selected, `Inner HTML Head` auto-focuses around the match and color-highlights the matched term.
+- Use `j` / `k` to move around the nearby context after auto-focus.
+- Search input accepts UTF-8 text (for example Japanese and Khmer) and symbols like `-` / `_`.
+- Search execution is debounced while typing; auto-search starts at 2+ characters.
+- Press `Enter` to run immediately (including 1-character queries).
+
+Session behavior:
+
+- Explorer restores your last expanded nodes, selected node, search query, and zoom for the same input during the current MarkQL session.
+- Explorer also restores the current search mode (exact or fuzzy) for that input.
+
+Layout:
+
+- Left pane: collapsed tree (`node_id tag` with compact attribute hints)
+- Left pane bottom: `Suggest` box with generated full MarkQL statement (manual trigger via `g`/`G`)
+- Right pane: boxed sections for `Node`, `Inner HTML Head` (formatted preview), and `Attributes`
+
 ## From Row Probe To Real Extraction
 
 **Listing 2: A minimal `PROJECT` extraction**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT section.node_id, PROJECT(section) AS ( city: TEXT(h3), stops: TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%'), price_text: TEXT(span WHERE attributes.role = 'text') ) FROM doc WHERE attributes.class CONTAINS 'result' AND attributes.data-kind = 'flight' ORDER BY node_id;"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT section.node_id,
+       PROJECT(section) AS (
+         city: TEXT(h3),
+         stops: TEXT(span WHERE DIRECT_TEXT(span) LIKE '%stop%'),
+         price_text: TEXT(span WHERE attributes.role = 'text')
+       )
+FROM doc
+WHERE attributes.class CONTAINS 'result'
+  AND attributes.data-kind = 'flight'
+ORDER BY node_id;
+"
 ```
 
 Observed output:
@@ -126,7 +254,12 @@ What happened:
 **Listing 3: Failing query**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT TEXT(div) FROM doc;"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT TEXT(div)
+FROM doc;
+"
 ```
 
 Observed error:
@@ -140,7 +273,13 @@ Why this fails: this branch requires extraction functions to run under a query-l
 **Listing 4: Corrected query**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT TEXT(p) FROM doc WHERE attributes.class CONTAINS 'summary';"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT TEXT(p)
+FROM doc
+WHERE attributes.class CONTAINS 'summary';
+"
 ```
 
 Observed output:
@@ -153,12 +292,30 @@ Rows: 1
 
 The fix is not syntax decoration. It forces explicit extraction scope.
 
+Extraction function contract summary:
+
+- `TEXT()/INNER_HTML()/RAW_INNER_HTML()` require an outer `WHERE`.
+- The outer `WHERE` must include at least one non-tag self predicate.
+- `INNER_HTML(tag)` defaults to depth `1`.
+- `INNER_HTML(tag, MAX_DEPTH)` uses each row's `max_depth` automatically.
+
 ## Deliberate Failure: Row Filtering vs Field Selection
 
 **Listing 5: Naive row filter (keeps incomplete variant)**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT section.node_id, PROJECT(section) AS ( name: TEXT(h3), price_text: TEXT(span WHERE attributes.role = 'text') ) FROM doc WHERE attributes.class CONTAINS 'result' ORDER BY node_id;"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT section.node_id,
+       PROJECT(section) AS (
+         name: TEXT(h3),
+         price_text: TEXT(span WHERE attributes.role = 'text')
+       )
+FROM doc
+WHERE attributes.class CONTAINS 'result'
+ORDER BY node_id;
+"
 ```
 
 Observed output:
@@ -176,7 +333,15 @@ Why this happens: outer `WHERE` admitted both flight and hotel cards. The hotel 
 **Listing 6: Corrected with row-quality guard**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT section.node_id FROM doc WHERE tag = 'section' AND EXISTS(descendant WHERE attributes.role = 'text') ORDER BY node_id;"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT section.node_id
+FROM doc
+WHERE tag = 'section'
+  AND EXISTS(descendant WHERE attributes.role = 'text')
+ORDER BY node_id;
+"
 ```
 
 Observed output:
@@ -197,7 +362,15 @@ This is the key pattern: use `EXISTS(...)` in outer `WHERE` to keep rows that ha
 **Listing 7: FLATTEN on semi-regular items**
 
 ```bash
-./build/markql --input docs/fixtures/products.html --query "SELECT li.node_id, FLATTEN(li) AS (name, summary, lang1, lang2) FROM doc WHERE attributes.class = 'item' ORDER BY node_id;"
+./build/markql \
+  --input docs/fixtures/products.html \
+  --query "
+SELECT li.node_id,
+       FLATTEN(li) AS (name, summary, lang1, lang2)
+FROM doc
+WHERE attributes.class = 'item'
+ORDER BY node_id;
+"
 ```
 
 Observed output:
@@ -219,7 +392,20 @@ Interpretation:
 **Listing 8: Stable mapping with PROJECT**
 
 ```bash
-./build/markql --input docs/fixtures/products.html --query "SELECT li.node_id, PROJECT(li) AS ( title: TEXT(h2), summary: TEXT(p), language_primary: FIRST_TEXT(span), language_secondary: LAST_TEXT(span) ) FROM doc WHERE attributes.class = 'item' ORDER BY node_id;"
+./build/markql \
+  --input docs/fixtures/products.html \
+  --query "
+SELECT li.node_id,
+       PROJECT(li) AS (
+         title: TEXT(h2),
+         summary: TEXT(p),
+         language_primary: FIRST_TEXT(span),
+         language_secondary: LAST_TEXT(span)
+       )
+FROM doc
+WHERE attributes.class = 'item'
+ORDER BY node_id;
+"
 ```
 
 Observed output:
@@ -254,7 +440,18 @@ Examples include:
 **Listing 9: Text normalization for numeric export**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT section.node_id, PROJECT(section) AS ( price_text: TEXT(span WHERE attributes.role = 'text'), price_num: TRIM(REPLACE(REPLACE(TEXT(span WHERE attributes.role = 'text'), '¥', ''), ',', '')) ) FROM doc WHERE attributes.data-kind = 'flight' ORDER BY node_id;"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT section.node_id,
+       PROJECT(section) AS (
+         price_text: TEXT(span WHERE attributes.role = 'text'),
+         price_num: TRIM(REPLACE(REPLACE(TEXT(span WHERE attributes.role = 'text'), '¥', ''), ',', ''))
+       )
+FROM doc
+WHERE attributes.data-kind = 'flight'
+ORDER BY node_id;
+"
 ```
 
 Observed output:
@@ -269,7 +466,17 @@ Rows: 2
 **Listing 10: CASE expression**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT CASE WHEN tag = 'section' THEN 'card' ELSE 'other' END FROM doc WHERE tag = 'section' LIMIT 2;"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT CASE
+         WHEN tag = 'section' THEN 'card'
+         ELSE 'other'
+       END
+FROM doc
+WHERE tag = 'section'
+LIMIT 2;
+"
 ```
 
 Observed output:
@@ -286,7 +493,15 @@ Rows: 2
 **Listing 11: JSON array**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT a(href, rel) FROM doc WHERE tag = 'a' ORDER BY node_id TO JSON();"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT a(href, rel)
+FROM doc
+WHERE tag = 'a'
+ORDER BY node_id
+TO JSON();
+"
 ```
 
 Observed output:
@@ -298,7 +513,15 @@ Observed output:
 **Listing 12: NDJSON (one object per line)**
 
 ```bash
-./build/markql --input docs/fixtures/basic.html --query "SELECT a(href, rel) FROM doc WHERE tag = 'a' ORDER BY node_id TO NDJSON();"
+./build/markql \
+  --input docs/fixtures/basic.html \
+  --query "
+SELECT a(href, rel)
+FROM doc
+WHERE tag = 'a'
+ORDER BY node_id
+TO NDJSON();
+"
 ```
 
 Observed output:
@@ -313,7 +536,14 @@ Observed output:
 **Listing 13: Querying inline HTML with `RAW(...)`**
 
 ```bash
-./build/markql --query "SELECT a(href) FROM RAW('<div><a href=\"/x\">X</a><a href=\"/y\">Y</a></div>') WHERE tag = 'a' ORDER BY node_id TO JSON();"
+./build/markql \
+  --query "
+SELECT a(href)
+FROM RAW('<div><a href=\"/x\">X</a><a href=\"/y\">Y</a></div>')
+WHERE tag = 'a'
+ORDER BY node_id
+TO JSON();
+"
 ```
 
 Observed output:

@@ -74,6 +74,9 @@ std::vector<std::string> build_columns(const Query& query);
 /// MUST return nullopt when no depth is specified.
 /// Inputs are Query objects; outputs are optional depth values.
 std::optional<size_t> find_inner_html_depth(const Query& query);
+/// Detects whether inner_html depth should use each row's max_depth.
+/// MUST return true only when inner_html(..., MAX_DEPTH) is requested.
+bool has_inner_html_auto_depth(const Query& query);
 /// Computes TFIDF term scores per node for TFIDF() queries.
 /// MUST return rows with term score dictionaries for each matched node.
 std::vector<QueryResultRow> build_tfidf_rows(const Query& query,

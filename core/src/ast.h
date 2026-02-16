@@ -43,9 +43,21 @@ struct Operand {
   Span span;
 };
 
+struct SelfRef {
+  Span span;
+};
+
 struct ScalarExpr {
-  enum class Kind { Operand, StringLiteral, NumberLiteral, NullLiteral, FunctionCall } kind = Kind::Operand;
+  enum class Kind {
+    Operand,
+    SelfRef,
+    StringLiteral,
+    NumberLiteral,
+    NullLiteral,
+    FunctionCall
+  } kind = Kind::Operand;
   Operand operand;
+  SelfRef self_ref;
   std::string string_value;
   int64_t number_value = 0;
   std::string function_name;
@@ -162,6 +174,7 @@ struct Query {
     size_t tfidf_min_df = 1;
     size_t tfidf_max_df = 0;
     std::optional<size_t> inner_html_depth;
+    bool inner_html_auto_depth = false;
     bool inner_html_function = false;
     bool raw_inner_html_function = false;
     bool text_function = false;

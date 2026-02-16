@@ -66,10 +66,27 @@ struct QuerySource {
   xsql::Query::Kind statement_kind = xsql::Query::Kind::Select;
 };
 
+/// Summarizes lexical inspection results for comment-only/error handling.
+struct LexInspection {
+  bool empty_after_comments = false;
+  bool has_error = false;
+  std::string error_message;
+  size_t error_position = 0;
+};
+
 /// Parses the query to identify its source kind for execution routing.
 /// MUST return nullopt on parse errors and MUST not throw for invalid queries.
 /// Inputs are query text; outputs are optional source with no side effects.
 std::optional<QuerySource> parse_query_source(const std::string& query);
+/// Lexically inspects SQL text for comment-only and lexer-error scenarios.
+/// MUST treat comments as whitespace and MUST never throw.
+LexInspection inspect_sql_input(const std::string& query);
+/// Converts a byte offset to 1-based line/column coordinates.
+/// MUST clamp out-of-range offsets to the end of the input.
+std::pair<size_t, size_t> line_col_from_offset(const std::string& text, size_t offset);
+/// Validates that text is well-formed UTF-8.
+/// MUST return false on malformed byte sequences.
+bool is_valid_utf8(const std::string& text);
 
 /// Serializes full query rows into JSON objects for CLI output modes.
 /// MUST preserve column ordering semantics and MUST escape content correctly.

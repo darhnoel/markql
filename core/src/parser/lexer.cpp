@@ -7,73 +7,81 @@ namespace xsql {
 Lexer::Lexer(const std::string& input) : input_(input) {}
 
 Token Lexer::next() {
-  skip_ws();
+  skip_ws_and_comments();
+  if (has_error()) {
+    return make_token(TokenType::Invalid, error_message_, error_position_);
+  }
   if (pos_ >= input_.size()) {
-    return Token{TokenType::End, "", pos_};
+    return make_token(TokenType::End, "", pos_);
   }
 
+  size_t start = pos_;
   char c = input_[pos_];
   if (c == ',') {
-    ++pos_;
-    return Token{TokenType::Comma, ",", pos_ - 1};
+    advance_char();
+    return make_token(TokenType::Comma, ",", start);
   }
   if (c == ':') {
-    ++pos_;
-    return Token{TokenType::Colon, ":", pos_ - 1};
+    advance_char();
+    return make_token(TokenType::Colon, ":", start);
   }
   if (c == '.') {
-    ++pos_;
-    return Token{TokenType::Dot, ".", pos_ - 1};
+    advance_char();
+    return make_token(TokenType::Dot, ".", start);
   }
   if (c == '(') {
-    ++pos_;
-    return Token{TokenType::LParen, "(", pos_ - 1};
+    advance_char();
+    return make_token(TokenType::LParen, "(", start);
   }
   if (c == ')') {
-    ++pos_;
-    return Token{TokenType::RParen, ")", pos_ - 1};
+    advance_char();
+    return make_token(TokenType::RParen, ")", start);
   }
   if (c == ';') {
-    ++pos_;
-    return Token{TokenType::Semicolon, ";", pos_ - 1};
+    advance_char();
+    return make_token(TokenType::Semicolon, ";", start);
   }
   if (c == '*') {
-    ++pos_;
-    return Token{TokenType::Star, "*", pos_ - 1};
+    advance_char();
+    return make_token(TokenType::Star, "*", start);
   }
   if (c == '=') {
-    ++pos_;
-    return Token{TokenType::Equal, "=", pos_ - 1};
+    advance_char();
+    return make_token(TokenType::Equal, "=", start);
   }
   if (c == '!') {
     if (pos_ + 1 < input_.size() && input_[pos_ + 1] == '=') {
-      pos_ += 2;
-      return Token{TokenType::NotEqual, "!=", pos_ - 2};
+      advance_char();
+      advance_char();
+      return make_token(TokenType::NotEqual, "!=", start);
     }
   }
   if (c == '>') {
     if (pos_ + 1 < input_.size() && input_[pos_ + 1] == '=') {
-      pos_ += 2;
-      return Token{TokenType::GreaterEqual, ">=", pos_ - 2};
+      advance_char();
+      advance_char();
+      return make_token(TokenType::GreaterEqual, ">=", start);
     }
-    ++pos_;
-    return Token{TokenType::Greater, ">", pos_ - 1};
+    advance_char();
+    return make_token(TokenType::Greater, ">", start);
   }
   if (c == '<') {
     if (pos_ + 1 < input_.size() && input_[pos_ + 1] == '>') {
-      pos_ += 2;
-      return Token{TokenType::NotEqual, "<>", pos_ - 2};
+      advance_char();
+      advance_char();
+      return make_token(TokenType::NotEqual, "<>", start);
     }
     if (pos_ + 1 < input_.size() && input_[pos_ + 1] == '=') {
-      pos_ += 2;
-      return Token{TokenType::LessEqual, "<=", pos_ - 2};
+      advance_char();
+      advance_char();
+      return make_token(TokenType::LessEqual, "<=", start);
     }
-    ++pos_;
-    return Token{TokenType::Less, "<", pos_ - 1};
+    advance_char();
+    return make_token(TokenType::Less, "<", start);
   }
   if (c == '~') {
-    ++pos_;
-    return Token{TokenType::RegexMatch, "~", pos_ - 1};
+    advance_char();
+    return make_token(TokenType::RegexMatch, "~", start);
   }
   if (c == '\'' || c == '\"') {
     return lex_string();
@@ -86,93 +94,152 @@ Token Lexer::next() {
   }
 
   // WHY: advance on unknown input to avoid infinite loops on malformed queries.
-  ++pos_;
-  return Token{TokenType::End, "", pos_ - 1};
+  advance_char();
+  return make_token(TokenType::End, "", start);
 }
 
 Token Lexer::lex_string() {
   size_t start = pos_;
-  char quote = input_[pos_++];
+  char quote = advance_char();
   std::string out;
   while (pos_ < input_.size()) {
-    char c = input_[pos_++];
+    char c = advance_char();
     if (c == quote) {
-      return Token{TokenType::String, out, start};
+      return make_token(TokenType::String, out, start);
     }
     out.push_back(c);
   }
-  return Token{TokenType::String, out, start};
+  return make_token(TokenType::String, out, start);
 }
 
 Token Lexer::lex_identifier_or_keyword() {
   size_t start = pos_;
   std::string out;
   while (pos_ < input_.size() && is_ident_char(input_[pos_])) {
-    out.push_back(input_[pos_++]);
+    out.push_back(advance_char());
   }
   std::string upper = to_upper(out);
-  if (upper == "SELECT") return Token{TokenType::KeywordSelect, out, start};
-  if (upper == "FROM") return Token{TokenType::KeywordFrom, out, start};
-  if (upper == "WHERE") return Token{TokenType::KeywordWhere, out, start};
-  if (upper == "AND") return Token{TokenType::KeywordAnd, out, start};
-  if (upper == "OR") return Token{TokenType::KeywordOr, out, start};
-  if (upper == "IN") return Token{TokenType::KeywordIn, out, start};
-  if (upper == "EXISTS") return Token{TokenType::KeywordExists, out, start};
-  if (upper == "DOCUMENT") return Token{TokenType::KeywordDocument, out, start};
-  if (upper == "LIMIT") return Token{TokenType::KeywordLimit, out, start};
-  if (upper == "EXCLUDE") return Token{TokenType::KeywordExclude, out, start};
-  if (upper == "ORDER") return Token{TokenType::KeywordOrder, out, start};
-  if (upper == "BY") return Token{TokenType::KeywordBy, out, start};
-  if (upper == "ASC") return Token{TokenType::KeywordAsc, out, start};
-  if (upper == "DESC") return Token{TokenType::KeywordDesc, out, start};
-  if (upper == "AS") return Token{TokenType::KeywordAs, out, start};
-  if (upper == "TO") return Token{TokenType::KeywordTo, out, start};
-  if (upper == "LIST") return Token{TokenType::KeywordList, out, start};
-  if (upper == "COUNT") return Token{TokenType::KeywordCount, out, start};
-  if (upper == "TABLE") return Token{TokenType::KeywordTable, out, start};
-  if (upper == "CSV") return Token{TokenType::KeywordCsv, out, start};
-  if (upper == "PARQUET") return Token{TokenType::KeywordParquet, out, start};
-  if (upper == "JSON") return Token{TokenType::KeywordJson, out, start};
-  if (upper == "NDJSON") return Token{TokenType::KeywordNdjson, out, start};
-  if (upper == "RAW") return Token{TokenType::KeywordRaw, out, start};
-  if (upper == "FRAGMENTS") return Token{TokenType::KeywordFragments, out, start};
-  if (upper == "CONTAINS") return Token{TokenType::KeywordContains, out, start};
-  if (upper == "HAS_DIRECT_TEXT") return Token{TokenType::KeywordHasDirectText, out, start};
-  if (upper == "LIKE") return Token{TokenType::KeywordLike, out, start};
-  if (upper == "ALL") return Token{TokenType::KeywordAll, out, start};
-  if (upper == "ANY") return Token{TokenType::KeywordAny, out, start};
-  if (upper == "IS") return Token{TokenType::KeywordIs, out, start};
-  if (upper == "NOT") return Token{TokenType::KeywordNot, out, start};
-  if (upper == "NULL") return Token{TokenType::KeywordNull, out, start};
-  if (upper == "CASE") return Token{TokenType::KeywordCase, out, start};
-  if (upper == "WHEN") return Token{TokenType::KeywordWhen, out, start};
-  if (upper == "THEN") return Token{TokenType::KeywordThen, out, start};
-  if (upper == "ELSE") return Token{TokenType::KeywordElse, out, start};
-  if (upper == "END") return Token{TokenType::KeywordEnd, out, start};
-  if (upper == "SHOW") return Token{TokenType::KeywordShow, out, start};
-  if (upper == "DESCRIBE") return Token{TokenType::KeywordDescribe, out, start};
-  if (upper == "PROJECT") return Token{TokenType::KeywordProject, out, start};
-  if (upper == "INPUT") return Token{TokenType::KeywordInput, out, start};
-  if (upper == "INPUTS") return Token{TokenType::KeywordInputs, out, start};
-  if (upper == "FUNCTIONS") return Token{TokenType::KeywordFunctions, out, start};
-  if (upper == "AXES") return Token{TokenType::KeywordAxes, out, start};
-  if (upper == "OPERATORS") return Token{TokenType::KeywordOperators, out, start};
-  return Token{TokenType::Identifier, out, start};
+  if (upper == "SELECT") return make_token(TokenType::KeywordSelect, out, start);
+  if (upper == "FROM") return make_token(TokenType::KeywordFrom, out, start);
+  if (upper == "WHERE") return make_token(TokenType::KeywordWhere, out, start);
+  if (upper == "AND") return make_token(TokenType::KeywordAnd, out, start);
+  if (upper == "OR") return make_token(TokenType::KeywordOr, out, start);
+  if (upper == "IN") return make_token(TokenType::KeywordIn, out, start);
+  if (upper == "EXISTS") return make_token(TokenType::KeywordExists, out, start);
+  if (upper == "DOCUMENT") return make_token(TokenType::KeywordDocument, out, start);
+  if (upper == "LIMIT") return make_token(TokenType::KeywordLimit, out, start);
+  if (upper == "EXCLUDE") return make_token(TokenType::KeywordExclude, out, start);
+  if (upper == "ORDER") return make_token(TokenType::KeywordOrder, out, start);
+  if (upper == "BY") return make_token(TokenType::KeywordBy, out, start);
+  if (upper == "ASC") return make_token(TokenType::KeywordAsc, out, start);
+  if (upper == "DESC") return make_token(TokenType::KeywordDesc, out, start);
+  if (upper == "AS") return make_token(TokenType::KeywordAs, out, start);
+  if (upper == "TO") return make_token(TokenType::KeywordTo, out, start);
+  if (upper == "LIST") return make_token(TokenType::KeywordList, out, start);
+  if (upper == "COUNT") return make_token(TokenType::KeywordCount, out, start);
+  if (upper == "TABLE") return make_token(TokenType::KeywordTable, out, start);
+  if (upper == "CSV") return make_token(TokenType::KeywordCsv, out, start);
+  if (upper == "PARQUET") return make_token(TokenType::KeywordParquet, out, start);
+  if (upper == "JSON") return make_token(TokenType::KeywordJson, out, start);
+  if (upper == "NDJSON") return make_token(TokenType::KeywordNdjson, out, start);
+  if (upper == "RAW") return make_token(TokenType::KeywordRaw, out, start);
+  if (upper == "FRAGMENTS") return make_token(TokenType::KeywordFragments, out, start);
+  if (upper == "CONTAINS") return make_token(TokenType::KeywordContains, out, start);
+  if (upper == "HAS_DIRECT_TEXT") return make_token(TokenType::KeywordHasDirectText, out, start);
+  if (upper == "LIKE") return make_token(TokenType::KeywordLike, out, start);
+  if (upper == "ALL") return make_token(TokenType::KeywordAll, out, start);
+  if (upper == "ANY") return make_token(TokenType::KeywordAny, out, start);
+  if (upper == "IS") return make_token(TokenType::KeywordIs, out, start);
+  if (upper == "NOT") return make_token(TokenType::KeywordNot, out, start);
+  if (upper == "NULL") return make_token(TokenType::KeywordNull, out, start);
+  if (upper == "CASE") return make_token(TokenType::KeywordCase, out, start);
+  if (upper == "WHEN") return make_token(TokenType::KeywordWhen, out, start);
+  if (upper == "THEN") return make_token(TokenType::KeywordThen, out, start);
+  if (upper == "ELSE") return make_token(TokenType::KeywordElse, out, start);
+  if (upper == "END") return make_token(TokenType::KeywordEnd, out, start);
+  if (upper == "SHOW") return make_token(TokenType::KeywordShow, out, start);
+  if (upper == "DESCRIBE") return make_token(TokenType::KeywordDescribe, out, start);
+  if (upper == "PROJECT") return make_token(TokenType::KeywordProject, out, start);
+  if (upper == "INPUT") return make_token(TokenType::KeywordInput, out, start);
+  if (upper == "INPUTS") return make_token(TokenType::KeywordInputs, out, start);
+  if (upper == "FUNCTIONS") return make_token(TokenType::KeywordFunctions, out, start);
+  if (upper == "AXES") return make_token(TokenType::KeywordAxes, out, start);
+  if (upper == "OPERATORS") return make_token(TokenType::KeywordOperators, out, start);
+  if (upper == "SELF") return make_token(TokenType::KeywordSelf, out, start);
+  return make_token(TokenType::Identifier, out, start);
 }
 
 Token Lexer::lex_number() {
   size_t start = pos_;
   std::string out;
   while (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
-    out.push_back(input_[pos_++]);
+    out.push_back(advance_char());
   }
-  return Token{TokenType::Number, out, start};
+  return make_token(TokenType::Number, out, start);
 }
 
-void Lexer::skip_ws() {
-  while (pos_ < input_.size() && std::isspace(static_cast<unsigned char>(input_[pos_]))) {
-    ++pos_;
+void Lexer::skip_ws_and_comments() {
+  while (true) {
+    size_t before = pos_;
+    while (pos_ < input_.size() && std::isspace(static_cast<unsigned char>(input_[pos_]))) {
+      advance_char();
+    }
+    if (pos_ + 1 < input_.size() && input_[pos_] == '-' && input_[pos_ + 1] == '-') {
+      advance_char();
+      advance_char();
+      while (pos_ < input_.size() && input_[pos_] != '\n') {
+        advance_char();
+      }
+      continue;
+    }
+    if (pos_ + 1 < input_.size() && input_[pos_] == '/' && input_[pos_ + 1] == '*') {
+      size_t start = pos_;
+      advance_char();
+      advance_char();
+      bool closed = false;
+      while (pos_ < input_.size()) {
+        if (pos_ + 1 < input_.size() && input_[pos_] == '*' && input_[pos_ + 1] == '/') {
+          advance_char();
+          advance_char();
+          closed = true;
+          break;
+        }
+        advance_char();
+      }
+      if (!closed) {
+        set_error("Unterminated block comment", start);
+        return;
+      }
+      continue;
+    }
+    if (pos_ == before) {
+      break;
+    }
   }
+}
+
+char Lexer::advance_char() {
+  char c = input_[pos_++];
+  if (c == '\n') {
+    ++line_;
+    col_ = 1;
+  } else {
+    ++col_;
+  }
+  return c;
+}
+
+bool Lexer::has_error() const { return has_error_; }
+
+Token Lexer::make_token(TokenType type, const std::string& text, size_t start_pos) const {
+  return Token{type, text, start_pos};
+}
+
+void Lexer::set_error(const std::string& message, size_t position) {
+  if (has_error_) return;
+  has_error_ = true;
+  error_message_ = message;
+  error_position_ = position;
 }
 
 bool Lexer::is_ident_start(char c) {

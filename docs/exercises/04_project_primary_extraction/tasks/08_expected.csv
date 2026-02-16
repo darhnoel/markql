@@ -1,0 +1,4 @@
+node_id,city,stop_text,price_num
+2,Tokyo,1 stop,12300
+11,Osaka,nonstop,8500
+24,Seoul,2 stops,14200
