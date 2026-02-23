@@ -105,6 +105,16 @@ FROM 'https://example.com'
 FROM RAW('<div>...</div>')
 ```
 
+Short table-trimming example:
+
+```sql
+SELECT table
+FROM doc
+TO TABLE(TRIM_EMPTY_ROWS=ON, TRIM_EMPTY_COLS=TRAILING);
+```
+
+This keeps the table rectangular, drops fully empty padding rows, and trims only right-edge empty columns.
+
 ## Running Scripts
 
 You can run multiple statements from a `.sql` file:

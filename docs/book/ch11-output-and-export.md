@@ -24,6 +24,53 @@ This may feel unfamiliar if you are used to handling output entirely in host lan
 - Use `TO NDJSON` for streaming pipelines.
 - Verify sink constraints with small test exports first.
 
+## Tables
+`TO TABLE()` is rectangular by default. It preserves extracted rows/cells as-is unless you opt into trimming or sparse output options.
+
+Defaults:
+- `TRIM_EMPTY_ROWS=OFF`
+- `TRIM_EMPTY_COLS=OFF`
+- `EMPTY_IS=BLANK_OR_NULL`
+- `STOP_AFTER_EMPTY_ROWS=0` (disabled)
+- `FORMAT=RECT`
+- `SPARSE_SHAPE=LONG` (used only when `FORMAT=SPARSE`)
+- `HEADER_NORMALIZE=ON` only when explicitly enabled with `HEADER_NORMALIZE=ON`
+
+Tiny before/after (same fixture shape as `tests/fixtures/tables/trailing_empty_rows_and_cols.html`):
+
+```sql
+SELECT table FROM doc TO TABLE();
+```
+
+Keeps trailing padding rows and trailing empty columns.
+
+```sql
+SELECT table FROM doc
+TO TABLE(TRIM_EMPTY_ROWS=ON, TRIM_EMPTY_COLS=TRAILING);
+```
+
+Drops padding rows and trims only right-edge empty columns.
+
+Sparse formats:
+
+```sql
+SELECT table FROM doc
+TO TABLE(FORMAT=SPARSE, SPARSE_SHAPE=LONG, TRIM_EMPTY_ROWS=ON, TRIM_EMPTY_COLS=TRAILING, HEADER=ON);
+```
+
+Returns one record per non-empty cell (`row_index`, `col_index`, optional `header`, `value`). Use this for pipelines and append-style processing.
+
+```sql
+SELECT table FROM doc
+TO TABLE(FORMAT=SPARSE, SPARSE_SHAPE=WIDE, TRIM_EMPTY_ROWS=ON, TRIM_EMPTY_COLS=TRAILING, HEADER=ON);
+```
+
+Returns one object per data row with only non-empty keys. Use this for per-row object payloads.
+
+Determinism and compatibility:
+- With no new options, table output stays backward compatible.
+- For a fixed DOM snapshot and fixed options, output is deterministic.
+
 ## Scope
 
 ```text

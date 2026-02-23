@@ -225,6 +225,7 @@ if (XSQL_BUILD_TESTS)
     cli/explore/markql_suggestor.cpp
     tests/test_explore_search.cpp
     tests/test_markql_suggestor.cpp
+    tests/test_table_options.cpp
     cli/repl/core/vim_edit.cpp
     cli/repl/core/vim_normal.cpp
     cli/repl/core/line_editor.cpp
@@ -462,6 +463,20 @@ if (XSQL_BUILD_TESTS)
     fuzzy_search_candidate_subset
     fuzzy_search_prioritizes_word_level_match
     make_inner_html_snippet_context
+    table_header_normalize_behavior
+    table_empty_is_semantics
+    table_trim_empty_rows_semantics
+    table_trim_empty_cols_semantics
+    table_sparse_non_empty_cells_only
+    golden_table_trim_baseline
+    golden_table_trim_rows
+    golden_table_trim_trailing_cols
+    golden_table_trim_rows_and_trailing_cols
+    golden_table_trim_all_cols
+    golden_table_stop_after_empty_rows
+    golden_table_header_normalize
+    golden_table_sparse_long
+    golden_table_sparse_wide
   )
   if (XSQL_ENABLE_KHMER_NUMBER)
     list(APPEND XSQL_TESTS

@@ -446,7 +446,24 @@ bool export_result(const xsql::QueryResult& result,
       error = "Export requires a single table result; add a filter to select one table";
       return false;
     }
+    const bool sparse = result.table_options.format == xsql::QueryResult::TableOptions::Format::Sparse;
+    const bool sparse_long =
+        result.table_options.sparse_shape == xsql::QueryResult::TableOptions::SparseShape::Long;
+    if (sparse && !sparse_long) {
+      error = "TO TABLE(FORMAT=SPARSE, SPARSE_SHAPE=WIDE) does not support EXPORT";
+      return false;
+    }
     if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Csv) {
+      if (sparse && sparse_long) {
+        xsql::QueryResult::TableResult table = result.tables[0];
+        std::vector<std::string> header_row = {"row_index", "col_index"};
+        if (result.table_has_header) {
+          header_row.push_back("header");
+        }
+        header_row.push_back("value");
+        table.rows.insert(table.rows.begin(), std::move(header_row));
+        return write_table_csv(table, result.export_sink.path, error, true);
+      }
       return write_table_csv(result.tables[0], result.export_sink.path, error,
                              result.table_has_header);
     }

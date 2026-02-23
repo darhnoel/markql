@@ -749,8 +749,65 @@ std::string build_json_list(const xsql::QueryResult& result, xsql::ColumnNameMod
 }
 
 std::string build_table_json(const xsql::QueryResult& result) {
+  const bool sparse =
+      result.table_options.format == xsql::QueryResult::TableOptions::Format::Sparse;
+  const bool sparse_long =
+      result.table_options.sparse_shape == xsql::QueryResult::TableOptions::SparseShape::Long;
 #ifdef XSQL_USE_NLOHMANN_JSON
   using nlohmann::json;
+  auto parse_index_or_string = [](const std::string& text) -> json {
+    try {
+      size_t idx = 0;
+      int64_t value = std::stoll(text, &idx);
+      if (idx == text.size()) {
+        return value;
+      }
+    } catch (...) {
+    }
+    return text;
+  };
+  auto sparse_long_rows_json = [&](const xsql::QueryResult::TableResult& table) -> json {
+    json rows = json::array();
+    const bool include_header = result.table_has_header;
+    const size_t expected = include_header ? 4 : 3;
+    for (const auto& row : table.rows) {
+      if (row.size() < expected) continue;
+      json obj = json::object();
+      obj["row_index"] = parse_index_or_string(row[0]);
+      obj["col_index"] = parse_index_or_string(row[1]);
+      if (include_header) {
+        obj["header"] = row[2];
+        obj["value"] = row[3];
+      } else {
+        obj["value"] = row[2];
+      }
+      rows.push_back(std::move(obj));
+    }
+    return rows;
+  };
+  auto sparse_wide_rows_json = [](const xsql::QueryResult::TableResult& table) -> json {
+    json rows = json::array();
+    for (const auto& row : table.sparse_wide_rows) {
+      json obj = json::object();
+      for (const auto& kv : row) {
+        obj[kv.first] = kv.second;
+      }
+      rows.push_back(std::move(obj));
+    }
+    return rows;
+  };
+  if (sparse && result.tables.size() == 1) {
+    if (sparse_long) return sparse_long_rows_json(result.tables[0]).dump(2);
+    return sparse_wide_rows_json(result.tables[0]).dump(2);
+  }
+  if (sparse) {
+    json out = json::array();
+    for (const auto& table : result.tables) {
+      json rows = sparse_long ? sparse_long_rows_json(table) : sparse_wide_rows_json(table);
+      out.push_back({{"node_id", table.node_id}, {"rows", rows}});
+    }
+    return out.dump(2);
+  }
   if (result.tables.size() == 1) {
     json rows = json::array();
     for (const auto& row : result.tables[0].rows) {
@@ -768,6 +825,76 @@ std::string build_table_json(const xsql::QueryResult& result) {
   }
   return out.dump(2);
 #else
+  auto sparse_long_rows_json = [&](const xsql::QueryResult::TableResult& table) -> std::string {
+    std::ostringstream oss;
+    oss << "[";
+    const bool include_header = result.table_has_header;
+    const size_t expected = include_header ? 4 : 3;
+    bool first = true;
+    for (const auto& row : table.rows) {
+      if (row.size() < expected) continue;
+      if (!first) oss << ",";
+      first = false;
+      oss << "{\"row_index\":";
+      bool numeric_row = !row[0].empty() &&
+                         std::all_of(row[0].begin(), row[0].end(),
+                                     [](unsigned char c) { return std::isdigit(c) != 0; });
+      if (numeric_row) oss << row[0];
+      else oss << "\"" << json_escape(row[0]) << "\"";
+      oss << ",\"col_index\":";
+      bool numeric_col = !row[1].empty() &&
+                         std::all_of(row[1].begin(), row[1].end(),
+                                     [](unsigned char c) { return std::isdigit(c) != 0; });
+      if (numeric_col) oss << row[1];
+      else oss << "\"" << json_escape(row[1]) << "\"";
+      if (include_header) {
+        oss << ",\"header\":\"" << json_escape(row[2]) << "\"";
+        oss << ",\"value\":\"" << json_escape(row[3]) << "\"";
+      } else {
+        oss << ",\"value\":\"" << json_escape(row[2]) << "\"";
+      }
+      oss << "}";
+    }
+    oss << "]";
+    return oss.str();
+  };
+  auto sparse_wide_rows_json = [](const xsql::QueryResult::TableResult& table) -> std::string {
+    std::ostringstream oss;
+    oss << "[";
+    for (size_t i = 0; i < table.sparse_wide_rows.size(); ++i) {
+      if (i > 0) oss << ",";
+      oss << "{";
+      const auto& row = table.sparse_wide_rows[i];
+      for (size_t j = 0; j < row.size(); ++j) {
+        if (j > 0) oss << ",";
+        oss << "\"" << json_escape(row[j].first) << "\":"
+            << "\"" << json_escape(row[j].second) << "\"";
+      }
+      oss << "}";
+    }
+    oss << "]";
+    return oss.str();
+  };
+  if (sparse && result.tables.size() == 1) {
+    if (sparse_long) return sparse_long_rows_json(result.tables[0]);
+    return sparse_wide_rows_json(result.tables[0]);
+  }
+  if (sparse) {
+    std::ostringstream oss;
+    oss << "[";
+    for (size_t i = 0; i < result.tables.size(); ++i) {
+      if (i > 0) oss << ",";
+      oss << "{\"node_id\":" << result.tables[i].node_id << ",\"rows\":";
+      if (sparse_long) {
+        oss << sparse_long_rows_json(result.tables[i]);
+      } else {
+        oss << sparse_wide_rows_json(result.tables[i]);
+      }
+      oss << "}";
+    }
+    oss << "]";
+    return oss.str();
+  }
   std::ostringstream oss;
   if (result.tables.size() == 1) {
     oss << "[";

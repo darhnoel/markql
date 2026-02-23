@@ -1,9 +1,11 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace xsql {
@@ -30,6 +32,16 @@ struct QueryResultRow {
 /// MUST keep columns consistent with rows/tables and MUST NOT mix incompatible modes.
 /// Inputs/outputs are populated by execution; side effects include downstream export behavior.
 struct QueryResult {
+  struct TableOptions {
+    enum class TrimEmptyCols { Off, Trailing, All } trim_empty_cols = TrimEmptyCols::Off;
+    enum class EmptyIs { BlankOrNull, NullOnly, BlankOnly } empty_is = EmptyIs::BlankOrNull;
+    enum class Format { Rect, Sparse } format = Format::Rect;
+    enum class SparseShape { Long, Wide } sparse_shape = SparseShape::Long;
+    bool trim_empty_rows = false;
+    size_t stop_after_empty_rows = 0;
+    bool header_normalize = true;
+    bool header_normalize_explicit = false;
+  };
   struct ExportSink {
     /// Describes an export target so the CLI can write files without re-parsing the query.
     /// MUST use Kind::None to indicate no export and MUST carry a valid path otherwise.
@@ -50,11 +62,15 @@ struct QueryResult {
     /// MUST preserve row order from the source table and MUST NOT mutate cell contents.
     /// Inputs are node_id/rows; side effects are none but output formatting depends on them.
     int64_t node_id = 0;
+    std::vector<std::string> headers;
+    std::vector<std::string> header_keys;
     std::vector<std::vector<std::string>> rows;
+    std::vector<std::vector<std::pair<std::string, std::string>>> sparse_wide_rows;
   };
   std::vector<TableResult> tables;
   bool to_table = false;
   bool table_has_header = true;
+  TableOptions table_options;
   ExportSink export_sink;
 };
 

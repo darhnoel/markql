@@ -78,10 +78,19 @@ bool Parser::parse_query_body(Query& q) {
       if (!consume(TokenType::LParen, "Expected ( after TABLE")) return false;
       bool saw_header = false;
       bool saw_export = false;
+      bool saw_trim_empty_rows = false;
+      bool saw_trim_empty_cols = false;
+      bool saw_empty_is = false;
+      bool saw_stop_after_empty_rows = false;
+      bool saw_format = false;
+      bool saw_sparse_shape = false;
+      bool saw_header_normalize = false;
       if (current_.type != TokenType::RParen) {
         while (true) {
           if (current_.type != TokenType::Identifier) {
-            return set_error("Expected HEADER, NOHEADER, or EXPORT inside TABLE()");
+            return set_error(
+                "Expected HEADER, NOHEADER, EXPORT, TRIM_EMPTY_ROWS, TRIM_EMPTY_COLS, "
+                "EMPTY_IS, STOP_AFTER_EMPTY_ROWS, FORMAT, SPARSE_SHAPE, or HEADER_NORMALIZE inside TABLE()");
           }
           size_t option_start = current_.pos;
           std::string option = to_upper(current_.text);
@@ -133,8 +142,153 @@ bool Parser::parse_query_body(Query& q) {
             q.export_sink = sink;
             saw_export = true;
             advance();
+          } else if (option == "TRIM_EMPTY_ROWS") {
+            if (saw_trim_empty_rows) {
+              return set_error("Duplicate TRIM_EMPTY_ROWS option inside TABLE()");
+            }
+            if (current_.type == TokenType::Equal) {
+              advance();
+            }
+            if (current_.type != TokenType::Identifier) {
+              return set_error("Expected ON or OFF after TRIM_EMPTY_ROWS");
+            }
+            const std::string value = to_upper(current_.text);
+            if (value == "ON") {
+              q.table_options.trim_empty_rows = true;
+            } else if (value == "OFF") {
+              q.table_options.trim_empty_rows = false;
+            } else {
+              return set_error("Expected ON or OFF after TRIM_EMPTY_ROWS");
+            }
+            saw_trim_empty_rows = true;
+            advance();
+          } else if (option == "TRIM_EMPTY_COLS") {
+            if (saw_trim_empty_cols) {
+              return set_error("Duplicate TRIM_EMPTY_COLS option inside TABLE()");
+            }
+            if (current_.type == TokenType::Equal) {
+              advance();
+            }
+            if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordAll) {
+              return set_error("Expected OFF, TRAILING, or ALL after TRIM_EMPTY_COLS");
+            }
+            const std::string value = to_upper(current_.text);
+            if (value == "OFF") {
+              q.table_options.trim_empty_cols = Query::TableOptions::TrimEmptyCols::Off;
+            } else if (value == "TRAILING") {
+              q.table_options.trim_empty_cols = Query::TableOptions::TrimEmptyCols::Trailing;
+            } else if (value == "ALL") {
+              q.table_options.trim_empty_cols = Query::TableOptions::TrimEmptyCols::All;
+            } else {
+              return set_error("Expected OFF, TRAILING, or ALL after TRIM_EMPTY_COLS");
+            }
+            saw_trim_empty_cols = true;
+            advance();
+          } else if (option == "EMPTY_IS") {
+            if (saw_empty_is) {
+              return set_error("Duplicate EMPTY_IS option inside TABLE()");
+            }
+            if (current_.type == TokenType::Equal) {
+              advance();
+            }
+            if (current_.type != TokenType::Identifier) {
+              return set_error("Expected BLANK_OR_NULL, NULL_ONLY, or BLANK_ONLY after EMPTY_IS");
+            }
+            const std::string value = to_upper(current_.text);
+            if (value == "BLANK_OR_NULL") {
+              q.table_options.empty_is = Query::TableOptions::EmptyIs::BlankOrNull;
+            } else if (value == "NULL_ONLY") {
+              q.table_options.empty_is = Query::TableOptions::EmptyIs::NullOnly;
+            } else if (value == "BLANK_ONLY") {
+              q.table_options.empty_is = Query::TableOptions::EmptyIs::BlankOnly;
+            } else {
+              return set_error("Expected BLANK_OR_NULL, NULL_ONLY, or BLANK_ONLY after EMPTY_IS");
+            }
+            saw_empty_is = true;
+            advance();
+          } else if (option == "STOP_AFTER_EMPTY_ROWS") {
+            if (saw_stop_after_empty_rows) {
+              return set_error("Duplicate STOP_AFTER_EMPTY_ROWS option inside TABLE()");
+            }
+            if (current_.type == TokenType::Equal) {
+              advance();
+            }
+            if (current_.type != TokenType::Number) {
+              return set_error("Expected non-negative integer after STOP_AFTER_EMPTY_ROWS");
+            }
+            try {
+              q.table_options.stop_after_empty_rows =
+                  static_cast<size_t>(std::stoull(current_.text));
+            } catch (...) {
+              return set_error("Expected non-negative integer after STOP_AFTER_EMPTY_ROWS");
+            }
+            saw_stop_after_empty_rows = true;
+            advance();
+          } else if (option == "FORMAT") {
+            if (saw_format) {
+              return set_error("Duplicate FORMAT option inside TABLE()");
+            }
+            if (current_.type == TokenType::Equal) {
+              advance();
+            }
+            if (current_.type != TokenType::Identifier) {
+              return set_error("Expected RECT or SPARSE after FORMAT");
+            }
+            const std::string value = to_upper(current_.text);
+            if (value == "RECT") {
+              q.table_options.format = Query::TableOptions::Format::Rect;
+            } else if (value == "SPARSE") {
+              q.table_options.format = Query::TableOptions::Format::Sparse;
+            } else {
+              return set_error("Expected RECT or SPARSE after FORMAT");
+            }
+            saw_format = true;
+            advance();
+          } else if (option == "SPARSE_SHAPE") {
+            if (saw_sparse_shape) {
+              return set_error("Duplicate SPARSE_SHAPE option inside TABLE()");
+            }
+            if (current_.type == TokenType::Equal) {
+              advance();
+            }
+            if (current_.type != TokenType::Identifier) {
+              return set_error("Expected LONG or WIDE after SPARSE_SHAPE");
+            }
+            const std::string value = to_upper(current_.text);
+            if (value == "LONG") {
+              q.table_options.sparse_shape = Query::TableOptions::SparseShape::Long;
+            } else if (value == "WIDE") {
+              q.table_options.sparse_shape = Query::TableOptions::SparseShape::Wide;
+            } else {
+              return set_error("Expected LONG or WIDE after SPARSE_SHAPE");
+            }
+            saw_sparse_shape = true;
+            advance();
+          } else if (option == "HEADER_NORMALIZE") {
+            if (saw_header_normalize) {
+              return set_error("Duplicate HEADER_NORMALIZE option inside TABLE()");
+            }
+            if (current_.type == TokenType::Equal) {
+              advance();
+            }
+            if (current_.type != TokenType::Identifier) {
+              return set_error("Expected ON or OFF after HEADER_NORMALIZE");
+            }
+            const std::string value = to_upper(current_.text);
+            if (value == "ON") {
+              q.table_options.header_normalize = true;
+            } else if (value == "OFF") {
+              q.table_options.header_normalize = false;
+            } else {
+              return set_error("Expected ON or OFF after HEADER_NORMALIZE");
+            }
+            q.table_options.header_normalize_explicit = true;
+            saw_header_normalize = true;
+            advance();
           } else {
-            return set_error("Expected HEADER, NOHEADER, or EXPORT inside TABLE()");
+            return set_error(
+                "Expected HEADER, NOHEADER, EXPORT, TRIM_EMPTY_ROWS, TRIM_EMPTY_COLS, "
+                "EMPTY_IS, STOP_AFTER_EMPTY_ROWS, FORMAT, SPARSE_SHAPE, or HEADER_NORMALIZE inside TABLE()");
           }
           if (current_.type == TokenType::Comma) {
             advance();
@@ -144,6 +298,9 @@ bool Parser::parse_query_body(Query& q) {
         }
       }
       if (!consume(TokenType::RParen, "Expected ) after TABLE(")) return false;
+      if (q.table_options.format != Query::TableOptions::Format::Sparse && saw_sparse_shape) {
+        return set_error("SPARSE_SHAPE requires FORMAT=SPARSE");
+      }
       q.to_table = true;
     } else if (current_.type == TokenType::KeywordCsv ||
                current_.type == TokenType::KeywordParquet ||

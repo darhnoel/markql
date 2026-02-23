@@ -91,6 +91,7 @@ Run interactive REPL:
 - URL sources (`FROM 'https://...'`) require `XSQL_WITH_CURL=ON`.
 - `TO PARQUET(...)` requires `XSQL_WITH_ARROW=ON`.
 - `INNER_HTML(...)` returns minified HTML by default. Use `RAW_INNER_HTML(...)` for unmodified raw output.
+- `TO TABLE(...)` supports explicit trimming/sparse options: `TRIM_EMPTY_ROWS`, `TRIM_EMPTY_COLS`, `EMPTY_IS`, `STOP_AFTER_EMPTY_ROWS`, `FORMAT`, `SPARSE_SHAPE`, and `HEADER_NORMALIZE`.
 
 ## Testing
 
@@ -118,6 +119,7 @@ Python package/tests (optional):
 
 - Book (chapter path + verified examples): [docs/book/SUMMARY.md](docs/book/SUMMARY.md)
 - Canonical tutorial: [docs/markql-tutorial.md](docs/markql-tutorial.md)
+- CLI guide: [docs/markql-cli-guide.md](docs/markql-cli-guide.md)
 - Docs index: [docs/README.md](docs/README.md)
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 
