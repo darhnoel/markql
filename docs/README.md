@@ -1,6 +1,7 @@
 # MarkQL Docs
 
 - Canonical tutorial: [markql-tutorial.md](markql-tutorial.md)
+- CLI guide: [markql-cli-guide.md](markql-cli-guide.md)
 - Book (chapter path): [book/SUMMARY.md](book/SUMMARY.md)
 - Exercises workbook: [exercises/README.md](exercises/README.md)
 - Contributor implementation guide: [implementation-guide.md](implementation-guide.md)

@@ -56,3 +56,6 @@ __pycache__/
 # Specs
 specs/*
 examples/*
+
+# frontend
+static_server/*

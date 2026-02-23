@@ -25,11 +25,13 @@ const std::vector<std::string>& markql_completion_keywords() {
       "parent", "child", "ancestor", "descendant", "node_id", "parent_id", "sibling_pos",
       "max_depth", "doc_order", "source_uri", "count", "summarize", "tfidf", "top_terms",
       "min_df", "max_df", "stopwords", "english", "none", "default", "header", "noheader",
-      "no_header", "on", "off", "export", "show", "describe", "input", "inputs", "functions",
-      "axes", "operators", "language", "case", "when", "then", "else", "end", "coalesce",
-      "concat", "substring", "substr", "length", "char_length", "position", "locate", "replace",
-      "lower", "upper", "trim", "ltrim", "rtrim", "first_text", "last_text", "first_attr",
-      "last_attr"};
+      "no_header", "on", "off", "export", "trim_empty_rows", "trim_empty_cols", "empty_is",
+      "stop_after_empty_rows", "format", "sparse_shape", "header_normalize", "blank_or_null",
+      "null_only", "blank_only", "trailing", "rect", "sparse", "long", "wide", "show",
+      "describe", "input", "inputs", "functions", "axes", "operators", "language", "case",
+      "when", "then", "else", "end", "coalesce", "concat", "substring", "substr", "length",
+      "char_length", "position", "locate", "replace", "lower", "upper", "trim", "ltrim",
+      "rtrim", "first_text", "last_text", "first_attr", "last_attr"};
   return keywords;
 }
 

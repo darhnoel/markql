@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <optional>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <variant>
@@ -134,6 +135,16 @@ struct Query {
     bool descending = false;
     Span span;
   };
+  struct TableOptions {
+    enum class TrimEmptyCols { Off, Trailing, All } trim_empty_cols = TrimEmptyCols::Off;
+    enum class EmptyIs { BlankOrNull, NullOnly, BlankOnly } empty_is = EmptyIs::BlankOrNull;
+    enum class Format { Rect, Sparse } format = Format::Rect;
+    enum class SparseShape { Long, Wide } sparse_shape = SparseShape::Long;
+    bool trim_empty_rows = false;
+    size_t stop_after_empty_rows = 0;
+    bool header_normalize = true;
+    bool header_normalize_explicit = false;
+  };
   struct SelectItem {
     struct FlattenExtractExpr {
       enum class Kind {
@@ -199,6 +210,7 @@ struct Query {
   bool to_list = false;
   bool to_table = false;
   bool table_has_header = true;
+  TableOptions table_options;
   std::optional<ExportSink> export_sink;
   Span span;
 };

@@ -1,0 +1,6 @@
+[
+  ["City", "Code", "Price"],
+  ["Tokyo", "TYO", "100"],
+  ["Osaka", "OSA", "80"],
+  ["Sapporo", "SPK", "120"]
+]

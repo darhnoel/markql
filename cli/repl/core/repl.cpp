@@ -171,6 +171,26 @@ int run_repl(ReplConfig& config) {
         if (result.tables.empty()) {
           std::cout << "(empty table)" << std::endl;
           std::cout << "Rows: 0" << std::endl;
+        } else if (result.table_options.format ==
+                   xsql::QueryResult::TableOptions::Format::Sparse) {
+          std::string json_out = build_table_json(result);
+          last_full_output = json_out;
+          if (display_full) {
+            std::cout << colorize_json(json_out, config.color) << std::endl;
+          } else {
+            TruncateResult truncated = truncate_output(json_out, 10, 10);
+            std::cout << colorize_json(truncated.output, config.color) << std::endl;
+          }
+          size_t sparse_rows = 0;
+          for (const auto& table : result.tables) {
+            if (result.table_options.sparse_shape ==
+                xsql::QueryResult::TableOptions::SparseShape::Long) {
+              sparse_rows += table.rows.size();
+            } else {
+              sparse_rows += table.sparse_wide_rows.size();
+            }
+          }
+          std::cout << "Rows: " << sparse_rows << std::endl;
         } else {
           for (size_t i = 0; i < result.tables.size(); ++i) {
             if (result.tables.size() > 1) {
