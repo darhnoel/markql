@@ -33,7 +33,7 @@
   }
 
   function captureMainContentHtml() {
-    const preferred = document.querySelector("article, main, [role='main']");
+    const preferred = document.querySelector("article, main, [role='main'], [role='full']");
     if (preferred) {
       return { html: preferred.outerHTML, source: "preferred" };
     }
