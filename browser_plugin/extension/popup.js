@@ -2,11 +2,15 @@ const AGENT_URL = "http://127.0.0.1:7337/v1/query";
 const STORAGE_KEY_TOKEN = "markqlAgentToken";
 const STORAGE_KEY_QUERY = "markqlLastQuery";
 const STORAGE_KEY_SNAPSHOT = "markqlSnapshotHtml";
+const STORAGE_KEY_SNAPSHOT_SCOPE = "markqlSnapshotScope";
 const LEGACY_STORAGE_KEY_TOKEN = "xsqlAgentToken";
 const LEGACY_STORAGE_KEY_QUERY = "xsqlLastQuery";
 const LEGACY_STORAGE_KEY_SNAPSHOT = "xsqlSnapshotHtml";
+const PRIMARY_CAPTURE_SCOPE = "full";
+const FALLBACK_CAPTURE_SCOPE = "main";
 
 let snapshotHtml = "";
+let snapshotScope = "";
 let lastResult = null;
 const SQL_KEYWORDS = new Set([
   "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "AS", "LIMIT",
@@ -294,38 +298,68 @@ async function getActiveTab() {
   return tabs[0];
 }
 
-async function saveSnapshotToSession(html) {
-  if (!chrome.storage.session) return;
-  await chrome.storage.session.set({ [STORAGE_KEY_SNAPSHOT]: html });
+async function saveSnapshotToSession(html, scope) {
+  if (!chrome.storage.session) return false;
+  try {
+    await chrome.storage.session.set({
+      [STORAGE_KEY_SNAPSHOT]: html,
+      [STORAGE_KEY_SNAPSHOT_SCOPE]: scope
+    });
+    return true;
+  } catch (err) {
+    // Large pages can exceed storage.session quota; keep in-memory snapshot usable.
+    console.warn("Failed to cache snapshot in session storage:", err);
+    return false;
+  }
 }
 
 async function restoreSnapshotFromSession() {
-  if (!chrome.storage.session) return "";
-  const data = await chrome.storage.session.get([STORAGE_KEY_SNAPSHOT]);
-  return typeof data[STORAGE_KEY_SNAPSHOT] === "string" ? data[STORAGE_KEY_SNAPSHOT] : "";
+  if (!chrome.storage.session) return { html: "", scope: "" };
+  const data = await chrome.storage.session.get([STORAGE_KEY_SNAPSHOT, STORAGE_KEY_SNAPSHOT_SCOPE]);
+  const html = typeof data[STORAGE_KEY_SNAPSHOT] === "string" ? data[STORAGE_KEY_SNAPSHOT] : "";
+  const scope = typeof data[STORAGE_KEY_SNAPSHOT_SCOPE] === "string" ? data[STORAGE_KEY_SNAPSHOT_SCOPE] : "";
+  return { html, scope };
+}
+
+async function requestSnapshot(tabId, scope) {
+  return chrome.runtime.sendMessage({
+    type: "captureSnapshot",
+    tabId,
+    scope
+  });
 }
 
 async function captureSnapshot(force = false) {
-  if (!force && snapshotHtml) {
+  if (!force && snapshotHtml && snapshotScope === PRIMARY_CAPTURE_SCOPE) {
     return snapshotHtml;
   }
 
   const tab = await getActiveTab();
-  status("Capturing snapshot...");
+  status(`Capturing ${PRIMARY_CAPTURE_SCOPE} snapshot...`);
 
-  const response = await chrome.runtime.sendMessage({
-    type: "captureSnapshot",
-    tabId: tab.id,
-    scope: "main"
-  });
+  let response;
+  try {
+    response = await requestSnapshot(tab.id, PRIMARY_CAPTURE_SCOPE);
+  } catch (err) {
+    if (FALLBACK_CAPTURE_SCOPE === PRIMARY_CAPTURE_SCOPE) {
+      throw err;
+    }
+    status(`Full capture failed, retrying ${FALLBACK_CAPTURE_SCOPE}...`);
+    response = await requestSnapshot(tab.id, FALLBACK_CAPTURE_SCOPE);
+  }
 
   if (!response || !response.ok || typeof response.html !== "string") {
     throw new Error(response && response.error ? response.error : "Capture failed");
   }
 
   snapshotHtml = response.html;
-  await saveSnapshotToSession(snapshotHtml);
-  status(`Captured ${response.size_bytes} bytes.`);
+  const captureScope = response.scope || PRIMARY_CAPTURE_SCOPE;
+  snapshotScope = captureScope;
+  const cached = await saveSnapshotToSession(snapshotHtml, snapshotScope);
+  const captureSource = response.source || "unknown";
+  status(
+    `Captured ${response.size_bytes} bytes (${captureScope}/${captureSource})${cached ? "" : " | cache skipped"}.`
+  );
   return snapshotHtml;
 }
 
@@ -348,7 +382,7 @@ async function runQuery() {
 
   await chrome.storage.local.set({ [STORAGE_KEY_QUERY]: query });
 
-  if (!snapshotHtml) {
+  if (!snapshotHtml || snapshotScope !== PRIMARY_CAPTURE_SCOPE) {
     snapshotHtml = await captureSnapshot(false);
   }
 
@@ -464,17 +498,21 @@ async function restoreSettings() {
     }
   }
 
-  snapshotHtml = await restoreSnapshotFromSession();
+  const restoredSnapshot = await restoreSnapshotFromSession();
+  snapshotHtml = restoredSnapshot.html;
+  snapshotScope = restoredSnapshot.scope;
   if (!snapshotHtml && chrome.storage.session) {
     const legacySnapshotData = await chrome.storage.session.get([LEGACY_STORAGE_KEY_SNAPSHOT]);
     const legacySnapshot = legacySnapshotData[LEGACY_STORAGE_KEY_SNAPSHOT];
     if (typeof legacySnapshot === "string" && legacySnapshot) {
       snapshotHtml = legacySnapshot;
-      await saveSnapshotToSession(snapshotHtml);
+      snapshotScope = "";
+      await saveSnapshotToSession(snapshotHtml, snapshotScope);
     }
   }
   if (snapshotHtml) {
-    status(`Restored cached snapshot (${snapshotHtml.length} bytes).`);
+    const scopeLabel = snapshotScope || "unknown";
+    status(`Restored cached snapshot (${snapshotHtml.length} bytes, scope=${scopeLabel}).`);
   } else {
     status("Ready.");
   }
