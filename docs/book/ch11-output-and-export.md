@@ -34,7 +34,7 @@ Defaults:
 - `STOP_AFTER_EMPTY_ROWS=0` (disabled)
 - `FORMAT=RECT`
 - `SPARSE_SHAPE=LONG` (used only when `FORMAT=SPARSE`)
-- `HEADER_NORMALIZE=ON` only when explicitly enabled with `HEADER_NORMALIZE=ON`
+- `HEADER_NORMALIZE=ON` when `HEADER=ON` (ignored otherwise)
 
 Tiny before/after (same fixture shape as `tests/fixtures/tables/trailing_empty_rows_and_cols.html`):
 
