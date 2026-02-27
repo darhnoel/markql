@@ -10,4 +10,4 @@ if [[ ! -d "${VENV_DIR}" ]]; then
 fi
 
 source "${VENV_DIR}/bin/activate"
-pytest -v python/tests
+PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}python" pytest -v python/tests

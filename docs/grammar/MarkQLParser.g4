@@ -32,13 +32,35 @@ describeQuery
     ;
 
 selectQuery
-    : SELECT selectList
+    : withClause?
+      SELECT selectList
       (EXCLUDE excludeList)?
       FROM source
+      joinClause*
       (WHERE expr)?
       (ORDER BY orderByItem (COMMA orderByItem)*)?
       (LIMIT UINT)?
       (TO toTarget)?
+    ;
+
+withClause
+    : WITH cteDef (COMMA cteDef)*
+    ;
+
+cteDef
+    : identifier AS LPAREN subqueryBody RPAREN
+    ;
+
+joinClause
+    : joinType source ON expr
+    | CROSS JOIN source
+    | CROSS JOIN LATERAL LPAREN subqueryBody RPAREN sourceAliasRequired
+    ;
+
+joinType
+    : JOIN
+    | INNER JOIN
+    | LEFT JOIN
     ;
 
 selectList
@@ -294,18 +316,25 @@ excludeList
 
 source
     : DOCUMENT sourceAlias?
+    | DOC sourceAlias?
     | RAW LPAREN stringLiteral RPAREN sourceAlias?
     | FRAGMENTS LPAREN (RAW LPAREN stringLiteral RPAREN | subqueryBody) RPAREN sourceAlias?
+    | PARSE LPAREN (subqueryBody | scalarExpr) RPAREN sourceAlias?
+    | LPAREN subqueryBody RPAREN sourceAliasRequired
     | stringLiteral sourceAlias?
-    | identifier
+    | identifier sourceAlias?
     ;
 
 sourceAlias
     : AS? identifier
     ;
 
+sourceAliasRequired
+    : AS? identifier
+    ;
+
 orderByItem
-    : (identifier | COUNT) (ASC | DESC)?
+    : (identifier | COUNT) (DOT identifier)? (ASC | DESC)?
     ;
 
 toTarget

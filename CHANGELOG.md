@@ -7,6 +7,30 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 
 ## [Unreleased]
 
+### Added
+- Added `PARSE(...)` as a source constructor for parsing HTML strings into queryable node streams.
+- Added `PARSE(...)` support for both scalar HTML expressions and subquery-produced HTML strings.
+- Added SQL-style row alias field binding with `alias.field` across projections/predicates.
+- Added implicit `doc` row alias binding for plain `FROM doc` / `FROM document`.
+- Added alias parser/evaluator tests for implicit `doc` binding, explicit alias binding, and alias error paths.
+- Added `WITH` (CTE) support with ordered CTE evaluation and statement-local scope.
+- Added SQL-style join chains in `FROM`: `JOIN`, `LEFT JOIN`, `CROSS JOIN`, and `CROSS JOIN LATERAL`.
+- Added derived-table sources: `FROM (SELECT ...) AS alias`.
+- Added parser and evaluator coverage for CTE/join/lateral acceptance, rejection, and deterministic baseline outputs.
+- Added Python smoke coverage for `WITH` + `LEFT JOIN` + `CROSS JOIN LATERAL`.
+
+### Deprecated
+- Deprecated `FRAGMENTS(...)` in favor of `PARSE(...)`.
+- `FRAGMENTS(...)` remains supported for backward compatibility and now emits a deprecation warning.
+
+### Changed
+- `FROM doc AS <alias>` is now accepted directly (for example `FROM doc AS n`).
+- Alias misuse now emits clearer errors:
+  - `Identifier 'doc' is not bound; did you mean '<alias>'?`
+  - `Unknown identifier '<x>' (expected a FROM alias or legacy tag binding)`
+  - `Duplicate source alias '<x>' in FROM`
+- Bumped project/core and Python package metadata versions to `1.10.0`.
+
 ## [1.8.0] - 2026-02-13
 
 ### Added

@@ -7,48 +7,74 @@ void test_attributes_is_null() {
   std::string html = "<div></div><div id='x'></div>";
   auto result = run_query(html, "SELECT div FROM document WHERE attributes IS NULL");
   expect_eq(result.rows.size(), 1, "attributes is null");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].attributes.empty(), "attributes is null matched empty attributes");
+  }
 }
 
 void test_attributes_is_not_null() {
   std::string html = "<div></div><div id='x'></div>";
   auto result = run_query(html, "SELECT div FROM document WHERE attributes IS NOT NULL");
   expect_eq(result.rows.size(), 1, "attributes is not null");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].attributes["id"] == "x", "attributes is not null matched row");
+  }
 }
 
 void test_not_equal_attribute() {
   std::string html = "<a href='x'></a><a href='y'></a>";
   auto result = run_query(html, "SELECT a FROM document WHERE attributes.href <> 'x'");
   expect_eq(result.rows.size(), 1, "not equal attribute");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].attributes["href"] == "y", "not equal attribute matched row");
+  }
 }
 
 void test_is_not_null_attribute() {
   std::string html = "<a></a><a href='x'></a>";
   auto result = run_query(html, "SELECT a FROM document WHERE attributes.href IS NOT NULL");
   expect_eq(result.rows.size(), 1, "is not null attribute");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].attributes["href"] == "x", "is not null attribute matched row");
+  }
 }
 
 void test_is_null_attribute() {
   std::string html = "<a></a><a href='x'></a>";
   auto result = run_query(html, "SELECT a FROM document WHERE attributes.href IS NULL");
   expect_eq(result.rows.size(), 1, "is null attribute");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].attributes.find("href") == result.rows[0].attributes.end(),
+                "is null attribute matched row");
+  }
 }
 
 void test_text_not_equal() {
   std::string html = "<div>Hi</div><div></div>";
   auto result = run_query(html, "SELECT div FROM document WHERE text <> ''");
   expect_eq(result.rows.size(), 1, "text not equal");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].text == "Hi", "text not equal matched row");
+  }
 }
 
 void test_regex_attribute() {
   std::string html = "<a href='file.pdf'></a><a href='file.txt'></a>";
   auto result = run_query(html, "SELECT a FROM document WHERE attributes.href ~ '.*\\.pdf$'");
   expect_eq(result.rows.size(), 1, "regex attribute");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].attributes["href"] == "file.pdf", "regex attribute matched row");
+  }
 }
 
 void test_contains_attribute() {
   std::string html = "<a href='https://techkhmer.net'></a><a href='https://example.com'></a>";
   auto result = run_query(html, "SELECT a FROM document WHERE attributes.href CONTAINS 'TECHKHMEr'");
   expect_eq(result.rows.size(), 1, "contains attribute");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].attributes["href"] == "https://techkhmer.net",
+                "contains attribute matched row");
+  }
 }
 
 void test_contains_all_attribute() {
@@ -58,6 +84,10 @@ void test_contains_all_attribute() {
       run_query(html,
                 "SELECT a FROM document WHERE attributes.href CONTAINS ALL ('https', '.html')");
   expect_eq(result.rows.size(), 1, "contains all attribute");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].attributes["href"] == "https://example.com/docs.html",
+                "contains all attribute matched row");
+  }
 }
 
 void test_contains_any_attribute() {
@@ -67,18 +97,40 @@ void test_contains_any_attribute() {
       run_query(html,
                 "SELECT a FROM document WHERE attributes.href CONTAINS ANY ('https', 'mailto')");
   expect_eq(result.rows.size(), 2, "contains any attribute");
+  if (result.rows.size() == 2) {
+    bool saw_https = false;
+    bool saw_mailto = false;
+    for (const auto& row : result.rows) {
+      const auto it = row.attributes.find("href");
+      if (it == row.attributes.end()) continue;
+      if (it->second == "https://example.com/docs.html") saw_https = true;
+      if (it->second == "mailto:help@example.com") saw_mailto = true;
+    }
+    expect_true(saw_https, "contains any attribute includes https row");
+    expect_true(saw_mailto, "contains any attribute includes mailto row");
+  }
 }
 
 void test_sibling_pos_filter() {
   std::string html = "<ul><li>One</li><li>Two</li><li>Three</li></ul>";
   auto result = run_query(html, "SELECT li FROM document WHERE sibling_pos = 2");
   expect_eq(result.rows.size(), 1, "sibling_pos filter");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].text == "Two", "sibling_pos filter matched row");
+  }
 }
 
 void test_has_direct_text() {
-  std::string html = "<div>Something <section>Else</section></div><div><section>Something</section></div>";
+  std::string html =
+      "<div id='direct'>Visible <section>Hidden</section></div>"
+      "<div id='nested'><section>Visible</section></div>";
   auto result = run_query(html, "SELECT div FROM document WHERE div HAS_DIRECT_TEXT 'something'");
-  expect_eq(result.rows.size(), 1, "has direct text");
+  expect_eq(result.rows.size(), 0, "has direct text case-insensitive mismatch");
+  auto match = run_query(html, "SELECT div FROM document WHERE div HAS_DIRECT_TEXT 'visible'");
+  expect_eq(match.rows.size(), 1, "has direct text");
+  if (!match.rows.empty()) {
+    expect_true(match.rows[0].attributes["id"] == "direct", "has direct text matched direct row");
+  }
 }
 
 void test_parenthesized_predicates() {
@@ -88,28 +140,51 @@ void test_parenthesized_predicates() {
                           "SELECT a FROM document WHERE attributes.id = 'keep' AND "
                           "(attributes.href = 'x' OR attributes.href = 'y')");
   expect_eq(result.rows.size(), 2, "parenthesized predicates");
+  if (result.rows.size() == 2) {
+    bool saw_x = false;
+    bool saw_y = false;
+    for (const auto& row : result.rows) {
+      if (row.attributes.at("id") != "keep") {
+        expect_true(false, "parenthesized predicates preserves keep id");
+        return;
+      }
+      if (row.attributes.at("href") == "x") saw_x = true;
+      if (row.attributes.at("href") == "y") saw_y = true;
+    }
+    expect_true(saw_x, "parenthesized predicates includes x row");
+    expect_true(saw_y, "parenthesized predicates includes y row");
+  }
 }
 
 void test_exists_child_any() {
-  std::string html = "<div><span></span></div><div></div>";
+  std::string html = "<div id='has'><span></span></div><div id='none'></div>";
   auto result = run_query(html, "SELECT div FROM document WHERE EXISTS(child)");
   expect_eq(result.rows.size(), 1, "exists child any");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].attributes["id"] == "has", "exists child any matched row");
+  }
 }
 
 void test_exists_child_tag() {
-  std::string html = "<div><h2></h2></div><div><span></span></div>";
+  std::string html = "<div id='has-h2'><h2></h2></div><div id='only-span'><span></span></div>";
   auto result = run_query(html, "SELECT div FROM document WHERE EXISTS(child WHERE tag = 'h2')");
   expect_eq(result.rows.size(), 1, "exists child tag");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].attributes["id"] == "has-h2", "exists child tag matched row");
+  }
 }
 
 void test_exists_child_same_node() {
   std::string html =
-      "<div><span class='price'>1</span><h2></h2></div>"
-      "<div><span></span><h2 class='price'></h2></div>";
+      "<div id='keep'><span class='price'>1</span><h2></h2></div>"
+      "<div id='skip'><span></span><h2 class='price'></h2></div>";
   auto result = run_query(
       html,
       "SELECT div FROM document WHERE EXISTS(child WHERE tag = 'span' AND attributes.class = 'price')");
   expect_eq(result.rows.size(), 1, "exists child same node");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].attributes["id"] == "keep", "exists child same node matched row");
+  }
 }
 
 }  // namespace

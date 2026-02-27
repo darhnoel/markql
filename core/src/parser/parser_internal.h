@@ -3,6 +3,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "../query_parser.h"
@@ -25,9 +26,11 @@ class Parser {
   bool parse_source(Source& src);
   bool parse_subquery(std::shared_ptr<Query>& out);
   bool parse_query_body(Query& q);
+  bool parse_with_clause(Query::WithClause& with_clause);
+  bool parse_join_clauses(std::vector<Query::JoinItem>& joins);
   bool parse_show(Query& q);
   bool parse_describe(Query& q);
-  bool parse_source_alias(Source& src);
+  bool parse_source_alias(Source& src, bool require_alias = false, const char* required_msg = nullptr);
 
   bool parse_expr(Expr& out);
   bool parse_and_expr(Expr& out);
@@ -57,6 +60,7 @@ class Parser {
   Token peek_{};
   bool has_peek_ = false;
   std::optional<ParseError> error_;
+  std::unordered_set<std::string> cte_names_;
 };
 
 }  // namespace xsql

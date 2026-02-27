@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(markql VERSION 1.8.0 LANGUAGES CXX)
+project(markql VERSION 1.10.0 LANGUAGES CXX)
 
 option(XSQL_BUILD_CLI "Build the MarkQL CLI" ON)
 option(XSQL_BUILD_TESTS "Build tests" ON)
@@ -200,6 +200,7 @@ if (XSQL_BUILD_TESTS)
     tests/test_utils.cpp
     tests/test_query_basic.cpp
     tests/test_sources_alias.cpp
+    tests/test_with_join.cpp
     tests/test_shorthand.cpp
     tests/test_projections.cpp
     tests/test_functions.cpp
@@ -322,6 +323,26 @@ if (XSQL_BUILD_TESTS)
     limit
     alias_qualifier
     alias_source_only
+    attr_shorthand_self_and_qualified_aliases
+    attr_shorthand_axis_paths
+    parse_alias_field_with_implicit_doc
+    parse_alias_field_with_explicit_alias
+    parse_legacy_tag_binding_still_works
+    duplicate_source_alias_rejected
+    implicit_doc_alias_matches_explicit_alias_values
+    doc_identifier_rejected_after_explicit_realias
+    unknown_identifier_error_mentions_alias_or_legacy_binding
+    parse_with_single_and_multiple_ctes
+    parse_derived_table_and_joins
+    parse_cross_join_lateral
+    parse_reject_duplicate_cte_name
+    parse_reject_derived_table_without_alias
+    parse_reject_join_without_on
+    parse_reject_cross_join_with_on
+    parse_reject_lateral_without_alias
+    lateral_unknown_alias_throws
+    with_left_join_lateral_baseline_values
+    with_left_join_lateral_missing_right_value_null
     shorthand_attribute_filter
     shorthand_qualified_attribute_filter
     ancestor_attribute_filter
@@ -372,6 +393,9 @@ if (XSQL_BUILD_TESTS)
     fragments_from_raw
     fragments_from_inner_html
     fragments_non_html_error
+    fragments_warn_deprecated
+    parse_from_string_expr
+    parse_from_subquery
     guardrails_limit_cap
     guardrails_regex_length_cap
     guardrails_fragments_count_cap
@@ -410,6 +434,7 @@ if (XSQL_BUILD_TESTS)
     parse_scoped_selector_inside_text
     parse_case_expression_in_select
     parse_nested_case_expression
+    parse_parse_source_forms
     eval_like_wildcards
     eval_string_functions_in_select
     eval_length_byte_semantics

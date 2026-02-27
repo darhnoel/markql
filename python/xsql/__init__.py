@@ -109,6 +109,7 @@ def execute(
     export_sink = ExportSink(kind=export.get("kind", "none"), path=export.get("path", ""))
     return QueryResult(
         columns=raw.get("columns", []),
+        warnings=raw.get("warnings", []),
         rows=rows,
         tables=tables,
         to_list=raw.get("to_list", False),

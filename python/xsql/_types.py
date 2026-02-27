@@ -33,6 +33,7 @@ class QueryResult:
     """Carries rows/tables plus metadata from executing an XSQL query."""
 
     columns: List[str]
+    warnings: List[str]
     rows: List[Dict[str, Any]]
     tables: List[TableResult]
     to_list: bool

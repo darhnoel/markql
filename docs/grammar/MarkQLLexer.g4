@@ -5,7 +5,14 @@ options {
 }
 
 SELECT          : 'SELECT';
+WITH            : 'WITH';
 FROM            : 'FROM';
+JOIN            : 'JOIN';
+LEFT            : 'LEFT';
+INNER           : 'INNER';
+CROSS           : 'CROSS';
+LATERAL         : 'LATERAL';
+ON              : 'ON';
 WHERE           : 'WHERE';
 AND             : 'AND';
 OR              : 'OR';
@@ -29,6 +36,7 @@ JSON            : 'JSON';
 NDJSON          : 'NDJSON';
 RAW             : 'RAW';
 FRAGMENTS       : 'FRAGMENTS';
+PARSE           : 'PARSE';
 CONTAINS        : 'CONTAINS';
 HAS_DIRECT_TEXT : 'HAS_DIRECT_TEXT';
 LIKE            : 'LIKE';

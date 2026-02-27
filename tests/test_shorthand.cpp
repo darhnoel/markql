@@ -7,12 +7,21 @@ void test_shorthand_attribute_filter() {
   std::string html = "<div id='root'></div><div></div>";
   auto result = run_query(html, "SELECT div FROM document WHERE id = 'root'");
   expect_eq(result.rows.size(), 1, "shorthand attribute filter");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].tag == "div", "shorthand attribute filter tag");
+    expect_true(result.rows[0].attributes["id"] == "root", "shorthand attribute filter value");
+  }
 }
 
 void test_shorthand_qualified_attribute_filter() {
   std::string html = "<a href='x'></a>";
   auto result = run_query(html, "SELECT a FROM document AS a WHERE a.href = 'x'");
   expect_eq(result.rows.size(), 1, "shorthand qualified attribute filter");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].tag == "a", "shorthand qualified attribute filter tag");
+    expect_true(result.rows[0].attributes["href"] == "x",
+                "shorthand qualified attribute filter value");
+  }
 }
 
 }  // namespace

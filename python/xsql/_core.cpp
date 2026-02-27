@@ -62,6 +62,7 @@ PYBIND11_MODULE(_core, m) {
           xsql::QueryResult result = xsql::execute_query_from_document(html, query);
           py::dict out;
           out["columns"] = result.columns;
+          out["warnings"] = result.warnings;
           py::list rows;
           for (const auto& row : result.rows) {
             rows.append(row_to_dict(row, result.columns));

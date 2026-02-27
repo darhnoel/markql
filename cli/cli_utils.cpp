@@ -9,6 +9,9 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
+#ifdef __linux__
+#include <unistd.h>
+#endif
 
 #include "parser/lexer.h"
 #include "query_parser.h"
@@ -356,6 +359,59 @@ std::string load_html_input(const std::string& input, int timeout_ms) {
   return read_file(input);
 }
 
+std::optional<size_t> read_process_rss_bytes() {
+#ifdef __linux__
+  std::ifstream statm("/proc/self/statm");
+  if (!statm.is_open()) return std::nullopt;
+  unsigned long ignored_pages = 0;
+  unsigned long resident_pages = 0;
+  if (!(statm >> ignored_pages >> resident_pages)) {
+    return std::nullopt;
+  }
+  long page_size = sysconf(_SC_PAGESIZE);
+  if (page_size <= 0) return std::nullopt;
+  return static_cast<size_t>(resident_pages) * static_cast<size_t>(page_size);
+#else
+  return std::nullopt;
+#endif
+}
+
+std::string format_bytes_iec(size_t bytes) {
+  static const char* kUnits[] = {"B", "KiB", "MiB", "GiB", "TiB"};
+  double value = static_cast<double>(bytes);
+  size_t unit = 0;
+  while (value >= 1024.0 && unit + 1 < (sizeof(kUnits) / sizeof(kUnits[0]))) {
+    value /= 1024.0;
+    ++unit;
+  }
+  std::ostringstream oss;
+  if (unit == 0) {
+    oss << bytes << " " << kUnits[unit];
+  } else {
+    oss << std::fixed << std::setprecision(2) << value << " " << kUnits[unit];
+  }
+  return oss.str();
+}
+
+void print_query_runtime_summary(std::optional<size_t> rss_before_bytes,
+                                 std::optional<size_t> rss_after_bytes,
+                                 long long elapsed_ms) {
+  std::cout << "Time: " << elapsed_ms << " ms" << std::endl;
+  if (!rss_after_bytes.has_value()) {
+    std::cout << "Memory (RSS): n/a" << std::endl;
+    return;
+  }
+  std::cout << "Memory (RSS): " << format_bytes_iec(*rss_after_bytes);
+  if (rss_before_bytes.has_value()) {
+    if (*rss_after_bytes >= *rss_before_bytes) {
+      std::cout << " (delta +" << format_bytes_iec(*rss_after_bytes - *rss_before_bytes) << ")";
+    } else {
+      std::cout << " (delta -" << format_bytes_iec(*rss_before_bytes - *rss_after_bytes) << ")";
+    }
+  }
+  std::cout << std::endl;
+}
+
 std::string rewrite_from_path_if_needed(const std::string& query) {
   std::string lower = query;
   for (char& c : lower) {
@@ -438,16 +494,93 @@ std::optional<QuerySource> parse_query_source(const std::string& query) {
   std::string cleaned = trim_semicolon(query);
   auto parsed = xsql::parse_query(cleaned);
   if (!parsed.query.has_value()) return std::nullopt;
+
+  auto lower = [](const std::string& in) {
+    std::string out = in;
+    for (char& c : out) {
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return out;
+  };
+
+  auto trim_ws = [](std::string text) {
+    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front()))) {
+      text.erase(text.begin());
+    }
+    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back()))) {
+      text.pop_back();
+    }
+    return text;
+  };
+
+  auto source_needs_input = [&](const xsql::Query& owner,
+                                const xsql::Source& source,
+                                const auto& self_source,
+                                const auto& self_query) -> bool {
+    if (source.kind == xsql::Source::Kind::RawHtml) return false;
+    if (source.kind == xsql::Source::Kind::Path || source.kind == xsql::Source::Kind::Url) return false;
+    if (source.kind == xsql::Source::Kind::DerivedSubquery) {
+      if (source.derived_query != nullptr) return self_query(*source.derived_query, self_source, self_query);
+      return true;
+    }
+    if (source.kind == xsql::Source::Kind::CteRef) {
+      if (owner.with.has_value()) {
+        const std::string target = lower(source.value);
+        for (const auto& cte : owner.with->ctes) {
+          if (lower(cte.name) != target || cte.query == nullptr) continue;
+          return self_query(*cte.query, self_source, self_query);
+        }
+      }
+      return true;
+    }
+    if (source.kind == xsql::Source::Kind::Fragments) {
+      if (source.fragments_raw.has_value()) return false;
+      if (source.fragments_query != nullptr) return self_query(*source.fragments_query, self_source, self_query);
+      return true;
+    }
+    if (source.kind == xsql::Source::Kind::Parse) {
+      if (source.parse_expr != nullptr) return false;
+      if (source.parse_query != nullptr) return self_query(*source.parse_query, self_source, self_query);
+      return true;
+    }
+    return true;
+  };
+
+  auto query_needs_input = [&](const xsql::Query& q,
+                               const auto& self_source,
+                               const auto& self_query) -> bool {
+    bool needs_input = source_needs_input(q, q.source, self_source, self_query);
+    if (q.with.has_value()) {
+      for (const auto& cte : q.with->ctes) {
+        if (cte.query == nullptr) continue;
+        needs_input = needs_input || self_query(*cte.query, self_source, self_query);
+      }
+    }
+    return needs_input;
+  };
+
   QuerySource source;
   source.kind = parsed.query->source.kind;
   source.value = parsed.query->source.value;
-  source.alias = parsed.query->source.alias;
-  source.statement_kind = parsed.query->kind;
-  if (source.kind == xsql::Source::Kind::RawHtml) {
-    source.needs_input = false;
-  } else if (source.kind == xsql::Source::Kind::Fragments) {
-    source.needs_input = !parsed.query->source.fragments_raw.has_value();
+  if (parsed.query->source.span.end > parsed.query->source.span.start &&
+      parsed.query->source.span.end <= cleaned.size()) {
+    source.source_token = lower(trim_ws(cleaned.substr(
+        parsed.query->source.span.start,
+        parsed.query->source.span.end - parsed.query->source.span.start)));
   }
+  if (parsed.query->source.kind == xsql::Source::Kind::Document) {
+    if (source.source_token.has_value() &&
+        (*source.source_token == "doc" || *source.source_token == "document")) {
+      // WHY: `FROM doc [AS x]` should still resolve to the default document input.
+      source.alias = "doc";
+    } else {
+      source.alias = parsed.query->source.alias;
+    }
+  } else {
+    source.alias.reset();
+  }
+  source.statement_kind = parsed.query->kind;
+  source.needs_input = query_needs_input(*parsed.query, source_needs_input, query_needs_input);
   return source;
 }
 

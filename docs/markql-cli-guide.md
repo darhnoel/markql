@@ -71,11 +71,11 @@ SELECT div FROM doc LIMIT 5;
 ```
 
 ```sql
-SELECT a FROM doc WHERE href CONTAINS 'https';
+SELECT n FROM doc AS n WHERE n.href CONTAINS 'https';
 ```
 
 ```sql
-SELECT a.href FROM doc WHERE rel = 'preload' TO LIST();
+SELECT n.href FROM doc AS n WHERE n.rel = 'preload' TO LIST();
 ```
 
 ```sql
@@ -95,11 +95,107 @@ SELECT div FROM document;
 SELECT div FROM 'page.html';
 SELECT div FROM 'https://example.com';
 SELECT div FROM RAW('<div class="x">hello</div>');
+SELECT li FROM PARSE('<ul><li>1</li><li>2</li></ul>') AS frag;
 ```
 
 Alias sources:
 ```sql
 SELECT a FROM document AS d WHERE d.id = 'login';
+```
+
+## Aliases and fields
+
+Use `alias.field` as the primary row-reference style.
+
+`FROM doc` binds an implicit row alias named `doc`:
+
+```sql
+SELECT doc.node_id, doc.tag
+FROM doc
+WHERE doc.tag = 'div';
+```
+
+You can still bind an explicit alias:
+
+```sql
+SELECT n.node_id, n.tag
+FROM doc AS n
+WHERE n.tag = 'div';
+```
+
+Rules:
+- Once you alias `doc` (for example `FROM doc AS n`), use only that alias in row references.
+- `doc.*` is not bound in that scope.
+- Prefer neutral aliases (`n`, `r`, `c`, `x`), not tag-name aliases.
+
+`PARSE(...)` accepts either:
+- an HTML string expression
+- a subquery returning HTML strings (single projected column)
+
+Example:
+```sql
+SELECT li
+FROM PARSE(
+  SELECT inner_html(div, 2)
+  FROM doc
+  WHERE attributes.class = 'pagination'
+) AS frag;
+```
+
+Compatibility note:
+- `FRAGMENTS(...)` still works but is deprecated.
+- Migration: `FRAGMENTS(x)` -> `PARSE(x)`.
+
+## WITH, JOIN, and LATERAL
+
+MarkQL supports SQL-style CTEs and joins with deterministic row order.
+
+- `WITH ...` defines statement-local relations.
+- `JOIN` / `LEFT JOIN` use `ON ...`.
+- `CROSS JOIN` is cartesian and does not take `ON`.
+- `CROSS JOIN LATERAL (...) AS x` runs the right subquery per left row (flatMap behavior).
+
+Efficient baseline pattern (filtered rows + lateral expansion + selective left joins):
+
+```sql
+WITH rows AS (
+  SELECT n.node_id AS row_id
+  FROM doc AS n
+  WHERE n.tag = 'tr' AND EXISTS(child WHERE tag = 'td')
+),
+cells AS (
+  SELECT
+    r.row_id,
+    c.sibling_pos AS pos,
+    TEXT(c) AS val
+  FROM rows AS r
+  CROSS JOIN LATERAL (
+    SELECT c
+    FROM doc AS c
+    WHERE c.parent_id = r.row_id
+      AND c.tag = 'td'
+  ) AS c
+)
+SELECT
+  r.row_id,
+  c2.val AS item_id,
+  c4.val AS item_name
+FROM rows AS r
+LEFT JOIN cells AS c2 ON c2.row_id = r.row_id AND c2.pos = 2
+LEFT JOIN cells AS c4 ON c4.row_id = r.row_id AND c4.pos = 4
+ORDER BY r.row_id;
+```
+
+Derived-table source form is also supported:
+
+```sql
+SELECT t.row_id
+FROM (
+  SELECT n.node_id AS row_id
+  FROM doc AS n
+  WHERE n.tag = 'tr'
+) AS t
+ORDER BY t.row_id;
 ```
 
 ## Filtering with WHERE
@@ -119,8 +215,8 @@ Basic operators:
 Examples:
 ```sql
 SELECT div FROM doc WHERE id = 'main';
-SELECT a FROM doc WHERE href IN ('/a','/b');
-SELECT a FROM doc WHERE href ~ '.*\.pdf$';
+SELECT n FROM doc AS n WHERE n.href IN ('/a','/b');
+SELECT n FROM doc AS n WHERE n.href ~ '.*\.pdf$';
 SELECT div FROM doc WHERE text LIKE '%coupon%';
 SELECT div FROM doc WHERE POSITION('coupon' IN LOWER(text)) > 0;
 SELECT div FROM doc WHERE attributes IS NULL;
@@ -165,7 +261,9 @@ SELECT a FROM doc WHERE ancestor.id = 'content';
 ```
 
 Important parser detail for axis attributes:
-- Use `child.attributes.foo`, `parent.attributes.foo`, `descendant.attributes.foo`, etc.
+- Use `child.attr.foo`, `parent.attr.foo`, `descendant.attr.foo`, etc.
+- `attr` is a shorthand alias of `attributes` (`child.attributes.foo` still works).
+- Prefer `attr` in new queries for shorter, consistent syntax.
 - In this branch, shorthand like `child.foo` may fail parse.
 
 `EXISTS` predicate:

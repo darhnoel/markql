@@ -306,6 +306,15 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr, const Html
   return make_null_projection();
 }
 
+std::optional<std::string> eval_parse_source_expr(const ScalarExpr& expr) {
+  // WHY: PARSE(<expr>) is source-level and has no row context, so evaluate
+  // against an empty node and only allow expressions that reduce to scalars.
+  const HtmlNode empty_node;
+  ScalarProjectionValue value = eval_select_scalar_expr(expr, empty_node);
+  if (projection_is_null(value)) return std::nullopt;
+  return projection_to_string(value);
+}
+
 std::optional<std::string> selector_value(
     const std::string& tag,
     const std::optional<std::string>& attr,
@@ -1135,6 +1144,1028 @@ std::optional<std::string> field_value_string(const QueryResultRow& row, const s
   return it->second;
 }
 
+struct RelationRecord {
+  std::unordered_map<std::string, std::optional<std::string>> values;
+  std::unordered_map<std::string, std::string> attributes;
+};
+
+struct RelationRow {
+  std::unordered_map<std::string, RelationRecord> aliases;
+};
+
+struct Relation {
+  std::vector<RelationRow> rows;
+  std::unordered_map<std::string, std::unordered_set<std::string>> alias_columns;
+  std::vector<std::string> warnings;
+};
+
+struct SourceRowPrefilter {
+  std::optional<int64_t> parent_id_eq;
+  std::optional<std::string> tag_eq;
+  bool impossible = false;
+};
+
+bool query_uses_relation_runtime(const Query& query,
+                                 const std::unordered_map<std::string, Relation>* ctes,
+                                 const RelationRow* outer_row) {
+  if (outer_row != nullptr) return true;
+  if (ctes != nullptr && !ctes->empty()) return true;
+  if (query.with.has_value() && !query.with->ctes.empty()) return true;
+  if (!query.joins.empty()) return true;
+  if (query.source.kind == Source::Kind::CteRef ||
+      query.source.kind == Source::Kind::DerivedSubquery) {
+    return true;
+  }
+  for (const auto& order : query.order_by) {
+    if (order.field.find('.') != std::string::npos) return true;
+  }
+  return false;
+}
+
+bool is_plain_count_star_document_query(const Query& query) {
+  if (query.kind != Query::Kind::Select) return false;
+  if (query.source.kind != Source::Kind::Document) return false;
+  if (query.with.has_value()) return false;
+  if (!query.joins.empty()) return false;
+  if (query.where.has_value()) return false;
+  if (!query.order_by.empty()) return false;
+  if (!query.exclude_fields.empty()) return false;
+  if (query.limit.has_value()) return false;
+  if (query.to_list || query.to_table) return false;
+  if (query.export_sink.has_value()) return false;
+  if (query.select_items.size() != 1) return false;
+  const auto& item = query.select_items.front();
+  return item.aggregate == Query::SelectItem::Aggregate::Count && item.tag == "*";
+}
+
+QueryResult build_count_star_result(const Query& query,
+                                    int64_t count,
+                                    const std::string& source_uri) {
+  QueryResult out;
+  out.columns = xsql_internal::build_columns(query);
+  out.columns_implicit = !xsql_internal::is_projection_query(query);
+  out.to_list = query.to_list;
+  out.to_table = query.to_table;
+  out.table_has_header = query.table_has_header;
+  out.table_options = to_result_table_options(query.table_options);
+  QueryResultRow row;
+  row.node_id = count;
+  row.source_uri = source_uri;
+  out.rows.push_back(std::move(row));
+  return out;
+}
+
+std::string lower_alias_name(const std::string& alias) {
+  return util::to_lower(alias);
+}
+
+void merge_alias_columns(Relation& rel,
+                         const std::string& alias,
+                         const RelationRecord& record) {
+  auto& cols = rel.alias_columns[alias];
+  for (const auto& kv : record.values) {
+    cols.insert(kv.first);
+  }
+}
+
+std::optional<int64_t> parse_optional_i64(const std::optional<std::string>& value) {
+  if (!value.has_value()) return std::nullopt;
+  return parse_int64_value(*value);
+}
+
+void fill_result_core_from_record(QueryResultRow& out, const RelationRecord& record) {
+  auto get = [&](const std::string& key) -> std::optional<std::string> {
+    auto it = record.values.find(key);
+    if (it == record.values.end()) return std::nullopt;
+    return it->second;
+  };
+  if (auto v = get("node_id"); v.has_value()) {
+    if (auto parsed = parse_int64_value(*v); parsed.has_value()) out.node_id = *parsed;
+  }
+  if (auto v = get("tag"); v.has_value()) out.tag = *v;
+  if (auto v = get("text"); v.has_value()) out.text = *v;
+  if (auto v = get("inner_html"); v.has_value()) out.inner_html = *v;
+  if (auto v = get("parent_id"); v.has_value()) {
+    if (auto parsed = parse_int64_value(*v); parsed.has_value()) out.parent_id = *parsed;
+  }
+  if (auto v = get("sibling_pos"); v.has_value()) {
+    if (auto parsed = parse_int64_value(*v); parsed.has_value()) out.sibling_pos = *parsed;
+  }
+  if (auto v = get("max_depth"); v.has_value()) {
+    if (auto parsed = parse_int64_value(*v); parsed.has_value()) out.max_depth = *parsed;
+  }
+  if (auto v = get("doc_order"); v.has_value()) {
+    if (auto parsed = parse_int64_value(*v); parsed.has_value()) out.doc_order = *parsed;
+  }
+  if (auto v = get("source_uri"); v.has_value()) out.source_uri = *v;
+  out.attributes = record.attributes;
+}
+
+const RelationRecord* resolve_record(const RelationRow& row,
+                                     const std::optional<std::string>& qualifier,
+                                     const std::optional<std::string>& active_alias) {
+  if (qualifier.has_value()) {
+    const std::string lowered = lower_alias_name(*qualifier);
+    auto it = row.aliases.find(lowered);
+    if (it != row.aliases.end()) return &it->second;
+    if (lowered == "doc" && row.aliases.size() == 1) {
+      const std::string suggestion = row.aliases.begin()->first;
+      if (suggestion != "doc") {
+        throw std::runtime_error(
+            "Identifier 'doc' is not bound; did you mean '" + suggestion + "'?");
+      }
+    }
+    throw std::runtime_error("Unknown identifier '" + *qualifier +
+                             "' (expected a FROM alias or legacy tag binding)");
+  }
+  if (active_alias.has_value()) {
+    auto it = row.aliases.find(*active_alias);
+    if (it != row.aliases.end()) return &it->second;
+  }
+  if (row.aliases.size() == 1) {
+    return &row.aliases.begin()->second;
+  }
+  return nullptr;
+}
+
+std::optional<std::string> relation_operand_value(const Operand& operand,
+                                                  const RelationRow& row,
+                                                  const std::optional<std::string>& active_alias) {
+  if (operand.axis != Operand::Axis::Self) {
+    return std::nullopt;
+  }
+  const RelationRecord* record = resolve_record(row, operand.qualifier, active_alias);
+  if (record == nullptr) return std::nullopt;
+  auto get_field = [&](const std::string& key) -> std::optional<std::string> {
+    auto it = record->values.find(key);
+    if (it == record->values.end()) return std::nullopt;
+    return it->second;
+  };
+  switch (operand.field_kind) {
+    case Operand::FieldKind::Attribute: {
+      auto it = record->values.find(operand.attribute);
+      if (it != record->values.end()) return it->second;
+      auto attr = record->attributes.find(operand.attribute);
+      if (attr != record->attributes.end()) return attr->second;
+      return std::nullopt;
+    }
+    case Operand::FieldKind::Tag:
+      return get_field("tag");
+    case Operand::FieldKind::Text:
+      return get_field("text");
+    case Operand::FieldKind::NodeId:
+      return get_field("node_id");
+    case Operand::FieldKind::ParentId:
+      return get_field("parent_id");
+    case Operand::FieldKind::SiblingPos:
+      return get_field("sibling_pos");
+    case Operand::FieldKind::MaxDepth:
+      return get_field("max_depth");
+    case Operand::FieldKind::DocOrder:
+      return get_field("doc_order");
+    case Operand::FieldKind::AttributesMap:
+      return std::nullopt;
+  }
+  return std::nullopt;
+}
+
+std::optional<std::string> eval_relation_scalar_expr(const ScalarExpr& expr,
+                                                     const RelationRow& row,
+                                                     const std::optional<std::string>& active_alias) {
+  if (expr.kind == ScalarExpr::Kind::NullLiteral) return std::nullopt;
+  if (expr.kind == ScalarExpr::Kind::StringLiteral) return expr.string_value;
+  if (expr.kind == ScalarExpr::Kind::NumberLiteral) return std::to_string(expr.number_value);
+  if (expr.kind == ScalarExpr::Kind::Operand) {
+    return relation_operand_value(expr.operand, row, active_alias);
+  }
+  if (expr.kind == ScalarExpr::Kind::SelfRef) {
+    return std::nullopt;
+  }
+  const std::string fn = util::to_upper(expr.function_name);
+  if ((fn == "TEXT" || fn == "DIRECT_TEXT" || fn == "INNER_HTML" || fn == "RAW_INNER_HTML") &&
+      !expr.args.empty()) {
+    std::optional<std::string> target = eval_relation_scalar_expr(expr.args[0], row, active_alias);
+    if (!target.has_value()) return std::nullopt;
+    const std::string lowered_target = util::to_lower(*target);
+    auto alias_it = row.aliases.find(lowered_target);
+    if (alias_it != row.aliases.end()) {
+      const std::string key = (fn == "INNER_HTML" || fn == "RAW_INNER_HTML") ? "inner_html" : "text";
+      auto it = alias_it->second.values.find(key);
+      if (it == alias_it->second.values.end()) return std::nullopt;
+      return it->second;
+    }
+    const RelationRecord* active = resolve_record(row, std::nullopt, active_alias);
+    if (active == nullptr) return std::nullopt;
+    auto tag_it = active->values.find("tag");
+    if (tag_it == active->values.end() || !tag_it->second.has_value()) return std::nullopt;
+    if (util::to_lower(*tag_it->second) != lowered_target) return std::nullopt;
+    const std::string key = (fn == "INNER_HTML" || fn == "RAW_INNER_HTML") ? "inner_html" : "text";
+    auto value_it = active->values.find(key);
+    if (value_it == active->values.end()) return std::nullopt;
+    return value_it->second;
+  }
+  if (fn == "ATTR" && expr.args.size() == 2) {
+    std::optional<std::string> target = eval_relation_scalar_expr(expr.args[0], row, active_alias);
+    std::optional<std::string> attr = eval_relation_scalar_expr(expr.args[1], row, active_alias);
+    if (!target.has_value() || !attr.has_value()) return std::nullopt;
+    const std::string lowered_target = util::to_lower(*target);
+    auto alias_it = row.aliases.find(lowered_target);
+    if (alias_it != row.aliases.end()) {
+      auto value_it = alias_it->second.values.find(util::to_lower(*attr));
+      if (value_it != alias_it->second.values.end()) return value_it->second;
+      auto attr_it = alias_it->second.attributes.find(util::to_lower(*attr));
+      if (attr_it != alias_it->second.attributes.end()) return attr_it->second;
+      return std::nullopt;
+    }
+  }
+  if (fn == "COALESCE") {
+    for (const auto& arg : expr.args) {
+      std::optional<std::string> value = eval_relation_scalar_expr(arg, row, active_alias);
+      if (!value.has_value()) continue;
+      if (util::trim_ws(*value).empty()) continue;
+      return value;
+    }
+    return std::nullopt;
+  }
+  if (fn == "LOWER" || fn == "UPPER" || fn == "TRIM") {
+    if (expr.args.size() != 1) return std::nullopt;
+    std::optional<std::string> value = eval_relation_scalar_expr(expr.args[0], row, active_alias);
+    if (!value.has_value()) return std::nullopt;
+    if (fn == "LOWER") return util::to_lower(*value);
+    if (fn == "UPPER") return util::to_upper(*value);
+    return util::trim_ws(*value);
+  }
+  return std::nullopt;
+}
+
+bool eval_relation_expr(const Expr& expr,
+                        const RelationRow& row,
+                        const std::optional<std::string>& active_alias) {
+  if (std::holds_alternative<CompareExpr>(expr)) {
+    const auto& cmp = std::get<CompareExpr>(expr);
+    std::optional<std::string> lhs;
+    if (cmp.lhs_expr.has_value()) {
+      lhs = eval_relation_scalar_expr(*cmp.lhs_expr, row, active_alias);
+    } else {
+      lhs = relation_operand_value(cmp.lhs, row, active_alias);
+    }
+    if (cmp.op == CompareExpr::Op::IsNull) {
+      return !lhs.has_value();
+    }
+    if (cmp.op == CompareExpr::Op::IsNotNull) {
+      return lhs.has_value();
+    }
+    if (cmp.op == CompareExpr::Op::In) {
+      if (!lhs.has_value()) return false;
+      std::vector<std::string> candidates;
+      if (!cmp.rhs_expr_list.empty()) {
+        for (const auto& rhs_expr : cmp.rhs_expr_list) {
+          std::optional<std::string> rhs = eval_relation_scalar_expr(rhs_expr, row, active_alias);
+          if (rhs.has_value()) candidates.push_back(*rhs);
+        }
+      } else {
+        candidates = cmp.rhs.values;
+      }
+      return executor_internal::string_in_list(*lhs, candidates);
+    }
+    if (cmp.op == CompareExpr::Op::Contains ||
+        cmp.op == CompareExpr::Op::ContainsAll ||
+        cmp.op == CompareExpr::Op::ContainsAny) {
+      if (!lhs.has_value()) return false;
+      if (cmp.op == CompareExpr::Op::Contains) {
+        if (cmp.rhs.values.empty()) return false;
+        return contains_ci(*lhs, cmp.rhs.values.front());
+      }
+      if (cmp.op == CompareExpr::Op::ContainsAll) {
+        return contains_all_ci(*lhs, cmp.rhs.values);
+      }
+      return contains_any_ci(*lhs, cmp.rhs.values);
+    }
+    std::optional<std::string> rhs;
+    if (cmp.rhs_expr.has_value()) {
+      rhs = eval_relation_scalar_expr(*cmp.rhs_expr, row, active_alias);
+    } else if (!cmp.rhs.values.empty()) {
+      rhs = cmp.rhs.values.front();
+    }
+    if (!lhs.has_value() || !rhs.has_value()) return false;
+    if (cmp.op == CompareExpr::Op::Like) {
+      return like_match_ci(*lhs, *rhs);
+    }
+    auto lhs_num = parse_int64_value(*lhs);
+    auto rhs_num = parse_int64_value(*rhs);
+    if (lhs_num.has_value() && rhs_num.has_value()) {
+      if (cmp.op == CompareExpr::Op::Eq) return *lhs_num == *rhs_num;
+      if (cmp.op == CompareExpr::Op::NotEq) return *lhs_num != *rhs_num;
+      if (cmp.op == CompareExpr::Op::Lt) return *lhs_num < *rhs_num;
+      if (cmp.op == CompareExpr::Op::Lte) return *lhs_num <= *rhs_num;
+      if (cmp.op == CompareExpr::Op::Gt) return *lhs_num > *rhs_num;
+      if (cmp.op == CompareExpr::Op::Gte) return *lhs_num >= *rhs_num;
+    }
+    if (cmp.op == CompareExpr::Op::Eq) return *lhs == *rhs;
+    if (cmp.op == CompareExpr::Op::NotEq) return *lhs != *rhs;
+    if (cmp.op == CompareExpr::Op::Lt) return *lhs < *rhs;
+    if (cmp.op == CompareExpr::Op::Lte) return *lhs <= *rhs;
+    if (cmp.op == CompareExpr::Op::Gt) return *lhs > *rhs;
+    if (cmp.op == CompareExpr::Op::Gte) return *lhs >= *rhs;
+    return false;
+  }
+  if (std::holds_alternative<std::shared_ptr<ExistsExpr>>(expr)) {
+    return false;
+  }
+  const auto& bin = *std::get<std::shared_ptr<BinaryExpr>>(expr);
+  bool left = eval_relation_expr(bin.left, row, active_alias);
+  bool right = eval_relation_expr(bin.right, row, active_alias);
+  return (bin.op == BinaryExpr::Op::And) ? (left && right) : (left || right);
+}
+
+int compare_optional_relation_values(const std::optional<std::string>& left,
+                                     const std::optional<std::string>& right) {
+  if (!left.has_value() && !right.has_value()) return 0;
+  if (!left.has_value()) return -1;
+  if (!right.has_value()) return 1;
+  auto left_num = parse_int64_value(*left);
+  auto right_num = parse_int64_value(*right);
+  if (left_num.has_value() && right_num.has_value()) {
+    if (*left_num < *right_num) return -1;
+    if (*left_num > *right_num) return 1;
+    return 0;
+  }
+  if (*left < *right) return -1;
+  if (*left > *right) return 1;
+  return 0;
+}
+
+std::optional<std::string> relation_field_by_name(const RelationRow& row,
+                                                  const std::string& field,
+                                                  const std::optional<std::string>& active_alias) {
+  size_t dot = field.find('.');
+  if (dot != std::string::npos) {
+    const std::string alias = lower_alias_name(field.substr(0, dot));
+    const std::string col = field.substr(dot + 1);
+    auto it = row.aliases.find(alias);
+    if (it == row.aliases.end()) return std::nullopt;
+    auto value_it = it->second.values.find(col);
+    if (value_it == it->second.values.end()) return std::nullopt;
+    return value_it->second;
+  }
+  if (active_alias.has_value()) {
+    auto it = row.aliases.find(*active_alias);
+    if (it != row.aliases.end()) {
+      auto value_it = it->second.values.find(field);
+      if (value_it != it->second.values.end()) return value_it->second;
+    }
+  }
+  std::optional<std::string> found;
+  for (const auto& alias_entry : row.aliases) {
+    auto value_it = alias_entry.second.values.find(field);
+    if (value_it == alias_entry.second.values.end()) continue;
+    if (found.has_value()) return std::nullopt;
+    found = value_it->second;
+  }
+  return found;
+}
+
+bool operand_targets_source_row(const Operand& operand,
+                                const std::optional<std::string>& active_alias) {
+  if (operand.axis != Operand::Axis::Self) return false;
+  if (!operand.qualifier.has_value()) return true;
+  if (!active_alias.has_value()) return false;
+  return lower_alias_name(*operand.qualifier) == *active_alias;
+}
+
+std::optional<std::string> compare_rhs_single_value(const CompareExpr& cmp,
+                                                    const RelationRow* outer_row,
+                                                    const std::optional<std::string>& active_alias) {
+  if (cmp.rhs_expr.has_value()) {
+    static const RelationRow kEmptyRow;
+    const RelationRow& row = outer_row != nullptr ? *outer_row : kEmptyRow;
+    return eval_relation_scalar_expr(*cmp.rhs_expr, row, active_alias);
+  }
+  if (cmp.rhs.values.size() == 1) {
+    return cmp.rhs.values.front();
+  }
+  return std::nullopt;
+}
+
+void collect_source_prefilter_constraints(const Expr& expr,
+                                          const std::optional<std::string>& active_alias,
+                                          const RelationRow* outer_row,
+                                          SourceRowPrefilter& out) {
+  if (std::holds_alternative<CompareExpr>(expr)) {
+    const auto& cmp = std::get<CompareExpr>(expr);
+    if (cmp.op != CompareExpr::Op::Eq) return;
+    const Operand* lhs = nullptr;
+    if (cmp.lhs_expr.has_value() && cmp.lhs_expr->kind == ScalarExpr::Kind::Operand) {
+      lhs = &cmp.lhs_expr->operand;
+    } else {
+      lhs = &cmp.lhs;
+    }
+    if (!operand_targets_source_row(*lhs, active_alias)) return;
+    std::optional<std::string> rhs = compare_rhs_single_value(cmp, outer_row, active_alias);
+    if (!rhs.has_value()) return;
+    if (lhs->field_kind == Operand::FieldKind::Tag) {
+      std::string lowered = util::to_lower(*rhs);
+      if (out.tag_eq.has_value() && *out.tag_eq != lowered) {
+        out.impossible = true;
+      } else {
+        out.tag_eq = lowered;
+      }
+      return;
+    }
+    if (lhs->field_kind == Operand::FieldKind::ParentId) {
+      auto parsed = parse_int64_value(*rhs);
+      if (!parsed.has_value()) return;
+      if (out.parent_id_eq.has_value() && *out.parent_id_eq != *parsed) {
+        out.impossible = true;
+      } else {
+        out.parent_id_eq = *parsed;
+      }
+      return;
+    }
+    return;
+  }
+  if (std::holds_alternative<std::shared_ptr<BinaryExpr>>(expr)) {
+    const auto& bin = *std::get<std::shared_ptr<BinaryExpr>>(expr);
+    if (bin.op != BinaryExpr::Op::And) return;
+    collect_source_prefilter_constraints(bin.left, active_alias, outer_row, out);
+    collect_source_prefilter_constraints(bin.right, active_alias, outer_row, out);
+    return;
+  }
+}
+
+QueryResult execute_query_with_source_legacy(const Query& query,
+                                             const std::string& default_html,
+                                             const std::string& default_source_uri);
+
+QueryResult execute_query_with_source_context(
+    const Query& query,
+    const std::string& default_html,
+    const std::string& default_source_uri,
+    const std::unordered_map<std::string, Relation>* ctes,
+    const RelationRow* outer_row,
+    struct RelationRuntimeCache* cache);
+
+struct RelationRuntimeCache {
+  std::optional<HtmlDocument> default_document;
+  std::optional<std::vector<int64_t>> default_sibling_pos;
+};
+
+FragmentSource collect_html_fragments(const QueryResult& result, const std::string& source_name);
+HtmlDocument build_fragments_document(const FragmentSource& fragments);
+
+Relation relation_from_query_result(const QueryResult& result, const std::string& alias_name) {
+  Relation out;
+  const std::string alias = lower_alias_name(alias_name);
+  out.warnings = result.warnings;
+  for (const auto& row : result.rows) {
+    RelationRow rel_row;
+    RelationRecord record;
+    record.values["node_id"] = std::to_string(row.node_id);
+    record.values["tag"] = row.tag;
+    record.values["text"] = row.text;
+    record.values["inner_html"] = row.inner_html;
+    if (row.parent_id.has_value()) {
+      record.values["parent_id"] = std::to_string(*row.parent_id);
+    } else {
+      record.values["parent_id"] = std::nullopt;
+    }
+    record.values["sibling_pos"] = std::to_string(row.sibling_pos);
+    record.values["max_depth"] = std::to_string(row.max_depth);
+    record.values["doc_order"] = std::to_string(row.doc_order);
+    record.values["source_uri"] = row.source_uri;
+    for (const auto& col : result.columns) {
+      record.values[col] = field_value_string(row, col);
+    }
+    for (const auto& attr : row.attributes) {
+      record.attributes[attr.first] = attr.second;
+      record.values[attr.first] = attr.second;
+    }
+    rel_row.aliases[alias] = std::move(record);
+    merge_alias_columns(out, alias, rel_row.aliases[alias]);
+    out.rows.push_back(std::move(rel_row));
+  }
+  return out;
+}
+
+std::vector<int64_t> build_sibling_positions(const HtmlDocument& doc) {
+  std::vector<int64_t> sibling_pos(doc.nodes.size(), 1);
+  std::vector<std::vector<int64_t>> children(doc.nodes.size());
+  for (const auto& node : doc.nodes) {
+    if (node.parent_id.has_value()) {
+      children.at(static_cast<size_t>(*node.parent_id)).push_back(node.id);
+    }
+  }
+  for (const auto& kids : children) {
+    for (size_t i = 0; i < kids.size(); ++i) {
+      sibling_pos.at(static_cast<size_t>(kids[i])) = static_cast<int64_t>(i + 1);
+    }
+  }
+  return sibling_pos;
+}
+
+Relation relation_from_document(const HtmlDocument& doc,
+                                const std::string& alias_name,
+                                const std::string& source_uri,
+                                const std::vector<int64_t>* sibling_pos_override = nullptr,
+                                const SourceRowPrefilter* prefilter = nullptr) {
+  Relation out;
+  const std::string alias = lower_alias_name(alias_name);
+  std::vector<int64_t> local_sibling_pos;
+  if (sibling_pos_override == nullptr) {
+    local_sibling_pos = build_sibling_positions(doc);
+    sibling_pos_override = &local_sibling_pos;
+  }
+  for (const auto& node : doc.nodes) {
+    if (prefilter != nullptr) {
+      if (prefilter->impossible) continue;
+      if (prefilter->parent_id_eq.has_value()) {
+        if (!node.parent_id.has_value() || *node.parent_id != *prefilter->parent_id_eq) continue;
+      }
+      if (prefilter->tag_eq.has_value() && node.tag != *prefilter->tag_eq) continue;
+    }
+    RelationRow rel_row;
+    RelationRecord record;
+    record.values["node_id"] = std::to_string(node.id);
+    record.values["tag"] = node.tag;
+    record.values["text"] = node.text;
+    record.values["inner_html"] = node.inner_html;
+    if (node.parent_id.has_value()) {
+      record.values["parent_id"] = std::to_string(*node.parent_id);
+    } else {
+      record.values["parent_id"] = std::nullopt;
+    }
+    record.values["sibling_pos"] =
+        std::to_string(sibling_pos_override->at(static_cast<size_t>(node.id)));
+    record.values["max_depth"] = std::to_string(node.max_depth);
+    record.values["doc_order"] = std::to_string(node.doc_order);
+    record.values["source_uri"] = source_uri;
+    for (const auto& attr : node.attributes) {
+      record.attributes[attr.first] = attr.second;
+      record.values[attr.first] = attr.second;
+    }
+    rel_row.aliases[alias] = std::move(record);
+    merge_alias_columns(out, alias, rel_row.aliases[alias]);
+    out.rows.push_back(std::move(rel_row));
+  }
+  return out;
+}
+
+bool merge_row_aliases(RelationRow& target, const RelationRow& add, std::string* duplicate_alias) {
+  for (const auto& alias_entry : add.aliases) {
+    if (target.aliases.find(alias_entry.first) != target.aliases.end()) {
+      if (duplicate_alias != nullptr) *duplicate_alias = alias_entry.first;
+      return false;
+    }
+    target.aliases.insert(alias_entry);
+  }
+  return true;
+}
+
+Relation evaluate_source_relation(const Source& source,
+                                  const std::string& default_html,
+                                  const std::string& default_source_uri,
+                                  const std::unordered_map<std::string, Relation>* ctes,
+                                  const RelationRow* outer_row,
+                                  RelationRuntimeCache* cache,
+                                  const SourceRowPrefilter* prefilter = nullptr) {
+  if (source.kind == Source::Kind::CteRef) {
+    const std::string lookup = lower_alias_name(source.value);
+    if (ctes == nullptr || ctes->find(lookup) == ctes->end()) {
+      throw std::runtime_error("Unknown CTE source '" + source.value + "'");
+    }
+    Relation rel = ctes->at(lookup);
+    const std::string target_alias =
+        source.alias.has_value() ? lower_alias_name(*source.alias) : lookup;
+    if (target_alias != lookup) {
+      for (auto& row : rel.rows) {
+        auto it = row.aliases.find(lookup);
+        if (it == row.aliases.end()) continue;
+        RelationRecord record = std::move(it->second);
+        row.aliases.erase(it);
+        row.aliases[target_alias] = std::move(record);
+      }
+      auto schema_it = rel.alias_columns.find(lookup);
+      if (schema_it != rel.alias_columns.end()) {
+        rel.alias_columns[target_alias] = std::move(schema_it->second);
+        rel.alias_columns.erase(schema_it);
+      }
+    }
+    return rel;
+  }
+  if (source.kind == Source::Kind::DerivedSubquery) {
+    if (source.derived_query == nullptr) {
+      throw std::runtime_error("Derived table source is missing a subquery");
+    }
+    if (!source.alias.has_value()) {
+      throw std::runtime_error("Derived table requires an alias");
+    }
+    QueryResult sub = execute_query_with_source_context(
+        *source.derived_query, default_html, default_source_uri, ctes, outer_row, cache);
+    return relation_from_query_result(sub, *source.alias);
+  }
+
+  HtmlDocument doc;
+  const std::vector<int64_t>* sibling_pos = nullptr;
+  std::string source_uri = default_source_uri;
+  std::vector<std::string> warnings;
+  if (source.kind == Source::Kind::Document) {
+    // WHY: WITH/JOIN/LATERAL can revisit FROM doc many times; parse once per statement.
+    if (cache != nullptr && cache->default_document.has_value()) {
+      doc = *cache->default_document;
+    } else {
+      doc = parse_html(default_html);
+      if (cache != nullptr) {
+        cache->default_document = doc;
+      }
+    }
+    if (cache != nullptr) {
+      if (!cache->default_sibling_pos.has_value()) {
+        cache->default_sibling_pos = build_sibling_positions(doc);
+      }
+      sibling_pos = &*cache->default_sibling_pos;
+    }
+  } else if (source.kind == Source::Kind::Path) {
+    doc = parse_html(xsql_internal::read_file(source.value));
+    source_uri = source.value;
+  } else if (source.kind == Source::Kind::Url) {
+    doc = parse_html(xsql_internal::fetch_url(source.value, 5000));
+    source_uri = source.value;
+  } else if (source.kind == Source::Kind::RawHtml) {
+    if (source.value.size() > xsql_internal::kMaxRawHtmlBytes) {
+      throw std::runtime_error("RAW() HTML exceeds maximum size");
+    }
+    doc = parse_html(source.value);
+    source_uri = "raw";
+  } else if (source.kind == Source::Kind::Fragments) {
+    FragmentSource fragments;
+    if (source.fragments_raw.has_value()) {
+      fragments.fragments.push_back(*source.fragments_raw);
+    } else if (source.fragments_query != nullptr) {
+      const Query& subquery = *source.fragments_query;
+      QueryResult sub = execute_query_with_source_context(
+          subquery, default_html, default_source_uri, ctes, nullptr, cache);
+      fragments = collect_html_fragments(sub, "FRAGMENTS");
+    } else {
+      throw std::runtime_error("FRAGMENTS requires a subquery or RAW('<...>') input");
+    }
+    doc = build_fragments_document(fragments);
+    source_uri = "fragment";
+    warnings.push_back("FRAGMENTS is deprecated; use PARSE(...) instead.");
+  } else if (source.kind == Source::Kind::Parse) {
+    FragmentSource fragments;
+    if (source.parse_expr != nullptr) {
+      std::optional<std::string> value = eval_parse_source_expr(*source.parse_expr);
+      if (!value.has_value()) {
+        throw std::runtime_error("PARSE() requires a non-null HTML string expression");
+      }
+      std::string trimmed = util::trim_ws(*value);
+      if (trimmed.empty() || !looks_like_html_fragment(trimmed)) {
+        throw std::runtime_error("PARSE() expects an HTML string expression");
+      }
+      fragments.fragments.push_back(std::move(trimmed));
+    } else if (source.parse_query != nullptr) {
+      QueryResult sub = execute_query_with_source_context(
+          *source.parse_query, default_html, default_source_uri, ctes, nullptr, cache);
+      fragments = collect_html_fragments(sub, "PARSE");
+    } else {
+      throw std::runtime_error("PARSE() requires an expression or subquery input");
+    }
+    doc = build_fragments_document(fragments);
+    source_uri = "parse";
+  } else {
+    throw std::runtime_error("Unsupported source kind in relation runtime");
+  }
+  const std::string alias =
+      source.alias.has_value() ? *source.alias : std::string("__self");
+  Relation rel = relation_from_document(doc, alias, source_uri, sibling_pos, prefilter);
+  for (const auto& warning : warnings) {
+    rel.warnings.push_back(warning);
+  }
+  return rel;
+}
+
+Relation evaluate_query_relation(
+    const Query& query,
+    const std::string& default_html,
+    const std::string& default_source_uri,
+    const std::unordered_map<std::string, Relation>* parent_ctes,
+    const RelationRow* outer_row,
+    RelationRuntimeCache* cache) {
+  const std::optional<std::string> active_alias =
+      query.source.alias.has_value()
+          ? std::optional<std::string>(lower_alias_name(*query.source.alias))
+          : std::nullopt;
+
+  std::unordered_map<std::string, Relation> local_ctes;
+  if (parent_ctes != nullptr) {
+    local_ctes = *parent_ctes;
+  }
+  std::vector<std::string> warnings;
+  if (query.with.has_value()) {
+    for (const auto& cte : query.with->ctes) {
+      if (cte.query == nullptr) {
+        throw std::runtime_error("CTE '" + cte.name + "' is missing a subquery");
+      }
+      QueryResult cte_result = execute_query_with_source_context(
+          *cte.query, default_html, default_source_uri, &local_ctes, nullptr, cache);
+      Relation cte_relation = relation_from_query_result(cte_result, cte.name);
+      warnings.insert(warnings.end(),
+                      cte_relation.warnings.begin(),
+                      cte_relation.warnings.end());
+      local_ctes[lower_alias_name(cte.name)] = std::move(cte_relation);
+    }
+  }
+
+  std::optional<SourceRowPrefilter> source_prefilter;
+  if (query.source.kind == Source::Kind::Document &&
+      query.where.has_value()) {
+    SourceRowPrefilter candidate;
+    collect_source_prefilter_constraints(*query.where, active_alias, outer_row, candidate);
+    if (candidate.impossible ||
+        candidate.parent_id_eq.has_value() ||
+        candidate.tag_eq.has_value()) {
+      source_prefilter = std::move(candidate);
+    }
+  }
+
+  Relation from_rel = evaluate_source_relation(
+      query.source, default_html, default_source_uri, &local_ctes, outer_row, cache,
+      source_prefilter.has_value() ? &*source_prefilter : nullptr);
+  warnings.insert(warnings.end(), from_rel.warnings.begin(), from_rel.warnings.end());
+
+  Relation current;
+  current.alias_columns = from_rel.alias_columns;
+  current.rows.reserve(from_rel.rows.size());
+  for (const auto& base_row : from_rel.rows) {
+    RelationRow merged;
+    if (outer_row != nullptr) {
+      std::string duplicate;
+      if (!merge_row_aliases(merged, *outer_row, &duplicate)) {
+        throw std::runtime_error("Duplicate source alias '" + duplicate + "' in FROM");
+      }
+    }
+    std::string duplicate;
+    if (!merge_row_aliases(merged, base_row, &duplicate)) {
+      throw std::runtime_error("Duplicate source alias '" + duplicate + "' in FROM");
+    }
+    current.rows.push_back(std::move(merged));
+  }
+  if (outer_row != nullptr) {
+    for (const auto& alias_entry : outer_row->aliases) {
+      merge_alias_columns(current, alias_entry.first, alias_entry.second);
+    }
+  }
+
+  for (const auto& join : query.joins) {
+    Relation next;
+    next.alias_columns = current.alias_columns;
+    if (join.lateral) {
+      for (const auto& left_row : current.rows) {
+        Relation right_rel = evaluate_source_relation(
+            join.right_source, default_html, default_source_uri, &local_ctes, &left_row, cache,
+            nullptr);
+        warnings.insert(warnings.end(), right_rel.warnings.begin(), right_rel.warnings.end());
+        for (const auto& alias_cols : right_rel.alias_columns) {
+          next.alias_columns[alias_cols.first].insert(
+              alias_cols.second.begin(), alias_cols.second.end());
+        }
+        for (const auto& right_row : right_rel.rows) {
+          RelationRow merged = left_row;
+          std::string duplicate;
+          if (!merge_row_aliases(merged, right_row, &duplicate)) {
+            throw std::runtime_error("Duplicate source alias '" + duplicate + "' in FROM");
+          }
+          next.rows.push_back(std::move(merged));
+        }
+      }
+      current = std::move(next);
+      continue;
+    }
+
+    Relation right_rel = evaluate_source_relation(
+        join.right_source, default_html, default_source_uri, &local_ctes, nullptr, cache,
+        nullptr);
+    warnings.insert(warnings.end(), right_rel.warnings.begin(), right_rel.warnings.end());
+    for (const auto& alias_cols : right_rel.alias_columns) {
+      next.alias_columns[alias_cols.first].insert(
+          alias_cols.second.begin(), alias_cols.second.end());
+    }
+    for (const auto& left_row : current.rows) {
+      bool matched = false;
+      for (const auto& right_row : right_rel.rows) {
+        RelationRow merged = left_row;
+        std::string duplicate;
+        if (!merge_row_aliases(merged, right_row, &duplicate)) {
+          throw std::runtime_error("Duplicate source alias '" + duplicate + "' in FROM");
+        }
+        bool keep = true;
+        if (join.type != Query::JoinItem::Type::Cross && join.on.has_value()) {
+          keep = eval_relation_expr(*join.on, merged, active_alias);
+        }
+        if (!keep) continue;
+        matched = true;
+        next.rows.push_back(std::move(merged));
+      }
+      if (join.type == Query::JoinItem::Type::Left && !matched) {
+        RelationRow padded = left_row;
+        for (const auto& alias_cols : right_rel.alias_columns) {
+          RelationRecord null_record;
+          for (const auto& col : alias_cols.second) {
+            null_record.values[col] = std::nullopt;
+          }
+          padded.aliases[alias_cols.first] = std::move(null_record);
+        }
+        next.rows.push_back(std::move(padded));
+      }
+    }
+    current = std::move(next);
+  }
+
+  if (query.where.has_value()) {
+    Relation filtered;
+    filtered.alias_columns = current.alias_columns;
+    for (const auto& row : current.rows) {
+      if (eval_relation_expr(*query.where, row, active_alias)) {
+        filtered.rows.push_back(row);
+      }
+    }
+    current = std::move(filtered);
+  }
+
+  if (!query.order_by.empty()) {
+    std::stable_sort(current.rows.begin(), current.rows.end(),
+                     [&](const RelationRow& left, const RelationRow& right) {
+                       for (const auto& order : query.order_by) {
+                         int cmp = compare_optional_relation_values(
+                             relation_field_by_name(left, order.field, active_alias),
+                             relation_field_by_name(right, order.field, active_alias));
+                         if (cmp == 0) continue;
+                         return order.descending ? (cmp > 0) : (cmp < 0);
+                       }
+                       return false;
+                     });
+  }
+  if (query.limit.has_value() && current.rows.size() > *query.limit) {
+    current.rows.resize(*query.limit);
+  }
+  current.warnings = std::move(warnings);
+  return current;
+}
+
+void assign_result_column_value(QueryResultRow& row,
+                                const std::string& column,
+                                const std::optional<std::string>& value) {
+  if (!value.has_value()) return;
+  if (column == "node_id") {
+    if (auto parsed = parse_int64_value(*value); parsed.has_value()) row.node_id = *parsed;
+    return;
+  }
+  if (column == "tag") {
+    row.tag = *value;
+    return;
+  }
+  if (column == "text") {
+    row.text = *value;
+    return;
+  }
+  if (column == "inner_html") {
+    row.inner_html = *value;
+    return;
+  }
+  if (column == "parent_id") {
+    if (auto parsed = parse_int64_value(*value); parsed.has_value()) row.parent_id = *parsed;
+    return;
+  }
+  if (column == "sibling_pos") {
+    if (auto parsed = parse_int64_value(*value); parsed.has_value()) row.sibling_pos = *parsed;
+    return;
+  }
+  if (column == "max_depth") {
+    if (auto parsed = parse_int64_value(*value); parsed.has_value()) row.max_depth = *parsed;
+    return;
+  }
+  if (column == "doc_order") {
+    if (auto parsed = parse_int64_value(*value); parsed.has_value()) row.doc_order = *parsed;
+    return;
+  }
+  if (column == "source_uri") {
+    row.source_uri = *value;
+    return;
+  }
+  row.computed_fields[column] = *value;
+}
+
+QueryResult query_result_from_relation(const Query& query, const Relation& relation) {
+  QueryResult out;
+  out.columns = xsql_internal::build_columns(query);
+  out.columns_implicit = !xsql_internal::is_projection_query(query);
+  out.to_list = query.to_list;
+  out.to_table = query.to_table;
+  out.table_has_header = query.table_has_header;
+  out.table_options = to_result_table_options(query.table_options);
+  out.warnings = relation.warnings;
+
+  for (const auto& item : query.select_items) {
+    if (item.aggregate == Query::SelectItem::Aggregate::Count) {
+      QueryResultRow row;
+      row.node_id = static_cast<int64_t>(relation.rows.size());
+      out.rows.push_back(std::move(row));
+      return out;
+    }
+  }
+
+  const std::optional<std::string> active_alias =
+      query.source.alias.has_value()
+          ? std::optional<std::string>(lower_alias_name(*query.source.alias))
+          : std::nullopt;
+
+  if (!xsql_internal::is_projection_query(query)) {
+    for (const auto& rel_row : relation.rows) {
+      const RelationRecord* selected = nullptr;
+      for (const auto& item : query.select_items) {
+        const std::string tag_or_alias = lower_alias_name(item.tag);
+        if (item.tag == "*") {
+          if (active_alias.has_value()) {
+            auto it = rel_row.aliases.find(*active_alias);
+            if (it != rel_row.aliases.end()) selected = &it->second;
+          }
+          if (selected == nullptr && !rel_row.aliases.empty()) {
+            selected = &rel_row.aliases.begin()->second;
+          }
+          break;
+        }
+        auto alias_it = rel_row.aliases.find(tag_or_alias);
+        if (alias_it != rel_row.aliases.end()) {
+          selected = &alias_it->second;
+          break;
+        }
+        for (const auto& alias_entry : rel_row.aliases) {
+          auto tag_it = alias_entry.second.values.find("tag");
+          if (tag_it == alias_entry.second.values.end() || !tag_it->second.has_value()) continue;
+          if (util::to_lower(*tag_it->second) == tag_or_alias) {
+            selected = &alias_entry.second;
+            break;
+          }
+        }
+        if (selected != nullptr) break;
+      }
+      if (selected == nullptr) continue;
+      QueryResultRow row;
+      fill_result_core_from_record(row, *selected);
+      out.rows.push_back(std::move(row));
+    }
+    return out;
+  }
+
+  for (const auto& rel_row : relation.rows) {
+    QueryResultRow row;
+    const RelationRecord* seed = resolve_record(rel_row, std::nullopt, active_alias);
+    if (seed != nullptr) {
+      fill_result_core_from_record(row, *seed);
+    }
+    for (const auto& item : query.select_items) {
+      if (!item.field.has_value()) continue;
+      std::optional<std::string> value;
+      if (item.expr_projection && item.expr.has_value()) {
+        value = eval_relation_scalar_expr(*item.expr, rel_row, active_alias);
+      } else if (item.expr_projection && item.project_expr.has_value()) {
+        value = std::nullopt;
+      } else {
+        const std::string lowered_tag = lower_alias_name(item.tag);
+        auto it = rel_row.aliases.find(lowered_tag);
+        if (it != rel_row.aliases.end()) {
+          auto value_it = it->second.values.find(*item.field);
+          if (value_it != it->second.values.end()) {
+            value = value_it->second;
+          }
+        } else {
+          value = relation_field_by_name(rel_row, *item.field, active_alias);
+        }
+      }
+      assign_result_column_value(row, *item.field, value);
+    }
+    out.rows.push_back(std::move(row));
+  }
+  return out;
+}
+
+QueryResult execute_query_with_source_context(
+    const Query& query,
+    const std::string& default_html,
+    const std::string& default_source_uri,
+    const std::unordered_map<std::string, Relation>* ctes,
+    const RelationRow* outer_row,
+    RelationRuntimeCache* cache) {
+  if (!query_uses_relation_runtime(query, ctes, outer_row)) {
+    return execute_query_with_source_legacy(query, default_html, default_source_uri);
+  }
+  RelationRuntimeCache local_cache;
+  RelationRuntimeCache* active_cache = cache != nullptr ? cache : &local_cache;
+  Relation relation = evaluate_query_relation(
+      query, default_html, default_source_uri, ctes, outer_row, active_cache);
+  return query_result_from_relation(query, relation);
+}
+
 QueryResult build_meta_result(const std::vector<std::string>& columns,
                               const std::vector<std::vector<std::string>>& rows) {
   QueryResult out;
@@ -1271,8 +2302,10 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
               {"source", "path", "FROM 'file.html'", "Local file"},
               {"source", "url", "FROM 'https://example.com'", "Requires libcurl"},
               {"source", "raw", "FROM RAW('<html>')", "Inline HTML"},
+              {"source", "parse", "FROM PARSE('<ul><li>...</li></ul>') AS frag",
+               "Parse HTML strings into a node source"},
               {"source", "fragments", "FROM FRAGMENTS(<raw|subquery>)",
-               "Concatenate HTML fragments"},
+               "Concatenate HTML fragments (deprecated; use PARSE)"},
               {"source", "fragments_raw", "FRAGMENTS(RAW('<ul>...</ul>'))", "Raw fragment input"},
               {"source", "fragments_query",
                "FRAGMENTS(SELECT inner_html(...) FROM doc)", "Subquery returns HTML strings"},
@@ -1369,12 +2402,12 @@ HtmlDocument build_fragments_document(const FragmentSource& fragments) {
   return merged;
 }
 
-FragmentSource collect_fragments(const QueryResult& result) {
+FragmentSource collect_html_fragments(const QueryResult& result, const std::string& source_name) {
   if (result.to_table || !result.tables.empty()) {
-    throw std::runtime_error("FRAGMENTS does not accept TO TABLE() results");
+    throw std::runtime_error(source_name + " does not accept TO TABLE() results");
   }
   if (result.columns.size() != 1) {
-    throw std::runtime_error("FRAGMENTS expects a single HTML string column");
+    throw std::runtime_error(source_name + " expects a single HTML string column");
   }
   const std::string& field = result.columns[0];
   FragmentSource out;
@@ -1382,29 +2415,31 @@ FragmentSource collect_fragments(const QueryResult& result) {
   for (const auto& row : result.rows) {
     std::optional<std::string> value = field_value_string(row, field);
     if (!value.has_value()) {
-      throw std::runtime_error("FRAGMENTS expects HTML strings (use inner_html(...) or RAW('<...>'))");
+      throw std::runtime_error(
+          source_name + " expects HTML strings (use inner_html(...) or RAW('<...>'))");
     }
     std::string trimmed = util::trim_ws(*value);
     if (trimmed.empty()) {
       continue;
     }
     if (!looks_like_html_fragment(trimmed)) {
-      throw std::runtime_error("FRAGMENTS expects HTML strings (use inner_html(...) or RAW('<...>'))");
+      throw std::runtime_error(
+          source_name + " expects HTML strings (use inner_html(...) or RAW('<...>'))");
     }
     if (trimmed.size() > xsql_internal::kMaxFragmentHtmlBytes) {
-      throw std::runtime_error("FRAGMENTS HTML fragment exceeds maximum size");
+      throw std::runtime_error(source_name + " HTML fragment exceeds maximum size");
     }
     total_bytes += trimmed.size();
     if (out.fragments.size() >= xsql_internal::kMaxFragmentCount) {
-      throw std::runtime_error("FRAGMENTS exceeds maximum fragment count");
+      throw std::runtime_error(source_name + " exceeds maximum fragment count");
     }
     if (total_bytes > xsql_internal::kMaxFragmentBytes) {
-      throw std::runtime_error("FRAGMENTS exceeds maximum total HTML size");
+      throw std::runtime_error(source_name + " exceeds maximum total HTML size");
     }
     out.fragments.push_back(std::move(trimmed));
   }
   if (out.fragments.empty()) {
-    throw std::runtime_error("FRAGMENTS produced no HTML fragments");
+    throw std::runtime_error(source_name + " produced no HTML fragments");
   }
   return out;
 }
@@ -1813,6 +2848,19 @@ void validate_query(const Query& query) {
   if (query.kind != Query::Kind::Select) {
     return;
   }
+  const bool relation_runtime =
+      query.with.has_value() ||
+      !query.joins.empty() ||
+      query.source.kind == Source::Kind::CteRef ||
+      query.source.kind == Source::Kind::DerivedSubquery;
+  if (relation_runtime) {
+    if (query.to_table) {
+      throw std::runtime_error("TO TABLE() is not supported with WITH/JOIN queries");
+    }
+    xsql_internal::validate_limits(query);
+    xsql_internal::validate_predicates(query);
+    return;
+  }
   xsql_internal::validate_projection(query);
   xsql_internal::validate_order_by(query);
   xsql_internal::validate_to_table(query);
@@ -1822,10 +2870,15 @@ void validate_query(const Query& query) {
   xsql_internal::validate_limits(query);
 }
 
-QueryResult execute_query_with_source(const Query& query,
-                                      const std::string& default_html,
-                                      const std::string& default_source_uri) {
+QueryResult execute_query_with_source_legacy(const Query& query,
+                                             const std::string& default_html,
+                                             const std::string& default_source_uri) {
   std::string effective_source_uri = default_source_uri;
+  if (is_plain_count_star_document_query(query)) {
+    // WHY: COUNT(*) FROM doc does not need per-node inner_html/text materialization.
+    int64_t count = count_html_nodes_fast(default_html);
+    return build_count_star_result(query, count, effective_source_uri);
+  }
   if (query.source.kind == Source::Kind::RawHtml) {
     if (query.source.value.size() > xsql_internal::kMaxRawHtmlBytes) {
       throw std::runtime_error("RAW() HTML exceeds maximum size");
@@ -1847,17 +2900,61 @@ QueryResult execute_query_with_source(const Query& query,
       if (subquery.source.kind == Source::Kind::Path || subquery.source.kind == Source::Kind::Url) {
         throw std::runtime_error("FRAGMENTS subquery cannot use URL or file sources");
       }
-      QueryResult sub_result = execute_query_with_source(subquery, default_html, default_source_uri);
-      fragments = collect_fragments(sub_result);
+      QueryResult sub_result = execute_query_with_source_context(
+          subquery, default_html, default_source_uri, nullptr, nullptr, nullptr);
+      fragments = collect_html_fragments(sub_result, "FRAGMENTS");
     } else {
       throw std::runtime_error("FRAGMENTS requires a subquery or RAW('<...>') input");
     }
     HtmlDocument doc = build_fragments_document(fragments);
     effective_source_uri = "fragment";
+    QueryResult out = execute_query_ast(query, doc, effective_source_uri);
+    out.warnings.push_back("FRAGMENTS is deprecated; use PARSE(...) instead.");
+    return out;
+  }
+  if (query.source.kind == Source::Kind::Parse) {
+    FragmentSource fragments;
+    if (query.source.parse_expr != nullptr) {
+      std::optional<std::string> value = eval_parse_source_expr(*query.source.parse_expr);
+      if (!value.has_value()) {
+        throw std::runtime_error("PARSE() requires a non-null HTML string expression");
+      }
+      std::string trimmed = util::trim_ws(*value);
+      if (trimmed.empty()) {
+        throw std::runtime_error("PARSE() produced no HTML fragments");
+      }
+      if (!looks_like_html_fragment(trimmed)) {
+        throw std::runtime_error("PARSE() expects an HTML string expression");
+      }
+      if (trimmed.size() > xsql_internal::kMaxFragmentHtmlBytes) {
+        throw std::runtime_error("PARSE() HTML fragment exceeds maximum size");
+      }
+      fragments.fragments.push_back(std::move(trimmed));
+    } else if (query.source.parse_query != nullptr) {
+      const Query& subquery = *query.source.parse_query;
+      validate_query(subquery);
+      if (subquery.source.kind == Source::Kind::Path || subquery.source.kind == Source::Kind::Url) {
+        throw std::runtime_error("PARSE() subquery cannot use URL or file sources");
+      }
+      QueryResult sub_result = execute_query_with_source_context(
+          subquery, default_html, default_source_uri, nullptr, nullptr, nullptr);
+      fragments = collect_html_fragments(sub_result, "PARSE()");
+    } else {
+      throw std::runtime_error("PARSE() requires a scalar expression or subquery input");
+    }
+    HtmlDocument doc = build_fragments_document(fragments);
+    effective_source_uri = "parse";
     return execute_query_ast(query, doc, effective_source_uri);
   }
   HtmlDocument doc = parse_html(default_html);
   return execute_query_ast(query, doc, effective_source_uri);
+}
+
+QueryResult execute_query_with_source(const Query& query,
+                                      const std::string& default_html,
+                                      const std::string& default_source_uri) {
+  return execute_query_with_source_context(
+      query, default_html, default_source_uri, nullptr, nullptr, nullptr);
 }
 
 /// Executes a parsed query over provided HTML and assembles QueryResult.

@@ -4,20 +4,20 @@
 Source choice controls reproducibility. Use stable sources while developing queries, then switch inputs deliberately for production workflows.
 
 ## What are MarkQL sources?
-A MarkQL source is the input root that supplies the row stream. `doc` is the canonical parsed input source in CLI runs, but MarkQL also supports file/URL string sources, `RAW(...)` inline HTML, and `FRAGMENTS(...)` when you need multiple top-level roots.
+A MarkQL source is the input root that supplies the row stream. `doc` is the canonical parsed input source in CLI runs, but MarkQL also supports file/URL string sources, `RAW(...)` inline HTML, and `PARSE(...)` when you need to parse HTML strings into a source.
 
 This matters because source choice affects reproducibility. A query that works on captured local HTML is reproducible for tests. A query that reads from network input may change over time. MarkQL supports both, but you should choose deliberately based on whether you are debugging, testing, or running production extraction.
 
 This may feel unfamiliar if you normally tie scraping logic to browser state directly. In MarkQL, source and query are separate concerns. That separation is practical: you can freeze one HTML fixture and iterate on query semantics quickly.
 
 > ### Note: Source is where determinism starts
-> Teams often think determinism starts in query syntax. It starts earlier, at input. If the source changes every run, debugging semantic issues becomes noisy. MarkQL’s source system (`--input`, `RAW`, `FRAGMENTS`, stdin) is intentionally explicit so you can control that noise.
+> Teams often think determinism starts in query syntax. It starts earlier, at input. If the source changes every run, debugging semantic issues becomes noisy. MarkQL’s source system (`--input`, `RAW`, `PARSE`, stdin) is intentionally explicit so you can control that noise.
 
 ## Rules
 - Use `--input <file>` for reproducible local runs.
 - Use `doc` as the default source table for the loaded input.
 - Use `RAW(...)` for tiny inline fixtures in docs/tests.
-- Use `FRAGMENTS(...)` when your snippet has sibling roots.
+- Use `PARSE(...)` when your snippet has sibling roots or when HTML comes from query output.
 - Use stdin when piping dynamic HTML from another command.
 
 ## Scope
@@ -30,7 +30,7 @@ CLI input path
 ```
 
 ```text
-RAW/FRAGMENTS
+RAW/PARSE
   query literal source
       -> parsed in-query
       -> row stream local to that source expression
@@ -120,12 +120,12 @@ Observed output:
 ]
 ```
 
-## Listing 4-5: `FRAGMENTS(...)` for multiple roots
+## Listing 4-5: `PARSE(...)` for multiple roots
 
 <!-- VERIFY: ch04-listing-6 -->
 ```bash
 ./build/markql --mode plain --color=disabled \
-  --query "SELECT div FROM FRAGMENTS(RAW('<div id=\"a\">one</div><div id=\"b\">two</div>')) ORDER BY node_id;"
+  --query "SELECT div FROM PARSE('<div id=\"a\">one</div><div id=\"b\">two</div>') AS frag ORDER BY node_id;"
 ```
 
 Observed output:
@@ -136,6 +136,10 @@ Observed output:
   {"attributes":{"id":"b"},...}
 ]
 ```
+
+Compatibility note:
+- `FRAGMENTS(...)` is still supported but deprecated.
+- Migration: `FRAGMENTS(x)` -> `PARSE(x)`.
 
 ## Before/after diagrams
 

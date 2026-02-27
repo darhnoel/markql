@@ -39,6 +39,10 @@ void test_projection_tag_field_list() {
     expect_true(result.columns[2] == "parent_id", "tag field list column 3");
   }
   expect_eq(result.rows.size(), 1, "tag field list row count");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].tag == "div", "tag field list projected tag value");
+    expect_true(result.rows[0].parent_id.has_value(), "tag field list parent_id present");
+  }
 }
 
 void test_attribute_projection_value() {
@@ -64,12 +68,35 @@ void test_select_exclude_single() {
   std::string html = "<div></div>";
   auto result = run_query(html, "SELECT * EXCLUDE source_uri FROM document");
   expect_eq(result.columns.size(), 6, "exclude removes one column");
+  if (result.columns.size() == 6) {
+    bool saw_source_uri = false;
+    bool saw_tag = false;
+    for (const auto& col : result.columns) {
+      if (col == "source_uri") saw_source_uri = true;
+      if (col == "tag") saw_tag = true;
+    }
+    expect_true(!saw_source_uri, "exclude single removes source_uri column");
+    expect_true(saw_tag, "exclude single keeps other columns");
+  }
 }
 
 void test_select_exclude_list() {
   std::string html = "<div></div>";
   auto result = run_query(html, "SELECT * EXCLUDE (source_uri, tag) FROM document");
   expect_eq(result.columns.size(), 5, "exclude removes two columns");
+  if (result.columns.size() == 5) {
+    bool saw_source_uri = false;
+    bool saw_tag = false;
+    bool saw_node_id = false;
+    for (const auto& col : result.columns) {
+      if (col == "source_uri") saw_source_uri = true;
+      if (col == "tag") saw_tag = true;
+      if (col == "node_id") saw_node_id = true;
+    }
+    expect_true(!saw_source_uri, "exclude list removes source_uri column");
+    expect_true(!saw_tag, "exclude list removes tag column");
+    expect_true(saw_node_id, "exclude list keeps node_id column");
+  }
 }
 
 }  // namespace

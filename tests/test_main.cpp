@@ -10,6 +10,7 @@
 
 void register_query_basic_tests(std::vector<TestCase>& tests);
 void register_source_alias_tests(std::vector<TestCase>& tests);
+void register_with_join_tests(std::vector<TestCase>& tests);
 void register_shorthand_tests(std::vector<TestCase>& tests);
 void register_projection_tests(std::vector<TestCase>& tests);
 void register_function_tests(std::vector<TestCase>& tests);
@@ -68,6 +69,7 @@ int main(int argc, char** argv) {
   tests.reserve(64);
   register_query_basic_tests(tests);
   register_source_alias_tests(tests);
+  register_with_join_tests(tests);
   register_shorthand_tests(tests);
   register_projection_tests(tests);
   register_function_tests(tests);

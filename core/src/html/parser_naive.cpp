@@ -171,4 +171,8 @@ HtmlDocument parse_html_naive(const std::string& html) {
   return doc;
 }
 
+int64_t count_html_nodes_naive(const std::string& html) {
+  return static_cast<int64_t>(parse_html_naive(html).nodes.size());
+}
+
 }  // namespace xsql

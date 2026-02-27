@@ -24,5 +24,6 @@ struct HtmlDocument {
 };
 
 HtmlDocument parse_html(const std::string& html);
+int64_t count_html_nodes_fast(const std::string& html);
 
 }  // namespace xsql

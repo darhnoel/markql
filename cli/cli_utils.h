@@ -46,6 +46,17 @@ bool is_url(const std::string& value);
 /// MUST honor timeouts and MUST fail when network support is disabled.
 /// Inputs are path/url and timeout; outputs are HTML text with IO side effects.
 std::string load_html_input(const std::string& input, int timeout_ms);
+/// Reads current process resident memory (RSS) in bytes when available.
+/// MUST return nullopt on unsupported platforms or read errors.
+std::optional<size_t> read_process_rss_bytes();
+/// Formats a byte count using IEC units (KiB, MiB, GiB).
+/// MUST be deterministic and locale-independent.
+std::string format_bytes_iec(size_t bytes);
+/// Prints time and memory summary lines for a completed query.
+/// MUST keep output stable for CLI parsing and user inspection.
+void print_query_runtime_summary(std::optional<size_t> rss_before_bytes,
+                                 std::optional<size_t> rss_after_bytes,
+                                 long long elapsed_ms);
 /// Rewrites bare FROM paths into quoted string literals for parsing.
 /// MUST only rewrite likely paths and MUST preserve user intent otherwise.
 /// Inputs are the query string; outputs are rewritten query with no side effects.
@@ -62,6 +73,7 @@ struct QuerySource {
   xsql::Source::Kind kind = xsql::Source::Kind::Document;
   std::string value;
   std::optional<std::string> alias;
+  std::optional<std::string> source_token;
   bool needs_input = true;
   xsql::Query::Kind statement_kind = xsql::Query::Kind::Select;
 };

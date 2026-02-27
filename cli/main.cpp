@@ -1,4 +1,5 @@
 #include <iostream>
+#include <chrono>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -80,6 +81,19 @@ int main(int argc, char** argv) {
 
     std::optional<std::string> stdin_cache;
     auto execute_and_render = [&](const std::string& raw_query) {
+      const auto started_at = std::chrono::steady_clock::now();
+      const auto rss_before_bytes = read_process_rss_bytes();
+      bool runtime_summary_printed = false;
+      auto emit_runtime_summary = [&]() {
+        if (runtime_summary_printed) return;
+        runtime_summary_printed = true;
+        const auto finished_at = std::chrono::steady_clock::now();
+        const long long elapsed_ms = static_cast<long long>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(finished_at - started_at).count());
+        const auto rss_after_bytes = read_process_rss_bytes();
+        print_query_runtime_summary(rss_before_bytes, rss_after_bytes, elapsed_ms);
+      };
+
       std::string statement = rewrite_from_path_if_needed(raw_query);
       xsql::QueryResult result;
       auto source = parse_query_source(statement);
@@ -103,8 +117,7 @@ int main(int argc, char** argv) {
           result = xsql::execute_query_from_file(source->value, statement);
         } else if (source.has_value() && source->kind == xsql::Source::Kind::RawHtml) {
           result = xsql::execute_query_from_document("", statement);
-        } else if (source.has_value() && source->kind == xsql::Source::Kind::Fragments &&
-                   !source->needs_input) {
+        } else if (source.has_value() && !source->needs_input) {
           result = xsql::execute_query_from_document("", statement);
         } else if (input.empty() || input == "document") {
           if (!stdin_cache.has_value()) {
@@ -120,6 +133,11 @@ int main(int argc, char** argv) {
         }
         auto sources = collect_source_uris(result);
         apply_source_uri_policy(result, sources);
+      }
+      for (const auto& warning : result.warnings) {
+        if (color) std::cerr << kColor.yellow;
+        std::cerr << "Warning: " << warning << std::endl;
+        if (color) std::cerr << kColor.reset;
       }
 
       if (result.export_sink.kind != xsql::QueryResult::ExportSink::Kind::None) {
@@ -139,6 +157,7 @@ int main(int argc, char** argv) {
           if (result.tables.empty()) {
             std::cout << "(empty table)" << std::endl;
             std::cout << "Rows: 0" << std::endl;
+            emit_runtime_summary();
           } else if (result.table_options.format ==
                      xsql::QueryResult::TableOptions::Format::Sparse) {
             std::string json_out = build_table_json(result);
@@ -158,6 +177,7 @@ int main(int argc, char** argv) {
               }
             }
             std::cout << "Rows: " << sparse_rows << std::endl;
+            emit_runtime_summary();
           } else {
             for (size_t i = 0; i < result.tables.size(); ++i) {
               if (result.tables.size() > 1) {
@@ -170,6 +190,7 @@ int main(int argc, char** argv) {
                         << count_table_rows(result.tables[i], result.table_has_header)
                         << std::endl;
             }
+            emit_runtime_summary();
           }
         } else if (!result.to_list) {
           xsql::render::DuckboxOptions options;
@@ -180,6 +201,7 @@ int main(int argc, char** argv) {
           options.colname_mode = colname_mode;
           std::cout << xsql::render::render_duckbox(result, options) << std::endl;
           std::cout << "Rows: " << count_result_rows(result) << std::endl;
+          emit_runtime_summary();
         } else {
           std::string json_out = build_json_list(result, colname_mode);
           if (display_full) {
@@ -189,6 +211,7 @@ int main(int argc, char** argv) {
             std::cout << colorize_json(truncated.output, color) << std::endl;
           }
           std::cout << "Rows: " << count_result_rows(result) << std::endl;
+          emit_runtime_summary();
         }
       } else {
         std::string json_out =
