@@ -1432,6 +1432,21 @@ std::optional<std::string> eval_relation_scalar_expr(const ScalarExpr& expr,
     while (end > 0 && std::isspace(static_cast<unsigned char>((*value)[end - 1]))) --end;
     return value->substr(0, end);
   }
+  if (fn == "REPLACE") {
+    if (expr.args.size() != 3) return std::nullopt;
+    std::optional<std::string> text = eval_relation_scalar_expr(expr.args[0], row, active_alias);
+    std::optional<std::string> from = eval_relation_scalar_expr(expr.args[1], row, active_alias);
+    std::optional<std::string> to = eval_relation_scalar_expr(expr.args[2], row, active_alias);
+    if (!text.has_value() || !from.has_value() || !to.has_value()) return std::nullopt;
+    std::string out = *text;
+    if (from->empty()) return out;
+    size_t pos = 0;
+    while ((pos = out.find(*from, pos)) != std::string::npos) {
+      out.replace(pos, from->size(), *to);
+      pos += to->size();
+    }
+    return out;
+  }
   return std::nullopt;
 }
 
