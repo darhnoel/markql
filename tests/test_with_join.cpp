@@ -1,6 +1,6 @@
 #include <exception>
 
-#include "query_parser.h"
+#include "lang/markql_parser.h"
 #include "test_harness.h"
 #include "test_utils.h"
 

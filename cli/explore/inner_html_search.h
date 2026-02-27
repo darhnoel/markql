@@ -6,7 +6,7 @@
 #include <string_view>
 #include <vector>
 
-#include "html_parser.h"
+#include "dom/html_parser.h"
 
 namespace xsql::cli {
 

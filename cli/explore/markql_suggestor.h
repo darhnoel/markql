@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#include "html_parser.h"
+#include "dom/html_parser.h"
 
 namespace xsql::cli {
 

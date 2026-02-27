@@ -3,8 +3,8 @@
 
 #include <vector>
 
-#include "parser/lexer.h"
-#include "query_parser.h"
+#include "lang/markql_parser.h"
+#include "lang/parser/lexer.h"
 
 namespace {
 

@@ -2,7 +2,7 @@
 
 #include "test_harness.h"
 #include "test_utils.h"
-#include "query_parser.h"
+#include "lang/markql_parser.h"
 
 namespace {
 

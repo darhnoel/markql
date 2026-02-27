@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "ast.h"
+#include "lang/ast.h"
 #include "xsql/column_names.h"
 #include "xsql/xsql.h"
 

@@ -3,7 +3,7 @@
 
 #include <stdexcept>
 
-#include "query_parser.h"
+#include "lang/markql_parser.h"
 
 namespace {
 

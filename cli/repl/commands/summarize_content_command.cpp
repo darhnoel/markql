@@ -12,8 +12,8 @@
 #include "../../render/duckbox_renderer.h"
 #include "../../ui/color.h"
 #include "../plugin_manager.h"
-#include "html_parser.h"
-#include "xsql/xsql_internal.h"
+#include "dom/html_parser.h"
+#include "runtime/engine/xsql_internal.h"
 
 namespace xsql::cli {
 namespace {

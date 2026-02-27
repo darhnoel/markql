@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "../ast.h"
-#include "../html_parser.h"
+#include "../../dom/html_parser.h"
+#include "../../lang/ast.h"
 #include "xsql/xsql.h"
 
 namespace xsql::xsql_internal {

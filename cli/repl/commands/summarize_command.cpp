@@ -8,7 +8,7 @@
 #include "../../cli_utils.h"
 #include "../../render/duckbox_renderer.h"
 #include "../../ui/color.h"
-#include "../../../core/src/html_parser.h"
+#include "dom/html_parser.h"
 
 namespace xsql::cli {
 

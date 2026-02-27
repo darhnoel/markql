@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "ast.h"
-#include "html_parser.h"
+#include "dom/html_parser.h"
+#include "lang/ast.h"
 
 namespace xsql {
 

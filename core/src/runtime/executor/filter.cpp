@@ -5,8 +5,8 @@
 #include <regex>
 #include <vector>
 
-#include "../util/string_util.h"
-#include "../xsql/xsql_internal.h"
+#include "../../util/string_util.h"
+#include "../engine/xsql_internal.h"
 
 namespace xsql::executor_internal {
 

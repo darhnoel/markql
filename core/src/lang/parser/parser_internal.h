@@ -6,7 +6,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "../query_parser.h"
+#include "../markql_parser.h"
 #include "lexer.h"
 
 namespace xsql {

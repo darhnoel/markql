@@ -15,34 +15,36 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(xsql_core
-  core/src/ast.cpp
-  core/src/query_parser.cpp
-  core/src/parser/parser.cpp
-  core/src/parser/parser_expr.cpp
-  core/src/parser/parser_query.cpp
-  core/src/parser/parser_select.cpp
-  core/src/parser/parser_source.cpp
-  core/src/parser/parser_util.cpp
-  core/src/parser/lexer.cpp
-  core/src/html_parser.cpp
-  core/src/html/parser_naive.cpp
-  core/src/html/parser_libxml2.cpp
-  core/src/executor/executor.cpp
-  core/src/executor/filter.cpp
-  core/src/executor/order.cpp
+  core/src/lang/ast.cpp
+  core/src/lang/markql_parser.cpp
+  core/src/lang/parser/parser.cpp
+  core/src/lang/parser/parser_expr.cpp
+  core/src/lang/parser/parser_query.cpp
+  core/src/lang/parser/parser_select.cpp
+  core/src/lang/parser/parser_source.cpp
+  core/src/lang/parser/parser_util.cpp
+  core/src/lang/parser/lexer.cpp
+  core/src/dom/html_parser.cpp
+  core/src/dom/backend/parser_naive.cpp
+  core/src/dom/backend/parser_libxml2.cpp
+  core/src/runtime/executor/executor.cpp
+  core/src/runtime/executor/filter.cpp
+  core/src/runtime/executor/order.cpp
   core/src/util/string_util.cpp
-  core/src/xsql/execute.cpp
-  core/src/xsql/io.cpp
-  core/src/xsql/column_names.cpp
-  core/src/xsql/validation.cpp
-  core/src/xsql/result_builder.cpp
-  core/src/xsql/table_extract.cpp
-  core/src/xsql/tfidf.cpp
+  core/src/runtime/engine/execute.cpp
+  core/src/runtime/engine/io.cpp
+  core/src/runtime/engine/column_names.cpp
+  core/src/runtime/engine/validation.cpp
+  core/src/runtime/engine/result_builder.cpp
+  core/src/runtime/engine/table_extract.cpp
+  core/src/runtime/engine/tfidf.cpp
 )
 
 target_include_directories(xsql_core
   PUBLIC
     core/include
+  PRIVATE
+    core/src
 )
 
 target_compile_features(xsql_core PUBLIC cxx_std_20)

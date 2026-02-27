@@ -1,6 +1,6 @@
 #include "parser_impl.h"
 
-#include "../util/string_util.h"
+#include "../../util/string_util.h"
 
 #ifdef XSQL_USE_LIBXML2
 

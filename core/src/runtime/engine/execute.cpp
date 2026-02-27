@@ -9,9 +9,9 @@
 
 #include "../executor/executor_internal.h"
 #include "../executor.h"
-#include "../html_parser.h"
-#include "../query_parser.h"
-#include "../util/string_util.h"
+#include "../../dom/html_parser.h"
+#include "../../lang/markql_parser.h"
+#include "../../util/string_util.h"
 #include "xsql_internal.h"
 
 namespace xsql {

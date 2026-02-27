@@ -2,7 +2,7 @@
 
 #include <cctype>
 
-#include "../util/string_util.h"
+#include "../../util/string_util.h"
 
 namespace xsql::xsql_internal {
 
