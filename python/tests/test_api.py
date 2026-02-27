@@ -27,6 +27,30 @@ def _supports_describe_language() -> bool:
         return False
 
 
+def _supports_parse_source() -> bool:
+    doc = xsql.load("<html><body></body></html>")
+    try:
+        xsql.execute(
+            "SELECT li FROM PARSE('<ul><li>1</li></ul>') AS frag",
+            doc=doc,
+        )
+        return True
+    except RuntimeError:
+        return False
+
+
+def _supports_fragments_warnings() -> bool:
+    doc = xsql.load("<html><body></body></html>")
+    try:
+        result = xsql.execute(
+            "SELECT li FROM FRAGMENTS(RAW('<ul><li>1</li></ul>')) AS frag",
+            doc=doc,
+        )
+    except RuntimeError:
+        return False
+    return bool(result.warnings)
+
+
 def test_load_local_file_with_base_dir(tmp_path: pathlib.Path) -> None:
     # Load from an allowed base_dir to ensure safe local access.
     html_path = tmp_path / "sample.html"
@@ -90,6 +114,37 @@ def test_execute_examples() -> None:
     assert count.rows[0]["count"] == 2
 
 
+def test_parse_source_in_python_binding() -> None:
+    # PARSE should work through Python bindings and return deterministic row values.
+    if not _supports_parse_source():
+        pytest.skip("native xsql._core module does not include PARSE source support yet")
+    doc = xsql.load("<html><body></body></html>")
+    result = xsql.execute(
+        "SELECT li FROM PARSE('<ul><li>1</li><li>2</li></ul>') AS frag ORDER BY node_id",
+        doc=doc,
+    )
+    assert len(result.rows) == 2
+    assert result.rows[0]["tag"] == "li"
+    assert result.rows[1]["tag"] == "li"
+    assert result.warnings == []
+
+
+def test_fragments_deprecation_warning_in_python_binding() -> None:
+    # FRAGMENTS remains supported but should surface deprecation warning in Python results.
+    if not _supports_fragments_warnings():
+        pytest.skip("native xsql._core module does not include FRAGMENTS warnings yet")
+    doc = xsql.load("<html><body></body></html>")
+    result = xsql.execute(
+        "SELECT li FROM FRAGMENTS(RAW('<ul><li>1</li><li>2</li></ul>')) AS frag ORDER BY node_id",
+        doc=doc,
+    )
+    assert len(result.rows) == 2
+    assert result.rows[0]["tag"] == "li"
+    assert result.rows[1]["tag"] == "li"
+    assert result.warnings
+    assert "deprecated" in result.warnings[0].lower()
+
+
 def test_execute_project_projection() -> None:
     # PROJECT should expose computed alias columns through Python bindings.
     if not _supports_project():
@@ -146,6 +201,132 @@ def test_describe_language_lists_project() -> None:
         row.get("category") == "function" and row.get("name") == "project"
         for row in result.rows
     )
+
+
+def test_python_alias_field_implicit_doc_and_explicit_alias_match() -> None:
+    # implicit `document` alias (`doc.*`) and explicit alias should produce identical rows.
+    doc = xsql.load(
+        "<div class='keep'>One</div>"
+        "<div class='keep'>Two</div>"
+        "<span class='keep'>Skip</span>"
+    )
+    implicit = xsql.execute(
+        "SELECT doc.node_id, doc.tag "
+        "FROM document "
+        "WHERE doc.tag = 'div' "
+        "ORDER BY node_id",
+        doc=doc,
+    )
+    explicit = xsql.execute(
+        "SELECT n.node_id, n.tag "
+        "FROM document AS n "
+        "WHERE n.tag = 'div' "
+        "ORDER BY node_id",
+        doc=doc,
+    )
+    assert implicit.rows == explicit.rows
+    assert len(implicit.rows) == 2
+    assert implicit.rows[0]["tag"] == "div"
+    assert implicit.rows[1]["tag"] == "div"
+
+
+def test_python_text_accepts_alias_binding() -> None:
+    # TEXT(alias) should work with both implicit `doc` and explicit alias bindings.
+    doc = xsql.load(
+        "<div class='keep'>One</div>"
+        "<div class='keep'>Two</div>"
+        "<span class='keep'>Skip</span>"
+    )
+    implicit = xsql.execute(
+        "SELECT doc.node_id, TEXT(doc) "
+        "FROM document "
+        "WHERE doc.attributes.class = 'keep' AND doc.tag = 'div' "
+        "ORDER BY node_id",
+        doc=doc,
+    )
+    explicit = xsql.execute(
+        "SELECT n.node_id, TEXT(n) "
+        "FROM document AS n "
+        "WHERE n.attributes.class = 'keep' AND n.tag = 'div' "
+        "ORDER BY node_id",
+        doc=doc,
+    )
+    assert implicit.rows == explicit.rows
+    assert [row["text"] for row in implicit.rows] == ["One", "Two"]
+
+
+def test_python_doc_identifier_rejected_when_document_is_realiased() -> None:
+    # once document is re-aliased, `doc.*` should raise the same binding error.
+    doc = xsql.load("<div>One</div>")
+    with pytest.raises(RuntimeError, match=r"Identifier 'doc' is not bound; did you mean 'n'\?"):
+        xsql.execute("SELECT doc.node_id FROM document AS n WHERE n.tag = 'div'", doc=doc)
+
+
+def test_python_duplicate_source_alias_error() -> None:
+    # duplicate source aliases should fail parse with a clear message.
+    doc = xsql.load("<div>One</div>")
+    with pytest.raises(RuntimeError, match=r"Query parse error: Duplicate source alias 'n' in FROM"):
+        xsql.execute("SELECT n.node_id FROM document AS n AS m WHERE n.tag = 'div'", doc=doc)
+
+
+def test_python_attr_shorthand_for_attributes_paths() -> None:
+    # `attr` should be a shorthand alias of `attributes` in self/alias/axis paths.
+    doc = xsql.load(
+        "<div id='root'><span id='child'></span></div>"
+        "<div id='skip'><span></span></div>"
+    )
+    implicit = xsql.execute(
+        "SELECT span FROM document WHERE parent.attr.id = 'root'",
+        doc=doc,
+    )
+    explicit = xsql.execute(
+        "SELECT n FROM document AS n WHERE n.attr.id = 'root'",
+        doc=doc,
+    )
+    assert len(implicit.rows) == 1
+    assert implicit.rows[0]["attributes"]["id"] == "child"
+    assert explicit.rows == xsql.execute(
+        "SELECT n FROM document AS n WHERE n.attributes.id = 'root'",
+        doc=doc,
+    ).rows
+
+
+def test_python_with_left_join_lateral_smoke() -> None:
+    # Smoke test: WITH + LEFT JOIN + CROSS JOIN LATERAL should return deterministic values.
+    doc = xsql.load(
+        "<table>"
+        "<tr><td>A</td><td>ID-123</td><td>...</td><td>Apple</td></tr>"
+        "<tr><td>B</td><td>ID-999</td><td>...</td></tr>"
+        "</table>"
+    )
+    query = (
+        "WITH rows AS ("
+        "  SELECT n.node_id AS row_id "
+        "  FROM document AS n "
+        "  WHERE n.tag = 'tr' AND EXISTS(child WHERE tag = 'td')"
+        "), "
+        "cells AS ("
+        "  SELECT r.row_id, c.sibling_pos AS pos, TEXT(c) AS val "
+        "  FROM rows AS r "
+        "  CROSS JOIN LATERAL ("
+        "    SELECT c "
+        "    FROM document AS c "
+        "    WHERE c.parent_id = r.row_id AND c.tag = 'td'"
+        "  ) AS c"
+        ") "
+        "SELECT r.row_id, c2.val AS item_id, c4.val AS item_name "
+        "FROM rows AS r "
+        "LEFT JOIN cells AS c2 ON c2.row_id = r.row_id AND c2.pos = 2 "
+        "LEFT JOIN cells AS c4 ON c4.row_id = r.row_id AND c4.pos = 4 "
+        "ORDER BY r.row_id"
+    )
+    result = xsql.execute(query, doc=doc)
+    assert result.columns == ["row_id", "item_id", "item_name"]
+    assert len(result.rows) == 2
+    assert result.rows[0]["item_id"] == "ID-123"
+    assert result.rows[0]["item_name"] == "Apple"
+    assert result.rows[1]["item_id"] == "ID-999"
+    assert result.rows[1]["item_name"] is None
 
 
 def test_summarize_output_shape() -> None:

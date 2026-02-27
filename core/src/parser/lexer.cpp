@@ -120,7 +120,14 @@ Token Lexer::lex_identifier_or_keyword() {
   }
   std::string upper = to_upper(out);
   if (upper == "SELECT") return make_token(TokenType::KeywordSelect, out, start);
+  if (upper == "WITH") return make_token(TokenType::KeywordWith, out, start);
   if (upper == "FROM") return make_token(TokenType::KeywordFrom, out, start);
+  if (upper == "JOIN") return make_token(TokenType::KeywordJoin, out, start);
+  if (upper == "LEFT") return make_token(TokenType::KeywordLeft, out, start);
+  if (upper == "INNER") return make_token(TokenType::KeywordInner, out, start);
+  if (upper == "CROSS") return make_token(TokenType::KeywordCross, out, start);
+  if (upper == "LATERAL") return make_token(TokenType::KeywordLateral, out, start);
+  if (upper == "ON") return make_token(TokenType::KeywordOn, out, start);
   if (upper == "WHERE") return make_token(TokenType::KeywordWhere, out, start);
   if (upper == "AND") return make_token(TokenType::KeywordAnd, out, start);
   if (upper == "OR") return make_token(TokenType::KeywordOr, out, start);
@@ -144,6 +151,7 @@ Token Lexer::lex_identifier_or_keyword() {
   if (upper == "NDJSON") return make_token(TokenType::KeywordNdjson, out, start);
   if (upper == "RAW") return make_token(TokenType::KeywordRaw, out, start);
   if (upper == "FRAGMENTS") return make_token(TokenType::KeywordFragments, out, start);
+  if (upper == "PARSE") return make_token(TokenType::KeywordParse, out, start);
   if (upper == "CONTAINS") return make_token(TokenType::KeywordContains, out, start);
   if (upper == "HAS_DIRECT_TEXT") return make_token(TokenType::KeywordHasDirectText, out, start);
   if (upper == "LIKE") return make_token(TokenType::KeywordLike, out, start);

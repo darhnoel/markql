@@ -79,6 +79,28 @@ void test_inspect_sql_input_unterminated_block_comment() {
               "unterminated block comment message is deterministic");
 }
 
+void test_parse_query_source_doc_alias_targets_doc_input() {
+  auto parsed = xsql::cli::parse_query_source("SELECT n.node_id FROM doc AS n");
+  expect_true(parsed.has_value(), "doc alias query parses");
+  expect_true(parsed->alias.has_value(), "doc alias keeps a dispatch alias");
+  expect_true(*parsed->alias == "doc", "FROM doc AS n resolves dispatch alias to doc");
+}
+
+void test_parse_query_source_cte_alias_not_dispatch_alias() {
+  auto parsed = xsql::cli::parse_query_source(
+      "WITH rows AS (SELECT n.node_id AS row_id FROM doc AS n) "
+      "SELECT r.row_id FROM rows AS r");
+  expect_true(parsed.has_value(), "cte query parses");
+  expect_true(!parsed->alias.has_value(), "CTE row alias is not treated as input alias");
+}
+
+void test_parse_query_source_named_input_alias_dispatches() {
+  auto parsed = xsql::cli::parse_query_source("SELECT x.node_id FROM x WHERE x.tag = 'li'");
+  expect_true(parsed.has_value(), "named input query parses");
+  expect_true(parsed->alias.has_value(), "named input query keeps dispatch alias");
+  expect_true(*parsed->alias == "x", "named input alias is used for dispatch");
+}
+
 }  // namespace
 
 void register_cli_utils_tests(std::vector<TestCase>& tests) {
@@ -94,4 +116,10 @@ void register_cli_utils_tests(std::vector<TestCase>& tests) {
   tests.push_back({"inspect_sql_input_block_comment_only", test_inspect_sql_input_block_comment_only});
   tests.push_back({"inspect_sql_input_unterminated_block_comment",
                    test_inspect_sql_input_unterminated_block_comment});
+  tests.push_back({"parse_query_source_doc_alias_targets_doc_input",
+                   test_parse_query_source_doc_alias_targets_doc_input});
+  tests.push_back({"parse_query_source_cte_alias_not_dispatch_alias",
+                   test_parse_query_source_cte_alias_not_dispatch_alias});
+  tests.push_back({"parse_query_source_named_input_alias_dispatches",
+                   test_parse_query_source_named_input_alias_dispatches});
 }

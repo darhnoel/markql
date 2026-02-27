@@ -8,19 +8,37 @@ This appendix summarizes practical grammar shapes used in the book.
 ## Core query
 
 ```sql
+WITH <cte_name> AS (<select_query>) [, ...]
 SELECT <projection>
-FROM <source>
+FROM <source> [AS <alias>]
+[<join_clause> ...]
 [WHERE <predicate>]
 [ORDER BY <field> [ASC|DESC]]
 [LIMIT <n>]
 [TO <sink>]
 ```
 
+`WITH` is optional. If omitted, the query starts at `SELECT`.
+
 ## Sources
 - `doc` / `document`
+- `doc AS n` (or `document AS n`)
+- `<cte_name>` / `<cte_name> AS r`
+- `(SELECT ...) AS t`
 - `'path-or-url'`
+- `'path-or-url' AS x`
 - `RAW('<html...>')`
-- `FRAGMENTS(RAW('<fragment...>'))`
+- `RAW('<html...>') AS x`
+- `PARSE('<fragment...>')`
+- `PARSE(SELECT inner_html(...) FROM doc ...)`
+- `PARSE(...) AS x`
+- `FRAGMENTS(RAW('<fragment...>'))` (deprecated; use `PARSE(...)`)
+
+## Joins
+- `JOIN <source> AS x ON <expr>` (inner join)
+- `LEFT JOIN <source> AS x ON <expr>`
+- `CROSS JOIN <source> AS x` (no `ON`)
+- `CROSS JOIN LATERAL (SELECT ...) AS x` (correlated per-left-row expansion)
 
 ## Projections
 - Tag rows: `SELECT div FROM doc ...`
@@ -53,8 +71,12 @@ Extraction semantics (important):
 - Structural: `EXISTS(axis WHERE ...)`
 - Axes: `parent`, `child`, `ancestor`, `descendant`
 - Row-node self reference: `DIRECT_TEXT(self) LIKE '%needle%'`
+- Attribute path shorthand: `attr.foo` is equivalent to `attributes.foo` (also works as `alias.attr.foo`, `parent.attr.foo`, etc.).
 
 ## Notes on current behavior
+- `FROM doc` binds an implicit row alias named `doc`.
+- `FROM doc AS n` rebinds the row alias to `n`; `doc.*` is no longer bound in that scope.
+- Prefer neutral aliases (`n`, `r`, `c`, `x`) over tag-name aliases.
 - `self` refers to the current node for the current row produced by `FROM`.
 - Inside axis scopes (for example `EXISTS(descendant WHERE ...)`), `self` is rebound to the node being evaluated in that scope.
 - `PROJECT` / `FLATTEN_EXTRACT` requires `AS (alias: expr, ...)`.

@@ -58,13 +58,31 @@ void test_parse_nested_case_expression() {
   expect_true(parsed.query.has_value(), "parse nested CASE expression");
 }
 
+void test_parse_parse_source_forms() {
+  auto parsed_literal = xsql::parse_query(
+      "SELECT li FROM PARSE('<ul><li>1</li></ul>') AS frag");
+  expect_true(parsed_literal.query.has_value(), "parse PARSE() with string expression");
+
+  auto parsed_subquery = xsql::parse_query(
+      "SELECT li FROM PARSE(SELECT inner_html(div, 2) FROM document) AS frag");
+  expect_true(parsed_subquery.query.has_value(), "parse PARSE() with subquery");
+}
+
 void test_eval_like_wildcards() {
   std::string html = "<div>abc</div><div>axc</div><div>zzz</div>";
-  auto percent = run_query(html, "SELECT div FROM document WHERE text LIKE '%c'");
+  auto percent = run_query(html, "SELECT div FROM document WHERE text LIKE '%c' ORDER BY node_id ASC");
   expect_eq(percent.rows.size(), 2, "LIKE % wildcard");
+  if (percent.rows.size() == 2) {
+    expect_true(percent.rows[0].text == "abc", "LIKE % wildcard row1 value");
+    expect_true(percent.rows[1].text == "axc", "LIKE % wildcard row2 value");
+  }
 
-  auto underscore = run_query(html, "SELECT div FROM document WHERE text LIKE 'a_c'");
+  auto underscore = run_query(html, "SELECT div FROM document WHERE text LIKE 'a_c' ORDER BY node_id ASC");
   expect_eq(underscore.rows.size(), 2, "LIKE _ wildcard");
+  if (underscore.rows.size() == 2) {
+    expect_true(underscore.rows[0].text == "abc", "LIKE _ wildcard row1 value");
+    expect_true(underscore.rows[1].text == "axc", "LIKE _ wildcard row2 value");
+  }
 }
 
 void test_eval_string_functions_in_select() {
@@ -100,10 +118,16 @@ void test_eval_position_found_and_not_found() {
       html,
       "SELECT div FROM document WHERE POSITION('world' IN TEXT(div)) = 7");
   expect_eq(found.rows.size(), 1, "position found");
+  if (!found.rows.empty()) {
+    expect_true(found.rows[0].text == "hello world", "position found row value");
+  }
   auto missing = run_query(
       html,
       "SELECT div FROM document WHERE POSITION('world' IN TEXT(div)) = 0");
   expect_eq(missing.rows.size(), 1, "position not found returns 0");
+  if (!missing.rows.empty()) {
+    expect_true(missing.rows[0].text == "abc", "position missing row value");
+  }
 }
 
 void test_eval_direct_text_excludes_descendants() {
@@ -112,6 +136,10 @@ void test_eval_direct_text_excludes_descendants() {
       "<div><span>Top</span></div>";
   auto result = run_query(html, "SELECT div FROM document WHERE DIRECT_TEXT(div) LIKE '%Top%'");
   expect_eq(result.rows.size(), 1, "direct_text excludes descendant text");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].inner_html.find("Nested") != std::string::npos,
+                "direct_text excludes descendants keeps first div");
+  }
 }
 
 void test_eval_case_expression_select_and_null_else() {
@@ -300,6 +328,7 @@ void register_string_sql_tests(std::vector<TestCase>& tests) {
   tests.push_back({"parse_project_trailing_comma", test_parse_project_trailing_comma});
   tests.push_back({"parse_case_expression_in_select", test_parse_case_expression_in_select});
   tests.push_back({"parse_nested_case_expression", test_parse_nested_case_expression});
+  tests.push_back({"parse_parse_source_forms", test_parse_parse_source_forms});
   tests.push_back({"eval_like_wildcards", test_eval_like_wildcards});
   tests.push_back({"eval_string_functions_in_select", test_eval_string_functions_in_select});
   tests.push_back({"eval_length_byte_semantics", test_eval_length_byte_semantics});

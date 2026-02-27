@@ -16,6 +16,10 @@ ExecuteResult execute_query(const Query& query, const HtmlDocument& doc, const s
   std::vector<std::string> select_tags;
   select_tags.reserve(query.select_items.size());
   bool select_all = false;
+  std::optional<std::string> source_alias;
+  if (query.source.alias.has_value()) {
+    source_alias = util::to_lower(*query.source.alias);
+  }
   for (const auto& item : query.select_items) {
     if (item.aggregate == Query::SelectItem::Aggregate::Tfidf) {
       if (item.tfidf_all_tags) {
@@ -28,6 +32,14 @@ ExecuteResult execute_query(const Query& query, const HtmlDocument& doc, const s
       continue;
     }
     if (item.tag == "*") {
+      select_all = true;
+      break;
+    }
+    const bool alias_binding =
+        source_alias.has_value() &&
+        util::to_lower(item.tag) == *source_alias &&
+        (item.field.has_value() || item.flatten_text || item.flatten_extract || item.expr_projection);
+    if (alias_binding) {
       select_all = true;
       break;
     }

@@ -454,6 +454,9 @@ bool Parser::parse_scalar_function(const std::string& function_name, size_t star
 /// MUST set axis/field_kind consistently with grammar.
 /// Inputs are tokens; outputs are Operand or errors.
 bool Parser::parse_operand(Operand& operand) {
+  auto is_attr_keyword = [&](const std::string& upper) {
+    return upper == "ATTRIBUTES" || upper == "ATTR";
+  };
   if (current_.type == TokenType::KeywordSelf) {
     size_t self_pos = current_.pos;
     advance();
@@ -463,17 +466,17 @@ bool Parser::parse_operand(Operand& operand) {
     }
     advance();
     if (current_.type != TokenType::Identifier) {
-      return set_error("Expected self.<field> where field is node_id, tag, parent_id, doc_order, sibling_pos, max_depth, attributes, or text");
+      return set_error("Expected self.<field> where field is node_id, tag, parent_id, doc_order, sibling_pos, max_depth, attributes/attr, or text");
     }
     std::string field = to_upper(current_.text);
     operand.axis = Operand::Axis::Self;
     operand.qualifier = "self";
-    if (field == "ATTRIBUTES") {
+    if (is_attr_keyword(field)) {
       size_t attributes_pos = current_.pos;
       advance();
       if (current_.type == TokenType::Dot) {
         advance();
-        if (current_.type != TokenType::Identifier) return set_error("Expected attribute name after self.attributes.");
+        if (current_.type != TokenType::Identifier) return set_error("Expected attribute name after self.attributes/self.attr.");
         operand.field_kind = Operand::FieldKind::Attribute;
         operand.attribute = current_.text;
         operand.span = Span{self_pos, current_.pos + current_.text.size()};
@@ -499,7 +502,7 @@ bool Parser::parse_operand(Operand& operand) {
     } else if (field == "DOC_ORDER") {
       operand.field_kind = Operand::FieldKind::DocOrder;
     } else {
-      return set_error("Expected self.<field> where field is node_id, tag, parent_id, doc_order, sibling_pos, max_depth, attributes, or text");
+      return set_error("Expected self.<field> where field is node_id, tag, parent_id, doc_order, sibling_pos, max_depth, attributes/attr, or text");
     }
     operand.span = Span{self_pos, current_.pos + current_.text.size()};
     advance();
@@ -508,7 +511,7 @@ bool Parser::parse_operand(Operand& operand) {
   if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
     return set_error("Expected identifier");
   }
-  if (to_upper(current_.text) == "ATTRIBUTES") {
+  if (is_attr_keyword(to_upper(current_.text))) {
     advance();
     if (current_.type == TokenType::Dot) {
       advance();
@@ -579,7 +582,7 @@ bool Parser::parse_operand(Operand& operand) {
     if (!consume(TokenType::Dot, "Expected . after parent")) return false;
     if (current_.type != TokenType::Identifier) return set_error("Expected attributes, tag, text, or parent_id after parent");
     std::string next = to_upper(current_.text);
-    if (next == "ATTRIBUTES") {
+    if (is_attr_keyword(next)) {
       advance();
       if (!consume(TokenType::Dot, "Expected . after attributes")) return false;
       if (current_.type != TokenType::Identifier) return set_error("Expected attribute name");
@@ -619,7 +622,7 @@ bool Parser::parse_operand(Operand& operand) {
     if (!consume(TokenType::Dot, "Expected . after child")) return false;
     if (current_.type != TokenType::Identifier) return set_error("Expected attributes, tag, text, node_id, or parent_id after child");
     std::string next = to_upper(current_.text);
-    if (next == "ATTRIBUTES") {
+    if (is_attr_keyword(next)) {
       advance();
       if (!consume(TokenType::Dot, "Expected . after attributes")) return false;
       if (current_.type != TokenType::Identifier) return set_error("Expected attribute name");
@@ -659,7 +662,7 @@ bool Parser::parse_operand(Operand& operand) {
     if (!consume(TokenType::Dot, "Expected . after ancestor")) return false;
     if (current_.type != TokenType::Identifier) return set_error("Expected attributes, tag, text, node_id, or parent_id after ancestor");
     std::string next = to_upper(current_.text);
-    if (next == "ATTRIBUTES") {
+    if (is_attr_keyword(next)) {
       advance();
       if (!consume(TokenType::Dot, "Expected . after attributes")) return false;
       if (current_.type != TokenType::Identifier) return set_error("Expected attribute name");
@@ -699,7 +702,7 @@ bool Parser::parse_operand(Operand& operand) {
     if (!consume(TokenType::Dot, "Expected . after descendant")) return false;
     if (current_.type != TokenType::Identifier) return set_error("Expected attributes, tag, text, node_id, or parent_id after descendant");
     std::string next = to_upper(current_.text);
-    if (next == "ATTRIBUTES") {
+    if (is_attr_keyword(next)) {
       advance();
       if (!consume(TokenType::Dot, "Expected . after attributes")) return false;
       if (current_.type != TokenType::Identifier) return set_error("Expected attribute name");
@@ -789,7 +792,7 @@ bool Parser::parse_operand(Operand& operand) {
   if (current_.type != TokenType::Identifier) {
     return set_error("Expected attributes, parent, or attribute name after qualifier");
   }
-  if (to_upper(current_.text) == "ATTRIBUTES") {
+  if (is_attr_keyword(to_upper(current_.text))) {
     advance();
     if (current_.type == TokenType::Dot) {
       advance();
@@ -848,12 +851,28 @@ bool Parser::parse_operand(Operand& operand) {
     advance();
     return true;
   }
+  if (to_upper(current_.text) == "TAG") {
+    operand.axis = Operand::Axis::Self;
+    operand.field_kind = Operand::FieldKind::Tag;
+    operand.qualifier = qualifier;
+    operand.span = Span{current_.pos, current_.pos + current_.text.size()};
+    advance();
+    return true;
+  }
+  if (to_upper(current_.text) == "TEXT") {
+    operand.axis = Operand::Axis::Self;
+    operand.field_kind = Operand::FieldKind::Text;
+    operand.qualifier = qualifier;
+    operand.span = Span{current_.pos, current_.pos + current_.text.size()};
+    advance();
+    return true;
+  }
   if (to_upper(current_.text) == "PARENT") {
     advance();
     if (!consume(TokenType::Dot, "Expected . after parent")) return false;
     if (current_.type != TokenType::Identifier) return set_error("Expected attributes, tag, text, node_id, or parent_id after parent");
     std::string next = to_upper(current_.text);
-    if (next == "ATTRIBUTES") {
+    if (is_attr_keyword(next)) {
       advance();
       if (!consume(TokenType::Dot, "Expected . after attributes")) return false;
       if (current_.type != TokenType::Identifier) return set_error("Expected attribute name");
@@ -895,7 +914,7 @@ bool Parser::parse_operand(Operand& operand) {
     if (!consume(TokenType::Dot, "Expected . after child")) return false;
     if (current_.type != TokenType::Identifier) return set_error("Expected attributes, tag, text, or parent_id after child");
     std::string next = to_upper(current_.text);
-    if (next == "ATTRIBUTES") {
+    if (is_attr_keyword(next)) {
       advance();
       if (!consume(TokenType::Dot, "Expected . after attributes")) return false;
       if (current_.type != TokenType::Identifier) return set_error("Expected attribute name");
@@ -937,7 +956,7 @@ bool Parser::parse_operand(Operand& operand) {
     if (!consume(TokenType::Dot, "Expected . after ancestor")) return false;
     if (current_.type != TokenType::Identifier) return set_error("Expected attributes, tag, text, or parent_id after ancestor");
     std::string next = to_upper(current_.text);
-    if (next == "ATTRIBUTES") {
+    if (is_attr_keyword(next)) {
       advance();
       if (!consume(TokenType::Dot, "Expected . after attributes")) return false;
       if (current_.type != TokenType::Identifier) return set_error("Expected attribute name");
@@ -979,7 +998,7 @@ bool Parser::parse_operand(Operand& operand) {
     if (!consume(TokenType::Dot, "Expected . after descendant")) return false;
     if (current_.type != TokenType::Identifier) return set_error("Expected attributes, tag, text, or parent_id after descendant");
     std::string next = to_upper(current_.text);
-    if (next == "ATTRIBUTES") {
+    if (is_attr_keyword(next)) {
       advance();
       if (!consume(TokenType::Dot, "Expected . after attributes")) return false;
       if (current_.type != TokenType::Identifier) return set_error("Expected attribute name");

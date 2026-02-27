@@ -1,5 +1,6 @@
 #include "repl.h"
 
+#include <chrono>
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
@@ -91,6 +92,19 @@ int run_repl(ReplConfig& config) {
   }
 
   auto execute_and_render = [&](const std::string& raw_query) {
+    const auto started_at = std::chrono::steady_clock::now();
+    const auto rss_before_bytes = read_process_rss_bytes();
+    bool runtime_summary_printed = false;
+    auto emit_runtime_summary = [&]() {
+      if (runtime_summary_printed) return;
+      runtime_summary_printed = true;
+      const auto finished_at = std::chrono::steady_clock::now();
+      const long long elapsed_ms = static_cast<long long>(
+          std::chrono::duration_cast<std::chrono::milliseconds>(finished_at - started_at).count());
+      const auto rss_after_bytes = read_process_rss_bytes();
+      print_query_runtime_summary(rss_before_bytes, rss_after_bytes, elapsed_ms);
+    };
+
     std::string query_text = rewrite_from_path_if_needed(raw_query);
     xsql::QueryResult result;
     auto source = parse_query_source(query_text);
@@ -119,8 +133,7 @@ int run_repl(ReplConfig& config) {
         result = xsql::execute_query_from_file(source->value, query_text);
       } else if (source.has_value() && source->kind == xsql::Source::Kind::RawHtml) {
         result = xsql::execute_query_from_document("", query_text);
-      } else if (source.has_value() && source->kind == xsql::Source::Kind::Fragments &&
-                 !source->needs_input) {
+      } else if (source.has_value() && !source->needs_input) {
         result = xsql::execute_query_from_document("", query_text);
       } else {
         std::string alias = active_alias;
@@ -128,6 +141,16 @@ int run_repl(ReplConfig& config) {
           alias = *source->alias;
         }
         auto it = sources.find(alias);
+        if ((it == sources.end() || it->second.source.empty()) &&
+            source.has_value() &&
+            source->kind == xsql::Source::Kind::Document &&
+            source->source_token.has_value() &&
+            (*source->source_token == "doc" || *source->source_token == "document")) {
+          auto active_it = sources.find(active_alias);
+          if (active_it != sources.end() && !active_it->second.source.empty()) {
+            it = active_it;
+          }
+        }
         if (it == sources.end() || it->second.source.empty()) {
           if (config.color) std::cerr << kColor.red;
           if (source.has_value() && source->alias.has_value()) {
@@ -154,6 +177,11 @@ int run_repl(ReplConfig& config) {
       last_sources = collect_source_uris(result);
       apply_source_uri_policy(result, last_sources);
     }
+    for (const auto& warning : result.warnings) {
+      if (config.color) std::cerr << kColor.yellow;
+      std::cerr << "Warning: " << warning << std::endl;
+      if (config.color) std::cerr << kColor.reset;
+    }
     last_schema_map = xsql::build_column_name_map(result.columns, config.colname_mode);
     if (result.export_sink.kind != xsql::QueryResult::ExportSink::Kind::None) {
       std::string export_error;
@@ -171,6 +199,7 @@ int run_repl(ReplConfig& config) {
         if (result.tables.empty()) {
           std::cout << "(empty table)" << std::endl;
           std::cout << "Rows: 0" << std::endl;
+          emit_runtime_summary();
         } else if (result.table_options.format ==
                    xsql::QueryResult::TableOptions::Format::Sparse) {
           std::string json_out = build_table_json(result);
@@ -191,6 +220,7 @@ int run_repl(ReplConfig& config) {
             }
           }
           std::cout << "Rows: " << sparse_rows << std::endl;
+          emit_runtime_summary();
         } else {
           for (size_t i = 0; i < result.tables.size(); ++i) {
             if (result.tables.size() > 1) {
@@ -203,6 +233,7 @@ int run_repl(ReplConfig& config) {
                       << count_table_rows(result.tables[i], result.table_has_header)
                       << std::endl;
           }
+          emit_runtime_summary();
         }
       } else if (!result.to_list) {
         xsql::render::DuckboxOptions options;
@@ -213,6 +244,7 @@ int run_repl(ReplConfig& config) {
         options.colname_mode = config.colname_mode;
         std::cout << xsql::render::render_duckbox(result, options) << std::endl;
         std::cout << "Rows: " << count_result_rows(result) << std::endl;
+        emit_runtime_summary();
       } else {
         std::string json_out = build_json_list(result, config.colname_mode);
         last_full_output = json_out;
@@ -223,6 +255,7 @@ int run_repl(ReplConfig& config) {
           std::cout << colorize_json(truncated.output, config.color) << std::endl;
         }
         std::cout << "Rows: " << count_result_rows(result) << std::endl;
+        emit_runtime_summary();
       }
     } else {
       std::string json_out =

@@ -40,9 +40,16 @@ You can inspect the runtime list with:
 - `SUMMARIZE(*)`
 - `TFIDF(...)`
 
+## Source constructors
+- `RAW('<html...>')`
+- `PARSE('<html...>')`
+- `PARSE(SELECT inner_html(...) FROM doc ...)`
+- `FRAGMENTS(...)` (deprecated; prefer `PARSE(...)`)
+
 ## Behavior and constraints
 - `self` refers to the current node for the current row produced by `FROM`.
 - Inside axis scopes such as `EXISTS(descendant WHERE ...)`, `self` is rebound to the node being evaluated in that scope.
+- `attr.foo` is shorthand for `attributes.foo` in operand paths (including alias/axis-qualified forms).
 - `TEXT()/INNER_HTML()/RAW_INNER_HTML()` require an outer `WHERE` clause.
 - The outer `WHERE` must include a non-tag self predicate (for example `attributes.*`, `parent.*`, etc.), not only `tag = ...`.
 - `INNER_HTML(tag)` and `RAW_INNER_HTML(tag)` default to depth `1` when depth is omitted.

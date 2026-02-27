@@ -162,8 +162,12 @@ void test_summarize_star() {
 
 void test_summarize_limit() {
   std::string html = "<div></div><div></div><span></span>";
-  auto result = run_query(html, "SELECT summarize(*) FROM document LIMIT 1");
+  auto result = run_query(html, "SELECT summarize(*) FROM document WHERE tag IN ('div','span') LIMIT 1");
   expect_eq(result.rows.size(), 1, "summarize limit row count");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].tag == "div", "summarize limit top tag");
+    expect_true(result.rows[0].node_id == 1, "summarize limit top count");
+  }
 }
 
 void test_summarize_order_by_count() {
@@ -219,6 +223,12 @@ void test_tfidf_output_shape() {
     expect_true(result.columns[3] == "terms_score", "tfidf column terms_score");
   }
   expect_eq(result.rows.size(), 2, "tfidf row count");
+  if (result.rows.size() == 2) {
+    expect_true(result.rows[0].tag == "p", "tfidf output first tag");
+    expect_true(result.rows[1].tag == "li", "tfidf output second tag");
+    expect_true(!result.rows[0].term_scores.empty(), "tfidf output first row has scores");
+    expect_true(!result.rows[1].term_scores.empty(), "tfidf output second row has scores");
+  }
 }
 
 void test_tfidf_scoring_top_term() {

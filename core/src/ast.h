@@ -16,13 +16,26 @@ struct Span {
 };
 
 struct Query;
+struct ScalarExpr;
 
 struct Source {
-  enum class Kind { Document, Path, Url, RawHtml, Fragments } kind = Kind::Document;
+  enum class Kind {
+    Document,
+    Path,
+    Url,
+    RawHtml,
+    Fragments,
+    Parse,
+    CteRef,
+    DerivedSubquery
+  } kind = Kind::Document;
   std::string value;
   std::optional<std::string> alias;
   std::shared_ptr<Query> fragments_query;
   std::optional<std::string> fragments_raw;
+  std::shared_ptr<Query> parse_query;
+  std::shared_ptr<ScalarExpr> parse_expr;
+  std::shared_ptr<Query> derived_query;
   Span span;
 };
 
@@ -125,6 +138,22 @@ struct Query {
     DescribeDoc,
     DescribeLanguage
   } kind = Kind::Select;
+  struct WithClause {
+    struct CteDef {
+      std::string name;
+      std::shared_ptr<Query> query;
+      Span span;
+    };
+    std::vector<CteDef> ctes;
+    Span span;
+  };
+  struct JoinItem {
+    enum class Type { Inner, Left, Cross } type = Type::Inner;
+    Source right_source;
+    std::optional<Expr> on;
+    bool lateral = false;
+    Span span;
+  };
   struct ExportSink {
     enum class Kind { None, Csv, Parquet, Json, Ndjson } kind = Kind::None;
     std::string path;
@@ -201,8 +230,10 @@ struct Query {
     std::optional<FlattenExtractExpr> project_expr;
     Span span;
   };
+  std::optional<WithClause> with;
   std::vector<SelectItem> select_items;
   Source source;
+  std::vector<JoinItem> joins;
   std::optional<Expr> where;
   std::vector<OrderBy> order_by;
   std::vector<std::string> exclude_fields;

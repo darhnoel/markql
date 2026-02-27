@@ -18,18 +18,29 @@ void test_class_in_matches_token() {
   std::string html = "<div class=\"subtle newest\"></div><div class=\"old\"></div>";
   auto result = run_query(html, "SELECT div FROM document WHERE attributes.class IN ('newest')");
   expect_eq(result.rows.size(), 1, "class IN matches token");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].attributes["class"] == "subtle newest", "class IN matched row value");
+  }
 }
 
 void test_parent_attribute_filter() {
-  std::string html = "<div id='table-01'><table></table></div><div id='table-02'><table></table></div>";
+  std::string html = "<div id='table-01'><table id='keep'></table></div><div id='table-02'><table id='skip'></table></div>";
   auto result = run_query(html, "SELECT table FROM document WHERE parent.attributes.id = 'table-01'");
   expect_eq(result.rows.size(), 1, "parent attribute filter");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].tag == "table", "parent attribute filter tag");
+    expect_true(result.rows[0].attributes["id"] == "keep", "parent attribute filter row value");
+  }
 }
 
 void test_multi_tag_select() {
   std::string html = "<h1></h1><h2></h2><p></p>";
   auto result = run_query(html, "SELECT h1,h2 FROM document");
   expect_eq(result.rows.size(), 2, "multi-tag select");
+  if (result.rows.size() == 2) {
+    expect_true(result.rows[0].tag == "h1", "multi-tag select first tag");
+    expect_true(result.rows[1].tag == "h2", "multi-tag select second tag");
+  }
 }
 
 void test_select_star() {
@@ -49,6 +60,9 @@ void test_class_eq_matches_token() {
   std::string html = "<div class=\"subtle newest\"></div><div class=\"newest\"></div>";
   auto result = run_query(html, "SELECT div FROM document WHERE attributes.class = 'subtle'");
   expect_eq(result.rows.size(), 1, "class = matches token");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].attributes["class"] == "subtle newest", "class = matched row value");
+  }
 }
 
 void test_missing_attribute_no_match() {
@@ -69,9 +83,13 @@ void test_invalid_query_throws() {
 }
 
 void test_limit() {
-  std::string html = "<div></div><div></div><div></div>";
-  auto result = run_query(html, "SELECT div FROM document LIMIT 2");
+  std::string html = "<div id='first'></div><div id='second'></div><div id='third'></div>";
+  auto result = run_query(html, "SELECT div FROM document ORDER BY node_id ASC LIMIT 2");
   expect_eq(result.rows.size(), 2, "limit");
+  if (result.rows.size() == 2) {
+    expect_true(result.rows[0].attributes["id"] == "first", "limit first kept row");
+    expect_true(result.rows[1].attributes["id"] == "second", "limit second kept row");
+  }
 }
 
 }  // namespace

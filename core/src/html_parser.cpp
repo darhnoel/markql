@@ -98,4 +98,12 @@ HtmlDocument parse_html(const std::string& html) {
   return doc;
 }
 
+int64_t count_html_nodes_fast(const std::string& html) {
+#ifdef XSQL_USE_LIBXML2
+  return count_html_nodes_libxml2(html);
+#else
+  return count_html_nodes_naive(html);
+#endif
+}
+
 }  // namespace xsql

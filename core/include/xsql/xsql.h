@@ -52,6 +52,7 @@ struct QueryResult {
   };
   std::vector<std::string> columns;
   std::vector<QueryResultRow> rows;
+  std::vector<std::string> warnings;
   /// True when output columns come from implicit defaults (e.g., SELECT * or tag-only).
   bool columns_implicit = false;
   /// True when EXCLUDE explicitly removed source_uri in the query.

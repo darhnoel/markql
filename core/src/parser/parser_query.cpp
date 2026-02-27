@@ -12,6 +12,11 @@ bool Parser::parse_query_body(Query& q) {
   if (current_.type == TokenType::KeywordDescribe) {
     return parse_describe(q);
   }
+  if (current_.type == TokenType::KeywordWith) {
+    Query::WithClause with_clause;
+    if (!parse_with_clause(with_clause)) return false;
+    q.with = std::move(with_clause);
+  }
   if (!consume(TokenType::KeywordSelect, "Expected SELECT")) return false;
   if (!parse_select_list(q.select_items)) return false;
   if (current_.type == TokenType::KeywordExclude) {
@@ -20,6 +25,24 @@ bool Parser::parse_query_body(Query& q) {
   }
   if (!consume(TokenType::KeywordFrom, "Expected FROM")) return false;
   if (!parse_source(q.source)) return false;
+  if (!parse_join_clauses(q.joins)) return false;
+  if (current_.type == TokenType::KeywordAs) {
+    const std::string alias = q.source.alias.has_value() ? *q.source.alias : "?";
+    return set_error("Duplicate source alias '" + alias + "' in FROM");
+  }
+  std::unordered_set<std::string> seen_aliases;
+  if (q.source.alias.has_value()) {
+    seen_aliases.insert(to_lower(*q.source.alias));
+  }
+  for (const auto& join : q.joins) {
+    if (!join.right_source.alias.has_value()) {
+      continue;
+    }
+    const std::string lowered = to_lower(*join.right_source.alias);
+    if (!seen_aliases.insert(lowered).second) {
+      return set_error("Duplicate source alias '" + *join.right_source.alias + "' in FROM");
+    }
+  }
 
   if (current_.type == TokenType::KeywordWhere) {
     advance();
@@ -42,8 +65,18 @@ bool Parser::parse_query_body(Query& q) {
       } else {
         order_by.field = to_lower(current_.text);
       }
-      order_by.span = Span{current_.pos, current_.pos + current_.text.size()};
+      size_t start = current_.pos;
       advance();
+      if (current_.type == TokenType::Dot) {
+        advance();
+        if (current_.type != TokenType::Identifier) {
+          return set_error("Expected field after ORDER BY qualifier");
+        }
+        order_by.field += ".";
+        order_by.field += to_lower(current_.text);
+        advance();
+      }
+      order_by.span = Span{start, current_.pos};
       if (current_.type == TokenType::KeywordAsc) {
         advance();
       } else if (current_.type == TokenType::KeywordDesc) {
@@ -102,7 +135,8 @@ bool Parser::parse_query_body(Query& q) {
             if (current_.type == TokenType::Comma || current_.type == TokenType::RParen) {
               q.table_has_header = true;
             } else {
-              if (current_.type != TokenType::Identifier) {
+              if (current_.type != TokenType::Identifier &&
+                  current_.type != TokenType::KeywordOn) {
                 return set_error("Expected ON or OFF after HEADER");
               }
               std::string value = to_upper(current_.text);
@@ -149,7 +183,8 @@ bool Parser::parse_query_body(Query& q) {
             if (current_.type == TokenType::Equal) {
               advance();
             }
-            if (current_.type != TokenType::Identifier) {
+            if (current_.type != TokenType::Identifier &&
+                current_.type != TokenType::KeywordOn) {
               return set_error("Expected ON or OFF after TRIM_EMPTY_ROWS");
             }
             const std::string value = to_upper(current_.text);
@@ -271,7 +306,8 @@ bool Parser::parse_query_body(Query& q) {
             if (current_.type == TokenType::Equal) {
               advance();
             }
-            if (current_.type != TokenType::Identifier) {
+            if (current_.type != TokenType::Identifier &&
+                current_.type != TokenType::KeywordOn) {
               return set_error("Expected ON or OFF after HEADER_NORMALIZE");
             }
             const std::string value = to_upper(current_.text);
@@ -335,6 +371,116 @@ bool Parser::parse_query_body(Query& q) {
       set_error("Expected LIST, TABLE, CSV, PARQUET, JSON, or NDJSON after TO");
       return false;
     }
+  }
+  return true;
+}
+
+bool Parser::parse_with_clause(Query::WithClause& with_clause) {
+  if (!consume(TokenType::KeywordWith, "Expected WITH")) return false;
+  size_t with_start = current_.pos;
+  std::unordered_set<std::string> local_names;
+  while (true) {
+    if (current_.type != TokenType::Identifier) {
+      return set_error("Expected CTE name after WITH");
+    }
+    Query::WithClause::CteDef cte;
+    cte.name = current_.text;
+    const std::string lowered_name = to_lower(cte.name);
+    if (local_names.find(lowered_name) != local_names.end()) {
+      return set_error("Duplicate CTE name '" + cte.name + "' in WITH");
+    }
+    size_t cte_start = current_.pos;
+    advance();
+    if (!consume(TokenType::KeywordAs, "Expected AS after CTE name")) return false;
+    if (!consume(TokenType::LParen, "Expected ( after CTE AS")) return false;
+    std::shared_ptr<Query> subquery;
+    if (!parse_subquery(subquery)) return false;
+    if (!consume(TokenType::RParen, "Expected ) after CTE subquery")) return false;
+    cte.query = std::move(subquery);
+    cte.span = Span{cte_start, current_.pos};
+    with_clause.ctes.push_back(std::move(cte));
+    local_names.insert(lowered_name);
+    cte_names_.insert(lowered_name);
+    if (current_.type == TokenType::Comma) {
+      advance();
+      continue;
+    }
+    break;
+  }
+  with_clause.span = Span{with_start, current_.pos};
+  return true;
+}
+
+bool Parser::parse_join_clauses(std::vector<Query::JoinItem>& joins) {
+  while (true) {
+    Query::JoinItem join;
+    bool saw_join = false;
+    size_t join_start = current_.pos;
+    if (current_.type == TokenType::KeywordJoin) {
+      join.type = Query::JoinItem::Type::Inner;
+      saw_join = true;
+      advance();
+    } else if (current_.type == TokenType::KeywordInner) {
+      saw_join = true;
+      join.type = Query::JoinItem::Type::Inner;
+      advance();
+      if (!consume(TokenType::KeywordJoin, "Expected JOIN after INNER")) return false;
+    } else if (current_.type == TokenType::KeywordLeft) {
+      saw_join = true;
+      join.type = Query::JoinItem::Type::Left;
+      advance();
+      if (!consume(TokenType::KeywordJoin, "Expected JOIN after LEFT")) return false;
+    } else if (current_.type == TokenType::KeywordCross) {
+      saw_join = true;
+      join.type = Query::JoinItem::Type::Cross;
+      advance();
+      if (!consume(TokenType::KeywordJoin, "Expected JOIN after CROSS")) return false;
+    }
+    if (!saw_join) break;
+
+    if (join.type == Query::JoinItem::Type::Cross &&
+        current_.type == TokenType::KeywordLateral) {
+      // WHY: LATERAL is evaluated per-left-row (nested-loop flatMap), so we restrict
+      // syntax to an aliased subquery for deterministic correlation scope.
+      join.lateral = true;
+      advance();
+      if (current_.type != TokenType::LParen) {
+        return set_error("CROSS JOIN LATERAL requires a subquery source");
+      }
+      Source right;
+      size_t start = current_.pos;
+      advance();
+      std::shared_ptr<Query> subquery;
+      if (!parse_subquery(subquery)) return false;
+      if (!consume(TokenType::RParen, "Expected ) after LATERAL subquery")) return false;
+      right.kind = Source::Kind::DerivedSubquery;
+      right.derived_query = std::move(subquery);
+      right.span = Span{start, current_.pos};
+      if (!parse_source_alias(right, true, "LATERAL subquery requires an alias")) return false;
+      join.right_source = std::move(right);
+    } else {
+      if (!parse_source(join.right_source)) return false;
+    }
+
+    if (current_.type == TokenType::KeywordAs) {
+      const std::string alias =
+          join.right_source.alias.has_value() ? *join.right_source.alias : "?";
+      return set_error("Duplicate source alias '" + alias + "' in FROM");
+    }
+
+    if (join.type == Query::JoinItem::Type::Cross) {
+      if (current_.type == TokenType::KeywordOn) {
+        return set_error("CROSS JOIN does not allow ON");
+      }
+    } else {
+      if (!consume(TokenType::KeywordOn, "JOIN requires ON clause")) return false;
+      Expr on_expr;
+      if (!parse_expr(on_expr)) return false;
+      join.on = std::move(on_expr);
+    }
+
+    join.span = Span{join_start, current_.pos};
+    joins.push_back(std::move(join));
   }
   return true;
 }

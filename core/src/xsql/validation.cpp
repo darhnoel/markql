@@ -346,24 +346,42 @@ void validate_qualifiers(const Query& query) {
     sole_tag.reset();
   }
 
-  auto is_allowed = [&](const std::optional<std::string>& qualifier) -> bool {
-    if (!qualifier.has_value()) return true;
-    if (util::to_lower(*qualifier) == "self") return true;
-    if (query.source.alias.has_value() && *qualifier == *query.source.alias) return true;
-    if (query.source.kind == Source::Kind::Document && *qualifier == "document") return true;
-    if (sole_tag.has_value() && util::to_lower(*qualifier) == *sole_tag) return true;
-    return false;
+  std::optional<std::string> active_alias;
+  if (query.source.alias.has_value()) {
+    active_alias = util::to_lower(*query.source.alias);
+  }
+
+  auto qualifier_error = [&](const std::optional<std::string>& qualifier) -> std::optional<std::string> {
+    if (!qualifier.has_value()) return std::nullopt;
+    const std::string lowered = util::to_lower(*qualifier);
+    if (lowered == "self") return std::nullopt;
+    if (active_alias.has_value() && lowered == *active_alias) return std::nullopt;
+    if (query.source.kind == Source::Kind::Document &&
+        lowered == "document" &&
+        active_alias.has_value() &&
+        *active_alias == "doc") {
+      return std::nullopt;
+    }
+    if (query.source.kind == Source::Kind::Document &&
+        lowered == "doc" &&
+        active_alias.has_value() &&
+        *active_alias != "doc") {
+      return "Identifier 'doc' is not bound; did you mean '" + *query.source.alias + "'?";
+    }
+    if (sole_tag.has_value() && lowered == *sole_tag) return std::nullopt;
+    return "Unknown identifier '" + *qualifier +
+           "' (expected a FROM alias or legacy tag binding)";
   };
 
   std::function<void(const Expr&)> visit = [&](const Expr& expr) {
     if (std::holds_alternative<CompareExpr>(expr)) {
       const auto& cmp = std::get<CompareExpr>(expr);
       if (cmp.lhs_expr.has_value() && cmp.lhs_expr->kind == ScalarExpr::Kind::Operand) {
-        if (!is_allowed(cmp.lhs_expr->operand.qualifier)) {
-          throw std::runtime_error("Unknown qualifier: " + *cmp.lhs_expr->operand.qualifier);
+        if (auto err = qualifier_error(cmp.lhs_expr->operand.qualifier); err.has_value()) {
+          throw std::runtime_error(*err);
         }
-      } else if (!is_allowed(cmp.lhs.qualifier)) {
-        throw std::runtime_error("Unknown qualifier: " + *cmp.lhs.qualifier);
+      } else if (auto err = qualifier_error(cmp.lhs.qualifier); err.has_value()) {
+        throw std::runtime_error(*err);
       }
       return;
     }
@@ -385,8 +403,8 @@ void validate_qualifiers(const Query& query) {
   std::function<void(const Query::SelectItem::FlattenExtractExpr&)> visit_extract =
       [&](const Query::SelectItem::FlattenExtractExpr& expr) {
         if (expr.kind == Query::SelectItem::FlattenExtractExpr::Kind::OperandRef) {
-          if (!is_allowed(expr.operand.qualifier)) {
-            throw std::runtime_error("Unknown qualifier: " + *expr.operand.qualifier);
+          if (auto err = qualifier_error(expr.operand.qualifier); err.has_value()) {
+            throw std::runtime_error(*err);
           }
         }
         if (expr.where.has_value()) {
@@ -405,6 +423,17 @@ void validate_qualifiers(const Query& query) {
           visit_extract(arg);
         }
       };
+  if (query.source.kind == Source::Kind::Document &&
+      query.source.alias.has_value() &&
+      util::to_lower(*query.source.alias) != "doc") {
+    for (const auto& item : query.select_items) {
+      if (!item.field.has_value()) continue;
+      if (util::to_lower(item.tag) == "doc") {
+        throw std::runtime_error(
+            "Identifier 'doc' is not bound; did you mean '" + *query.source.alias + "'?");
+      }
+    }
+  }
   for (const auto& item : query.select_items) {
     if (item.flatten_extract) {
       for (const auto& expr : item.flatten_extract_exprs) {

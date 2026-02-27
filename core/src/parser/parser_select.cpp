@@ -858,6 +858,29 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
     item.tag = current_.text;
     advance();
     if (!consume(TokenType::RParen, "Expected ) after text argument")) return false;
+    if (current_.type == TokenType::KeywordAs) {
+      advance();
+      if (current_.type != TokenType::Identifier) {
+        return set_error("Expected alias identifier after AS");
+      }
+      // WHY: when TEXT(...) is aliased, preserve source semantics by treating it
+      // as an explicit scalar projection instead of relying on tag-scoped defaults.
+      ScalarExpr expr;
+      expr.kind = ScalarExpr::Kind::FunctionCall;
+      expr.function_name = "TEXT";
+      ScalarExpr arg;
+      arg.kind = ScalarExpr::Kind::StringLiteral;
+      arg.string_value = to_lower(item.tag);
+      arg.span = Span{start, current_.pos};
+      expr.args.push_back(std::move(arg));
+      expr.span = Span{start, current_.pos};
+      item.expr_projection = true;
+      item.expr = std::move(expr);
+      item.tag = "*";
+      item.text_function = false;
+      item.field = current_.text;
+      advance();
+    }
     item.span = Span{start, current_.pos};
     items.push_back(item);
     saw_field = true;
@@ -958,6 +981,14 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
       }
     }
     if (!consume(TokenType::RParen, "Expected ) after inner_html/raw_inner_html argument")) return false;
+    if (current_.type == TokenType::KeywordAs) {
+      advance();
+      if (current_.type != TokenType::Identifier) {
+        return set_error("Expected alias identifier after AS");
+      }
+      item.field = current_.text;
+      advance();
+    }
     item.span = Span{start, current_.pos};
     items.push_back(item);
     saw_field = true;
@@ -998,9 +1029,53 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
     if (current_.type != TokenType::Identifier) {
       return set_error("Expected field identifier after '.'");
     }
-    item.field = current_.text;
+    std::string field_name = current_.text;
+    item.field = field_name;
     item.span = Span{start, current_.pos + current_.text.size()};
     advance();
+    if (current_.type == TokenType::KeywordAs) {
+      advance();
+      if (current_.type != TokenType::Identifier) {
+        return set_error("Expected alias identifier after AS");
+      }
+      std::string output_alias = current_.text;
+      advance();
+
+      // WHY: `alias.field AS out` must keep reading from the qualified input field,
+      // so we store it as an expression projection instead of mutating the source field.
+      ScalarExpr expr;
+      expr.kind = ScalarExpr::Kind::Operand;
+      expr.operand.axis = Operand::Axis::Self;
+      expr.operand.qualifier = tag_token.text;
+      std::string upper = to_upper(field_name);
+      if (upper == "TAG") {
+        expr.operand.field_kind = Operand::FieldKind::Tag;
+      } else if (upper == "TEXT") {
+        expr.operand.field_kind = Operand::FieldKind::Text;
+      } else if (upper == "NODE_ID") {
+        expr.operand.field_kind = Operand::FieldKind::NodeId;
+      } else if (upper == "PARENT_ID") {
+        expr.operand.field_kind = Operand::FieldKind::ParentId;
+      } else if (upper == "SIBLING_POS") {
+        expr.operand.field_kind = Operand::FieldKind::SiblingPos;
+      } else if (upper == "MAX_DEPTH") {
+        expr.operand.field_kind = Operand::FieldKind::MaxDepth;
+      } else if (upper == "DOC_ORDER") {
+        expr.operand.field_kind = Operand::FieldKind::DocOrder;
+      } else if (upper == "ATTRIBUTES" || upper == "ATTR") {
+        expr.operand.field_kind = Operand::FieldKind::AttributesMap;
+      } else {
+        expr.operand.field_kind = Operand::FieldKind::Attribute;
+        expr.operand.attribute = field_name;
+      }
+      expr.operand.span = item.span;
+      expr.span = item.span;
+      item.expr_projection = true;
+      item.expr = std::move(expr);
+      item.tag = "*";
+      item.field = output_alias;
+      item.span = Span{start, current_.pos};
+    }
     saw_field = true;
   } else {
     item.span = Span{start, current_.pos};
