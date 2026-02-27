@@ -337,6 +337,7 @@ if (XSQL_BUILD_TESTS)
     lateral_unknown_alias_throws
     with_left_join_lateral_baseline_values
     with_left_join_lateral_missing_right_value_null
+    with_qualified_parent_axis_and_case_projection
     shorthand_attribute_filter
     shorthand_qualified_attribute_filter
     ancestor_attribute_filter

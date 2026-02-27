@@ -789,7 +789,9 @@ bool Parser::parse_operand(Operand& operand) {
     return true;
   }
   advance();
-  if (current_.type != TokenType::Identifier) {
+  if (current_.type != TokenType::Identifier &&
+      current_.type != TokenType::KeywordTable &&
+      current_.type != TokenType::KeywordSelf) {
     return set_error("Expected attributes, parent, or attribute name after qualifier");
   }
   if (is_attr_keyword(to_upper(current_.text))) {

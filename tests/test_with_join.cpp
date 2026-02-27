@@ -196,6 +196,29 @@ void test_with_left_join_lateral_missing_right_value_null() {
               "missing fourth cell becomes NULL");
 }
 
+void test_with_qualified_parent_axis_and_case_projection() {
+  std::string html =
+      "<table>"
+      "<tr>Sunday<td data-date='2025-02-23'>A</td></tr>"
+      "</table>";
+  auto result = run_query(
+      html,
+      "WITH cells AS ("
+      "  SELECT n.node_id AS node_id, LTRIM(RTRIM(n.parent.text)) AS raw_day "
+      "  FROM doc AS n "
+      "  WHERE n.tag = 'td'"
+      ") "
+      "SELECT c.raw_day, "
+      "CASE WHEN c.raw_day LIKE 'Sunday%' THEN 'Sunday' ELSE c.raw_day END AS day "
+      "FROM cells AS c "
+      "ORDER BY c.node_id");
+  expect_eq(result.rows.size(), 1, "qualified parent axis row count");
+  if (result.rows.empty()) return;
+  const std::string raw = result.rows[0].computed_fields["raw_day"];
+  expect_true(raw.rfind("Sunday", 0) == 0, "parent text projection");
+  expect_true(result.rows[0].computed_fields["day"] == "Sunday", "CASE projection in relation runtime");
+}
+
 }  // namespace
 
 void register_with_join_tests(std::vector<TestCase>& tests) {
@@ -213,4 +236,6 @@ void register_with_join_tests(std::vector<TestCase>& tests) {
                    test_with_left_join_lateral_baseline_values});
   tests.push_back({"with_left_join_lateral_missing_right_value_null",
                    test_with_left_join_lateral_missing_right_value_null});
+  tests.push_back({"with_qualified_parent_axis_and_case_projection",
+                   test_with_qualified_parent_axis_and_case_projection});
 }

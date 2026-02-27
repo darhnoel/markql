@@ -124,7 +124,17 @@ bool projection_is_null(const ScalarProjectionValue& value) {
   return value.kind == ScalarProjectionValue::Kind::Null;
 }
 
-ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr, const HtmlNode& node) {
+std::optional<std::string> projection_operand_value(
+    const Operand& operand,
+    const HtmlNode& base_node,
+    const HtmlDocument& doc,
+    const std::vector<std::vector<int64_t>>& children);
+
+ScalarProjectionValue eval_select_scalar_expr(
+    const ScalarExpr& expr,
+    const HtmlNode& node,
+    const HtmlDocument* doc = nullptr,
+    const std::vector<std::vector<int64_t>>* children = nullptr) {
   switch (expr.kind) {
     case ScalarExpr::Kind::NullLiteral:
       return make_null_projection();
@@ -134,7 +144,23 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr, const Html
       return make_number_projection(expr.number_value);
     case ScalarExpr::Kind::Operand: {
       const Operand& op = expr.operand;
-      if (op.axis != Operand::Axis::Self) return make_null_projection();
+      if (op.axis != Operand::Axis::Self ||
+          op.field_kind == Operand::FieldKind::SiblingPos) {
+        if (doc == nullptr || children == nullptr) return make_null_projection();
+        std::optional<std::string> value =
+            projection_operand_value(op, node, *doc, *children);
+        if (!value.has_value()) return make_null_projection();
+        if (op.field_kind == Operand::FieldKind::NodeId ||
+            op.field_kind == Operand::FieldKind::ParentId ||
+            op.field_kind == Operand::FieldKind::SiblingPos ||
+            op.field_kind == Operand::FieldKind::MaxDepth ||
+            op.field_kind == Operand::FieldKind::DocOrder) {
+          if (auto parsed = parse_int64_value(*value); parsed.has_value()) {
+            return make_number_projection(*parsed);
+          }
+        }
+        return make_string_projection(*value);
+      }
       if (op.field_kind == Operand::FieldKind::Tag) return make_string_projection(node.tag);
       if (op.field_kind == Operand::FieldKind::Text) return make_string_projection(node.text);
       if (op.field_kind == Operand::FieldKind::NodeId) return make_number_projection(node.id);
@@ -177,7 +203,7 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr, const Html
     if (first_arg.kind == ScalarExpr::Kind::SelfRef) {
       target = &node;
     } else {
-      ScalarProjectionValue arg_value = eval_select_scalar_expr(first_arg, node);
+      ScalarProjectionValue arg_value = eval_select_scalar_expr(first_arg, node, doc, children);
       if (projection_is_null(arg_value)) return make_null_projection();
       std::string tag = util::to_lower(projection_to_string(arg_value));
       if (node.tag != tag) return make_null_projection();
@@ -190,7 +216,7 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr, const Html
       return make_string_projection(xsql_internal::extract_direct_text_strict(target->inner_html));
     }
     if (fn == "ATTR") {
-      ScalarProjectionValue attr_value = eval_select_scalar_expr(expr.args[1], node);
+      ScalarProjectionValue attr_value = eval_select_scalar_expr(expr.args[1], node, doc, children);
       if (projection_is_null(attr_value)) return make_null_projection();
       std::string attr = util::to_lower(projection_to_string(attr_value));
       auto it = target->attributes.find(attr);
@@ -200,7 +226,7 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr, const Html
 
     size_t depth = 1;
     if (expr.args.size() == 2) {
-      ScalarProjectionValue depth_value = eval_select_scalar_expr(expr.args[1], node);
+      ScalarProjectionValue depth_value = eval_select_scalar_expr(expr.args[1], node, doc, children);
       auto parsed = projection_to_int(depth_value);
       if (!parsed.has_value() || *parsed < 0) return make_null_projection();
       depth = static_cast<size_t>(*parsed);
@@ -213,7 +239,7 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr, const Html
   std::vector<ScalarProjectionValue> args;
   args.reserve(expr.args.size());
   for (const auto& arg : expr.args) {
-    args.push_back(eval_select_scalar_expr(arg, node));
+    args.push_back(eval_select_scalar_expr(arg, node, doc, children));
   }
 
   if (fn == "COALESCE") {
@@ -1285,9 +1311,6 @@ const RelationRecord* resolve_record(const RelationRow& row,
 std::optional<std::string> relation_operand_value(const Operand& operand,
                                                   const RelationRow& row,
                                                   const std::optional<std::string>& active_alias) {
-  if (operand.axis != Operand::Axis::Self) {
-    return std::nullopt;
-  }
   const RelationRecord* record = resolve_record(row, operand.qualifier, active_alias);
   if (record == nullptr) return std::nullopt;
   auto get_field = [&](const std::string& key) -> std::optional<std::string> {
@@ -1295,28 +1318,40 @@ std::optional<std::string> relation_operand_value(const Operand& operand,
     if (it == record->values.end()) return std::nullopt;
     return it->second;
   };
+  auto prefixed_key = [&](const std::string& key) {
+    if (operand.axis == Operand::Axis::Parent) {
+      return std::string("parent.") + key;
+    }
+    return key;
+  };
+  if (operand.axis != Operand::Axis::Self &&
+      operand.axis != Operand::Axis::Parent) {
+    return std::nullopt;
+  }
   switch (operand.field_kind) {
     case Operand::FieldKind::Attribute: {
-      auto it = record->values.find(operand.attribute);
+      auto it = record->values.find(prefixed_key(operand.attribute));
       if (it != record->values.end()) return it->second;
-      auto attr = record->attributes.find(operand.attribute);
-      if (attr != record->attributes.end()) return attr->second;
+      if (operand.axis == Operand::Axis::Self) {
+        auto attr = record->attributes.find(operand.attribute);
+        if (attr != record->attributes.end()) return attr->second;
+      }
       return std::nullopt;
     }
     case Operand::FieldKind::Tag:
-      return get_field("tag");
+      return get_field(prefixed_key("tag"));
     case Operand::FieldKind::Text:
-      return get_field("text");
+      return get_field(prefixed_key("text"));
     case Operand::FieldKind::NodeId:
-      return get_field("node_id");
+      return get_field(prefixed_key("node_id"));
     case Operand::FieldKind::ParentId:
-      return get_field("parent_id");
+      return get_field(prefixed_key("parent_id"));
     case Operand::FieldKind::SiblingPos:
-      return get_field("sibling_pos");
+      return get_field(prefixed_key("sibling_pos"));
     case Operand::FieldKind::MaxDepth:
-      return get_field("max_depth");
+      return get_field(prefixed_key("max_depth"));
     case Operand::FieldKind::DocOrder:
-      return get_field("doc_order");
+      return get_field(prefixed_key("doc_order"));
     case Operand::FieldKind::AttributesMap:
       return std::nullopt;
   }
@@ -1381,13 +1416,123 @@ std::optional<std::string> eval_relation_scalar_expr(const ScalarExpr& expr,
     }
     return std::nullopt;
   }
-  if (fn == "LOWER" || fn == "UPPER" || fn == "TRIM") {
+  if (fn == "LOWER" || fn == "UPPER" || fn == "TRIM" || fn == "LTRIM" || fn == "RTRIM") {
     if (expr.args.size() != 1) return std::nullopt;
     std::optional<std::string> value = eval_relation_scalar_expr(expr.args[0], row, active_alias);
     if (!value.has_value()) return std::nullopt;
     if (fn == "LOWER") return util::to_lower(*value);
     if (fn == "UPPER") return util::to_upper(*value);
-    return util::trim_ws(*value);
+    if (fn == "TRIM") return util::trim_ws(*value);
+    if (fn == "LTRIM") {
+      size_t i = 0;
+      while (i < value->size() && std::isspace(static_cast<unsigned char>((*value)[i]))) ++i;
+      return value->substr(i);
+    }
+    size_t end = value->size();
+    while (end > 0 && std::isspace(static_cast<unsigned char>((*value)[end - 1]))) --end;
+    return value->substr(0, end);
+  }
+  return std::nullopt;
+}
+
+bool eval_relation_expr(const Expr& expr,
+                        const RelationRow& row,
+                        const std::optional<std::string>& active_alias);
+
+std::optional<std::string> eval_relation_project_expr(
+    const Query::SelectItem::FlattenExtractExpr& expr,
+    const RelationRow& row,
+    const std::optional<std::string>& active_alias,
+    const std::unordered_map<std::string, std::string>& bindings) {
+  using Kind = Query::SelectItem::FlattenExtractExpr::Kind;
+  if (expr.kind == Kind::StringLiteral) return expr.string_value;
+  if (expr.kind == Kind::NumberLiteral) return std::to_string(expr.number_value);
+  if (expr.kind == Kind::NullLiteral) return std::nullopt;
+  if (expr.kind == Kind::AliasRef) {
+    auto it = bindings.find(expr.alias_ref);
+    if (it == bindings.end()) return std::nullopt;
+    return it->second;
+  }
+  if (expr.kind == Kind::OperandRef) {
+    return relation_operand_value(expr.operand, row, active_alias);
+  }
+  if (expr.kind == Kind::Coalesce) {
+    for (const auto& arg : expr.args) {
+      std::optional<std::string> value =
+          eval_relation_project_expr(arg, row, active_alias, bindings);
+      if (!value.has_value()) continue;
+      if (util::trim_ws(*value).empty()) continue;
+      return value;
+    }
+    return std::nullopt;
+  }
+  if (expr.kind == Kind::FunctionCall) {
+    ScalarExpr scalar_expr;
+    scalar_expr.kind = ScalarExpr::Kind::FunctionCall;
+    scalar_expr.function_name = expr.function_name;
+    for (const auto& arg : expr.args) {
+      if (arg.kind == Kind::StringLiteral) {
+        ScalarExpr scalar_arg;
+        scalar_arg.kind = ScalarExpr::Kind::StringLiteral;
+        scalar_arg.string_value = arg.string_value;
+        scalar_expr.args.push_back(std::move(scalar_arg));
+        continue;
+      }
+      if (arg.kind == Kind::NumberLiteral) {
+        ScalarExpr scalar_arg;
+        scalar_arg.kind = ScalarExpr::Kind::NumberLiteral;
+        scalar_arg.number_value = arg.number_value;
+        scalar_expr.args.push_back(std::move(scalar_arg));
+        continue;
+      }
+      if (arg.kind == Kind::NullLiteral) {
+        ScalarExpr scalar_arg;
+        scalar_arg.kind = ScalarExpr::Kind::NullLiteral;
+        scalar_expr.args.push_back(std::move(scalar_arg));
+        continue;
+      }
+      if (arg.kind == Kind::OperandRef) {
+        ScalarExpr scalar_arg;
+        scalar_arg.kind = ScalarExpr::Kind::Operand;
+        scalar_arg.operand = arg.operand;
+        scalar_expr.args.push_back(std::move(scalar_arg));
+        continue;
+      }
+      if (arg.kind == Kind::AliasRef) {
+        auto it = bindings.find(arg.alias_ref);
+        ScalarExpr scalar_arg;
+        if (it == bindings.end()) {
+          scalar_arg.kind = ScalarExpr::Kind::NullLiteral;
+        } else {
+          scalar_arg.kind = ScalarExpr::Kind::StringLiteral;
+          scalar_arg.string_value = it->second;
+        }
+        scalar_expr.args.push_back(std::move(scalar_arg));
+        continue;
+      }
+      std::optional<std::string> nested =
+          eval_relation_project_expr(arg, row, active_alias, bindings);
+      ScalarExpr scalar_arg;
+      if (!nested.has_value()) {
+        scalar_arg.kind = ScalarExpr::Kind::NullLiteral;
+      } else {
+        scalar_arg.kind = ScalarExpr::Kind::StringLiteral;
+        scalar_arg.string_value = *nested;
+      }
+      scalar_expr.args.push_back(std::move(scalar_arg));
+    }
+    return eval_relation_scalar_expr(scalar_expr, row, active_alias);
+  }
+  if (expr.kind == Kind::CaseWhen) {
+    for (size_t i = 0; i < expr.case_when_conditions.size() &&
+                       i < expr.case_when_values.size(); ++i) {
+      if (!eval_relation_expr(expr.case_when_conditions[i], row, active_alias)) continue;
+      return eval_relation_project_expr(expr.case_when_values[i], row, active_alias, bindings);
+    }
+    if (expr.case_else != nullptr) {
+      return eval_relation_project_expr(*expr.case_else, row, active_alias, bindings);
+    }
+    return std::nullopt;
   }
   return std::nullopt;
 }
@@ -1669,6 +1814,11 @@ Relation relation_from_document(const HtmlDocument& doc,
     local_sibling_pos = build_sibling_positions(doc);
     sibling_pos_override = &local_sibling_pos;
   }
+  std::unordered_map<int64_t, const HtmlNode*> node_by_id;
+  node_by_id.reserve(doc.nodes.size());
+  for (const auto& n : doc.nodes) {
+    node_by_id[n.id] = &n;
+  }
   for (const auto& node : doc.nodes) {
     if (prefilter != nullptr) {
       if (prefilter->impossible) continue;
@@ -1696,6 +1846,28 @@ Relation relation_from_document(const HtmlDocument& doc,
     for (const auto& attr : node.attributes) {
       record.attributes[attr.first] = attr.second;
       record.values[attr.first] = attr.second;
+    }
+    if (node.parent_id.has_value()) {
+      auto parent_it = node_by_id.find(*node.parent_id);
+      if (parent_it != node_by_id.end() && parent_it->second != nullptr) {
+        const HtmlNode& parent = *parent_it->second;
+        record.values["parent.node_id"] = std::to_string(parent.id);
+        record.values["parent.tag"] = parent.tag;
+        record.values["parent.text"] = parent.text;
+        record.values["parent.inner_html"] = parent.inner_html;
+        if (parent.parent_id.has_value()) {
+          record.values["parent.parent_id"] = std::to_string(*parent.parent_id);
+        } else {
+          record.values["parent.parent_id"] = std::nullopt;
+        }
+        record.values["parent.sibling_pos"] =
+            std::to_string(sibling_pos_override->at(static_cast<size_t>(parent.id)));
+        record.values["parent.max_depth"] = std::to_string(parent.max_depth);
+        record.values["parent.doc_order"] = std::to_string(parent.doc_order);
+        for (const auto& attr : parent.attributes) {
+          record.values["parent." + attr.first] = attr.second;
+        }
+      }
     }
     rel_row.aliases[alias] = std::move(record);
     merge_alias_columns(out, alias, rel_row.aliases[alias]);
@@ -2123,7 +2295,8 @@ QueryResult query_result_from_relation(const Query& query, const Relation& relat
       if (item.expr_projection && item.expr.has_value()) {
         value = eval_relation_scalar_expr(*item.expr, rel_row, active_alias);
       } else if (item.expr_projection && item.project_expr.has_value()) {
-        value = std::nullopt;
+        value = eval_relation_project_expr(
+            *item.project_expr, rel_row, active_alias, row.computed_fields);
       } else {
         const std::string lowered_tag = lower_alias_name(item.tag);
         auto it = rel_row.aliases.find(lowered_tag);
@@ -2812,7 +2985,7 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
         continue;
       }
       if (!item.expr.has_value()) continue;
-      ScalarProjectionValue value = eval_select_scalar_expr(*item.expr, node);
+      ScalarProjectionValue value = eval_select_scalar_expr(*item.expr, node, &doc, &children);
       if (projection_is_null(value)) continue;
       row.computed_fields[*item.field] = projection_to_string(value);
     }
