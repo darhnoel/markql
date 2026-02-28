@@ -61,8 +61,68 @@ Run REPL:
 ./build/markql --interactive --input ./data/index.html
 ```
 
+Lint query (parse + validate only, no execution):
+```bash
+./build/markql --lint "SELECT FROM doc"
+```
+
+Lint as JSON:
+```bash
+./build/markql --lint "SELECT FROM doc" --format json
+```
+
+Check version + provenance:
+```bash
+./build/markql --version
+```
+
 Compatibility note:
 - `./build/xsql` remains available as a legacy command name.
+
+## Diagnostics and Lint
+
+Use lint mode to validate syntax + key semantic rules without loading/executing data:
+
+```bash
+./build/markql --lint "SELECT TEXT(n) FROM doc AS n WHERE n.tag = 'div'"
+```
+
+Default lint output provides one diagnostic block per issue:
+- severity and stable `code`
+- caret-positioned snippet
+- `help:` fix guidance
+
+`doc_ref` remains available in JSON diagnostics output.
+
+JSON format is available for automation:
+
+```bash
+./build/markql --lint "SELECT FROM doc" --format json
+```
+
+Exit codes:
+- `0` no ERROR diagnostics
+- `1` one or more ERROR diagnostics
+- `2` CLI/tooling failure
+
+Normal query execution uses the same diagnostic formatting for invalid queries (instead of raw exception text).
+
+## Version and Provenance
+
+CLI version output includes provenance:
+- semantic version
+- git commit hash
+- `-dirty` suffix when built from a dirty worktree
+- version source of truth: `python/xsql/_meta.py` (`__version__`)
+
+Python exposes the same core provenance:
+
+```python
+import xsql
+print(xsql.__version__)
+print(xsql.core_version())
+print(xsql.core_version_info())
+```
 
 ## Fast Start: 5 Queries
 

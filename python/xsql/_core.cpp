@@ -52,6 +52,49 @@ py::dict row_to_dict(const xsql::QueryResultRow& row, const std::vector<std::str
   return out;
 }
 
+py::dict diagnostic_span_to_dict(const xsql::DiagnosticSpan& span) {
+  py::dict out;
+  out["start_line"] = span.start_line;
+  out["start_col"] = span.start_col;
+  out["end_line"] = span.end_line;
+  out["end_col"] = span.end_col;
+  out["byte_start"] = span.byte_start;
+  out["byte_end"] = span.byte_end;
+  return out;
+}
+
+std::string severity_to_string(xsql::DiagnosticSeverity severity) {
+  switch (severity) {
+    case xsql::DiagnosticSeverity::Error:
+      return "ERROR";
+    case xsql::DiagnosticSeverity::Warning:
+      return "WARNING";
+    case xsql::DiagnosticSeverity::Note:
+      return "NOTE";
+  }
+  return "ERROR";
+}
+
+py::dict diagnostic_to_dict(const xsql::Diagnostic& diagnostic) {
+  py::dict out;
+  out["severity"] = severity_to_string(diagnostic.severity);
+  out["code"] = diagnostic.code;
+  out["message"] = diagnostic.message;
+  out["help"] = diagnostic.help;
+  out["doc_ref"] = diagnostic.doc_ref;
+  out["span"] = diagnostic_span_to_dict(diagnostic.span);
+  out["snippet"] = diagnostic.snippet;
+  py::list related;
+  for (const auto& item : diagnostic.related) {
+    py::dict rel;
+    rel["message"] = item.message;
+    rel["span"] = diagnostic_span_to_dict(item.span);
+    related.append(rel);
+  }
+  out["related"] = related;
+  return out;
+}
+
 }  // namespace
 
 PYBIND11_MODULE(_core, m) {
@@ -97,4 +140,31 @@ PYBIND11_MODULE(_core, m) {
         },
         py::arg("html"),
         py::arg("query"));
+
+  m.def("lint_query",
+        [](const std::string& query) {
+          std::vector<xsql::Diagnostic> diagnostics = xsql::lint_query(query);
+          py::list out;
+          for (const auto& diagnostic : diagnostics) {
+            out.append(diagnostic_to_dict(diagnostic));
+          }
+          return out;
+        },
+        py::arg("query"));
+
+  m.def("core_version",
+        []() {
+          return xsql::version_string();
+        });
+
+  m.def("core_version_info",
+        []() {
+          xsql::VersionInfo info = xsql::get_version_info();
+          py::dict out;
+          out["version"] = info.version;
+          out["git_commit"] = info.git_commit;
+          out["git_dirty"] = info.git_dirty;
+          out["provenance"] = xsql::version_string();
+          return out;
+        });
 }

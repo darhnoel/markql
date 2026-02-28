@@ -69,6 +69,65 @@ void test_parse_cli_args_rejects_query_and_query_file_together() {
               "mutual exclusion has clear error");
 }
 
+void test_parse_cli_args_accepts_lint_inline_query() {
+  const char* argv[] = {
+      "markql",
+      "--lint",
+      "SELECT FROM doc",
+  };
+  int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
+  xsql::cli::CliOptions options;
+  std::string error;
+  bool ok = xsql::cli::parse_cli_args(argc, const_cast<char**>(argv), options, error);
+  expect_true(ok, "lint inline query is accepted");
+  expect_true(options.lint, "lint mode parsed");
+  expect_true(options.query == "SELECT FROM doc", "lint inline query captured");
+}
+
+void test_parse_cli_args_accepts_lint_json_format() {
+  const char* argv[] = {
+      "markql",
+      "--lint",
+      "SELECT FROM doc",
+      "--format",
+      "json",
+  };
+  int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
+  xsql::cli::CliOptions options;
+  std::string error;
+  bool ok = xsql::cli::parse_cli_args(argc, const_cast<char**>(argv), options, error);
+  expect_true(ok, "lint json format is accepted");
+  expect_true(options.lint_format == "json", "lint format parsed");
+}
+
+void test_parse_cli_args_rejects_format_without_lint() {
+  const char* argv[] = {
+      "markql",
+      "--format",
+      "json",
+  };
+  int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
+  xsql::cli::CliOptions options;
+  std::string error;
+  bool ok = xsql::cli::parse_cli_args(argc, const_cast<char**>(argv), options, error);
+  expect_true(!ok, "format without lint is rejected");
+  expect_true(error.find("--format is only supported with --lint") != std::string::npos,
+              "format without lint has clear error");
+}
+
+void test_parse_cli_args_accepts_version_flag() {
+  const char* argv[] = {
+      "markql",
+      "--version",
+  };
+  int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
+  xsql::cli::CliOptions options;
+  std::string error;
+  bool ok = xsql::cli::parse_cli_args(argc, const_cast<char**>(argv), options, error);
+  expect_true(ok, "version flag is accepted");
+  expect_true(options.show_version, "version mode parsed");
+}
+
 }  // namespace
 
 void register_cli_args_tests(std::vector<TestCase>& tests) {
@@ -77,4 +136,12 @@ void register_cli_args_tests(std::vector<TestCase>& tests) {
   tests.push_back({"parse_cli_args_rejects_unknown_argument", test_parse_cli_args_rejects_unknown_argument});
   tests.push_back({"parse_cli_args_rejects_query_and_query_file_together",
                    test_parse_cli_args_rejects_query_and_query_file_together});
+  tests.push_back({"parse_cli_args_accepts_lint_inline_query",
+                   test_parse_cli_args_accepts_lint_inline_query});
+  tests.push_back({"parse_cli_args_accepts_lint_json_format",
+                   test_parse_cli_args_accepts_lint_json_format});
+  tests.push_back({"parse_cli_args_rejects_format_without_lint",
+                   test_parse_cli_args_rejects_format_without_lint});
+  tests.push_back({"parse_cli_args_accepts_version_flag",
+                   test_parse_cli_args_accepts_version_flag});
 }

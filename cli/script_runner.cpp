@@ -3,6 +3,7 @@
 #include <stdexcept>
 
 #include "cli_utils.h"
+#include "xsql/diagnostics.h"
 #include "lang/markql_parser.h"
 #include "lang/parser/lexer.h"
 
@@ -77,12 +78,13 @@ int run_sql_script(const std::string& script,
       }
       auto [line, col] = line_col_from_offset(script, error_pos);
       err << "Error: statement " << statement_index << "/" << total
-          << " at line " << line << ", column " << col << ": ";
-      if (parsed.error.has_value()) {
-        err << parsed.error->message << "\n";
-      } else {
-        err << "Query parse error\n";
-      }
+          << " at line " << line << ", column " << col << "\n";
+      const std::string parse_message =
+          parsed.error.has_value() ? parsed.error->message : "Query parse error";
+      const size_t parse_pos = parsed.error.has_value() ? parsed.error->position : 0;
+      std::vector<xsql::Diagnostic> diagnostics;
+      diagnostics.push_back(xsql::make_syntax_diagnostic(statement.text, parse_message, parse_pos));
+      err << xsql::render_diagnostics_text(diagnostics) << "\n";
       had_error = true;
       if (!options.continue_on_error) return 1;
       continue;
@@ -93,8 +95,14 @@ int run_sql_script(const std::string& script,
     } catch (const std::exception& ex) {
       auto [line, col] = line_col_from_offset(script, statement.start_pos);
       err << "Error: statement " << statement_index << "/" << total
-          << " at line " << line << ", column " << col << ": "
-          << ex.what() << "\n";
+          << " at line " << line << ", column " << col << "\n";
+      std::vector<xsql::Diagnostic> diagnostics =
+          xsql::diagnose_query_failure(statement.text, ex.what());
+      if (!diagnostics.empty()) {
+        err << xsql::render_diagnostics_text(diagnostics) << "\n";
+      } else {
+        err << ex.what() << "\n";
+      }
       had_error = true;
       if (!options.continue_on_error) return 1;
     }

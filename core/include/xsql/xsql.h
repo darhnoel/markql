@@ -89,3 +89,6 @@ QueryResult execute_query_from_file(const std::string& path, const std::string& 
 QueryResult execute_query_from_url(const std::string& url, const std::string& query, int timeout_ms);
 
 }  // namespace xsql
+
+#include "diagnostics.h"
+#include "version.h"

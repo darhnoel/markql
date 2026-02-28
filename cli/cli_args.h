@@ -20,8 +20,11 @@ struct CliOptions {
   bool display_mode_set = false;
   int timeout_ms = 5000;
   bool show_help = false;
+  bool show_version = false;
   bool continue_on_error = false;
   bool quiet = false;
+  bool lint = false;
+  std::string lint_format = "text";
 };
 
 /// Prints the brief startup help shown when no arguments are provided.

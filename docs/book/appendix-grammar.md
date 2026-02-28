@@ -89,3 +89,17 @@ Extraction semantics (important):
 - `INNER_HTML(tag, MAX_DEPTH)` uses each row's `max_depth` automatically.
 - `RAW_INNER_HTML(tag, MAX_DEPTH)` uses each row's `max_depth` automatically.
 - In one `SELECT`, `INNER_HTML`/`RAW_INNER_HTML` depth mode must be consistent.
+
+## Diagnostics Quick Use
+
+Validate grammar + semantic shape without execution:
+
+```bash
+./build/markql --lint "SELECT FROM doc"
+./build/markql --lint "SELECT FROM doc" --format json
+```
+
+Diagnostic references:
+- syntax and clause-order issues point here: `docs/book/appendix-grammar.md`
+- function/projection constraints point to: `docs/book/appendix-function-reference.md`
+- sink/output usage points to: `docs/markql-cli-guide.md`

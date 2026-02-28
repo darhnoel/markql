@@ -3194,4 +3194,45 @@ QueryResult execute_query_from_url(const std::string& url, const std::string& qu
   return execute_query_from_html(html, url, query);
 }
 
+std::vector<Diagnostic> lint_query(const std::string& query) {
+  std::vector<Diagnostic> diagnostics;
+  auto parsed = parse_query(query);
+  if (!parsed.query.has_value()) {
+    const size_t position = parsed.error.has_value() ? parsed.error->position : 0;
+    const std::string message =
+        parsed.error.has_value() ? parsed.error->message : "Query parse error";
+    diagnostics.push_back(make_syntax_diagnostic(query, message, position));
+    return diagnostics;
+  }
+
+  const Query& ast = *parsed.query;
+  try {
+    if (ast.kind == Query::Kind::Select) {
+      const bool relation_runtime =
+          ast.with.has_value() ||
+          !ast.joins.empty() ||
+          ast.source.kind == Source::Kind::CteRef ||
+          ast.source.kind == Source::Kind::DerivedSubquery;
+      if (relation_runtime) {
+        if (ast.to_table) {
+          throw std::runtime_error("TO TABLE() is not supported with WITH/JOIN queries");
+        }
+        xsql_internal::validate_limits(ast);
+        xsql_internal::validate_predicates(ast);
+      } else {
+        xsql_internal::validate_projection(ast);
+        xsql_internal::validate_order_by(ast);
+        xsql_internal::validate_to_table(ast);
+        xsql_internal::validate_export_sink(ast);
+        xsql_internal::validate_qualifiers(ast);
+        xsql_internal::validate_predicates(ast);
+        xsql_internal::validate_limits(ast);
+      }
+    }
+  } catch (const std::exception& ex) {
+    diagnostics.push_back(make_semantic_diagnostic(query, ex.what()));
+  }
+  return diagnostics;
+}
+
 }  // namespace xsql

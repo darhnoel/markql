@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
-project(markql VERSION 1.10.0 LANGUAGES CXX)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/python/xsql/_meta.py" XSQL_META_PY)
+string(REGEX MATCH "__version__ = \"([0-9]+\\.[0-9]+\\.[0-9]+)\"" XSQL_VERSION_MATCH "${XSQL_META_PY}")
+if (XSQL_VERSION_MATCH)
+  set(XSQL_PROJECT_VERSION "${CMAKE_MATCH_1}")
+else()
+  set(XSQL_PROJECT_VERSION "0.0.0")
+endif()
+project(markql VERSION ${XSQL_PROJECT_VERSION} LANGUAGES CXX)
 
 option(XSQL_BUILD_CLI "Build the MarkQL CLI" ON)
 option(XSQL_BUILD_TESTS "Build tests" ON)
@@ -15,7 +22,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(xsql_core
+  core/src/version.cpp
   core/src/lang/ast.cpp
+  core/src/lang/diagnostics.cpp
   core/src/lang/markql_parser.cpp
   core/src/lang/parser/parser.cpp
   core/src/lang/parser/parser_expr.cpp
@@ -48,6 +57,34 @@ target_include_directories(xsql_core
 )
 
 target_compile_features(xsql_core PUBLIC cxx_std_20)
+execute_process(
+  COMMAND git rev-parse --short=12 HEAD
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  OUTPUT_VARIABLE XSQL_GIT_COMMIT
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  ERROR_QUIET
+)
+if (NOT XSQL_GIT_COMMIT)
+  set(XSQL_GIT_COMMIT "unknown")
+endif()
+
+execute_process(
+  COMMAND git diff --quiet --ignore-submodules HEAD --
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  RESULT_VARIABLE XSQL_GIT_DIRTY_RESULT
+  ERROR_QUIET
+)
+set(XSQL_GIT_DIRTY 0)
+if (NOT XSQL_GIT_DIRTY_RESULT EQUAL 0)
+  set(XSQL_GIT_DIRTY 1)
+endif()
+
+target_compile_definitions(xsql_core
+  PUBLIC
+    XSQL_VERSION="${PROJECT_VERSION}"
+    XSQL_GIT_COMMIT="${XSQL_GIT_COMMIT}"
+    XSQL_GIT_DIRTY=${XSQL_GIT_DIRTY}
+)
 
 if (XSQL_ENABLE_KHMER_NUMBER)
   target_sources(xsql_core PRIVATE core/src/khmer_number.cpp)
@@ -229,6 +266,7 @@ if (XSQL_BUILD_TESTS)
     tests/test_explore_search.cpp
     tests/test_markql_suggestor.cpp
     tests/test_table_options.cpp
+    tests/test_diagnostics.cpp
     cli/repl/core/vim_edit.cpp
     cli/repl/core/vim_normal.cpp
     cli/repl/core/line_editor.cpp
@@ -475,6 +513,18 @@ if (XSQL_BUILD_TESTS)
     parse_cli_args_rejects_missing_value
     parse_cli_args_rejects_unknown_argument
     parse_cli_args_rejects_query_and_query_file_together
+    parse_cli_args_accepts_lint_inline_query
+    parse_cli_args_accepts_lint_json_format
+    parse_cli_args_rejects_format_without_lint
+    parse_cli_args_accepts_version_flag
+    lint_syntax_diagnostic_has_stable_code_and_span
+    lint_semantic_diagnostic_has_stable_code
+    diagnostic_text_renderer_contains_help_docs_and_caret
+    diagnostic_json_renderer_contains_stable_fields
+    diagnostic_json_renderer_matches_snapshot
+    diagnostic_text_renderer_matches_golden_snippet
+    diagnose_query_failure_maps_parse_error
+    version_string_contains_provenance
     parse_self_projection_and_where
     parse_self_function_predicate
     parse_self_text_attr_inner_html_functions

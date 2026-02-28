@@ -18,6 +18,15 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 - Added derived-table sources: `FROM (SELECT ...) AS alias`.
 - Added parser and evaluator coverage for CTE/join/lateral acceptance, rejection, and deterministic baseline outputs.
 - Added Python smoke coverage for `WITH` + `LEFT JOIN` + `CROSS JOIN LATERAL`.
+- Added a structured diagnostics layer for syntax + semantic query failures with:
+  - severity, stable diagnostic code, message, help, docs reference
+  - byte/line-column spans
+  - caret-style code-frame snippets
+  - optional related spans.
+- Added CLI lint mode: `--lint` for parse+validate-only diagnostics (no execution).
+- Added lint machine output: `--lint --format json` with stable diagnostic JSON schema.
+- Added unified diagnostic rendering in CLI/script error paths (replacing raw exception-only output).
+- Added core/Python version provenance APIs (`version + git commit + dirty flag`).
 
 ### Deprecated
 - Deprecated `FRAGMENTS(...)` in favor of `PARSE(...)`.
@@ -29,7 +38,7 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
   - `Identifier 'doc' is not bound; did you mean '<alias>'?`
   - `Unknown identifier '<x>' (expected a FROM alias or legacy tag binding)`
   - `Duplicate source alias '<x>' in FROM`
-- Bumped project/core and Python package metadata versions to `1.10.0`.
+- Bumped project/core and Python package metadata versions to `1.11.0`.
 
 ## [1.8.0] - 2026-02-13
 

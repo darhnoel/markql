@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from ._loader import load_html_source
+from ._meta import __version__
 from ._security import FetchPolicy
 from ._summary import summarize_document
 from ._types import Document, ExportSink, QueryResult, TableResult
@@ -119,4 +120,35 @@ def execute(
     )
 
 
-__all__ = ["Document", "QueryResult", "TableResult", "ExportSink", "doc", "load", "summarize", "execute"]
+def lint(query: str) -> list[dict]:
+    """Parses + validates a query and returns diagnostics without execution."""
+    _require_core()
+    return list(_core.lint_query(query))
+
+
+def core_version() -> str:
+    """Returns core version + provenance string (version + commit, dirty if applicable)."""
+    _require_core()
+    return str(_core.core_version())
+
+
+def core_version_info() -> Dict[str, Any]:
+    """Returns structured core version/provenance metadata."""
+    _require_core()
+    return dict(_core.core_version_info())
+
+
+__all__ = [
+    "Document",
+    "QueryResult",
+    "TableResult",
+    "ExportSink",
+    "__version__",
+    "doc",
+    "load",
+    "summarize",
+    "execute",
+    "lint",
+    "core_version",
+    "core_version_info",
+]

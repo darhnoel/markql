@@ -48,6 +48,10 @@ int main(int argc, char** argv) {
     print_help(std::cout);
     return 0;
   }
+  if (options.show_version) {
+    std::cout << "markql " << xsql::version_string() << std::endl;
+    return 0;
+  }
 
   std::string query = options.query;
   std::string query_file = options.query_file;
@@ -68,6 +72,62 @@ int main(int argc, char** argv) {
   }
 
   try {
+    if (options.lint) {
+      std::vector<xsql::Diagnostic> diagnostics;
+
+      auto collect_statement_diagnostics = [&](const std::string& statement,
+                                               size_t statement_index,
+                                               size_t total_statements) {
+        std::vector<xsql::Diagnostic> statement_diags = xsql::lint_query(statement);
+        if (total_statements > 1) {
+          for (auto& diag : statement_diags) {
+            diag.message = "statement " + std::to_string(statement_index) + "/" +
+                           std::to_string(total_statements) + ": " + diag.message;
+          }
+        }
+        diagnostics.insert(diagnostics.end(), statement_diags.begin(), statement_diags.end());
+      };
+
+      if (!query_file.empty()) {
+        std::string script;
+        try {
+          script = read_file(query_file);
+        } catch (const std::exception& ex) {
+          std::cerr << "Error: " << ex.what() << std::endl;
+          return 2;
+        }
+        if (!is_valid_utf8(script)) {
+          std::cerr << "Error: query file is not valid UTF-8: " << query_file << std::endl;
+          return 2;
+        }
+        ScriptSplitResult split = split_sql_script(script);
+        if (split.error_message.has_value()) {
+          diagnostics.push_back(xsql::make_syntax_diagnostic(
+              script, *split.error_message, split.error_position));
+        } else {
+          const size_t total = split.statements.size();
+          for (size_t i = 0; i < total; ++i) {
+            collect_statement_diagnostics(split.statements[i].text, i + 1, total);
+          }
+        }
+      } else {
+        if (query.empty()) {
+          std::cerr << "Missing query for --lint (use --lint \"...\" or --query/--query-file)\n";
+          return 2;
+        }
+        collect_statement_diagnostics(query, 1, 1);
+      }
+
+      if (options.lint_format == "json") {
+        std::cout << xsql::render_diagnostics_json(diagnostics) << std::endl;
+      } else if (diagnostics.empty()) {
+        std::cout << "No diagnostics." << std::endl;
+      } else {
+        std::cout << xsql::render_diagnostics_text(diagnostics) << std::endl;
+      }
+      return xsql::has_error_diagnostics(diagnostics) ? 1 : 0;
+    }
+
     if (interactive) {
       ReplConfig repl_config;
       repl_config.input = input;
@@ -255,6 +315,17 @@ int main(int argc, char** argv) {
     execute_and_render(query);
     return 0;
   } catch (const std::exception& ex) {
+    if (options.lint) {
+      std::cerr << "Error: " << ex.what() << std::endl;
+      return 2;
+    }
+    if (!query.empty()) {
+      std::vector<xsql::Diagnostic> diagnostics = xsql::diagnose_query_failure(query, ex.what());
+      if (!diagnostics.empty()) {
+        std::cerr << xsql::render_diagnostics_text(diagnostics) << std::endl;
+        return 1;
+      }
+    }
     if (color) std::cerr << kColor.red;
     std::cerr << "Error: " << ex.what() << std::endl;
     if (color) std::cerr << kColor.reset;

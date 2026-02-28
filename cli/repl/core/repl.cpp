@@ -345,12 +345,17 @@ int run_repl(ReplConfig& config) {
       }
       editor.reset_render_state();
     } catch (const std::exception& ex) {
-      if (config.color) std::cerr << kColor.red;
-      std::cerr << "Error: " << ex.what() << std::endl;
-      if (config.color) std::cerr << kColor.reset;
-      if (config.color) std::cerr << kColor.yellow;
-      std::cerr << "Tip: Check SELECT/FROM/WHERE syntax." << std::endl;
-      if (config.color) std::cerr << kColor.reset;
+      std::vector<xsql::Diagnostic> diagnostics =
+          xsql::diagnose_query_failure(query_text, ex.what());
+      if (!diagnostics.empty()) {
+        if (config.color) std::cerr << kColor.red;
+        std::cerr << xsql::render_diagnostics_text(diagnostics) << std::endl;
+        if (config.color) std::cerr << kColor.reset;
+      } else {
+        if (config.color) std::cerr << kColor.red;
+        std::cerr << "Error: " << ex.what() << std::endl;
+        if (config.color) std::cerr << kColor.reset;
+      }
       editor.reset_render_state();
     }
   }

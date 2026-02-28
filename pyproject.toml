@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyxsql"
-version = "1.10.0"
+dynamic = ["version"]
 description = "SQL-style querying for static HTML with a deterministic node model."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -19,3 +19,6 @@ classifiers = [
 
 [project.optional-dependencies]
 test = ["pytest>=7.4.0"]
+
+[tool.setuptools.dynamic]
+version = {attr = "xsql._meta.__version__"}

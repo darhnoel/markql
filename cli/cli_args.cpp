@@ -13,12 +13,14 @@ void print_startup_help(std::ostream& os) {
   os << "  markql --query <query> [--input <path>]\n";
   os << "  markql --query-file <file> [--input <path>]\n";
   os << "         [--continue-on-error] [--quiet]\n";
+  os << "  markql --lint \"<query>\" [--format text|json]\n";
   os << "  markql --interactive [--input <path>]\n";
   os << "  markql explore <input.html>\n";
   os << "  markql --mode duckbox|json|plain\n";
   os << "  markql --display_mode more|less\n";
   os << "  markql --highlight on|off\n";
   os << "  markql --timeout-ms <n>\n";
+  os << "  markql --version\n";
   os << "  markql --color=disabled\n\n";
   os << "Notes:\n";
   os << "  - Legacy `xsql` binary name is still available for compatibility.\n";
@@ -30,6 +32,7 @@ void print_startup_help(std::ostream& os) {
   os << "  - Exit codes: 0=success, 1=parse/runtime error, 2=CLI/IO usage error.\n\n";
   os << "Examples:\n";
   os << "  markql --query \"SELECT table FROM doc\" --input ./data/index.html\n";
+  os << "  markql --lint \"SELECT div FROM doc WHERE\"\n";
   os << "  markql --query \"SELECT link.href FROM doc WHERE attributes.rel = 'preload' TO LIST()\" --input ./data/index.html\n";
   os << "  markql --interactive --input ./data/index.html\n";
 }
@@ -41,18 +44,22 @@ void print_help(std::ostream& os) {
   os << "Usage: markql --query <query> [--input <path>]\n";
   os << "       markql --query-file <file> [--input <path>]\n";
   os << "              [--continue-on-error] [--quiet]\n";
+  os << "       markql --lint \"<query>\" [--format text|json]\n";
   os << "       markql --interactive [--input <path>]\n";
   os << "       markql explore <input.html>\n";
   os << "       markql --mode duckbox|json|plain\n";
   os << "       markql --display_mode more|less\n";
   os << "       markql --highlight on|off\n";
   os << "       markql --timeout-ms <n>\n";
+  os << "       markql --version\n";
   os << "       markql --color=disabled\n";
   os << "Legacy `xsql` command name remains available.\n";
   os << "If --input is omitted, HTML is read from stdin.\n";
   os << "Scripts and REPL input support SQL comments: -- ... and /* ... */.\n";
   os << "Use TO CSV('file.csv'), TO PARQUET('file.parquet'), TO JSON('file.json'), or\n"
         "TO NDJSON('file.ndjson') in queries to export.\n";
+  os << "--lint validates syntax + semantic rules without executing the query.\n";
+  os << "--format json emits lint diagnostics as a JSON array.\n";
   os << "Explore mode keybindings: Up/Down move, Right/Enter expand, Left collapse, / search, n/N next/prev, j/k scroll inner_html, +/- zoom inner_html, q quit.\n";
   os << "Explore mode restores position/expansion per input within the current process session.\n";
   os << "Exit codes: 0=success, 1=parse/runtime error, 2=CLI/IO usage error.\n";
@@ -84,6 +91,21 @@ bool parse_cli_args(int argc, char** argv, CliOptions& options, std::string& err
       options.input = argv[++i];
     } else if (arg == "--interactive") {
       options.interactive = true;
+    } else if (arg == "--lint") {
+      options.lint = true;
+      if (i + 1 < argc) {
+        std::string maybe_query = argv[i + 1];
+        if (!maybe_query.empty() && maybe_query[0] != '-') {
+          options.query = maybe_query;
+          ++i;
+        }
+      }
+    } else if (arg == "--format") {
+      if (i + 1 >= argc) {
+        error = "Missing value for --format";
+        return false;
+      }
+      options.lint_format = argv[++i];
     } else if (arg == "--mode") {
       if (i + 1 >= argc) {
         error = "Missing value for --mode";
@@ -132,6 +154,8 @@ bool parse_cli_args(int argc, char** argv, CliOptions& options, std::string& err
       options.timeout_ms = std::stoi(argv[++i]);
     } else if (arg == "--help") {
       options.show_help = true;
+    } else if (arg == "--version") {
+      options.show_version = true;
     } else if (arg == "--continue-on-error") {
       options.continue_on_error = true;
     } else if (arg == "--quiet") {
@@ -143,6 +167,18 @@ bool parse_cli_args(int argc, char** argv, CliOptions& options, std::string& err
   }
   if (!options.query.empty() && !options.query_file.empty()) {
     error = "Error: --query and --query-file are mutually exclusive";
+    return false;
+  }
+  if (!options.lint && options.lint_format != "text") {
+    error = "--format is only supported with --lint";
+    return false;
+  }
+  if (options.lint_format != "text" && options.lint_format != "json") {
+    error = "Invalid --format value (use text|json)";
+    return false;
+  }
+  if (options.lint && options.interactive) {
+    error = "--lint and --interactive are mutually exclusive";
     return false;
   }
   return true;
