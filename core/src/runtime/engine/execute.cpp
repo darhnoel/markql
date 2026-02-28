@@ -2244,6 +2244,19 @@ QueryResult query_result_from_relation(const Query& query, const Relation& relat
   out.to_table = query.to_table;
   out.table_has_header = query.table_has_header;
   out.table_options = to_result_table_options(query.table_options);
+  if (query.export_sink.has_value()) {
+    const auto& sink = *query.export_sink;
+    if (sink.kind == Query::ExportSink::Kind::Csv) {
+      out.export_sink.kind = QueryResult::ExportSink::Kind::Csv;
+    } else if (sink.kind == Query::ExportSink::Kind::Parquet) {
+      out.export_sink.kind = QueryResult::ExportSink::Kind::Parquet;
+    } else if (sink.kind == Query::ExportSink::Kind::Json) {
+      out.export_sink.kind = QueryResult::ExportSink::Kind::Json;
+    } else if (sink.kind == Query::ExportSink::Kind::Ndjson) {
+      out.export_sink.kind = QueryResult::ExportSink::Kind::Ndjson;
+    }
+    out.export_sink.path = sink.path;
+  }
   out.warnings = relation.warnings;
 
   for (const auto& item : query.select_items) {

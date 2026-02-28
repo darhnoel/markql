@@ -219,6 +219,21 @@ void test_with_qualified_parent_axis_and_case_projection() {
   expect_true(result.rows[0].computed_fields["day"] == "Sunday", "CASE projection in relation runtime");
 }
 
+void test_with_join_to_csv_sets_export_sink() {
+  std::string html =
+      "<table>"
+      "<tr><td>A</td><td>ID-123</td><td>...</td><td>Apple</td></tr>"
+      "</table>";
+  auto result = run_query(
+      html,
+      "WITH rows AS (SELECT n.node_id AS row_id FROM doc AS n WHERE n.tag = 'tr') "
+      "SELECT r.row_id FROM rows AS r TO CSV('out.csv')");
+  expect_true(result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Csv,
+              "WITH/JOIN runtime keeps TO CSV export sink");
+  expect_true(result.export_sink.path == "out.csv",
+              "WITH/JOIN runtime keeps export path");
+}
+
 }  // namespace
 
 void register_with_join_tests(std::vector<TestCase>& tests) {
@@ -238,4 +253,6 @@ void register_with_join_tests(std::vector<TestCase>& tests) {
                    test_with_left_join_lateral_missing_right_value_null});
   tests.push_back({"with_qualified_parent_axis_and_case_projection",
                    test_with_qualified_parent_axis_and_case_projection});
+  tests.push_back({"with_join_to_csv_sets_export_sink",
+                   test_with_join_to_csv_sets_export_sink});
 }
