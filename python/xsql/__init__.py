@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+import json
+import os
+import re
+import shutil
+import subprocess
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from ._loader import load_html_source
@@ -24,6 +30,35 @@ doc: Optional[Document] = None
 def _require_core() -> None:
     if _core is None:
         raise RuntimeError("xsql native module is unavailable") from _core_import_error
+
+
+def _resolve_cli_binary() -> Optional[str]:
+    env_cli = os.environ.get("XSQL_CLI")
+    if env_cli:
+        return env_cli
+    cli = shutil.which("markql") or shutil.which("xsql")
+    if cli:
+        return cli
+    repo_root = Path(__file__).resolve().parents[2]
+    for candidate in (repo_root / "build" / "markql", repo_root / "build" / "xsql"):
+        if candidate.exists():
+            return str(candidate)
+    return None
+
+
+def _run_cli(args: list[str]) -> str:
+    cli = _resolve_cli_binary()
+    if not cli:
+        raise RuntimeError(
+            "xsql native module is missing required APIs and markql CLI was not found for fallback"
+        )
+    result = subprocess.run([cli, *args], capture_output=True, text=True, check=False)
+    if result.returncode not in (0, 1):
+        stderr = result.stderr.strip()
+        stdout = result.stdout.strip()
+        detail = stderr or stdout or f"exit code {result.returncode}"
+        raise RuntimeError(f"markql CLI fallback failed: {detail}")
+    return result.stdout
 
 
 def load(
@@ -123,19 +158,48 @@ def execute(
 def lint(query: str) -> list[dict]:
     """Parses + validates a query and returns diagnostics without execution."""
     _require_core()
-    return list(_core.lint_query(query))
+    if hasattr(_core, "lint_query"):
+        return list(_core.lint_query(query))
+    raw = _run_cli(["--lint", query, "--format", "json"]).strip()
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("Failed to parse lint diagnostics JSON from markql CLI fallback") from exc
+    if not isinstance(parsed, list):
+        raise RuntimeError("Unexpected lint diagnostics shape from markql CLI fallback")
+    return parsed
 
 
 def core_version() -> str:
     """Returns core version + provenance string (version + commit, dirty if applicable)."""
     _require_core()
-    return str(_core.core_version())
+    if hasattr(_core, "core_version"):
+        return str(_core.core_version())
+    return _run_cli(["--version"]).strip()
 
 
 def core_version_info() -> Dict[str, Any]:
     """Returns structured core version/provenance metadata."""
     _require_core()
-    return dict(_core.core_version_info())
+    if hasattr(_core, "core_version_info"):
+        return dict(_core.core_version_info())
+    rendered = core_version()
+    version_match = re.search(r"\b(\d+\.\d+\.\d+)\b", rendered)
+    if not version_match:
+        raise RuntimeError(f"Unable to parse version from core provenance string: {rendered}")
+    version = version_match.group(1)
+    provenance_match = re.search(r"\(([^)]+)\)", rendered)
+    git_token = provenance_match.group(1) if provenance_match else "unknown"
+    git_dirty = git_token.endswith("-dirty")
+    git_commit = git_token[:-6] if git_dirty else git_token
+    return {
+        "version": version,
+        "git_commit": git_commit,
+        "git_dirty": git_dirty,
+        "provenance": rendered,
+    }
 
 
 __all__ = [
