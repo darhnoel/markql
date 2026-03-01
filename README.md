@@ -1,5 +1,11 @@
 # MarkQL
 
+[![Build wheels](https://github.com/darhnoel/markql/actions/workflows/python-wheels.yml/badge.svg)](https://github.com/darhnoel/markql/actions/workflows/python-wheels.yml)
+[![GitHub tag](https://img.shields.io/github/v/tag/darhnoel/markql)](https://github.com/darhnoel/markql/tags)
+[![PyPI version](https://img.shields.io/pypi/v/pyxsql)](https://pypi.org/project/pyxsql/)
+[![PyPI downloads](https://img.shields.io/pypi/dm/pyxsql)](https://pypi.org/project/pyxsql/)
+[![License](https://img.shields.io/github/license/darhnoel/markql)](https://github.com/darhnoel/markql/blob/main/LICENSE)
+
 MarkQL is a C++20 SQL-style query engine for HTML. It treats HTML elements as rows and lets you query them with familiar `SELECT ... FROM ... WHERE ...` syntax.
 
 ## Quick Start
