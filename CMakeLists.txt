@@ -519,7 +519,7 @@ if (XSQL_BUILD_TESTS)
     parse_cli_args_accepts_version_flag
     lint_syntax_diagnostic_has_stable_code_and_span
     lint_semantic_diagnostic_has_stable_code
-    diagnostic_text_renderer_contains_help_docs_and_caret
+    diagnostic_text_renderer_contains_help_and_caret
     diagnostic_json_renderer_contains_stable_fields
     diagnostic_json_renderer_matches_snapshot
     diagnostic_text_renderer_matches_golden_snippet
