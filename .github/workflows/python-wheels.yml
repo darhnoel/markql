@@ -2,11 +2,61 @@ name: Build wheels
 
 on:
   push:
-    tags: ["v*"]
+    branches: ["main"]
+    tags: ["v*.*.*"]
+  pull_request:
   workflow_dispatch:
 
 jobs:
+  python_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test/build deps
+        run: python -m pip install -U pip setuptools wheel pybind11 pytest
+      - name: Install package
+        run: python -m pip install -e .[test]
+      - name: Run python tests
+        run: PYTHONPATH=python pytest -v python/tests
+
+  verify_release_tag:
+    needs: python_tests
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate tag matches package/core version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE_VERSION="$(python - <<'PY'
+          import pathlib
+          import re
+
+          meta = pathlib.Path("python/xsql/_meta.py").read_text(encoding="utf-8")
+          match = re.search(r'__version__\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"', meta)
+          if not match:
+              raise SystemExit("Failed to parse __version__ from python/xsql/_meta.py")
+          print(match.group(1))
+          PY
+          )"
+
+          echo "Tag version: ${TAG_VERSION}"
+          echo "Package version: ${PACKAGE_VERSION}"
+
+          if [ "${TAG_VERSION}" != "${PACKAGE_VERSION}" ]; then
+            echo "Tag/package version mismatch: v${PACKAGE_VERSION} expected" >&2
+            exit 1
+          fi
+
   build_wheels:
+    needs: verify_release_tag
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
