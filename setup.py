@@ -79,8 +79,8 @@ ext_modules = [
             "core/src/util",
         ],
         define_macros=[
-            ("XSQL_VERSION", f"\\\"{PACKAGE_VERSION}\\\""),
-            ("XSQL_GIT_COMMIT", f"\\\"{git_commit_short()}\\\""),
+            ("XSQL_VERSION", f'"{PACKAGE_VERSION}"'),
+            ("XSQL_GIT_COMMIT", f'"{git_commit_short()}"'),
             ("XSQL_GIT_DIRTY", git_dirty_flag()),
         ],
         cxx_std=20,
