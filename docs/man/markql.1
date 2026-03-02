@@ -1,0 +1,123 @@
+.TH MARKQL 1 "March 2026" "MarkQL" "User Commands"
+.SH NAME
+markql \- query HTML documents using SQL-like syntax
+.SH SYNOPSIS
+.B markql
+[\fB\-\-query\fR \fIQUERY\fR]
+[\fB\-\-query\-file\fR \fIFILE\fR]
+[\fB\-\-input\fR \fIPATH_OR_URL\fR]
+[\fB\-\-mode\fR \fIduckbox|json|plain\fR]
+[\fB\-\-display_mode\fR \fImore|less\fR]
+[\fB\-\-highlight\fR \fIon|off\fR]
+[\fB\-\-timeout\-ms\fR \fIN\fR]
+[\fB\-\-color=disabled\fR]
+
+.B markql
+\fB\-\-lint\fR [\fIQUERY\fR] [\fB\-\-format\fR \fItext|json\fR]
+
+.B markql
+\fB\-\-interactive\fR [\fB\-\-input\fR \fIPATH_OR_URL\fR]
+
+.B markql
+\fBexplore\fR \fIINPUT_HTML\fR
+
+.B markql
+\fB\-\-help\fR
+
+.B markql
+\fB\-\-version\fR
+.SH DESCRIPTION
+\fBmarkql\fR runs SQL-style queries on HTML. It can read input from files, URLs,
+or standard input and outputs rows in table, JSON, or plain formats.
+.SH OPTIONS
+.TP
+\fB\-\-query\fR \fIQUERY\fR
+Execute a single inline query.
+.TP
+\fB\-\-query\-file\fR \fIFILE\fR
+Execute queries from a SQL script file.
+.TP
+\fB\-\-input\fR \fIPATH_OR_URL\fR
+HTML input source. If omitted, input is read from standard input.
+.TP
+\fB\-\-interactive\fR
+Start REPL mode.
+.TP
+\fB\-\-lint\fR [\fIQUERY\fR]
+Validate syntax and semantic rules without execution.
+You can pass query text directly or combine with \fB\-\-query\fR/\fB\-\-query\-file\fR.
+.TP
+\fB\-\-format\fR \fItext|json\fR
+Output format for lint diagnostics. Valid only with \fB\-\-lint\fR.
+.TP
+\fB\-\-mode\fR \fIduckbox|json|plain\fR
+Output renderer for query results.
+.TP
+\fB\-\-display_mode\fR \fImore|less\fR
+Display full output (\fBmore\fR) or compact output (\fBless\fR).
+.TP
+\fB\-\-highlight\fR \fIon|off\fR
+Enable or disable syntax highlighting.
+.TP
+\fB\-\-timeout\-ms\fR \fIN\fR
+Network fetch timeout for URL inputs, in milliseconds.
+.TP
+\fB\-\-color=disabled\fR
+Disable ANSI colors.
+.TP
+\fB\-\-continue\-on\-error\fR
+In script mode, continue running statements after errors.
+.TP
+\fB\-\-quiet\fR
+In script mode, reduce progress output.
+.TP
+\fB\-\-help\fR
+Show command help.
+.TP
+\fB\-\-version\fR
+Show version and provenance string.
+.SH EXPLORE MODE
+\fBmarkql explore\fR opens an interactive DOM explorer.
+Common keys:
+Up/Down move, Right or Enter expand, Left collapse, \fB/\fR search,
+\fBn\fR/\fBN\fR next/previous match, \fBj\fR/\fBk\fR scroll inner HTML,
+\fB+\fR/\fB\-\fR zoom inner HTML, \fBq\fR quit.
+.SH QUERY NOTES
+SQL comments are supported in scripts and REPL input:
+\fB\-\-\fR line comments and \fB/* ... */\fR block comments.
+
+Export sinks are available in query text:
+\fBTO CSV('file.csv')\fR,
+\fBTO JSON('file.json')\fR,
+\fBTO NDJSON('file.ndjson')\fR,
+and \fBTO PARQUET('file.parquet')\fR (when built with Arrow/Parquet support).
+.SH EXIT STATUS
+.TP
+\fB0\fR
+Success.
+.TP
+\fB1\fR
+Query parse/runtime failure, or lint found one or more ERROR diagnostics.
+.TP
+\fB2\fR
+CLI usage/IO failure.
+.SH EXAMPLES
+.TP
+Run one query from file input:
+\fBmarkql \-\-query "SELECT table FROM doc" \-\-input ./data/index.html\fR
+.TP
+Lint a query without execution:
+\fBmarkql \-\-lint "SELECT FROM doc"\fR
+.TP
+Lint and output JSON diagnostics:
+\fBmarkql \-\-lint "SELECT FROM doc" \-\-format json\fR
+.TP
+Run in REPL mode:
+\fBmarkql \-\-interactive \-\-input ./data/index.html\fR
+.SH FILES
+.TP
+\fI/usr/bin/markql\fR
+Primary CLI binary.
+.TP
+\fI/usr/share/man/man1/markql.1\fR
+Manual page.

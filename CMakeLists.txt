@@ -587,3 +587,39 @@ if (XSQL_BUILD_PYTHON)
     set_target_properties(_core PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${SKBUILD_PLATLIB_DIR}/xsql")
   endif()
 endif()
+
+# Local packaging support (e.g., cpack -G DEB on Ubuntu).
+if (XSQL_BUILD_CLI)
+  install(TARGETS xsql RUNTIME DESTINATION bin)
+  if (EXISTS "${CMAKE_SOURCE_DIR}/markqli.sh")
+    install(PROGRAMS "${CMAKE_SOURCE_DIR}/markqli.sh" DESTINATION bin)
+  endif()
+endif()
+if (EXISTS "${CMAKE_SOURCE_DIR}/README.md")
+  install(FILES "${CMAKE_SOURCE_DIR}/README.md" DESTINATION share/doc/markql)
+endif()
+if (EXISTS "${CMAKE_SOURCE_DIR}/LICENSE")
+  install(FILES "${CMAKE_SOURCE_DIR}/LICENSE" DESTINATION share/doc/markql)
+endif()
+if (EXISTS "${CMAKE_SOURCE_DIR}/docs/man/markql.1")
+  install(FILES "${CMAKE_SOURCE_DIR}/docs/man/markql.1" DESTINATION share/man/man1)
+endif()
+if (EXISTS "${CMAKE_SOURCE_DIR}/completions/markql.bash")
+  install(FILES "${CMAKE_SOURCE_DIR}/completions/markql.bash"
+          DESTINATION share/bash-completion/completions
+          RENAME markql)
+  install(FILES "${CMAKE_SOURCE_DIR}/completions/markql.bash"
+          DESTINATION share/bash-completion/completions
+          RENAME xsql)
+endif()
+
+set(CPACK_PACKAGE_NAME "markql")
+set(CPACK_PACKAGE_VENDOR "MarkQL")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_CONTACT "maintainers@markql.local")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "MarkQL CLI for querying HTML with SQL-like syntax")
+set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
+set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+
+include(CPack)
