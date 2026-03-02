@@ -1,3 +1,8 @@
+---
+layout: default
+title: MarkQL Documentation
+---
+
 # MarkQL Documentation
 
 Welcome to MarkQL docs.
