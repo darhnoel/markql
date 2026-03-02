@@ -108,12 +108,6 @@ cmake --build build --target xsql_tests
 ctest --test-dir build --output-on-failure
 ```
 
-Benchmark harness (inner_html minified vs raw):
-
-```bash
-./build/markql_bench_inner_html 10000
-```
-
 Python package/tests (optional):
 
 ```bash
