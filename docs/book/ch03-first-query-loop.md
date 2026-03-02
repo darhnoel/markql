@@ -20,6 +20,26 @@ This may feel slower at first because you run more small queries. In practice it
 - Use deliberate failures to validate mental model boundaries.
 - Keep each step reproducible from CLI commands.
 
+## Alias convention (recommended style)
+
+This is a style recommendation for readability, especially once your queries grow into multiple CTEs.
+
+- Use `node_<semantic>` when aliasing DOM node rows.
+- Use `r_<semantic>` when aliasing CTE/derived rows.
+
+Example:
+
+```sql
+WITH r_links AS (
+  SELECT node_link.href
+  FROM doc AS node_link
+  WHERE node_link.tag = 'a'
+    AND node_link.href IS NOT NULL
+)
+SELECT r_links.href
+FROM r_links;
+```
+
 ## Scope
 
 ```text

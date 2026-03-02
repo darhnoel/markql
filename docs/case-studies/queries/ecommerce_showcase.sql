@@ -1,106 +1,106 @@
-WITH cards AS (
+WITH r_cards AS (
   SELECT
-    p.node_id AS card_id,
-    p.sibling_pos AS card_pos,
-    p.data_sku AS sku
-  FROM doc AS p
-  WHERE p.tag = 'article'
-    AND p.class = 'product-card'
+    node_card.node_id AS card_id,
+    node_card.sibling_pos AS card_pos,
+    node_card.data_sku AS sku
+  FROM doc AS node_card
+  WHERE node_card.tag = 'article'
+    AND node_card.class = 'product-card'
 ),
-titles AS (
+r_titles AS (
   SELECT
-    c.card_id,
-    TEXT(t) AS product_name
-  FROM cards AS c
+    r_card.card_id,
+    TEXT(node_title) AS product_name
+  FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT t
-    FROM doc AS t
-    WHERE t.parent_id = c.card_id
-      AND t.tag = 'h3'
-      AND t.class = 'product-title'
-  ) AS t
+    SELECT node_title
+    FROM doc AS node_title
+    WHERE node_title.parent_id = r_card.card_id
+      AND node_title.tag = 'h3'
+      AND node_title.class = 'product-title'
+  ) AS node_title
 ),
-links AS (
+r_links AS (
   SELECT
-    c.card_id,
-    a.href AS product_url
-  FROM cards AS c
+    r_card.card_id,
+    node_link.href AS product_url
+  FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT h
-    FROM doc AS h
-    WHERE h.parent_id = c.card_id
-      AND h.tag = 'h3'
-      AND h.class = 'product-title'
-  ) AS h
+    SELECT node_heading
+    FROM doc AS node_heading
+    WHERE node_heading.parent_id = r_card.card_id
+      AND node_heading.tag = 'h3'
+      AND node_heading.class = 'product-title'
+  ) AS node_heading
   CROSS JOIN LATERAL (
-    SELECT a
-    FROM doc AS a
-    WHERE a.parent_id = h.node_id
-      AND a.tag = 'a'
-      AND a.class = 'product-link'
-  ) AS a
+    SELECT node_link
+    FROM doc AS node_link
+    WHERE node_link.parent_id = node_heading.node_id
+      AND node_link.tag = 'a'
+      AND node_link.class = 'product-link'
+  ) AS node_link
 ),
-prices AS (
+r_prices AS (
   SELECT
-    c.card_id,
-    TEXT(s) AS price
-  FROM cards AS c
+    r_card.card_id,
+    TEXT(node_price) AS price
+  FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT s
-    FROM doc AS s
-    WHERE s.parent_id = c.card_id
-      AND s.tag = 'span'
-      AND s.class = 'price-current'
-  ) AS s
+    SELECT node_price
+    FROM doc AS node_price
+    WHERE node_price.parent_id = r_card.card_id
+      AND node_price.tag = 'span'
+      AND node_price.class = 'price-current'
+  ) AS node_price
 ),
-ratings AS (
+r_ratings AS (
   SELECT
-    c.card_id,
-    TEXT(r) AS rating
-  FROM cards AS c
+    r_card.card_id,
+    TEXT(node_rating) AS rating
+  FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT r
-    FROM doc AS r
-    WHERE r.parent_id = c.card_id
-      AND r.tag = 'div'
-      AND r.class = 'product-rating'
-  ) AS r
+    SELECT node_rating
+    FROM doc AS node_rating
+    WHERE node_rating.parent_id = r_card.card_id
+      AND node_rating.tag = 'div'
+      AND node_rating.class = 'product-rating'
+  ) AS node_rating
 ),
-badges AS (
+r_badges AS (
   SELECT
-    c.card_id,
-    b.sibling_pos AS badge_pos,
-    TEXT(b) AS badge_text
-  FROM cards AS c
+    r_card.card_id,
+    node_badge.sibling_pos AS badge_pos,
+    TEXT(node_badge) AS badge_text
+  FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT u
-    FROM doc AS u
-    WHERE u.parent_id = c.card_id
-      AND u.tag = 'ul'
-      AND u.class = 'badges'
-  ) AS u
+    SELECT node_badges_list
+    FROM doc AS node_badges_list
+    WHERE node_badges_list.parent_id = r_card.card_id
+      AND node_badges_list.tag = 'ul'
+      AND node_badges_list.class = 'badges'
+  ) AS node_badges_list
   CROSS JOIN LATERAL (
-    SELECT b
-    FROM doc AS b
-    WHERE b.parent_id = u.node_id
-      AND b.tag = 'li'
-      AND b.class = 'badge'
-  ) AS b
+    SELECT node_badge
+    FROM doc AS node_badge
+    WHERE node_badge.parent_id = node_badges_list.node_id
+      AND node_badge.tag = 'li'
+      AND node_badge.class = 'badge'
+  ) AS node_badge
 )
 SELECT
-  c.card_pos,
-  c.sku,
-  t.product_name,
-  p.price,
-  r.rating,
-  l.product_url,
-  b1.badge_text AS badge_1,
-  b2.badge_text AS badge_2
-FROM cards AS c
-LEFT JOIN titles AS t ON t.card_id = c.card_id
-LEFT JOIN prices AS p ON p.card_id = c.card_id
-LEFT JOIN ratings AS r ON r.card_id = c.card_id
-LEFT JOIN links AS l ON l.card_id = c.card_id
-LEFT JOIN badges AS b1 ON b1.card_id = c.card_id AND b1.badge_pos = 1
-LEFT JOIN badges AS b2 ON b2.card_id = c.card_id AND b2.badge_pos = 2
-ORDER BY c.card_pos;
+  r_card.card_pos,
+  r_card.sku,
+  r_title.product_name,
+  r_price.price,
+  r_rating.rating,
+  r_link.product_url,
+  r_badge_1.badge_text AS badge_1,
+  r_badge_2.badge_text AS badge_2
+FROM r_cards AS r_card
+LEFT JOIN r_titles AS r_title ON r_title.card_id = r_card.card_id
+LEFT JOIN r_prices AS r_price ON r_price.card_id = r_card.card_id
+LEFT JOIN r_ratings AS r_rating ON r_rating.card_id = r_card.card_id
+LEFT JOIN r_links AS r_link ON r_link.card_id = r_card.card_id
+LEFT JOIN r_badges AS r_badge_1 ON r_badge_1.card_id = r_card.card_id AND r_badge_1.badge_pos = 1
+LEFT JOIN r_badges AS r_badge_2 ON r_badge_2.card_id = r_card.card_id AND r_badge_2.badge_pos = 2
+ORDER BY r_card.card_pos;

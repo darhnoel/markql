@@ -84,7 +84,7 @@ Compatibility note:
 Use lint mode to validate syntax + key semantic rules without loading/executing data:
 
 ```bash
-./build/markql --lint "SELECT TEXT(n) FROM doc AS n WHERE n.tag = 'div'"
+./build/markql --lint "SELECT TEXT(node_div) FROM doc AS node_div WHERE node_div.tag = 'div'"
 ```
 
 Default lint output provides one diagnostic block per issue:
@@ -131,11 +131,11 @@ SELECT div FROM doc LIMIT 5;
 ```
 
 ```sql
-SELECT n FROM doc AS n WHERE n.href CONTAINS 'https';
+SELECT node_link FROM doc AS node_link WHERE node_link.href CONTAINS 'https';
 ```
 
 ```sql
-SELECT n.href FROM doc AS n WHERE n.rel = 'preload' TO LIST();
+SELECT node_link.href FROM doc AS node_link WHERE node_link.rel = 'preload' TO LIST();
 ```
 
 ```sql
@@ -155,12 +155,12 @@ SELECT div FROM document;
 SELECT div FROM 'page.html';
 SELECT div FROM 'https://example.com';
 SELECT div FROM RAW('<div class="x">hello</div>');
-SELECT li FROM PARSE('<ul><li>1</li><li>2</li></ul>') AS frag;
+SELECT li FROM PARSE('<ul><li>1</li><li>2</li></ul>') AS node_fragment;
 ```
 
 Alias sources:
 ```sql
-SELECT a FROM document AS d WHERE d.id = 'login';
+SELECT node_doc FROM document AS node_doc WHERE node_doc.id = 'login';
 ```
 
 ## Aliases and fields
@@ -178,15 +178,17 @@ WHERE doc.tag = 'div';
 You can still bind an explicit alias:
 
 ```sql
-SELECT n.node_id, n.tag
-FROM doc AS n
-WHERE n.tag = 'div';
+SELECT node_div.node_id, node_div.tag
+FROM doc AS node_div
+WHERE node_div.tag = 'div';
 ```
 
 Rules:
-- Once you alias `doc` (for example `FROM doc AS n`), use only that alias in row references.
+- Once you alias `doc` (for example `FROM doc AS node_div`), use only that alias in row references.
 - `doc.*` is not bound in that scope.
-- Prefer neutral aliases (`n`, `r`, `c`, `x`), not tag-name aliases.
+- Recommended style (not required by the language):
+  - `node_<semantic>` for DOM node rows.
+  - `r_<semantic>` for CTE/derived logical rows.
 
 `PARSE(...)` accepts either:
 - an HTML string expression
@@ -199,7 +201,7 @@ FROM PARSE(
   SELECT inner_html(div, 2)
   FROM doc
   WHERE attributes.class = 'pagination'
-) AS frag;
+) AS node_fragment;
 ```
 
 Compatibility note:
@@ -213,49 +215,49 @@ MarkQL supports SQL-style CTEs and joins with deterministic row order.
 - `WITH ...` defines statement-local relations.
 - `JOIN` / `LEFT JOIN` use `ON ...`.
 - `CROSS JOIN` is cartesian and does not take `ON`.
-- `CROSS JOIN LATERAL (...) AS x` runs the right subquery per left row (flatMap behavior).
+- `CROSS JOIN LATERAL (...) AS node_right` runs the right subquery per left row (flatMap behavior).
 
 Efficient baseline pattern (filtered rows + lateral expansion + selective left joins):
 
 ```sql
-WITH rows AS (
-  SELECT n.node_id AS row_id
-  FROM doc AS n
-  WHERE n.tag = 'tr' AND EXISTS(child WHERE tag = 'td')
+WITH r_rows AS (
+  SELECT node_row.node_id AS row_id
+  FROM doc AS node_row
+  WHERE node_row.tag = 'tr' AND EXISTS(child WHERE tag = 'td')
 ),
-cells AS (
+r_cells AS (
   SELECT
-    r.row_id,
-    c.sibling_pos AS pos,
-    TEXT(c) AS val
-  FROM rows AS r
+    r_row.row_id,
+    node_cell.sibling_pos AS pos,
+    TEXT(node_cell) AS val
+  FROM r_rows AS r_row
   CROSS JOIN LATERAL (
-    SELECT c
-    FROM doc AS c
-    WHERE c.parent_id = r.row_id
-      AND c.tag = 'td'
-  ) AS c
+    SELECT node_cell
+    FROM doc AS node_cell
+    WHERE node_cell.parent_id = r_row.row_id
+      AND node_cell.tag = 'td'
+  ) AS node_cell
 )
 SELECT
-  r.row_id,
-  c2.val AS item_id,
-  c4.val AS item_name
-FROM rows AS r
-LEFT JOIN cells AS c2 ON c2.row_id = r.row_id AND c2.pos = 2
-LEFT JOIN cells AS c4 ON c4.row_id = r.row_id AND c4.pos = 4
-ORDER BY r.row_id;
+  r_row.row_id,
+  r_cell_2.val AS item_id,
+  r_cell_4.val AS item_name
+FROM r_rows AS r_row
+LEFT JOIN r_cells AS r_cell_2 ON r_cell_2.row_id = r_row.row_id AND r_cell_2.pos = 2
+LEFT JOIN r_cells AS r_cell_4 ON r_cell_4.row_id = r_row.row_id AND r_cell_4.pos = 4
+ORDER BY r_row.row_id;
 ```
 
 Derived-table source form is also supported:
 
 ```sql
-SELECT t.row_id
+SELECT r_rows.row_id
 FROM (
-  SELECT n.node_id AS row_id
-  FROM doc AS n
-  WHERE n.tag = 'tr'
-) AS t
-ORDER BY t.row_id;
+  SELECT node_row.node_id AS row_id
+  FROM doc AS node_row
+  WHERE node_row.tag = 'tr'
+) AS r_rows
+ORDER BY r_rows.row_id;
 ```
 
 ## Filtering with WHERE
@@ -275,8 +277,8 @@ Basic operators:
 Examples:
 ```sql
 SELECT div FROM doc WHERE id = 'main';
-SELECT n FROM doc AS n WHERE n.href IN ('/a','/b');
-SELECT n FROM doc AS n WHERE n.href ~ '.*\.pdf$';
+SELECT node_link FROM doc AS node_link WHERE node_link.href IN ('/a','/b');
+SELECT node_link FROM doc AS node_link WHERE node_link.href ~ '.*\.pdf$';
 SELECT div FROM doc WHERE text LIKE '%coupon%';
 SELECT div FROM doc WHERE POSITION('coupon' IN LOWER(text)) > 0;
 SELECT div FROM doc WHERE attributes IS NULL;

@@ -57,7 +57,7 @@ Error: Query parse error: Expected FROM
 
 <!-- VERIFY: ch12-listing-2-fail -->
 ```bash
-# EXPECT_FAIL: Unexpected token after query
+# EXPECT_FAIL: ORDER BY supports node_id, tag, text, parent_id, sibling_pos, max_depth, or doc_order
 ./build/markql --mode plain --color=disabled \
   --query "SELECT section.node_id FROM doc WHERE tag='section' ORDER BY attributes.data-kind;" \
   --input docs/fixtures/basic.html
@@ -66,7 +66,7 @@ Error: Query parse error: Expected FROM
 Observed error:
 
 ```text
-Error: Query parse error: Unexpected token after query
+ERROR[MQL-SEM-0401]: ORDER BY supports node_id, tag, text, parent_id, sibling_pos, max_depth, or doc_order
 ```
 
 In this build, `ORDER BY` supports core row fields. Sorting by expression-like paths is not supported yet.

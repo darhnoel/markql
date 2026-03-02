@@ -22,23 +22,23 @@ FROM <source> [AS <alias>]
 
 ## Sources
 - `doc` / `document`
-- `doc AS n` (or `document AS n`)
-- `<cte_name>` / `<cte_name> AS r`
-- `(SELECT ...) AS t`
+- `doc AS node_doc` (or `document AS node_doc`)
+- `<cte_name>` / `<cte_name> AS r_rows`
+- `(SELECT ...) AS r_subquery`
 - `'path-or-url'`
-- `'path-or-url' AS x`
+- `'path-or-url' AS node_input`
 - `RAW('<html...>')`
-- `RAW('<html...>') AS x`
+- `RAW('<html...>') AS node_raw`
 - `PARSE('<fragment...>')`
 - `PARSE(SELECT inner_html(...) FROM doc ...)`
-- `PARSE(...) AS x`
+- `PARSE(...) AS node_fragment`
 - `FRAGMENTS(RAW('<fragment...>'))` (deprecated; use `PARSE(...)`)
 
 ## Joins
-- `JOIN <source> AS x ON <expr>` (inner join)
-- `LEFT JOIN <source> AS x ON <expr>`
-- `CROSS JOIN <source> AS x` (no `ON`)
-- `CROSS JOIN LATERAL (SELECT ...) AS x` (correlated per-left-row expansion)
+- `JOIN <source> AS node_right ON <expr>` (inner join)
+- `LEFT JOIN <source> AS node_right ON <expr>`
+- `CROSS JOIN <source> AS node_right` (no `ON`)
+- `CROSS JOIN LATERAL (SELECT ...) AS node_right` (correlated per-left-row expansion)
 
 ## Projections
 - Tag rows: `SELECT div FROM doc ...`
@@ -75,8 +75,7 @@ Extraction semantics (important):
 
 ## Notes on current behavior
 - `FROM doc` binds an implicit row alias named `doc`.
-- `FROM doc AS n` rebinds the row alias to `n`; `doc.*` is no longer bound in that scope.
-- Prefer neutral aliases (`n`, `r`, `c`, `x`) over tag-name aliases.
+- `FROM doc AS node_doc` rebinds the row alias to `node_doc`; `doc.*` is no longer bound in that scope.
 - `self` refers to the current node for the current row produced by `FROM`.
 - Inside axis scopes (for example `EXISTS(descendant WHERE ...)`), `self` is rebound to the node being evaluated in that scope.
 - `PROJECT` / `FLATTEN_EXTRACT` requires `AS (alias: expr, ...)`.
@@ -89,6 +88,70 @@ Extraction semantics (important):
 - `INNER_HTML(tag, MAX_DEPTH)` uses each row's `max_depth` automatically.
 - `RAW_INNER_HTML(tag, MAX_DEPTH)` uses each row's `max_depth` automatically.
 - In one `SELECT`, `INNER_HTML`/`RAW_INNER_HTML` depth mode must be consistent.
+
+## Alias naming conventions (recommended)
+
+This is a style recommendation, not a language rule.
+
+Why this helps:
+- CTE-heavy queries and joins are easier to read when alias roles are obvious.
+- It reduces ambiguity between DOM node rows and logical table rows.
+
+Rules of thumb:
+- Use `node_<semantic>` for DOM node aliases (`FROM doc AS node_card`, `... AS node_link`).
+- Use `r_<semantic>` for CTE/derived-table row aliases (`WITH r_rows AS (...)`, `FROM r_rows AS r_row`).
+
+Before:
+
+```sql
+WITH rows AS (
+  SELECT n.node_id AS row_id
+  FROM doc AS n
+  WHERE n.tag = 'tr'
+),
+cells AS (
+  SELECT
+    r.row_id,
+    c.sibling_pos AS pos,
+    TEXT(c) AS val
+  FROM rows AS r
+  CROSS JOIN LATERAL (
+    SELECT c
+    FROM doc AS c
+    WHERE c.parent_id = r.row_id
+      AND c.tag = 'td'
+  ) AS c
+)
+SELECT r.row_id, c.val
+FROM rows AS r
+JOIN cells AS c ON c.row_id = r.row_id;
+```
+
+After (recommended style):
+
+```sql
+WITH r_rows AS (
+  SELECT node_row.node_id AS row_id
+  FROM doc AS node_row
+  WHERE node_row.tag = 'tr'
+),
+r_cells AS (
+  SELECT
+    r_row.row_id,
+    node_cell.sibling_pos AS pos,
+    TEXT(node_cell) AS val
+  FROM r_rows AS r_row
+  CROSS JOIN LATERAL (
+    SELECT node_cell
+    FROM doc AS node_cell
+    WHERE node_cell.parent_id = r_row.row_id
+      AND node_cell.tag = 'td'
+  ) AS node_cell
+)
+SELECT r_row.row_id, r_cell.val
+FROM r_rows AS r_row
+JOIN r_cells AS r_cell ON r_cell.row_id = r_row.row_id;
+```
 
 ## Diagnostics Quick Use
 

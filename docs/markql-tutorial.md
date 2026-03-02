@@ -105,6 +105,32 @@ FROM 'https://example.com'
 FROM RAW('<div>...</div>')
 ```
 
+## Alias Naming Convention (Recommended Style)
+
+This is a readability convention, not a language rule.
+
+- `FROM doc` binds an implicit row alias named `doc`.
+- `FROM doc AS node_doc` rebinds the row alias to `node_doc`; `doc.*` is no longer bound in that scope.
+- Use `node_<semantic>` for DOM node rows.
+- Use `r_<semantic>` for CTE/derived logical rows.
+
+Examples:
+
+```sql
+SELECT node_doc
+FROM doc AS node_doc;
+```
+
+```sql
+WITH r_rows AS (
+  SELECT node_row.node_id AS row_id
+  FROM doc AS node_row
+  WHERE node_row.tag = 'tr'
+)
+SELECT r_rows.row_id
+FROM r_rows;
+```
+
 Short table-trimming example:
 
 ```sql

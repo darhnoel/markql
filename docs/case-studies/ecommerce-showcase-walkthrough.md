@@ -12,19 +12,19 @@ Target output: one row per product card with:
 - `product_url`
 - `badge_1`, `badge_2`
 
-## 1) `cards`: define row identity
+## 1) `r_cards`: define row identity
 
 Purpose: decide what one business row is.
 
 ```sql
-WITH cards AS (
+WITH r_cards AS (
   SELECT
-    p.node_id AS card_id,
-    p.sibling_pos AS card_pos,
-    p.data_sku AS sku
-  FROM doc AS p
-  WHERE p.tag = 'article'
-    AND p.class = 'product-card'
+    node_card.node_id AS card_id,
+    node_card.sibling_pos AS card_pos,
+    node_card.data_sku AS sku
+  FROM doc AS node_card
+  WHERE node_card.tag = 'article'
+    AND node_card.class = 'product-card'
 )
 ```
 
@@ -34,55 +34,55 @@ Why:
 - `card_pos` gives stable ordering.
 - `sku` is directly available on the card node.
 
-## 2) `titles`: extract product name
+## 2) `r_titles`: extract product name
 
 Purpose: get title text relative to each card.
 
 ```sql
-titles AS (
+r_titles AS (
   SELECT
-    c.card_id,
-    TEXT(t) AS product_name
-  FROM cards AS c
+    r_card.card_id,
+    TEXT(node_title) AS product_name
+  FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT t
-    FROM doc AS t
-    WHERE t.parent_id = c.card_id
-      AND t.tag = 'h3'
-      AND t.class = 'product-title'
-  ) AS t
+    SELECT node_title
+    FROM doc AS node_title
+    WHERE node_title.parent_id = r_card.card_id
+      AND node_title.tag = 'h3'
+      AND node_title.class = 'product-title'
+  ) AS node_title
 )
 ```
 
 Why `CROSS JOIN LATERAL`:
 
 - Evaluate child lookup per current card.
-- Keep scope strict to `parent_id = c.card_id`.
+- Keep scope strict to `parent_id = r_card.card_id`.
 
-## 3) `links`: two-hop extraction for URL
+## 3) `r_links`: two-hop extraction for URL
 
 Purpose: get anchor `href`.
 
 ```sql
-links AS (
+r_links AS (
   SELECT
-    c.card_id,
-    a.href AS product_url
-  FROM cards AS c
+    r_card.card_id,
+    node_link.href AS product_url
+  FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT h
-    FROM doc AS h
-    WHERE h.parent_id = c.card_id
-      AND h.tag = 'h3'
-      AND h.class = 'product-title'
-  ) AS h
+    SELECT node_heading
+    FROM doc AS node_heading
+    WHERE node_heading.parent_id = r_card.card_id
+      AND node_heading.tag = 'h3'
+      AND node_heading.class = 'product-title'
+  ) AS node_heading
   CROSS JOIN LATERAL (
-    SELECT a
-    FROM doc AS a
-    WHERE a.parent_id = h.node_id
-      AND a.tag = 'a'
-      AND a.class = 'product-link'
-  ) AS a
+    SELECT node_link
+    FROM doc AS node_link
+    WHERE node_link.parent_id = node_heading.node_id
+      AND node_link.tag = 'a'
+      AND node_link.class = 'product-link'
+  ) AS node_link
 )
 ```
 
@@ -91,75 +91,75 @@ Why two hops:
 - Card does not directly own the anchor.
 - Explicit path is more reliable than broad descendant matching.
 
-## 4) `prices`: extract current price text
+## 4) `r_prices`: extract current price text
 
 Purpose: read displayed price.
 
 ```sql
-prices AS (
+r_prices AS (
   SELECT
-    c.card_id,
-    TEXT(s) AS price
-  FROM cards AS c
+    r_card.card_id,
+    TEXT(node_price) AS price
+  FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT s
-    FROM doc AS s
-    WHERE s.parent_id = c.card_id
-      AND s.tag = 'span'
-      AND s.class = 'price-current'
-  ) AS s
+    SELECT node_price
+    FROM doc AS node_price
+    WHERE node_price.parent_id = r_card.card_id
+      AND node_price.tag = 'span'
+      AND node_price.class = 'price-current'
+  ) AS node_price
 )
 ```
 
 Output columns: `card_id`, `price`.
 
-## 5) `ratings`: extract rating summary
+## 5) `r_ratings`: extract rating summary
 
 Purpose: read user-facing rating text.
 
 ```sql
-ratings AS (
+r_ratings AS (
   SELECT
-    c.card_id,
-    TEXT(r) AS rating
-  FROM cards AS c
+    r_card.card_id,
+    TEXT(node_rating) AS rating
+  FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT r
-    FROM doc AS r
-    WHERE r.parent_id = c.card_id
-      AND r.tag = 'div'
-      AND r.class = 'product-rating'
-  ) AS r
+    SELECT node_rating
+    FROM doc AS node_rating
+    WHERE node_rating.parent_id = r_card.card_id
+      AND node_rating.tag = 'div'
+      AND node_rating.class = 'product-rating'
+  ) AS node_rating
 )
 ```
 
 Output columns: `card_id`, `rating`.
 
-## 6) `badges`: normalize repeated list items
+## 6) `r_badges`: normalize repeated list items
 
-Purpose: capture many badges per card as rows first.
+Purpose: capture many badge rows per card first.
 
 ```sql
-badges AS (
+r_badges AS (
   SELECT
-    c.card_id,
-    b.sibling_pos AS badge_pos,
-    TEXT(b) AS badge_text
-  FROM cards AS c
+    r_card.card_id,
+    node_badge.sibling_pos AS badge_pos,
+    TEXT(node_badge) AS badge_text
+  FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT u
-    FROM doc AS u
-    WHERE u.parent_id = c.card_id
-      AND u.tag = 'ul'
-      AND u.class = 'badges'
-  ) AS u
+    SELECT node_badges_list
+    FROM doc AS node_badges_list
+    WHERE node_badges_list.parent_id = r_card.card_id
+      AND node_badges_list.tag = 'ul'
+      AND node_badges_list.class = 'badges'
+  ) AS node_badges_list
   CROSS JOIN LATERAL (
-    SELECT b
-    FROM doc AS b
-    WHERE b.parent_id = u.node_id
-      AND b.tag = 'li'
-      AND b.class = 'badge'
-  ) AS b
+    SELECT node_badge
+    FROM doc AS node_badge
+    WHERE node_badge.parent_id = node_badges_list.node_id
+      AND node_badge.tag = 'li'
+      AND node_badge.class = 'badge'
+  ) AS node_badge
 )
 ```
 
@@ -170,26 +170,26 @@ Why this shape:
 
 ## 7) Final SELECT: assemble complete output row
 
-Purpose: merge all field CTEs back to `cards`.
+Purpose: merge all field CTEs back to `r_cards`.
 
 ```sql
 SELECT
-  c.card_pos,
-  c.sku,
-  t.product_name,
-  p.price,
-  r.rating,
-  l.product_url,
-  b1.badge_text AS badge_1,
-  b2.badge_text AS badge_2
-FROM cards AS c
-LEFT JOIN titles AS t ON t.card_id = c.card_id
-LEFT JOIN prices AS p ON p.card_id = c.card_id
-LEFT JOIN ratings AS r ON r.card_id = c.card_id
-LEFT JOIN links AS l ON l.card_id = c.card_id
-LEFT JOIN badges AS b1 ON b1.card_id = c.card_id AND b1.badge_pos = 1
-LEFT JOIN badges AS b2 ON b2.card_id = c.card_id AND b2.badge_pos = 2
-ORDER BY c.card_pos;
+  r_card.card_pos,
+  r_card.sku,
+  r_title.product_name,
+  r_price.price,
+  r_rating.rating,
+  r_link.product_url,
+  r_badge_1.badge_text AS badge_1,
+  r_badge_2.badge_text AS badge_2
+FROM r_cards AS r_card
+LEFT JOIN r_titles AS r_title ON r_title.card_id = r_card.card_id
+LEFT JOIN r_prices AS r_price ON r_price.card_id = r_card.card_id
+LEFT JOIN r_ratings AS r_rating ON r_rating.card_id = r_card.card_id
+LEFT JOIN r_links AS r_link ON r_link.card_id = r_card.card_id
+LEFT JOIN r_badges AS r_badge_1 ON r_badge_1.card_id = r_card.card_id AND r_badge_1.badge_pos = 1
+LEFT JOIN r_badges AS r_badge_2 ON r_badge_2.card_id = r_card.card_id AND r_badge_2.badge_pos = 2
+ORDER BY r_card.card_pos;
 ```
 
 Why `LEFT JOIN`:
@@ -201,11 +201,11 @@ Why `LEFT JOIN`:
 
 When adapting this pattern:
 
-1. Run `cards` only.
-2. Add `titles`.
-3. Add `prices`, then `ratings`.
-4. Add `links` (nested hop).
-5. Add `badges`.
+1. Run `r_cards` only.
+2. Add `r_titles`.
+3. Add `r_prices`, then `r_ratings`.
+4. Add `r_links` (nested hop).
+5. Add `r_badges`.
 6. Add final joins/pivot.
 
 If something breaks, inspect the newest CTE first.
@@ -221,143 +221,143 @@ Run each query in order against:
 
 `docs/case-studies/fixtures/ecommerce_showcase.html`
 
-### A) Validate row anchors (`cards`)
+### A) Validate row anchors (`r_cards`)
 
 ```sql
-WITH cards AS (
+WITH r_cards AS (
   SELECT
-    p.node_id AS card_id,
-    p.sibling_pos AS card_pos,
-    p.data_sku AS sku
-  FROM doc AS p
-  WHERE p.tag = 'article'
-    AND p.class = 'product-card'
+    node_card.node_id AS card_id,
+    node_card.sibling_pos AS card_pos,
+    node_card.data_sku AS sku
+  FROM doc AS node_card
+  WHERE node_card.tag = 'article'
+    AND node_card.class = 'product-card'
 )
-SELECT c.card_id, c.card_pos, c.sku
-FROM cards AS c
-ORDER BY c.card_pos;
+SELECT r_card.card_id, r_card.card_pos, r_card.sku
+FROM r_cards AS r_card
+ORDER BY r_card.card_pos;
 ```
 
 Expected: 3 rows, one per product card.
 
-### B) Add titles
+### B) Add r_titles
 
 ```sql
-WITH cards AS (
-  SELECT p.node_id AS card_id, p.sibling_pos AS card_pos, p.data_sku AS sku
-  FROM doc AS p
-  WHERE p.tag = 'article' AND p.class = 'product-card'
+WITH r_cards AS (
+  SELECT node_card.node_id AS card_id, node_card.sibling_pos AS card_pos, node_card.data_sku AS sku
+  FROM doc AS node_card
+  WHERE node_card.tag = 'article' AND node_card.class = 'product-card'
 ),
-titles AS (
-  SELECT c.card_id, TEXT(t) AS product_name
-  FROM cards AS c
+r_titles AS (
+  SELECT r_card.card_id, TEXT(node_title) AS product_name
+  FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT t
-    FROM doc AS t
-    WHERE t.parent_id = c.card_id
-      AND t.tag = 'h3'
-      AND t.class = 'product-title'
-  ) AS t
+    SELECT node_title
+    FROM doc AS node_title
+    WHERE node_title.parent_id = r_card.card_id
+      AND node_title.tag = 'h3'
+      AND node_title.class = 'product-title'
+  ) AS node_title
 )
-SELECT c.card_pos, c.sku, t.product_name
-FROM cards AS c
-LEFT JOIN titles AS t ON t.card_id = c.card_id
-ORDER BY c.card_pos;
+SELECT r_card.card_pos, r_card.sku, r_title.product_name
+FROM r_cards AS r_card
+LEFT JOIN r_titles AS r_title ON r_title.card_id = r_card.card_id
+ORDER BY r_card.card_pos;
 ```
 
 Expected: each card has non-NULL `product_name`.
 
-### C) Add links and prices
+### C) Add r_links and r_prices
 
 ```sql
-WITH cards AS (
-  SELECT p.node_id AS card_id, p.sibling_pos AS card_pos, p.data_sku AS sku
-  FROM doc AS p
-  WHERE p.tag = 'article' AND p.class = 'product-card'
+WITH r_cards AS (
+  SELECT node_card.node_id AS card_id, node_card.sibling_pos AS card_pos, node_card.data_sku AS sku
+  FROM doc AS node_card
+  WHERE node_card.tag = 'article' AND node_card.class = 'product-card'
 ),
-links AS (
-  SELECT c.card_id, a.href AS product_url
-  FROM cards AS c
+r_links AS (
+  SELECT r_card.card_id, node_link.href AS product_url
+  FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT h
-    FROM doc AS h
-    WHERE h.parent_id = c.card_id
-      AND h.tag = 'h3'
-      AND h.class = 'product-title'
-  ) AS h
+    SELECT node_heading
+    FROM doc AS node_heading
+    WHERE node_heading.parent_id = r_card.card_id
+      AND node_heading.tag = 'h3'
+      AND node_heading.class = 'product-title'
+  ) AS node_heading
   CROSS JOIN LATERAL (
-    SELECT a
-    FROM doc AS a
-    WHERE a.parent_id = h.node_id
-      AND a.tag = 'a'
-      AND a.class = 'product-link'
-  ) AS a
+    SELECT node_link
+    FROM doc AS node_link
+    WHERE node_link.parent_id = node_heading.node_id
+      AND node_link.tag = 'a'
+      AND node_link.class = 'product-link'
+  ) AS node_link
 ),
-prices AS (
-  SELECT c.card_id, TEXT(s) AS price
-  FROM cards AS c
+r_prices AS (
+  SELECT r_card.card_id, TEXT(node_price) AS price
+  FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT s
-    FROM doc AS s
-    WHERE s.parent_id = c.card_id
-      AND s.tag = 'span'
-      AND s.class = 'price-current'
-  ) AS s
+    SELECT node_price
+    FROM doc AS node_price
+    WHERE node_price.parent_id = r_card.card_id
+      AND node_price.tag = 'span'
+      AND node_price.class = 'price-current'
+  ) AS node_price
 )
-SELECT c.card_pos, c.sku, p.price, l.product_url
-FROM cards AS c
-LEFT JOIN prices AS p ON p.card_id = c.card_id
-LEFT JOIN links AS l ON l.card_id = c.card_id
-ORDER BY c.card_pos;
+SELECT r_card.card_pos, r_card.sku, r_price.price, r_link.product_url
+FROM r_cards AS r_card
+LEFT JOIN r_prices AS r_price ON r_price.card_id = r_card.card_id
+LEFT JOIN r_links AS r_link ON r_link.card_id = r_card.card_id
+ORDER BY r_card.card_pos;
 ```
 
 Expected: all rows have `price` and `product_url`.
 
-### D) Add ratings and long-form badges
+### D) Add r_ratings and long-form r_badges
 
 ```sql
-WITH cards AS (
-  SELECT p.node_id AS card_id, p.sibling_pos AS card_pos, p.data_sku AS sku
-  FROM doc AS p
-  WHERE p.tag = 'article' AND p.class = 'product-card'
+WITH r_cards AS (
+  SELECT node_card.node_id AS card_id, node_card.sibling_pos AS card_pos, node_card.data_sku AS sku
+  FROM doc AS node_card
+  WHERE node_card.tag = 'article' AND node_card.class = 'product-card'
 ),
-ratings AS (
-  SELECT c.card_id, TEXT(r) AS rating
-  FROM cards AS c
+r_ratings AS (
+  SELECT r_card.card_id, TEXT(node_rating) AS rating
+  FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT r
-    FROM doc AS r
-    WHERE r.parent_id = c.card_id
-      AND r.tag = 'div'
-      AND r.class = 'product-rating'
-  ) AS r
+    SELECT node_rating
+    FROM doc AS node_rating
+    WHERE node_rating.parent_id = r_card.card_id
+      AND node_rating.tag = 'div'
+      AND node_rating.class = 'product-rating'
+  ) AS node_rating
 ),
-badges AS (
-  SELECT c.card_id, b.sibling_pos AS badge_pos, TEXT(b) AS badge_text
-  FROM cards AS c
+r_badges AS (
+  SELECT r_card.card_id, node_badge.sibling_pos AS badge_pos, TEXT(node_badge) AS badge_text
+  FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT u
-    FROM doc AS u
-    WHERE u.parent_id = c.card_id
-      AND u.tag = 'ul'
-      AND u.class = 'badges'
-  ) AS u
+    SELECT node_badges_list
+    FROM doc AS node_badges_list
+    WHERE node_badges_list.parent_id = r_card.card_id
+      AND node_badges_list.tag = 'ul'
+      AND node_badges_list.class = 'badges'
+  ) AS node_badges_list
   CROSS JOIN LATERAL (
-    SELECT b
-    FROM doc AS b
-    WHERE b.parent_id = u.node_id
-      AND b.tag = 'li'
-      AND b.class = 'badge'
-  ) AS b
+    SELECT node_badge
+    FROM doc AS node_badge
+    WHERE node_badge.parent_id = node_badges_list.node_id
+      AND node_badge.tag = 'li'
+      AND node_badge.class = 'badge'
+  ) AS node_badge
 )
-SELECT c.card_pos, c.sku, r.rating, b.badge_pos, b.badge_text
-FROM cards AS c
-LEFT JOIN ratings AS r ON r.card_id = c.card_id
-LEFT JOIN badges AS b ON b.card_id = c.card_id
-ORDER BY c.card_pos, b.badge_pos;
+SELECT r_card.card_pos, r_card.sku, r_rating.rating, r_badge.badge_pos, r_badge.badge_text
+FROM r_cards AS r_card
+LEFT JOIN r_ratings AS r_rating ON r_rating.card_id = r_card.card_id
+LEFT JOIN r_badges AS r_badge ON r_badge.card_id = r_card.card_id
+ORDER BY r_card.card_pos, r_badge.badge_pos;
 ```
 
-Expected: multiple badge rows for cards with multiple badges.
+Expected: multiple badge rows for cards that carry multiple badges.
 
 ### E) Final pivot (badge_1 / badge_2)
 
