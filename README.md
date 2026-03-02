@@ -6,7 +6,7 @@
 [![PyPI downloads](https://img.shields.io/pypi/dm/pyxsql)](https://pypi.org/project/pyxsql/)
 [![License](https://img.shields.io/github/license/darhnoel/markql)](https://github.com/darhnoel/markql/blob/main/LICENSE)
 
-MarkQL is a C++20 SQL-style query engine for HTML. It treats HTML elements as rows and lets you query them with familiar `SELECT ... FROM ... WHERE ...` syntax.
+MarkQL is a **SQL-style query engine for HTML** that lets you **select precisely what you need**, **filter to the relevant parts of a page**, and **extract structured fields** using the familiar `SELECT ... FROM ... WHERE ...` flow, rather than relying on brittle, ad-hoc scraping logic.
 
 ## Quick Start
 
