@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MarkQL Demo Store</title>
+  <style>
+    :root {
+      --bg-1: #f7f4ee;
+      --bg-2: #fffdf9;
+      --ink: #1e1e1e;
+      --muted: #6a6259;
+      --card: #ffffff;
+      --line: #ebe5dc;
+      --accent: #c46a1a;
+      --accent-soft: #fde9d2;
+      --ok: #2d7f4f;
+      --shadow: 0 18px 50px rgba(29, 20, 10, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 10% -10%, #ffe8cf 0%, transparent 42%),
+        radial-gradient(circle at 100% 0%, #ffe2d8 0%, transparent 40%),
+        linear-gradient(180deg, var(--bg-1), var(--bg-2));
+      min-height: 100vh;
+      padding: 42px 20px 60px;
+    }
+
+    .wrap {
+      max-width: 1060px;
+      margin: 0 auto;
+    }
+
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 16px;
+      margin-bottom: 26px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 44px);
+      letter-spacing: -0.02em;
+    }
+
+    .hero p {
+      margin: 6px 0 0;
+      color: var(--muted);
+    }
+
+    .badge-chip {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(220px, 1fr));
+      gap: 18px;
+    }
+
+    .product-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .product-card::after {
+      content: "";
+      position: absolute;
+      width: 110px;
+      height: 110px;
+      right: -25px;
+      top: -25px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 227, 194, 0.6), rgba(255, 255, 255, 0));
+      pointer-events: none;
+    }
+
+    .product-title {
+      font-size: 20px;
+      margin: 8px 0 12px;
+      line-height: 1.25;
+    }
+
+    .product-link {
+      color: inherit;
+      text-decoration: none;
+      border-bottom: 1px dashed rgba(30, 30, 30, 0.26);
+    }
+
+    .price-current {
+      font-size: 25px;
+      font-weight: 800;
+      color: #111;
+    }
+
+    .price-note {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    .product-rating {
+      margin-top: 12px;
+      color: #4a4036;
+      font-size: 14px;
+    }
+
+    .stock {
+      margin-top: 7px;
+      font-size: 13px;
+      color: var(--ok);
+    }
+
+    .badges {
+      list-style: none;
+      margin: 14px 0 0;
+      padding: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .badge {
+      font-size: 12px;
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: var(--accent-soft);
+      color: #7c4a14;
+      border: 1px solid rgba(196, 106, 26, 0.22);
+    }
+
+    @media (max-width: 920px) {
+      .grid {
+        grid-template-columns: repeat(2, minmax(200px, 1fr));
+      }
+    }
+
+    @media (max-width: 620px) {
+      .hero {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div>
+        <h1>MarkQL Demo Store</h1>
+        <p>Seasonal picks with stable selectors for query demos.</p>
+      </div>
+      <div class="badge-chip">Updated March 2026</div>
+    </header>
+
+    <section id="products-grid" class="grid">
+      <article class="product-card" data_sku="SKU-A100">
+        <h3 class="product-title">
+          <a class="product-link" href="/products/aurora-kettle">Aurora Copper Kettle</a>
+        </h3>
+        <span class="price-current">$79.00</span>
+        <p class="price-note">Limited seasonal color</p>
+        <div class="product-rating">4.8 / 5 (124 reviews)</div>
+        <div class="stock">In stock</div>
+        <ul class="badges">
+          <li class="badge">Free Shipping</li>
+          <li class="badge">Best Seller</li>
+        </ul>
+      </article>
+
+      <article class="product-card" data_sku="SKU-A220">
+        <h3 class="product-title">
+          <a class="product-link" href="/products/linen-table-lamp">Linen Table Lamp</a>
+        </h3>
+        <span class="price-current">$129.00</span>
+        <p class="price-note">Ships in 2 business days</p>
+        <div class="product-rating">4.6 / 5 (89 reviews)</div>
+        <div class="stock">Low stock</div>
+        <ul class="badges">
+          <li class="badge">New Arrival</li>
+        </ul>
+      </article>
+
+      <article class="product-card" data_sku="SKU-A305">
+        <h3 class="product-title">
+          <a class="product-link" href="/products/atlas-backpack">Atlas City Backpack</a>
+        </h3>
+        <span class="price-current">$64.00</span>
+        <p class="price-note">Includes weather cover</p>
+        <div class="product-rating">4.9 / 5 (310 reviews)</div>
+        <div class="stock">In stock</div>
+        <ul class="badges">
+          <li class="badge">Eco Material</li>
+          <li class="badge">Member Discount</li>
+        </ul>
+      </article>
+    </section>
+  </div>
+</body>
+</html>

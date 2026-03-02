@@ -4,6 +4,9 @@ Practical, end-to-end extraction walk-throughs for developers in the field.
 
 - [Field Hunting Playbook](field-hunting-playbook.md)
 - [GitHub Contributions Calendar](github-contributions-calendar.md)
+- E-commerce showcase:
+  - Fixture: `fixtures/ecommerce_showcase.html`
+  - Query: `queries/ecommerce_showcase.sql`
 
 Use these when:
 
