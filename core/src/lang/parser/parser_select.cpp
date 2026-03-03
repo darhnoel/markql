@@ -388,6 +388,17 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
       return true;
   }
   if (current_.type == TokenType::KeywordSelf) {
+    if (peek().type != TokenType::Dot) {
+      Query::SelectItem item;
+      size_t start = current_.pos;
+      item.tag = "self";
+      item.self_node_projection = true;
+      advance();
+      item.span = Span{start, current_.pos};
+      items.push_back(item);
+      saw_tag_only = true;
+      return true;
+    }
     Query::SelectItem item;
     size_t start = current_.pos;
     ScalarExpr expr;

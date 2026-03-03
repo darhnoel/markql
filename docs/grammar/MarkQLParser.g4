@@ -212,7 +212,8 @@ flattenSelectItem
     ;
 
 selfProjectionSelectItem
-    : SELF DOT selfMember (AS identifier)?
+    : SELF
+    | SELF DOT selfMember (AS identifier)?
     ;
 
 trimSelectItem

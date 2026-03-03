@@ -33,6 +33,29 @@ void test_lint_semantic_diagnostic_has_stable_code() {
   expect_true(!first.doc_ref.empty(), "semantic doc ref is present");
 }
 
+void test_lint_warns_select_from_alias_as_ambiguous_node_value() {
+  std::vector<xsql::Diagnostic> diagnostics = xsql::lint_query(
+      "SELECT node_row FROM doc AS node_row WHERE node_row.tag = 'div'");
+  expect_true(!diagnostics.empty(), "ambiguous alias-select warning produced");
+  if (diagnostics.empty()) return;
+  const auto& first = diagnostics.front();
+  expect_true(first.severity == xsql::DiagnosticSeverity::Warning, "warning severity is stable");
+  expect_true(first.code == "MQL-LINT-0001", "warning code is stable");
+  expect_true(first.message == "Selecting the FROM alias as a value is ambiguous",
+              "warning message is stable");
+  expect_true(first.help == "Use SELECT self to return the current node",
+              "warning help is stable");
+  expect_true(first.doc_ref.find("appendix-grammar.md#select-self-for-current-row-nodes") !=
+                  std::string::npos,
+              "warning doc_ref points to canonical self docs");
+}
+
+void test_lint_select_self_has_no_alias_ambiguity_warning() {
+  std::vector<xsql::Diagnostic> diagnostics = xsql::lint_query(
+      "SELECT self FROM doc AS node_row WHERE node_row.tag = 'div'");
+  expect_true(diagnostics.empty(), "canonical select self has no ambiguity warning");
+}
+
 void test_diagnostic_text_renderer_contains_help_and_caret() {
   std::vector<xsql::Diagnostic> diagnostics = xsql::lint_query("SELECT FROM doc");
   expect_true(!diagnostics.empty(), "diagnostics available");
@@ -107,6 +130,10 @@ void register_diagnostic_tests(std::vector<TestCase>& tests) {
                    test_lint_syntax_diagnostic_has_stable_code_and_span});
   tests.push_back({"lint_semantic_diagnostic_has_stable_code",
                    test_lint_semantic_diagnostic_has_stable_code});
+  tests.push_back({"lint_warns_select_from_alias_as_ambiguous_node_value",
+                   test_lint_warns_select_from_alias_as_ambiguous_node_value});
+  tests.push_back({"lint_select_self_has_no_alias_ambiguity_warning",
+                   test_lint_select_self_has_no_alias_ambiguity_warning});
   tests.push_back({"diagnostic_text_renderer_contains_help_and_caret",
                    test_diagnostic_text_renderer_contains_help_and_caret});
   tests.push_back({"diagnostic_json_renderer_contains_stable_fields",

@@ -92,6 +92,9 @@ Default lint output provides one diagnostic block per issue:
 - caret-positioned snippet
 - `help:` fix guidance
 
+`SELECT <from_alias>` now emits a warning (`MQL-LINT-0001`) because alias-as-value
+is ambiguous; use `SELECT self` for current-row node projection.
+
 `doc_ref` remains available in JSON diagnostics output.
 
 JSON format is available for automation:

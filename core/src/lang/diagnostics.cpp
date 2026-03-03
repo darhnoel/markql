@@ -17,6 +17,8 @@ constexpr const char* kGrammarDoc = "docs/book/appendix-grammar.md";
 constexpr const char* kFunctionsDoc = "docs/book/appendix-function-reference.md";
 constexpr const char* kSourcesDoc = "docs/book/ch04-sources-and-loading.md";
 constexpr const char* kCliDoc = "docs/markql-cli-guide.md";
+constexpr const char* kSelectSelfDoc =
+    "docs/book/appendix-grammar.md#select-self-for-current-row-nodes";
 
 std::string to_upper_ascii(std::string_view in) {
   std::string out;
@@ -437,6 +439,20 @@ Diagnostic make_runtime_diagnostic(const std::string& query,
     d.code = "MQL-RUN-0002";
     d.help = "Verify the input path/URL and network/file permissions.";
   }
+  d.snippet = render_code_frame(query, d.span, "");
+  return d;
+}
+
+Diagnostic make_select_alias_ambiguity_warning(const std::string& query,
+                                               size_t byte_start,
+                                               size_t byte_end) {
+  Diagnostic d;
+  d.severity = DiagnosticSeverity::Warning;
+  d.code = "MQL-LINT-0001";
+  d.message = "Selecting the FROM alias as a value is ambiguous";
+  d.help = "Use SELECT self to return the current node";
+  d.doc_ref = kSelectSelfDoc;
+  d.span = span_from_bytes(query, byte_start, byte_end);
   d.snippet = render_code_frame(query, d.span, "");
   return d;
 }

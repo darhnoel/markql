@@ -13,6 +13,12 @@ void test_parse_self_projection_and_where() {
   expect_true(parsed.query.has_value(), "parse self.<field> in SELECT and WHERE");
 }
 
+void test_parse_select_self_node_projection() {
+  auto parsed = xsql::parse_query(
+      "SELECT self FROM document WHERE tag = 'div' LIMIT 5");
+  expect_true(parsed.query.has_value(), "parse bare self in SELECT");
+}
+
 void test_parse_self_function_predicate() {
   auto parsed = xsql::parse_query(
       "SELECT self.node_id, self.tag, DIRECT_TEXT(self) AS dt "
@@ -39,6 +45,18 @@ void test_eval_direct_text_self_without_tag_guessing() {
     expect_true(result.rows[0].tag == "div", "direct_text(self) keeps matching row");
     expect_true(result.rows[0].computed_fields["dt"] == "needle",
                 "direct_text(self) extracts current row direct text");
+  }
+}
+
+void test_eval_select_self_returns_current_row_node() {
+  std::string html = "<div id='a'>A</div><span id='b'>B</span>";
+  auto result = run_query(
+      html,
+      "SELECT self FROM document WHERE tag = 'span'");
+  expect_eq(result.rows.size(), 1, "select self row count");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].tag == "span", "select self keeps current row tag");
+    expect_true(result.rows[0].attributes["id"] == "b", "select self keeps current row attributes");
   }
 }
 
@@ -113,9 +131,12 @@ void test_select_mixing_tag_and_self_projection_still_errors() {
 
 void register_self_ref_tests(std::vector<TestCase>& tests) {
   tests.push_back({"parse_self_projection_and_where", test_parse_self_projection_and_where});
+  tests.push_back({"parse_select_self_node_projection", test_parse_select_self_node_projection});
   tests.push_back({"parse_self_function_predicate", test_parse_self_function_predicate});
   tests.push_back({"parse_self_text_attr_inner_html_functions", test_parse_self_text_attr_inner_html_functions});
   tests.push_back({"eval_direct_text_self_without_tag_guessing", test_eval_direct_text_self_without_tag_guessing});
+  tests.push_back({"eval_select_self_returns_current_row_node",
+                   test_eval_select_self_returns_current_row_node});
   tests.push_back({"eval_self_rebind_inside_exists_descendant", test_eval_self_rebind_inside_exists_descendant});
   tests.push_back({"eval_text_and_attr_with_self", test_eval_text_and_attr_with_self});
   tests.push_back({"eval_inner_html_with_self", test_eval_inner_html_with_self});

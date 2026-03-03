@@ -44,7 +44,8 @@ FROM <source> [AS <alias>]
 - Tag rows: `SELECT div FROM doc ...`
 - Field projections: `SELECT a.href, a.tag FROM doc ...`
 - Selector field-list projections: `SELECT a(href, tag) FROM doc ...`
-- Current row projections: `SELECT self.node_id, self.tag FROM doc ...`
+- Current row node projection (canonical): `SELECT self FROM doc ...`
+- Current row field projections: `SELECT self.node_id, self.tag FROM doc ...`
 - `FLATTEN(tag[, depth]) AS (c1, c2, ...)`
 - `PROJECT(tag) AS (alias: expr, ...)`
 - Extraction forms:
@@ -78,6 +79,7 @@ Extraction semantics (important):
 - `FROM doc AS node_doc` rebinds the row alias to `node_doc`; `doc.*` is no longer bound in that scope.
 - `self` refers to the current node for the current row produced by `FROM`.
 - Inside axis scopes (for example `EXISTS(descendant WHERE ...)`), `self` is rebound to the node being evaluated in that scope.
+- `self` is reserved in query grammar and cannot be used as a source alias.
 - `PROJECT` / `FLATTEN_EXTRACT` requires `AS (alias: expr, ...)`.
 - `FLATTEN_TEXT` / `FLATTEN` uses ordered descendant text slices.
 - `ORDER BY` currently supports core row fields.
@@ -116,7 +118,7 @@ cells AS (
     TEXT(c) AS val
   FROM rows AS r
   CROSS JOIN LATERAL (
-    SELECT c
+    SELECT self
     FROM doc AS c
     WHERE c.parent_id = r.row_id
       AND c.tag = 'td'
@@ -142,7 +144,7 @@ r_cells AS (
     TEXT(node_cell) AS val
   FROM r_rows AS r_row
   CROSS JOIN LATERAL (
-    SELECT node_cell
+    SELECT self
     FROM doc AS node_cell
     WHERE node_cell.parent_id = r_row.row_id
       AND node_cell.tag = 'td'
@@ -152,6 +154,26 @@ SELECT r_row.row_id, r_cell.val
 FROM r_rows AS r_row
 JOIN r_cells AS r_cell ON r_cell.row_id = r_row.row_id;
 ```
+
+## SELECT self for current row nodes
+
+Canonical rule:
+- In node-stream queries, write `SELECT self` to return the current row node.
+
+Why:
+- It reads as projection of a value expression, not as "select the row variable name".
+- It reduces ambiguity in `CROSS JOIN LATERAL` workflows where aliases are used for scoping.
+
+Compatibility:
+- Legacy `SELECT <from_alias>` is still accepted for backward compatibility.
+- Behavior of legacy form is preserved as-is (including query-shape differences in older flows).
+- Lint warns on that ambiguous form with:
+  - code: `MQL-LINT-0001`
+  - message: `Selecting the FROM alias as a value is ambiguous`
+  - help: `Use SELECT self to return the current node`
+
+Migration:
+- Replace `SELECT <from_alias>` with `SELECT self` when the intent is "return current row node".
 
 ## Diagnostics Quick Use
 

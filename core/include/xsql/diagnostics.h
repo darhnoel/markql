@@ -58,6 +58,11 @@ Diagnostic make_semantic_diagnostic(const std::string& query,
 /// MUST still provide actionable guidance and docs reference.
 Diagnostic make_runtime_diagnostic(const std::string& query,
                                    const std::string& runtime_message);
+/// Builds a lint warning for ambiguous node selection via FROM alias sugar.
+/// MUST keep code/message/help/doc_ref stable for migration tooling.
+Diagnostic make_select_alias_ambiguity_warning(const std::string& query,
+                                               size_t byte_start,
+                                               size_t byte_end);
 
 /// Renders diagnostics in a human-readable multi-block text format.
 /// MUST be deterministic for stable golden tests.
@@ -77,4 +82,3 @@ std::vector<Diagnostic> diagnose_query_failure(const std::string& query,
                                                const std::string& error_message);
 
 }  // namespace xsql
-

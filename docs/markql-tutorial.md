@@ -117,9 +117,13 @@ This is a readability convention, not a language rule.
 Examples:
 
 ```sql
-SELECT node_doc
+SELECT self
 FROM doc AS node_doc;
 ```
+
+Compatibility note:
+- `SELECT <from_alias>` remains accepted for backward compatibility in query shapes where it already behaved as row-node return sugar.
+- Lint now warns for that ambiguous pattern and recommends `SELECT self`.
 
 ```sql
 WITH r_rows AS (

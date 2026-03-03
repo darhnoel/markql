@@ -221,6 +221,7 @@ struct Query {
     bool trim = false;
     bool flatten_text = false;
     bool flatten_extract = false;
+    bool self_node_projection = false;
     bool expr_projection = false;
     std::optional<size_t> flatten_depth;
     std::vector<std::string> flatten_aliases;

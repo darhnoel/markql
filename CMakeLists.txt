@@ -377,6 +377,7 @@ if (XSQL_BUILD_TESTS)
     lateral_unknown_alias_throws
     with_left_join_lateral_baseline_values
     with_left_join_lateral_missing_right_value_null
+    lateral_select_self_equivalent_to_select_alias
     with_qualified_parent_axis_and_case_projection
     shorthand_attribute_filter
     shorthand_qualified_attribute_filter
@@ -519,6 +520,8 @@ if (XSQL_BUILD_TESTS)
     parse_cli_args_accepts_version_flag
     lint_syntax_diagnostic_has_stable_code_and_span
     lint_semantic_diagnostic_has_stable_code
+    lint_warns_select_from_alias_as_ambiguous_node_value
+    lint_select_self_has_no_alias_ambiguity_warning
     diagnostic_text_renderer_contains_help_and_caret
     diagnostic_json_renderer_contains_stable_fields
     diagnostic_json_renderer_matches_snapshot
@@ -526,9 +529,11 @@ if (XSQL_BUILD_TESTS)
     diagnose_query_failure_maps_parse_error
     version_string_contains_provenance
     parse_self_projection_and_where
+    parse_select_self_node_projection
     parse_self_function_predicate
     parse_self_text_attr_inner_html_functions
     eval_direct_text_self_without_tag_guessing
+    eval_select_self_returns_current_row_node
     eval_self_rebind_inside_exists_descendant
     eval_text_and_attr_with_self
     eval_inner_html_with_self

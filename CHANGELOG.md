@@ -27,6 +27,9 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 - Added lint machine output: `--lint --format json` with stable diagnostic JSON schema.
 - Added unified diagnostic rendering in CLI/script error paths (replacing raw exception-only output).
 - Added core/Python version provenance APIs (`version + git commit + dirty flag`).
+- Added canonical current-row node projection syntax: `SELECT self`.
+- Added lint warning `MQL-LINT-0001` for ambiguous `SELECT <from_alias>` value projection with migration help to `SELECT self`.
+- Added parser/runtime/tests/docs coverage for `SELECT self` in plain and `CROSS JOIN LATERAL` node-stream flows.
 
 ### Deprecated
 - Deprecated `FRAGMENTS(...)` in favor of `PARSE(...)`.
@@ -34,11 +37,13 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 
 ### Changed
 - `FROM doc AS <alias>` is now accepted directly (for example `FROM doc AS n`).
+- `SELECT self` is now the documented canonical form for returning the current node in node-stream queries.
 - Alias misuse now emits clearer errors:
   - `Identifier 'doc' is not bound; did you mean '<alias>'?`
   - `Unknown identifier '<x>' (expected a FROM alias or legacy tag binding)`
   - `Duplicate source alias '<x>' in FROM`
-- Bumped project/core and Python package metadata versions to `1.11.0`.
+- Updated tutorial/grammar/case-study examples to prefer `SELECT self` in node-returning `LATERAL` subqueries.
+- Bumped project/core and Python package metadata versions to `1.12.0`.
 
 ## [1.8.0] - 2026-02-13
 

@@ -35,6 +35,10 @@ ExecuteResult execute_query(const Query& query, const HtmlDocument& doc, const s
       select_all = true;
       break;
     }
+    if (item.self_node_projection) {
+      select_all = true;
+      break;
+    }
     const bool alias_binding =
         source_alias.has_value() &&
         util::to_lower(item.tag) == *source_alias &&

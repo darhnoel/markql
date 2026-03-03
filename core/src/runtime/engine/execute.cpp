@@ -2277,6 +2277,18 @@ QueryResult query_result_from_relation(const Query& query, const Relation& relat
     for (const auto& rel_row : relation.rows) {
       const RelationRecord* selected = nullptr;
       for (const auto& item : query.select_items) {
+        if (item.self_node_projection) {
+          if (active_alias.has_value()) {
+            auto it = rel_row.aliases.find(*active_alias);
+            if (it != rel_row.aliases.end()) {
+              selected = &it->second;
+            }
+          }
+          if (selected == nullptr && !rel_row.aliases.empty()) {
+            selected = &rel_row.aliases.begin()->second;
+          }
+          break;
+        }
         const std::string tag_or_alias = lower_alias_name(item.tag);
         if (item.tag == "*") {
           if (active_alias.has_value()) {
@@ -2475,7 +2487,8 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
       return build_meta_result(
           {"category", "name", "syntax", "notes"},
           {
-              {"clause", "SELECT", "SELECT <tag|*>[, ...]", "Tag list or *"},
+              {"clause", "SELECT", "SELECT <tag|self|*>[, ...]",
+               "Tag list, self row-node projection, or *"},
               {"clause", "FROM", "FROM <source>", "Defaults to document in REPL"},
               {"clause", "WHERE", "WHERE <expr>", "Predicate expression"},
               {"clause", "ORDER BY", "ORDER BY <field> [ASC|DESC]",
@@ -3194,6 +3207,72 @@ QueryResult execute_query_from_url(const std::string& url, const std::string& qu
   return execute_query_from_html(html, url, query);
 }
 
+namespace {
+
+bool is_node_stream_source(const Source& source) {
+  return source.kind == Source::Kind::Document ||
+         source.kind == Source::Kind::Path ||
+         source.kind == Source::Kind::Url ||
+         source.kind == Source::Kind::RawHtml ||
+         source.kind == Source::Kind::Fragments ||
+         source.kind == Source::Kind::Parse;
+}
+
+bool is_bare_identifier_node_projection(const Query::SelectItem& item) {
+  return item.aggregate == Query::SelectItem::Aggregate::None &&
+         !item.field.has_value() &&
+         !item.flatten_text &&
+         !item.flatten_extract &&
+         !item.self_node_projection &&
+         !item.expr_projection &&
+         item.tag != "*";
+}
+
+void collect_select_alias_ambiguity_warnings(const Query& q,
+                                             const std::string& query_text,
+                                             std::vector<Diagnostic>& diagnostics) {
+  if (q.kind == Query::Kind::Select &&
+      q.select_items.size() == 1 &&
+      q.source.alias.has_value() &&
+      is_node_stream_source(q.source)) {
+    const Query::SelectItem& item = q.select_items.front();
+    if (is_bare_identifier_node_projection(item) &&
+        util::to_lower(item.tag) == util::to_lower(*q.source.alias)) {
+      const size_t start = std::min(item.span.start, query_text.size());
+      const size_t end = std::min(query_text.size(), start + item.tag.size());
+      diagnostics.push_back(
+          make_select_alias_ambiguity_warning(query_text, start, end));
+    }
+  }
+
+  if (q.with.has_value()) {
+    for (const auto& cte : q.with->ctes) {
+      if (cte.query != nullptr) {
+        collect_select_alias_ambiguity_warnings(*cte.query, query_text, diagnostics);
+      }
+    }
+  }
+
+  auto visit_source = [&](const Source& source) -> void {
+    if (source.derived_query != nullptr) {
+      collect_select_alias_ambiguity_warnings(*source.derived_query, query_text, diagnostics);
+    }
+    if (source.fragments_query != nullptr) {
+      collect_select_alias_ambiguity_warnings(*source.fragments_query, query_text, diagnostics);
+    }
+    if (source.parse_query != nullptr) {
+      collect_select_alias_ambiguity_warnings(*source.parse_query, query_text, diagnostics);
+    }
+  };
+
+  visit_source(q.source);
+  for (const auto& join : q.joins) {
+    visit_source(join.right_source);
+  }
+}
+
+}  // namespace
+
 std::vector<Diagnostic> lint_query(const std::string& query) {
   std::vector<Diagnostic> diagnostics;
   auto parsed = parse_query(query);
@@ -3231,7 +3310,9 @@ std::vector<Diagnostic> lint_query(const std::string& query) {
     }
   } catch (const std::exception& ex) {
     diagnostics.push_back(make_semantic_diagnostic(query, ex.what()));
+    return diagnostics;
   }
+  collect_select_alias_ambiguity_warnings(ast, query, diagnostics);
   return diagnostics;
 }
 

@@ -196,6 +196,40 @@ void test_with_left_join_lateral_missing_right_value_null() {
               "missing fourth cell becomes NULL");
 }
 
+void test_lateral_select_self_equivalent_to_select_alias() {
+  std::string html =
+      "<div id='root'><span>A</span><span>B</span></div>";
+  auto legacy = run_query(
+      html,
+      "WITH rows AS (SELECT n.node_id AS row_id FROM doc AS n WHERE n.tag = 'div') "
+      "SELECT c.node_id "
+      "FROM rows AS r "
+      "CROSS JOIN LATERAL ("
+      "  SELECT node_span "
+      "  FROM doc AS node_span "
+      "  WHERE node_span.parent_id = r.row_id AND node_span.tag = 'span'"
+      ") AS c "
+      "ORDER BY node_id");
+  auto canonical = run_query(
+      html,
+      "WITH rows AS (SELECT n.node_id AS row_id FROM doc AS n WHERE n.tag = 'div') "
+      "SELECT c.node_id "
+      "FROM rows AS r "
+      "CROSS JOIN LATERAL ("
+      "  SELECT self "
+      "  FROM doc AS node_span "
+      "  WHERE node_span.parent_id = r.row_id AND node_span.tag = 'span'"
+      ") AS c "
+      "ORDER BY node_id");
+  expect_eq(canonical.rows.size(), legacy.rows.size(),
+            "select self and select <alias> equivalent row count in lateral");
+  if (canonical.rows.size() != legacy.rows.size()) return;
+  for (size_t i = 0; i < canonical.rows.size(); ++i) {
+    expect_true(canonical.rows[i].node_id == legacy.rows[i].node_id,
+                "select self and select <alias> equivalent node_id");
+  }
+}
+
 void test_with_qualified_parent_axis_and_case_projection() {
   std::string html =
       "<table>"
@@ -251,6 +285,8 @@ void register_with_join_tests(std::vector<TestCase>& tests) {
                    test_with_left_join_lateral_baseline_values});
   tests.push_back({"with_left_join_lateral_missing_right_value_null",
                    test_with_left_join_lateral_missing_right_value_null});
+  tests.push_back({"lateral_select_self_equivalent_to_select_alias",
+                   test_lateral_select_self_equivalent_to_select_alias});
   tests.push_back({"with_qualified_parent_axis_and_case_projection",
                    test_with_qualified_parent_axis_and_case_projection});
   tests.push_back({"with_join_to_csv_sets_export_sink",

@@ -13,7 +13,7 @@ r_titles AS (
     TEXT(node_title) AS product_name
   FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT node_title
+    SELECT self
     FROM doc AS node_title
     WHERE node_title.parent_id = r_card.card_id
       AND node_title.tag = 'h3'
@@ -26,14 +26,14 @@ r_links AS (
     node_link.href AS product_url
   FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT node_heading
+    SELECT self
     FROM doc AS node_heading
     WHERE node_heading.parent_id = r_card.card_id
       AND node_heading.tag = 'h3'
       AND node_heading.class = 'product-title'
   ) AS node_heading
   CROSS JOIN LATERAL (
-    SELECT node_link
+    SELECT self
     FROM doc AS node_link
     WHERE node_link.parent_id = node_heading.node_id
       AND node_link.tag = 'a'
@@ -46,7 +46,7 @@ r_prices AS (
     TEXT(node_price) AS price
   FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT node_price
+    SELECT self
     FROM doc AS node_price
     WHERE node_price.parent_id = r_card.card_id
       AND node_price.tag = 'span'
@@ -59,7 +59,7 @@ r_ratings AS (
     TEXT(node_rating) AS rating
   FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT node_rating
+    SELECT self
     FROM doc AS node_rating
     WHERE node_rating.parent_id = r_card.card_id
       AND node_rating.tag = 'div'
@@ -73,14 +73,14 @@ r_badges AS (
     TEXT(node_badge) AS badge_text
   FROM r_cards AS r_card
   CROSS JOIN LATERAL (
-    SELECT node_badges_list
+    SELECT self
     FROM doc AS node_badges_list
     WHERE node_badges_list.parent_id = r_card.card_id
       AND node_badges_list.tag = 'ul'
       AND node_badges_list.class = 'badges'
   ) AS node_badges_list
   CROSS JOIN LATERAL (
-    SELECT node_badge
+    SELECT self
     FROM doc AS node_badge
     WHERE node_badge.parent_id = node_badges_list.node_id
       AND node_badge.tag = 'li'
