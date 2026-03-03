@@ -1,10 +1,21 @@
-# MarkQL
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo/markql_logo_dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/logo/markql_logo_light.svg">
+    <img src="docs/assets/logo/markql_logo_light.svg" alt="MarkQL logo" width="220">
+  </picture>
+</p>
 
-[![Build wheels](https://github.com/darhnoel/markql/actions/workflows/python-wheels.yml/badge.svg)](https://github.com/darhnoel/markql/actions/workflows/python-wheels.yml)
-[![GitHub tag](https://img.shields.io/github/v/tag/darhnoel/markql)](https://github.com/darhnoel/markql/tags)
-[![PyPI version](https://img.shields.io/pypi/v/pyxsql)](https://pypi.org/project/pyxsql/)
-[![PyPI downloads](https://img.shields.io/pypi/dm/pyxsql)](https://pypi.org/project/pyxsql/)
-[![License](https://img.shields.io/github/license/darhnoel/markql)](https://github.com/darhnoel/markql/blob/main/LICENSE)
+<h1 align="center">MarkQL</h1>
+<p align="center">SQL-style query engine for HTML</p>
+
+<p align="center">
+  <a href="https://github.com/darhnoel/markql/actions/workflows/python-wheels.yml"><img src="https://github.com/darhnoel/markql/actions/workflows/python-wheels.yml/badge.svg" alt="Build wheels"></a>
+  <a href="https://github.com/darhnoel/markql/tags"><img src="https://img.shields.io/github/v/tag/darhnoel/markql" alt="GitHub tag"></a>
+  <a href="https://pypi.org/project/pyxsql/"><img src="https://img.shields.io/pypi/v/pyxsql" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/pyxsql/"><img src="https://img.shields.io/pypi/dm/pyxsql" alt="PyPI downloads"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
+</p>
 
 MarkQL is a **SQL-style query engine for HTML** that lets you **select precisely what you need**, **filter to the relevant parts of a page**, and **extract structured fields** using the familiar `SELECT ... FROM ... WHERE ...` flow, rather than relying on brittle, ad-hoc scraping logic.
 
