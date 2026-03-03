@@ -45,6 +45,12 @@ struct Diagnostic {
   std::vector<DiagnosticRelated> related;
 };
 
+/// Controls human-readable diagnostics rendering behavior.
+/// MUST default to plain deterministic text unless explicitly enabled.
+struct DiagnosticTextRenderOptions {
+  bool use_color = false;
+};
+
 /// Builds a syntax diagnostic anchored at a byte position.
 /// MUST return deterministic code/help/doc mappings for known parser errors.
 Diagnostic make_syntax_diagnostic(const std::string& query,
@@ -67,6 +73,10 @@ Diagnostic make_select_alias_ambiguity_warning(const std::string& query,
 /// Renders diagnostics in a human-readable multi-block text format.
 /// MUST be deterministic for stable golden tests.
 std::string render_diagnostics_text(const std::vector<Diagnostic>& diagnostics);
+/// Renders diagnostics text with optional styling.
+/// MUST preserve plain-text layout when color is disabled.
+std::string render_diagnostics_text(const std::vector<Diagnostic>& diagnostics,
+                                    const DiagnosticTextRenderOptions& options);
 /// Renders diagnostics as a stable JSON array for machine consumption.
 /// MUST keep key ordering stable across runs.
 std::string render_diagnostics_json(const std::vector<Diagnostic>& diagnostics);

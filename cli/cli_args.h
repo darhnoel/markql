@@ -5,6 +5,13 @@
 
 namespace xsql::cli {
 
+enum class ColorMode {
+  Legacy,
+  Auto,
+  Always,
+  Never,
+};
+
 /// Captures CLI arguments so main can dispatch without re-parsing raw argv.
 /// MUST keep defaults consistent with CLI behavior and MUST validate after parsing.
 /// Inputs are argv; outputs are populated fields with no side effects by itself.
@@ -25,6 +32,7 @@ struct CliOptions {
   bool quiet = false;
   bool lint = false;
   std::string lint_format = "text";
+  ColorMode color_mode = ColorMode::Legacy;
 };
 
 /// Prints the brief startup help shown when no arguments are provided.
@@ -39,5 +47,18 @@ void print_help(std::ostream& os);
 /// MUST leave options in a valid state and MUST return false on invalid flags.
 /// Inputs are argc/argv; outputs are options/error with no external side effects.
 bool parse_cli_args(int argc, char** argv, CliOptions& options, std::string& error);
+
+/// Resolves whether general CLI color output should be enabled.
+/// MUST honor NO_COLOR and TTY-aware auto mode.
+bool resolve_output_color_enabled(const CliOptions& options,
+                                  bool is_tty,
+                                  bool no_color_env);
+/// Resolves whether lint text diagnostics should render ANSI color.
+/// MUST keep legacy/default lint rendering plain unless explicitly opted in.
+bool resolve_diagnostics_color_enabled(const CliOptions& options,
+                                       bool is_tty,
+                                       bool no_color_env);
+/// Returns true when NO_COLOR is set and non-empty.
+bool no_color_env_present();
 
 }  // namespace xsql::cli

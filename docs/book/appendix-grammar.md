@@ -184,6 +184,13 @@ Validate grammar + semantic shape without execution:
 ./build/markql --lint "SELECT FROM doc" --format json
 ```
 
+Color controls for human lint text:
+- `--color=always` (always ANSI),
+- `--color=auto` (TTY-only ANSI),
+- `--color=never` / `--color=disabled` (plain text).
+- `NO_COLOR` always forces plain text.
+- `--format json` remains ANSI-free.
+
 Diagnostic references:
 - syntax and clause-order issues point here: `docs/book/appendix-grammar.md`
 - function/projection constraints point to: `docs/book/appendix-function-reference.md`

@@ -57,7 +57,16 @@ int main(int argc, char** argv) {
   std::string query_file = options.query_file;
   std::string input = options.input;
   bool interactive = options.interactive;
-  bool color = options.color;
+  const bool no_color_env = no_color_env_present();
+  const bool stdout_is_tty = isatty(fileno(stdout));
+  const bool stderr_is_tty = isatty(fileno(stderr));
+  bool color = resolve_output_color_enabled(options, stdout_is_tty, no_color_env);
+  const bool stderr_color = resolve_output_color_enabled(options, stderr_is_tty, no_color_env);
+  xsql::DiagnosticTextRenderOptions lint_render_options;
+  lint_render_options.use_color = resolve_diagnostics_color_enabled(options, stdout_is_tty, no_color_env);
+  xsql::DiagnosticTextRenderOptions error_render_options;
+  error_render_options.use_color =
+      resolve_diagnostics_color_enabled(options, stderr_is_tty, no_color_env);
   std::string output_mode = options.output_mode;
   // Assumption: default highlight is on (per CLI flag requirement); auto-disabled on non-TTY.
   bool highlight = options.highlight;
@@ -123,7 +132,7 @@ int main(int argc, char** argv) {
       } else if (diagnostics.empty()) {
         std::cout << "No diagnostics." << std::endl;
       } else {
-        std::cout << xsql::render_diagnostics_text(diagnostics) << std::endl;
+        std::cout << xsql::render_diagnostics_text(diagnostics, lint_render_options) << std::endl;
       }
       return xsql::has_error_diagnostics(diagnostics) ? 1 : 0;
     }
@@ -195,9 +204,9 @@ int main(int argc, char** argv) {
         apply_source_uri_policy(result, sources);
       }
       for (const auto& warning : result.warnings) {
-        if (color) std::cerr << kColor.yellow;
+        if (stderr_color) std::cerr << kColor.yellow;
         std::cerr << "Warning: " << warning << std::endl;
-        if (color) std::cerr << kColor.reset;
+        if (stderr_color) std::cerr << kColor.reset;
       }
 
       if (result.export_sink.kind != xsql::QueryResult::ExportSink::Kind::None) {
@@ -322,13 +331,13 @@ int main(int argc, char** argv) {
     if (!query.empty()) {
       std::vector<xsql::Diagnostic> diagnostics = xsql::diagnose_query_failure(query, ex.what());
       if (!diagnostics.empty()) {
-        std::cerr << xsql::render_diagnostics_text(diagnostics) << std::endl;
+        std::cerr << xsql::render_diagnostics_text(diagnostics, error_render_options) << std::endl;
         return 1;
       }
     }
-    if (color) std::cerr << kColor.red;
+    if (stderr_color) std::cerr << kColor.red;
     std::cerr << "Error: " << ex.what() << std::endl;
-    if (color) std::cerr << kColor.reset;
+    if (stderr_color) std::cerr << kColor.reset;
     return 1;
   }
 }

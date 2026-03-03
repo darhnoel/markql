@@ -106,6 +106,27 @@ void test_diagnostic_text_renderer_matches_golden_snippet() {
   expect_true(rendered == expected, "golden diagnostic text");
 }
 
+void test_diagnostic_text_renderer_color_includes_ansi_tokens() {
+  std::vector<xsql::Diagnostic> diagnostics = xsql::lint_query("SELECT FROM doc");
+  expect_true(!diagnostics.empty(), "diagnostics available for colorized text");
+  if (diagnostics.empty()) return;
+  xsql::DiagnosticTextRenderOptions options;
+  options.use_color = true;
+  std::string rendered = xsql::render_diagnostics_text(diagnostics, options);
+  expect_true(rendered.find("\033[31mERROR\033[0m") != std::string::npos,
+              "colorized text renders severity with ansi style");
+  expect_true(rendered.find("\033[36mhelp:\033[0m") != std::string::npos,
+              "colorized text renders help label with ansi style");
+}
+
+void test_diagnostic_json_renderer_never_contains_ansi_sequences() {
+  std::vector<xsql::Diagnostic> diagnostics = xsql::lint_query("SELECT FROM doc");
+  expect_true(!diagnostics.empty(), "diagnostics available for json ansi guard");
+  if (diagnostics.empty()) return;
+  std::string json = xsql::render_diagnostics_json(diagnostics);
+  expect_true(json.find("\033[") == std::string::npos, "json diagnostics remain ansi-free");
+}
+
 void test_diagnose_query_failure_maps_parse_error() {
   std::vector<xsql::Diagnostic> diagnostics =
       xsql::diagnose_query_failure("SELECT FROM doc", "Query parse error: Expected tag identifier");
@@ -142,6 +163,10 @@ void register_diagnostic_tests(std::vector<TestCase>& tests) {
                    test_diagnostic_json_renderer_matches_snapshot});
   tests.push_back({"diagnostic_text_renderer_matches_golden_snippet",
                    test_diagnostic_text_renderer_matches_golden_snippet});
+  tests.push_back({"diagnostic_text_renderer_color_includes_ansi_tokens",
+                   test_diagnostic_text_renderer_color_includes_ansi_tokens});
+  tests.push_back({"diagnostic_json_renderer_never_contains_ansi_sequences",
+                   test_diagnostic_json_renderer_never_contains_ansi_sequences});
   tests.push_back({"diagnose_query_failure_maps_parse_error",
                    test_diagnose_query_failure_maps_parse_error});
   tests.push_back({"version_string_contains_provenance",

@@ -141,6 +141,31 @@ std::string severity_name(DiagnosticSeverity severity) {
   return "ERROR";
 }
 
+constexpr const char* kAnsiReset = "\033[0m";
+constexpr const char* kAnsiRed = "\033[31m";
+constexpr const char* kAnsiYellow = "\033[33m";
+constexpr const char* kAnsiBlue = "\033[34m";
+constexpr const char* kAnsiCyan = "\033[36m";
+
+const char* severity_ansi_color(DiagnosticSeverity severity) {
+  switch (severity) {
+    case DiagnosticSeverity::Error:
+      return kAnsiRed;
+    case DiagnosticSeverity::Warning:
+      return kAnsiYellow;
+    case DiagnosticSeverity::Note:
+      return kAnsiBlue;
+  }
+  return kAnsiRed;
+}
+
+std::string style_token(const std::string& token,
+                        const char* color,
+                        const DiagnosticTextRenderOptions& options) {
+  if (!options.use_color) return token;
+  return std::string(color) + token + kAnsiReset;
+}
+
 std::string json_escape(std::string_view s) {
   std::ostringstream out;
   for (char c : s) {
@@ -458,16 +483,22 @@ Diagnostic make_select_alias_ambiguity_warning(const std::string& query,
 }
 
 std::string render_diagnostics_text(const std::vector<Diagnostic>& diagnostics) {
+  return render_diagnostics_text(diagnostics, DiagnosticTextRenderOptions{});
+}
+
+std::string render_diagnostics_text(const std::vector<Diagnostic>& diagnostics,
+                                    const DiagnosticTextRenderOptions& options) {
   std::ostringstream out;
   for (size_t i = 0; i < diagnostics.size(); ++i) {
     const auto& d = diagnostics[i];
-    out << severity_name(d.severity) << "[" << d.code << "]: " << d.message << "\n";
+    out << style_token(severity_name(d.severity), severity_ansi_color(d.severity), options)
+        << "[" << d.code << "]: " << d.message << "\n";
     if (!d.snippet.empty()) out << d.snippet << "\n";
     for (const auto& related : d.related) {
-      out << "note: " << related.message
+      out << style_token("note:", kAnsiBlue, options) << " " << related.message
           << " (line " << related.span.start_line << ", col " << related.span.start_col << ")\n";
     }
-    out << "help: " << d.help << "\n";
+    out << style_token("help:", kAnsiCyan, options) << " " << d.help << "\n";
     if (i + 1 < diagnostics.size()) out << "\n\n";
   }
   return out.str();

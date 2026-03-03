@@ -66,6 +66,11 @@ Lint query (parse + validate only, no execution):
 ./build/markql --lint "SELECT FROM doc"
 ```
 
+Force colorized human diagnostics:
+```bash
+./build/markql --lint "SELECT FROM doc" --color=always
+```
+
 Lint as JSON:
 ```bash
 ./build/markql --lint "SELECT FROM doc" --format json
@@ -91,6 +96,14 @@ Default lint output provides one diagnostic block per issue:
 - severity and stable `code`
 - caret-positioned snippet
 - `help:` fix guidance
+
+Lint text color controls:
+- `--color=always`: always emit ANSI colors for human lint text
+- `--color=auto`: emit ANSI colors only on a TTY
+- `--color=never` (or `--color=disabled`): force plain text
+- `NO_COLOR` overrides color and forces plain text
+
+`--format json` is always uncolored for automation stability.
 
 `SELECT <from_alias>` now emits a warning (`MQL-LINT-0001`) because alias-as-value
 is ambiguous; use `SELECT self` for current-row node projection.

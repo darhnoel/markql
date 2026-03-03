@@ -522,6 +522,10 @@ if (XSQL_BUILD_TESTS)
     parse_cli_args_accepts_lint_json_format
     parse_cli_args_rejects_format_without_lint
     parse_cli_args_accepts_version_flag
+    parse_cli_args_accepts_color_modes
+    parse_cli_args_rejects_invalid_color_mode
+    diagnostics_color_policy_modes_and_no_color_precedence
+    output_color_policy_auto_and_no_color
     lint_syntax_diagnostic_has_stable_code_and_span
     lint_semantic_diagnostic_has_stable_code
     lint_warns_select_from_alias_as_ambiguous_node_value
@@ -530,6 +534,8 @@ if (XSQL_BUILD_TESTS)
     diagnostic_json_renderer_contains_stable_fields
     diagnostic_json_renderer_matches_snapshot
     diagnostic_text_renderer_matches_golden_snippet
+    diagnostic_text_renderer_color_includes_ansi_tokens
+    diagnostic_json_renderer_never_contains_ansi_sequences
     diagnose_query_failure_maps_parse_error
     version_string_contains_provenance
     parse_self_projection_and_where

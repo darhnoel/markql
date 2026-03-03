@@ -30,6 +30,12 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 - Added canonical current-row node projection syntax: `SELECT self`.
 - Added lint warning `MQL-LINT-0001` for ambiguous `SELECT <from_alias>` value projection with migration help to `SELECT self`.
 - Added parser/runtime/tests/docs coverage for `SELECT self` in plain and `CROSS JOIN LATERAL` node-stream flows.
+- Added lint diagnostics color controls in CLI text mode:
+  - `--color=auto|always|never|disabled`
+  - `NO_COLOR` override support
+  - TTY-aware `auto` behavior.
+- Added diagnostics renderer styling option for severity-aware ANSI text formatting (human output only).
+- Added tests for diagnostics color on/off behavior, JSON ANSI guards, and CLI color policy precedence.
 
 ### Deprecated
 - Deprecated `FRAGMENTS(...)` in favor of `PARSE(...)`.
@@ -43,7 +49,8 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
   - `Unknown identifier '<x>' (expected a FROM alias or legacy tag binding)`
   - `Duplicate source alias '<x>' in FROM`
 - Updated tutorial/grammar/case-study examples to prefer `SELECT self` in node-returning `LATERAL` subqueries.
-- Bumped project/core and Python package metadata versions to `1.12.0`.
+- `--lint --format json` remains deterministic and ANSI-free regardless of color mode.
+- Bumped project/core and Python package metadata versions to `1.12.1`.
 
 ## [1.8.0] - 2026-02-13
 

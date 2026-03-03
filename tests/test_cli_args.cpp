@@ -128,6 +128,85 @@ void test_parse_cli_args_accepts_version_flag() {
   expect_true(options.show_version, "version mode parsed");
 }
 
+void test_parse_cli_args_accepts_color_modes() {
+  {
+    const char* argv[] = {"markql", "--color=always"};
+    int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
+    xsql::cli::CliOptions options;
+    std::string error;
+    bool ok = xsql::cli::parse_cli_args(argc, const_cast<char**>(argv), options, error);
+    expect_true(ok, "color=always accepted");
+    expect_true(options.color_mode == xsql::cli::ColorMode::Always, "color mode always parsed");
+  }
+  {
+    const char* argv[] = {"markql", "--color=auto"};
+    int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
+    xsql::cli::CliOptions options;
+    std::string error;
+    bool ok = xsql::cli::parse_cli_args(argc, const_cast<char**>(argv), options, error);
+    expect_true(ok, "color=auto accepted");
+    expect_true(options.color_mode == xsql::cli::ColorMode::Auto, "color mode auto parsed");
+  }
+  {
+    const char* argv[] = {"markql", "--color=never"};
+    int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
+    xsql::cli::CliOptions options;
+    std::string error;
+    bool ok = xsql::cli::parse_cli_args(argc, const_cast<char**>(argv), options, error);
+    expect_true(ok, "color=never accepted");
+    expect_true(options.color_mode == xsql::cli::ColorMode::Never, "color mode never parsed");
+  }
+  {
+    const char* argv[] = {"markql", "--color=disabled"};
+    int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
+    xsql::cli::CliOptions options;
+    std::string error;
+    bool ok = xsql::cli::parse_cli_args(argc, const_cast<char**>(argv), options, error);
+    expect_true(ok, "color=disabled accepted");
+    expect_true(options.color_mode == xsql::cli::ColorMode::Never, "disabled maps to never");
+  }
+}
+
+void test_parse_cli_args_rejects_invalid_color_mode() {
+  const char* argv[] = {"markql", "--color=rainbow"};
+  int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
+  xsql::cli::CliOptions options;
+  std::string error;
+  bool ok = xsql::cli::parse_cli_args(argc, const_cast<char**>(argv), options, error);
+  expect_true(!ok, "invalid color mode rejected");
+  expect_true(error.find("Invalid --color value") != std::string::npos,
+              "invalid color mode has clear error");
+}
+
+void test_diagnostics_color_policy_modes_and_no_color_precedence() {
+  xsql::cli::CliOptions options;
+  expect_true(!xsql::cli::resolve_diagnostics_color_enabled(options, true, false),
+              "legacy mode keeps diagnostics monochrome by default");
+
+  options.color_mode = xsql::cli::ColorMode::Always;
+  expect_true(xsql::cli::resolve_diagnostics_color_enabled(options, true, false),
+              "always mode enables diagnostics color");
+  expect_true(!xsql::cli::resolve_diagnostics_color_enabled(options, true, true),
+              "NO_COLOR disables diagnostics color in always mode");
+
+  options.color_mode = xsql::cli::ColorMode::Auto;
+  expect_true(xsql::cli::resolve_diagnostics_color_enabled(options, true, false),
+              "auto mode enables diagnostics color on tty");
+  expect_true(!xsql::cli::resolve_diagnostics_color_enabled(options, false, false),
+              "auto mode disables diagnostics color on non-tty");
+}
+
+void test_output_color_policy_auto_and_no_color() {
+  xsql::cli::CliOptions options;
+  options.color_mode = xsql::cli::ColorMode::Auto;
+  expect_true(xsql::cli::resolve_output_color_enabled(options, true, false),
+              "output color auto enables on tty");
+  expect_true(!xsql::cli::resolve_output_color_enabled(options, false, false),
+              "output color auto disables on non-tty");
+  expect_true(!xsql::cli::resolve_output_color_enabled(options, true, true),
+              "NO_COLOR disables output color");
+}
+
 }  // namespace
 
 void register_cli_args_tests(std::vector<TestCase>& tests) {
@@ -144,4 +223,12 @@ void register_cli_args_tests(std::vector<TestCase>& tests) {
                    test_parse_cli_args_rejects_format_without_lint});
   tests.push_back({"parse_cli_args_accepts_version_flag",
                    test_parse_cli_args_accepts_version_flag});
+  tests.push_back({"parse_cli_args_accepts_color_modes",
+                   test_parse_cli_args_accepts_color_modes});
+  tests.push_back({"parse_cli_args_rejects_invalid_color_mode",
+                   test_parse_cli_args_rejects_invalid_color_mode});
+  tests.push_back({"diagnostics_color_policy_modes_and_no_color_precedence",
+                   test_diagnostics_color_policy_modes_and_no_color_precedence});
+  tests.push_back({"output_color_policy_auto_and_no_color",
+                   test_output_color_policy_auto_and_no_color});
 }

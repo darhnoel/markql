@@ -1,5 +1,6 @@
 #include "cli_args.h"
 
+#include <cstdlib>
 #include <string>
 
 namespace xsql::cli {
@@ -21,7 +22,7 @@ void print_startup_help(std::ostream& os) {
   os << "  markql --highlight on|off\n";
   os << "  markql --timeout-ms <n>\n";
   os << "  markql --version\n";
-  os << "  markql --color=disabled\n\n";
+  os << "  markql --color=auto|always|never|disabled\n\n";
   os << "Notes:\n";
   os << "  - Legacy `xsql` binary name is still available for compatibility.\n";
   os << "  - If --input is omitted, HTML is read from stdin.\n";
@@ -52,7 +53,7 @@ void print_help(std::ostream& os) {
   os << "       markql --highlight on|off\n";
   os << "       markql --timeout-ms <n>\n";
   os << "       markql --version\n";
-  os << "       markql --color=disabled\n";
+  os << "       markql --color=auto|always|never|disabled\n";
   os << "Legacy `xsql` command name remains available.\n";
   os << "If --input is omitted, HTML is read from stdin.\n";
   os << "Scripts and REPL input support SQL comments: -- ... and /* ... */.\n";
@@ -60,6 +61,7 @@ void print_help(std::ostream& os) {
         "TO NDJSON('file.ndjson') in queries to export.\n";
   os << "--lint validates syntax + semantic rules without executing the query.\n";
   os << "--format json emits lint diagnostics as a JSON array.\n";
+  os << "NO_COLOR disables ANSI color output even when --color=always/auto is set.\n";
   os << "Explore mode keybindings: Up/Down move, Right/Enter expand, Left collapse, / search, n/N next/prev, j/k scroll inner_html, +/- zoom inner_html, q quit.\n";
   os << "Explore mode restores position/expansion per input within the current process session.\n";
   os << "Exit codes: 0=success, 1=parse/runtime error, 2=CLI/IO usage error.\n";
@@ -144,8 +146,21 @@ bool parse_cli_args(int argc, char** argv, CliOptions& options, std::string& err
         error = "Invalid --highlight value (use on|off)";
         return false;
       }
-    } else if (arg == "--color=disabled") {
-      options.color = false;
+    } else if (arg.rfind("--color=", 0) == 0) {
+      std::string value = arg.substr(std::string("--color=").size());
+      if (value == "disabled" || value == "never") {
+        options.color = false;
+        options.color_mode = ColorMode::Never;
+      } else if (value == "always" || value == "enabled") {
+        options.color = true;
+        options.color_mode = ColorMode::Always;
+      } else if (value == "auto") {
+        options.color = true;
+        options.color_mode = ColorMode::Auto;
+      } else {
+        error = "Invalid --color value (use auto|always|never|disabled)";
+        return false;
+      }
     } else if (arg == "--timeout-ms") {
       if (i + 1 >= argc) {
         error = "Missing value for --timeout-ms";
@@ -182,6 +197,45 @@ bool parse_cli_args(int argc, char** argv, CliOptions& options, std::string& err
     return false;
   }
   return true;
+}
+
+bool resolve_output_color_enabled(const CliOptions& options,
+                                  bool is_tty,
+                                  bool no_color_env) {
+  if (no_color_env) return false;
+  switch (options.color_mode) {
+    case ColorMode::Legacy:
+      return options.color;
+    case ColorMode::Auto:
+      return is_tty;
+    case ColorMode::Always:
+      return true;
+    case ColorMode::Never:
+      return false;
+  }
+  return options.color;
+}
+
+bool resolve_diagnostics_color_enabled(const CliOptions& options,
+                                       bool is_tty,
+                                       bool no_color_env) {
+  if (no_color_env) return false;
+  switch (options.color_mode) {
+    case ColorMode::Legacy:
+      return false;
+    case ColorMode::Auto:
+      return is_tty;
+    case ColorMode::Always:
+      return true;
+    case ColorMode::Never:
+      return false;
+  }
+  return false;
+}
+
+bool no_color_env_present() {
+  const char* value = std::getenv("NO_COLOR");
+  return value != nullptr && *value != '\0';
 }
 
 }  // namespace xsql::cli
