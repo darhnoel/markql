@@ -539,6 +539,7 @@ Useful commands:
 - `.load <path|url> [--alias <name>]`
 - `.mode duckbox|json|plain`
 - `.set colnames raw|normalize`
+- `.lint on|off`
 - `.display_mode more|less`
 - `.max_rows <n|inf>`
 - `DESCRIBE LAST`

@@ -14,6 +14,7 @@ CommandHandler make_help_command() {
     std::cout << "  .load <path|url> [--alias <name>]  Load input (or :load)\n";
     std::cout << "  .mode duckbox|json|plain  Set output mode\n";
     std::cout << "  .set colnames raw|normalize  Set output column naming mode\n";
+    std::cout << "  .lint on|off            Toggle lint warnings before query execution (or :lint)\n";
     std::cout << "  .display_mode more|less   Control truncation\n";
     std::cout << "  .max_rows <n|inf>        Set duckbox max rows (inf = no limit)\n";
     std::cout << "  .reload_config           Reload REPL config\n";

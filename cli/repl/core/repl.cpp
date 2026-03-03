@@ -106,6 +106,22 @@ int run_repl(ReplConfig& config) {
     };
 
     std::string query_text = rewrite_from_path_if_needed(raw_query);
+    if (config.lint_warnings) {
+      std::vector<xsql::Diagnostic> diagnostics = xsql::lint_query(query_text);
+      std::vector<xsql::Diagnostic> warnings;
+      warnings.reserve(diagnostics.size());
+      for (const auto& diagnostic : diagnostics) {
+        if (diagnostic.severity == xsql::DiagnosticSeverity::Warning) {
+          warnings.push_back(diagnostic);
+        }
+      }
+      if (!warnings.empty()) {
+        if (config.color) std::cerr << kColor.yellow;
+        std::cerr << xsql::render_diagnostics_text(warnings) << std::endl;
+        if (config.color) std::cerr << kColor.reset;
+      }
+    }
+
     xsql::QueryResult result;
     auto source = parse_query_source(query_text);
     if (source.has_value() && source->statement_kind != xsql::Query::Kind::Select) {

@@ -10,11 +10,11 @@ namespace xsql::cli {
 AutoCompleter::AutoCompleter() {
   keywords_ = markql_completion_keywords();
   commands_ = {
-      ".help", ".load", ".mode", ".set", ".display_mode", ".max_rows", ".reload_config",
+      ".help", ".load", ".mode", ".set", ".lint", ".display_mode", ".max_rows", ".reload_config",
       ".explore",
       ".summarize", ".summarize_content",
       ".plugin", ".quit", ".q",
-      ":help", ":load", ":explore", ":quit", ":exit"
+      ":help", ":load", ":lint", ":explore", ":quit", ":exit"
   };
 #ifdef XSQL_ENABLE_KHMER_NUMBER
   commands_.push_back(".number_to_khmer");

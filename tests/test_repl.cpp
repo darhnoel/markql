@@ -10,6 +10,7 @@
 #include "repl/commands/registry.h"
 #include "repl/commands/describe_last_command.h"
 #include "repl/commands/explore_command.h"
+#include "repl/commands/lint_command.h"
 #include "repl/commands/set_command.h"
 #include "repl/commands/summarize_content_command.h"
 #include "repl/core/line_editor.h"
@@ -207,6 +208,84 @@ static void test_set_colnames_command() {
   expect_true(config.colname_mode == xsql::ColumnNameMode::Raw, "set command updates mode");
 }
 
+static void test_lint_command_toggles_on_and_off() {
+  StreamCapture capture(std::cout);
+  xsql::cli::ReplConfig config;
+  config.color = false;
+  xsql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
+  std::string active_alias = "doc";
+  std::string last_full_output;
+  bool display_full = true;
+  size_t max_rows = 40;
+  std::vector<xsql::ColumnNameMapping> last_schema_map;
+  xsql::cli::CommandRegistry registry;
+  xsql::cli::PluginManager plugin_manager(registry);
+  xsql::cli::CommandContext ctx{
+      config,
+      editor,
+      sources,
+      active_alias,
+      last_full_output,
+      display_full,
+      max_rows,
+      last_schema_map,
+      plugin_manager,
+  };
+
+  auto handler = xsql::cli::make_lint_command();
+  bool handled_on = handler(".lint on", ctx);
+  expect_true(handled_on, ".lint on should be handled");
+  expect_true(config.lint_warnings, ".lint on enables lint warnings");
+
+  bool handled_off = handler(":lint off", ctx);
+  expect_true(handled_off, ":lint off should be handled");
+  expect_true(!config.lint_warnings, ":lint off disables lint warnings");
+
+  bool handled_status = handler(".lint", ctx);
+  expect_true(handled_status, ".lint status should be handled");
+  std::string output = capture.str();
+  expect_true(output.find("Lint warnings: on") != std::string::npos,
+              ".lint on should confirm enabled status");
+  expect_true(output.find("Lint warnings: off") != std::string::npos,
+              ".lint off should confirm disabled status");
+}
+
+static void test_lint_command_rejects_invalid_value() {
+  StreamCapture capture(std::cerr);
+  xsql::cli::ReplConfig config;
+  config.color = false;
+  config.lint_warnings = true;
+  xsql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
+  std::string active_alias = "doc";
+  std::string last_full_output;
+  bool display_full = true;
+  size_t max_rows = 40;
+  std::vector<xsql::ColumnNameMapping> last_schema_map;
+  xsql::cli::CommandRegistry registry;
+  xsql::cli::PluginManager plugin_manager(registry);
+  xsql::cli::CommandContext ctx{
+      config,
+      editor,
+      sources,
+      active_alias,
+      last_full_output,
+      display_full,
+      max_rows,
+      last_schema_map,
+      plugin_manager,
+  };
+
+  auto handler = xsql::cli::make_lint_command();
+  bool handled = handler(".lint maybe", ctx);
+  expect_true(handled, ".lint invalid value should be handled");
+  expect_true(config.lint_warnings, "invalid .lint value should not change state");
+  std::string output = capture.str();
+  expect_true(output.find("Usage: .lint on|off or :lint on|off") != std::string::npos,
+              "invalid .lint value should print usage");
+}
+
 static void test_describe_last_command_outputs_map() {
   StreamCapture capture(std::cout);
   xsql::cli::ReplConfig config;
@@ -323,6 +402,8 @@ void register_repl_tests(std::vector<TestCase>& tests) {
   tests.push_back({"sql_keyword_catalog_includes_new_tokens",
                    test_sql_keyword_catalog_includes_new_tokens});
   tests.push_back({"set_colnames_command", test_set_colnames_command});
+  tests.push_back({"lint_command_toggles_on_and_off", test_lint_command_toggles_on_and_off});
+  tests.push_back({"lint_command_rejects_invalid_value", test_lint_command_rejects_invalid_value});
   tests.push_back({"describe_last_command_outputs_map", test_describe_last_command_outputs_map});
   tests.push_back({"explore_command_uses_active_alias_by_default",
                    test_explore_command_uses_active_alias_by_default});

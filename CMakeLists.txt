@@ -176,6 +176,7 @@ if (XSQL_BUILD_CLI)
     cli/repl/commands/registry.cpp
     cli/repl/commands/help_command.cpp
     cli/repl/commands/set_command.cpp
+    cli/repl/commands/lint_command.cpp
     cli/repl/commands/describe_last_command.cpp
     cli/repl/commands/display_mode_command.cpp
     cli/repl/commands/mode_command.cpp
@@ -281,6 +282,7 @@ if (XSQL_BUILD_TESTS)
     cli/repl/commands/registry.cpp
     cli/repl/commands/help_command.cpp
     cli/repl/commands/set_command.cpp
+    cli/repl/commands/lint_command.cpp
     cli/repl/commands/describe_last_command.cpp
     cli/repl/commands/display_mode_command.cpp
     cli/repl/commands/mode_command.cpp
@@ -442,6 +444,8 @@ if (XSQL_BUILD_TESTS)
     summarize_content_khmer_requires_plugin
     summarize_content_max_tokens
     set_colnames_command
+    lint_command_toggles_on_and_off
+    lint_command_rejects_invalid_value
     describe_last_command_outputs_map
     explore_command_uses_active_alias_by_default
     explore_command_accepts_direct_target_and_alias_target

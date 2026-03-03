@@ -22,6 +22,7 @@ struct ReplConfig {
   bool color = true;
   bool highlight = true;
   bool display_full = true;
+  bool lint_warnings = false;
   std::string output_mode = "duckbox";
   xsql::ColumnNameMode colname_mode = xsql::ColumnNameMode::Normalize;
   int timeout_ms = 5000;
