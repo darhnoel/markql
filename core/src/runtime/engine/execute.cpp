@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
+#include <cstdlib>
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
@@ -30,6 +32,84 @@ struct DescendantTagFilter {
     std::vector<std::string> values;
   };
   std::vector<Predicate> predicates;
+};
+
+void collect_row_scope_nodes(const std::vector<std::vector<int64_t>>& children,
+                             int64_t node_id,
+                             std::vector<int64_t>& out);
+
+struct ProjectBenchStats {
+  uint64_t selector_calls = 0;
+  uint64_t scope_builds = 0;
+  uint64_t tag_cache_builds = 0;
+  uint64_t candidate_nodes_examined = 0;
+};
+
+bool project_bench_stats_enabled() {
+  static const bool enabled = []() {
+    const char* raw = std::getenv("MARKQL_BENCH_STATS");
+    if (raw == nullptr) return false;
+    std::string value = util::to_lower(util::trim_ws(raw));
+    return !value.empty() && value != "0" && value != "false" && value != "no" && value != "off";
+  }();
+  return enabled;
+}
+
+void maybe_emit_project_bench_stats(const ProjectBenchStats& stats) {
+  if (!project_bench_stats_enabled()) return;
+  if (stats.selector_calls == 0 && stats.scope_builds == 0 &&
+      stats.tag_cache_builds == 0 && stats.candidate_nodes_examined == 0) {
+    return;
+  }
+  std::fprintf(
+      stderr,
+      "[markql bench] project_selector_calls=%llu project_scope_builds=%llu "
+      "project_tag_cache_builds=%llu project_candidate_nodes_examined=%llu\n",
+      static_cast<unsigned long long>(stats.selector_calls),
+      static_cast<unsigned long long>(stats.scope_builds),
+      static_cast<unsigned long long>(stats.tag_cache_builds),
+      static_cast<unsigned long long>(stats.candidate_nodes_examined));
+}
+
+struct ScopedProjectBenchStats {
+  ProjectBenchStats stats;
+  ~ScopedProjectBenchStats() { maybe_emit_project_bench_stats(stats); }
+};
+
+struct ProjectRowEvalCache {
+  std::vector<int64_t> scope_nodes;
+  std::unordered_map<std::string, std::vector<int64_t>> tag_nodes;
+  ProjectBenchStats* stats = nullptr;
+
+  void reset_for_row(const std::vector<std::vector<int64_t>>& children, int64_t node_id) {
+    scope_nodes.clear();
+    tag_nodes.clear();
+    scope_nodes.reserve(32);
+    collect_row_scope_nodes(children, node_id, scope_nodes);
+    if (stats != nullptr) {
+      ++stats->scope_builds;
+    }
+  }
+
+  const std::vector<int64_t>& nodes_for_tag(const std::string& extract_tag, const HtmlDocument& doc) {
+    auto found = tag_nodes.find(extract_tag);
+    if (found != tag_nodes.end()) {
+      return found->second;
+    }
+    std::vector<int64_t> matches;
+    matches.reserve(8);
+    for (int64_t id : scope_nodes) {
+      const HtmlNode& node = doc.nodes.at(static_cast<size_t>(id));
+      if (node.tag == extract_tag) {
+        matches.push_back(id);
+      }
+    }
+    auto [it, _] = tag_nodes.emplace(extract_tag, std::move(matches));
+    if (stats != nullptr) {
+      ++stats->tag_cache_builds;
+    }
+    return it->second;
+  }
 };
 
 bool like_match_ci(const std::string& text, const std::string& pattern);
@@ -344,17 +424,30 @@ std::optional<std::string> selector_value(
     bool direct_text,
     const HtmlNode& base_node,
     const HtmlDocument& doc,
-    const std::vector<std::vector<int64_t>>& children) {
-  std::vector<int64_t> scope_nodes;
-  scope_nodes.reserve(32);
-  collect_row_scope_nodes(children, base_node.id, scope_nodes);
+    const std::vector<std::vector<int64_t>>& children,
+    ProjectRowEvalCache* row_cache) {
   const std::string extract_tag = util::to_lower(tag);
+  std::vector<int64_t> uncached_scope_nodes;
+  const std::vector<int64_t>* candidates = nullptr;
+  if (row_cache != nullptr) {
+    candidates = &row_cache->nodes_for_tag(extract_tag, doc);
+  } else {
+    uncached_scope_nodes.reserve(32);
+    collect_row_scope_nodes(children, base_node.id, uncached_scope_nodes);
+    candidates = &uncached_scope_nodes;
+  }
+  if (row_cache != nullptr && row_cache->stats != nullptr) {
+    ++row_cache->stats->selector_calls;
+  }
   int64_t seen = 0;
   std::optional<std::string> last_value;
   int64_t target = selector_index.value_or(1);
-  for (int64_t id : scope_nodes) {
+  for (int64_t id : *candidates) {
+    if (row_cache != nullptr && row_cache->stats != nullptr) {
+      ++row_cache->stats->candidate_nodes_examined;
+    }
     const HtmlNode& node = doc.nodes.at(static_cast<size_t>(id));
-    if (node.tag != extract_tag) continue;
+    if (row_cache == nullptr && node.tag != extract_tag) continue;
     if (where.has_value() && !executor_internal::eval_expr(*where, doc, children, node)) {
       continue;
     }
@@ -481,7 +574,8 @@ std::optional<std::string> eval_flatten_extract_expr(
     const HtmlNode& base_node,
     const HtmlDocument& doc,
     const std::vector<std::vector<int64_t>>& children,
-    const std::unordered_map<std::string, std::string>& bindings) {
+    const std::unordered_map<std::string, std::string>& bindings,
+    ProjectRowEvalCache* row_cache) {
   using ExtractKind = Query::SelectItem::FlattenExtractExpr::Kind;
 
   if (expr.kind == ExtractKind::StringLiteral) {
@@ -504,10 +598,10 @@ std::optional<std::string> eval_flatten_extract_expr(
   if (expr.kind == ExtractKind::CaseWhen) {
     for (size_t i = 0; i < expr.case_when_conditions.size() && i < expr.case_when_values.size(); ++i) {
       if (!executor_internal::eval_expr(expr.case_when_conditions[i], doc, children, base_node)) continue;
-      return eval_flatten_extract_expr(expr.case_when_values[i], base_node, doc, children, bindings);
+      return eval_flatten_extract_expr(expr.case_when_values[i], base_node, doc, children, bindings, row_cache);
     }
     if (expr.case_else != nullptr) {
-      return eval_flatten_extract_expr(*expr.case_else, base_node, doc, children, bindings);
+      return eval_flatten_extract_expr(*expr.case_else, base_node, doc, children, bindings, row_cache);
     }
     return std::nullopt;
   }
@@ -515,7 +609,7 @@ std::optional<std::string> eval_flatten_extract_expr(
   if (expr.kind == ExtractKind::Coalesce) {
     for (const auto& arg : expr.args) {
       std::optional<std::string> value =
-          eval_flatten_extract_expr(arg, base_node, doc, children, bindings);
+          eval_flatten_extract_expr(arg, base_node, doc, children, bindings, row_cache);
       if (!value.has_value()) continue;
       if (util::trim_ws(*value).empty()) continue;
       return value;
@@ -525,11 +619,11 @@ std::optional<std::string> eval_flatten_extract_expr(
 
   if (expr.kind == ExtractKind::Text) {
     return selector_value(expr.tag, std::nullopt, expr.where, expr.selector_index, expr.selector_last,
-                          false, base_node, doc, children);
+                          false, base_node, doc, children, row_cache);
   }
   if (expr.kind == ExtractKind::Attr) {
     return selector_value(expr.tag, expr.attribute, expr.where, expr.selector_index, expr.selector_last,
-                          false, base_node, doc, children);
+                          false, base_node, doc, children, row_cache);
   }
 
   if (expr.kind == ExtractKind::FunctionCall) {
@@ -537,22 +631,22 @@ std::optional<std::string> eval_flatten_extract_expr(
     std::vector<std::optional<std::string>> args;
     args.reserve(expr.args.size());
     for (const auto& arg : expr.args) {
-      args.push_back(eval_flatten_extract_expr(arg, base_node, doc, children, bindings));
+      args.push_back(eval_flatten_extract_expr(arg, base_node, doc, children, bindings, row_cache));
     }
     if (fn == "TEXT") {
       if (args.size() != 1 || !args[0].has_value()) return std::nullopt;
       return selector_value(*args[0], std::nullopt, expr.where, expr.selector_index, expr.selector_last,
-                            false, base_node, doc, children);
+                            false, base_node, doc, children, row_cache);
     }
     if (fn == "DIRECT_TEXT") {
       if (args.size() != 1 || !args[0].has_value()) return std::nullopt;
       return selector_value(*args[0], std::nullopt, expr.where, expr.selector_index, expr.selector_last,
-                            true, base_node, doc, children);
+                            true, base_node, doc, children, row_cache);
     }
     if (fn == "ATTR") {
       if (args.size() != 2 || !args[0].has_value() || !args[1].has_value()) return std::nullopt;
       return selector_value(*args[0], util::to_lower(*args[1]), expr.where, expr.selector_index, expr.selector_last,
-                            false, base_node, doc, children);
+                            false, base_node, doc, children, row_cache);
     }
     if (fn == "CONCAT") {
       std::string out;
@@ -2654,6 +2748,9 @@ FragmentSource collect_html_fragments(const QueryResult& result, const std::stri
 
 QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const std::string& source_uri) {
   ExecuteResult exec = execute_query(query, doc, source_uri);
+  ScopedProjectBenchStats scoped_project_bench_stats;
+  ProjectBenchStats* project_bench_stats =
+      project_bench_stats_enabled() ? &scoped_project_bench_stats.stats : nullptr;
   QueryResult out;
   out.columns = xsql_internal::build_columns(query);
   out.columns_implicit = !xsql_internal::is_projection_query(query);
@@ -2816,11 +2913,14 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
       row.doc_order = node.doc_order;
       row.parent_id = node.parent_id;
 
+      ProjectRowEvalCache row_eval_cache;
+      row_eval_cache.stats = project_bench_stats;
+      row_eval_cache.reset_for_row(children, node.id);
       for (size_t i = 0; i < flatten_extract_item->flatten_extract_aliases.size(); ++i) {
         const auto& alias = flatten_extract_item->flatten_extract_aliases[i];
         const auto& expr = flatten_extract_item->flatten_extract_exprs[i];
         std::optional<std::string> value =
-            eval_flatten_extract_expr(expr, node, doc, children, row.computed_fields);
+            eval_flatten_extract_expr(expr, node, doc, children, row.computed_fields, &row_eval_cache);
         if (!value.has_value()) continue;
         row.computed_fields[alias] = *value;
       }
@@ -2974,6 +3074,7 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
   bool use_text_function = false;
   bool use_inner_html_function = false;
   bool use_raw_inner_html_function = false;
+  bool has_project_expr = false;
   for (const auto& item : query.select_items) {
     if (item.field.has_value() && *item.field == "text" && item.text_function) {
       use_text_function = true;
@@ -2983,6 +3084,9 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
       if (item.raw_inner_html_function) {
         use_raw_inner_html_function = true;
       }
+    }
+    if (item.project_expr.has_value()) {
+      has_project_expr = true;
     }
   }
   auto children = xsql_internal::build_children(doc);
@@ -3016,11 +3120,19 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
     row.sibling_pos = sibling_positions.at(static_cast<size_t>(node.id));
     row.max_depth = node.max_depth;
     row.doc_order = node.doc_order;
+    ProjectRowEvalCache row_eval_cache;
+    ProjectRowEvalCache* row_eval_cache_ptr = nullptr;
+    if (has_project_expr) {
+      row_eval_cache.stats = project_bench_stats;
+      row_eval_cache.reset_for_row(children, node.id);
+      row_eval_cache_ptr = &row_eval_cache;
+    }
     for (const auto& item : query.select_items) {
       if (!item.expr_projection || !item.field.has_value()) continue;
       if (item.project_expr.has_value()) {
         std::optional<std::string> value =
-            eval_flatten_extract_expr(*item.project_expr, node, doc, children, row.computed_fields);
+            eval_flatten_extract_expr(*item.project_expr, node, doc, children, row.computed_fields,
+                                      row_eval_cache_ptr);
         if (!value.has_value()) continue;
         row.computed_fields[*item.field] = *value;
         continue;

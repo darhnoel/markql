@@ -119,6 +119,62 @@ void test_flatten_extract_alias_compatibility() {
   }
 }
 
+void test_flatten_extract_table_drift_stability() {
+  std::string html =
+      "<table class='hockey-stats'><tbody>"
+      "<tr>"
+      "<td><a href='/teams/bos'>  Boston  </a><sup class='note'>&#8224;</sup></td>"
+      "<td>82</td>"
+      "<td>47</td>"
+      "<td>8</td>"
+      "<td><abbr title='Points'>102</abbr></td>"
+      "</tr>"
+      "<tr>"
+      "<td><span>Detroit</span> <small>(OT-heavy)</small></td>"
+      "<td>82</td>"
+      "<td>39</td>"
+      "<td></td>"
+      "<td>91</td>"
+      "</tr>"
+      "<tr class='totals'>"
+      "<th>Totals</th>"
+      "<th>164</th>"
+      "<th>86</th>"
+      "<th>8</th>"
+      "<th>193</th>"
+      "</tr>"
+      "</tbody></table>";
+
+  auto result = run_query(
+      html,
+      "SELECT tr.node_id, PROJECT(tr) AS ("
+      "team: TRIM(TEXT(td WHERE sibling_pos = 1)),"
+      "gp: TEXT(td WHERE sibling_pos = 2),"
+      "wins: TEXT(td WHERE sibling_pos = 3),"
+      "ot: COALESCE(TEXT(td WHERE sibling_pos = 4), ''),"
+      "pts: TEXT(td WHERE sibling_pos = 5)"
+      ") "
+      "FROM document "
+      "WHERE tag = 'tr' AND EXISTS(child WHERE tag = 'td') "
+      "ORDER BY node_id ASC");
+
+  expect_eq(result.rows.size(), 2, "flatten_extract drift row count excludes totals");
+  if (result.rows.size() >= 2) {
+    expect_true(result.rows[0].computed_fields["team"].find("Boston") != std::string::npos,
+                "flatten_extract drift nested tags + whitespace row1");
+    expect_true(result.rows[0].computed_fields["ot"] == "8",
+                "flatten_extract drift ot row1");
+    expect_true(result.rows[0].computed_fields["pts"] == "102",
+                "flatten_extract drift points row1");
+    expect_true(result.rows[1].computed_fields["team"].find("Detroit") != std::string::npos,
+                "flatten_extract drift nested tags row2");
+    expect_true(result.rows[1].computed_fields["ot"] == "",
+                "flatten_extract drift missing optional cell padded blank");
+    expect_true(result.rows[1].computed_fields["pts"] == "91",
+                "flatten_extract drift points row2");
+  }
+}
+
 }  // namespace
 
 void register_flatten_extract_tests(std::vector<TestCase>& tests) {
@@ -126,4 +182,5 @@ void register_flatten_extract_tests(std::vector<TestCase>& tests) {
   tests.push_back({"flatten_extract_has_direct_text_predicate", test_flatten_extract_has_direct_text_predicate});
   tests.push_back({"flatten_extract_requires_as_pairs", test_flatten_extract_requires_as_pairs});
   tests.push_back({"flatten_extract_alias_compatibility", test_flatten_extract_alias_compatibility});
+  tests.push_back({"flatten_extract_table_drift_stability", test_flatten_extract_table_drift_stability});
 }

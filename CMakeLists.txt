@@ -467,6 +467,7 @@ if (XSQL_BUILD_TESTS)
     flatten_extract_has_direct_text_predicate
     flatten_extract_requires_as_pairs
     flatten_extract_alias_compatibility
+    flatten_extract_table_drift_stability
     parse_like_predicate
     parse_position_with_in
     parse_project_nested_string_functions
