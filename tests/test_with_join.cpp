@@ -268,6 +268,91 @@ void test_with_join_to_csv_sets_export_sink() {
               "WITH/JOIN runtime keeps export path");
 }
 
+void test_with_inner_equi_join_by_cte_field() {
+  std::string html =
+      "<table>"
+      "<tr><td>A</td><td>B</td></tr>"
+      "<tr><td>C</td></tr>"
+      "</table>";
+  auto result = run_query(
+      html,
+      "WITH rows AS ("
+      "  SELECT n.node_id AS row_id "
+      "  FROM doc AS n "
+      "  WHERE n.tag = 'tr'"
+      "), "
+      "cells AS ("
+      "  SELECT n.parent_id AS row_id, TEXT(n) AS cell_text "
+      "  FROM doc AS n "
+      "  WHERE n.tag = 'td'"
+      ") "
+      "SELECT r.row_id, c.cell_text "
+      "FROM rows AS r "
+      "JOIN cells AS c ON r.row_id = c.row_id "
+      "ORDER BY r.row_id, c.cell_text");
+  expect_eq(result.rows.size(), 3, "inner equi join row count");
+  if (result.rows.size() != 3) return;
+  expect_true(result.rows[0].computed_fields["cell_text"] == "A", "inner equi join first value");
+  expect_true(result.rows[1].computed_fields["cell_text"] == "B", "inner equi join second value");
+  expect_true(result.rows[2].computed_fields["cell_text"] == "C", "inner equi join third value");
+}
+
+void test_with_left_equi_join_preserves_unmatched_rows() {
+  std::string html =
+      "<table>"
+      "<tr><td>A</td></tr>"
+      "<tr><td>B</td></tr>"
+      "</table>";
+  auto result = run_query(
+      html,
+      "WITH rows AS ("
+      "  SELECT n.node_id AS row_id "
+      "  FROM doc AS n "
+      "  WHERE n.tag = 'tr'"
+      "), "
+      "only_a AS ("
+      "  SELECT n.parent_id AS row_id, TEXT(n) AS cell_text "
+      "  FROM doc AS n "
+      "  WHERE n.tag = 'td' AND TEXT(n) = 'A'"
+      ") "
+      "SELECT r.row_id, c.cell_text "
+      "FROM rows AS r "
+      "LEFT JOIN only_a AS c ON r.row_id = c.row_id "
+      "ORDER BY r.row_id");
+  expect_eq(result.rows.size(), 2, "left equi join keeps unmatched row");
+  if (result.rows.size() != 2) return;
+  expect_true(result.rows[0].computed_fields["cell_text"] == "A",
+              "left equi join matched row value");
+  expect_true(result.rows[1].computed_fields.find("cell_text") ==
+                  result.rows[1].computed_fields.end(),
+              "left equi join unmatched row remains NULL");
+}
+
+void test_with_non_equi_join_fallback_behavior() {
+  std::string html =
+      "<root>"
+      "<x>a</x>"
+      "<x>b</x>"
+      "</root>";
+  auto result = run_query(
+      html,
+      "WITH vals AS ("
+      "  SELECT n.text AS v "
+      "  FROM doc AS n "
+      "  WHERE n.tag = 'x'"
+      ") "
+      "SELECT l.v AS lv, r.v AS rv "
+      "FROM vals AS l "
+      "JOIN vals AS r ON l.v <> r.v "
+      "ORDER BY lv, rv");
+  expect_eq(result.rows.size(), 2, "non-equi join fallback row count");
+  if (result.rows.size() != 2) return;
+  expect_true(result.rows[0].computed_fields["lv"] == "a", "fallback row1 left");
+  expect_true(result.rows[0].computed_fields["rv"] == "b", "fallback row1 right");
+  expect_true(result.rows[1].computed_fields["lv"] == "b", "fallback row2 left");
+  expect_true(result.rows[1].computed_fields["rv"] == "a", "fallback row2 right");
+}
+
 }  // namespace
 
 void register_with_join_tests(std::vector<TestCase>& tests) {
@@ -291,4 +376,10 @@ void register_with_join_tests(std::vector<TestCase>& tests) {
                    test_with_qualified_parent_axis_and_case_projection});
   tests.push_back({"with_join_to_csv_sets_export_sink",
                    test_with_join_to_csv_sets_export_sink});
+  tests.push_back({"with_inner_equi_join_by_cte_field",
+                   test_with_inner_equi_join_by_cte_field});
+  tests.push_back({"with_left_equi_join_preserves_unmatched_rows",
+                   test_with_left_equi_join_preserves_unmatched_rows});
+  tests.push_back({"with_non_equi_join_fallback_behavior",
+                   test_with_non_equi_join_fallback_behavior});
 }

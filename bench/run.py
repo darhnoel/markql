@@ -44,6 +44,11 @@ VARIANTS: list[Variant] = [
     Variant("big", FIXTURES / "big.html", GOLD / "hockey_big.csv"),
 ]
 
+MARKQL_QUERY_BY_ENGINE: dict[str, Path] = {
+    "markql": QUERIES / "hockey_table_to_csv.sql",
+    "markql_cte": QUERIES / "hockey_table_to_csv_cte.sql",
+}
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run MarkQL benchmark suite")
@@ -62,6 +67,11 @@ def parse_args() -> argparse.Namespace:
         default="lxml",
         choices=["lxml", "html.parser"],
         help="BeautifulSoup parser backend",
+    )
+    parser.add_argument(
+        "--include-markql-cte",
+        action="store_true",
+        help="Also benchmark the CTE-based MarkQL query variant",
     )
     return parser.parse_args()
 
@@ -167,8 +177,7 @@ def mismatch_hint(expected: bytes, actual: bytes) -> str:
     return "\n".join(hint_lines)
 
 
-def run_markql_once(markql_bin: str, variant: Variant) -> dict[str, Any]:
-    query_file = QUERIES / "hockey_table_to_csv.sql"
+def run_markql_once(markql_bin: str, variant: Variant, query_file: Path) -> dict[str, Any]:
     output_csv = Path("/tmp/markql_hockey.csv")
 
     if output_csv.exists():
@@ -277,7 +286,9 @@ def run_engine_variant(
 
     for run_idx in range(total):
         if engine == "markql":
-            sample = run_markql_once(markql_bin, variant)
+            sample = run_markql_once(markql_bin, variant, MARKQL_QUERY_BY_ENGINE["markql"])
+        elif engine == "markql_cte":
+            sample = run_markql_once(markql_bin, variant, MARKQL_QUERY_BY_ENGINE["markql_cte"])
         elif engine == "bs4":
             sample = run_bs4_once(python_bin, variant, bs4_parser)
         elif engine == "lxml":
@@ -383,7 +394,7 @@ def print_summary_table(results: list[dict[str, Any]]) -> None:
         print(render_row(row))
 
 
-def ensure_inputs_exist(markql_bin: str) -> None:
+def ensure_inputs_exist(markql_bin: str, include_markql_cte: bool) -> None:
     if not Path(markql_bin).exists():
         raise RuntimeError(f"markql binary not found: {markql_bin}")
 
@@ -399,6 +410,8 @@ def ensure_inputs_exist(markql_bin: str) -> None:
         BASELINES / "bs4_extract.py",
         BASELINES / "lxml_extract.py",
     ]
+    if include_markql_cte:
+        required_paths.append(QUERIES / "hockey_table_to_csv_cte.sql")
     for path in required_paths:
         if not path.exists():
             raise RuntimeError(f"Missing required benchmark file: {path}")
@@ -444,7 +457,7 @@ def ensure_python_deps(python_bin: str, bs4_parser: str) -> None:
 
 def main() -> int:
     args = parse_args()
-    ensure_inputs_exist(args.markql_bin)
+    ensure_inputs_exist(args.markql_bin, args.include_markql_cte)
     ensure_python_deps(args.python, args.bs4_parser)
 
     if args.suite != "hockey":
@@ -453,7 +466,10 @@ def main() -> int:
     if args.warmups < 0 or args.runs <= 0:
         raise RuntimeError("--warmups must be >= 0 and --runs must be > 0")
 
-    engines = ["markql", "bs4", "lxml"]
+    engines = ["markql"]
+    if args.include_markql_cte:
+        engines.append("markql_cte")
+    engines.extend(["bs4", "lxml"])
     results: list[dict[str, Any]] = []
 
     started = time.perf_counter_ns()
@@ -486,6 +502,7 @@ def main() -> int:
             "python": args.python,
             "markql_bin": args.markql_bin,
             "bs4_parser": args.bs4_parser,
+            "include_markql_cte": args.include_markql_cte,
             "time_binary": str(TIME_BIN) if TIME_BIN else None,
             "cwd": os.getcwd(),
         },
