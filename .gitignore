@@ -60,3 +60,6 @@ examples/*
 
 # frontend
 static_server/*
+
+# benchmark
+bench/results/*
