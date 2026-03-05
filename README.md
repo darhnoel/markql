@@ -11,6 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/darhnoel/markql/actions/workflows/python-wheels.yml"><img src="https://github.com/darhnoel/markql/actions/workflows/python-wheels.yml/badge.svg" alt="Build wheels"></a>
+  <img src="https://img.shields.io/badge/status-beta-orange" alt="Status: Beta">
   <a href="https://github.com/darhnoel/markql/tags"><img src="https://img.shields.io/github/v/tag/darhnoel/markql" alt="GitHub tag"></a>
   <a href="https://pypi.org/project/pyxsql/"><img src="https://img.shields.io/pypi/v/pyxsql" alt="PyPI version"></a>
   <a href="https://pypi.org/project/pyxsql/"><img src="https://img.shields.io/pypi/dm/pyxsql" alt="PyPI downloads"></a>
