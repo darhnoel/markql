@@ -63,3 +63,6 @@ static_server/*
 
 # benchmark
 bench/results/*
+
+# cucumber rustt
+tests/integration/rust/target
