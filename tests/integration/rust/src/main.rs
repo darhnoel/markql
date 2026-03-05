@@ -11,6 +11,7 @@ struct CliWorld {
     markql_bin: Option<PathBuf>,
     fixture_path: Option<PathBuf>,
     query: Option<String>,
+    query_file: Option<PathBuf>,
     extra_args: Vec<String>,
     last_exit_code: Option<i32>,
     last_stdout: String,
@@ -100,6 +101,18 @@ fn given_html_fixture(world: &mut CliWorld, path: String) -> Result<()> {
 #[given(expr = "the MarkQL query {string}")]
 fn given_query(world: &mut CliWorld, query: String) {
     world.query = Some(query);
+    world.query_file = None;
+}
+
+#[given(expr = "the MarkQL query file {string}")]
+fn given_query_file(world: &mut CliWorld, path: String) -> Result<()> {
+    let resolved = CliWorld::resolve_repo_relative(&path)?;
+    if !resolved.exists() {
+        bail!("query file does not exist: {}", resolved.display());
+    }
+    world.query_file = Some(resolved);
+    world.query = None;
+    Ok(())
 }
 
 #[given(expr = "additional CLI args {string}")]
@@ -121,12 +134,20 @@ fn when_run_markql(world: &mut CliWorld) -> Result<()> {
     }
 
     let fixture = world.require_fixture()?;
-    let query = world.require_query()?;
+    if world.query.is_some() && world.query_file.is_some() {
+        bail!("scenario configured both inline query and query file; choose one");
+    }
 
     let mut cmd = Command::new(&markql_bin);
     cmd.args(&world.extra_args);
-    cmd.arg("--query");
-    cmd.arg(query);
+    if let Some(query_file) = &world.query_file {
+        cmd.arg("--query-file");
+        cmd.arg(query_file);
+    } else {
+        let query = world.require_query()?;
+        cmd.arg("--query");
+        cmd.arg(query);
+    }
     cmd.arg("--input");
     cmd.arg(fixture);
     cmd.arg("--color=disabled");
