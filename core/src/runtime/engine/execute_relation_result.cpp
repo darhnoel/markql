@@ -1,5 +1,6 @@
 #include "xsql/xsql.h"
 
+#include <chrono>
 #include <optional>
 #include <string>
 
@@ -11,6 +12,33 @@
 namespace xsql {
 
 namespace {
+
+class ScopedProfileTimer {
+ public:
+  ScopedProfileTimer(RelationRuntimeCache::Profile* profile, uint64_t* target_ns)
+      : profile_(profile), target_ns_(target_ns) {
+    if (profile_ == nullptr || target_ns_ == nullptr || !profile_->enabled) {
+      profile_ = nullptr;
+      target_ns_ = nullptr;
+      return;
+    }
+    started_at_ = std::chrono::steady_clock::now();
+  }
+
+  ~ScopedProfileTimer() {
+    if (profile_ == nullptr || target_ns_ == nullptr) return;
+    const auto finished_at = std::chrono::steady_clock::now();
+    const uint64_t elapsed_ns = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            finished_at - started_at_).count());
+    *target_ns_ += elapsed_ns;
+  }
+
+ private:
+  RelationRuntimeCache::Profile* profile_ = nullptr;
+  uint64_t* target_ns_ = nullptr;
+  std::chrono::steady_clock::time_point started_at_{};
+};
 
 void assign_result_column_value(QueryResultRow& row,
                                 const std::string& column,
@@ -57,7 +85,11 @@ void assign_result_column_value(QueryResultRow& row,
 
 }  // namespace
 
-QueryResult query_result_from_relation(const Query& query, const Relation& relation) {
+QueryResult query_result_from_relation(const Query& query,
+                                       const Relation& relation,
+                                       RelationRuntimeCache::Profile* profile) {
+  ScopedProfileTimer projection_timer(
+      profile, profile != nullptr ? &profile->projection_time_ns : nullptr);
   QueryResult out;
   out.columns = xsql_internal::build_columns(query);
   out.columns_implicit = !xsql_internal::is_projection_query(query);
@@ -79,6 +111,7 @@ QueryResult query_result_from_relation(const Query& query, const Relation& relat
     out.export_sink.path = sink.path;
   }
   out.warnings = relation.warnings;
+  out.rows.reserve(relation.rows.size());
 
   for (const auto& item : query.select_items) {
     if (item.aggregate == Query::SelectItem::Aggregate::Count) {
@@ -154,10 +187,10 @@ QueryResult query_result_from_relation(const Query& query, const Relation& relat
       if (!item.field.has_value()) continue;
       std::optional<std::string> value;
       if (item.expr_projection && item.expr.has_value()) {
-        value = eval_relation_scalar_expr(*item.expr, rel_row, active_alias);
+        value = eval_relation_scalar_expr(*item.expr, rel_row, active_alias, profile);
       } else if (item.expr_projection && item.project_expr.has_value()) {
         value = eval_relation_project_expr(
-            *item.project_expr, rel_row, active_alias, row.computed_fields);
+            *item.project_expr, rel_row, active_alias, row.computed_fields, profile);
       } else {
         const std::string lowered_tag = lower_alias_name(item.tag);
         auto it = rel_row.aliases.find(lowered_tag);

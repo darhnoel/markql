@@ -1,5 +1,6 @@
 #include "xsql/xsql.h"
 
+#include <chrono>
 #include <cctype>
 #include <optional>
 #include <stdexcept>
@@ -15,6 +16,40 @@
 #include "engine_execution_internal.h"
 
 namespace xsql {
+
+namespace {
+
+class ScopedScalarEvalTimer {
+ public:
+  explicit ScopedScalarEvalTimer(RelationRuntimeCache::Profile* profile)
+      : profile_(profile) {
+    if (profile_ == nullptr || !profile_->enabled) {
+      profile_ = nullptr;
+      return;
+    }
+    ++profile_->scalar_eval_active_depth;
+    started_at_ = std::chrono::steady_clock::now();
+  }
+
+  ~ScopedScalarEvalTimer() {
+    if (profile_ == nullptr) return;
+    if (profile_->scalar_eval_active_depth > 0) {
+      --profile_->scalar_eval_active_depth;
+    }
+    if (profile_->scalar_eval_active_depth != 0) return;
+    const auto finished_at = std::chrono::steady_clock::now();
+    const uint64_t elapsed_ns = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            finished_at - started_at_).count());
+    profile_->scalar_eval_time_ns += elapsed_ns;
+  }
+
+ private:
+  RelationRuntimeCache::Profile* profile_ = nullptr;
+  std::chrono::steady_clock::time_point started_at_{};
+};
+
+}  // namespace
 
 std::string lower_alias_name(const std::string& alias) {
   return util::to_lower(alias);
@@ -141,7 +176,9 @@ std::optional<std::string> relation_operand_value(const Operand& operand,
 
 std::optional<std::string> eval_relation_scalar_expr(const ScalarExpr& expr,
                                                      const RelationRow& row,
-                                                     const std::optional<std::string>& active_alias) {
+                                                     const std::optional<std::string>& active_alias,
+                                                     RelationRuntimeCache::Profile* profile) {
+  ScopedScalarEvalTimer timer(profile);
   if (expr.kind == ScalarExpr::Kind::NullLiteral) return std::nullopt;
   if (expr.kind == ScalarExpr::Kind::StringLiteral) return expr.string_value;
   if (expr.kind == ScalarExpr::Kind::NumberLiteral) return std::to_string(expr.number_value);
@@ -154,7 +191,8 @@ std::optional<std::string> eval_relation_scalar_expr(const ScalarExpr& expr,
   const std::string fn = util::to_upper(expr.function_name);
   if ((fn == "TEXT" || fn == "DIRECT_TEXT" || fn == "INNER_HTML" || fn == "RAW_INNER_HTML") &&
       !expr.args.empty()) {
-    std::optional<std::string> target = eval_relation_scalar_expr(expr.args[0], row, active_alias);
+    std::optional<std::string> target =
+        eval_relation_scalar_expr(expr.args[0], row, active_alias, profile);
     if (!target.has_value()) return std::nullopt;
     const std::string lowered_target = util::to_lower(*target);
     auto alias_it = row.aliases.find(lowered_target);
@@ -175,8 +213,10 @@ std::optional<std::string> eval_relation_scalar_expr(const ScalarExpr& expr,
     return value_it->second;
   }
   if (fn == "ATTR" && expr.args.size() == 2) {
-    std::optional<std::string> target = eval_relation_scalar_expr(expr.args[0], row, active_alias);
-    std::optional<std::string> attr = eval_relation_scalar_expr(expr.args[1], row, active_alias);
+    std::optional<std::string> target =
+        eval_relation_scalar_expr(expr.args[0], row, active_alias, profile);
+    std::optional<std::string> attr =
+        eval_relation_scalar_expr(expr.args[1], row, active_alias, profile);
     if (!target.has_value() || !attr.has_value()) return std::nullopt;
     const std::string lowered_target = util::to_lower(*target);
     auto alias_it = row.aliases.find(lowered_target);
@@ -190,7 +230,8 @@ std::optional<std::string> eval_relation_scalar_expr(const ScalarExpr& expr,
   }
   if (fn == "COALESCE") {
     for (const auto& arg : expr.args) {
-      std::optional<std::string> value = eval_relation_scalar_expr(arg, row, active_alias);
+      std::optional<std::string> value =
+          eval_relation_scalar_expr(arg, row, active_alias, profile);
       if (!value.has_value()) continue;
       if (util::trim_ws(*value).empty()) continue;
       return value;
@@ -199,7 +240,8 @@ std::optional<std::string> eval_relation_scalar_expr(const ScalarExpr& expr,
   }
   if (fn == "LOWER" || fn == "UPPER" || fn == "TRIM" || fn == "LTRIM" || fn == "RTRIM") {
     if (expr.args.size() != 1) return std::nullopt;
-    std::optional<std::string> value = eval_relation_scalar_expr(expr.args[0], row, active_alias);
+    std::optional<std::string> value =
+        eval_relation_scalar_expr(expr.args[0], row, active_alias, profile);
     if (!value.has_value()) return std::nullopt;
     if (fn == "LOWER") return util::to_lower(*value);
     if (fn == "UPPER") return util::to_upper(*value);
@@ -215,9 +257,12 @@ std::optional<std::string> eval_relation_scalar_expr(const ScalarExpr& expr,
   }
   if (fn == "REPLACE") {
     if (expr.args.size() != 3) return std::nullopt;
-    std::optional<std::string> text = eval_relation_scalar_expr(expr.args[0], row, active_alias);
-    std::optional<std::string> from = eval_relation_scalar_expr(expr.args[1], row, active_alias);
-    std::optional<std::string> to = eval_relation_scalar_expr(expr.args[2], row, active_alias);
+    std::optional<std::string> text =
+        eval_relation_scalar_expr(expr.args[0], row, active_alias, profile);
+    std::optional<std::string> from =
+        eval_relation_scalar_expr(expr.args[1], row, active_alias, profile);
+    std::optional<std::string> to =
+        eval_relation_scalar_expr(expr.args[2], row, active_alias, profile);
     if (!text.has_value() || !from.has_value() || !to.has_value()) return std::nullopt;
     std::string out = *text;
     if (from->empty()) return out;
@@ -233,13 +278,15 @@ std::optional<std::string> eval_relation_scalar_expr(const ScalarExpr& expr,
 
 bool eval_relation_expr(const Expr& expr,
                         const RelationRow& row,
-                        const std::optional<std::string>& active_alias);
+                        const std::optional<std::string>& active_alias,
+                        RelationRuntimeCache::Profile* profile);
 
 std::optional<std::string> eval_relation_project_expr(
     const Query::SelectItem::FlattenExtractExpr& expr,
     const RelationRow& row,
     const std::optional<std::string>& active_alias,
-    const std::unordered_map<std::string, std::string>& bindings) {
+    const std::unordered_map<std::string, std::string>& bindings,
+    RelationRuntimeCache::Profile* profile) {
   using Kind = Query::SelectItem::FlattenExtractExpr::Kind;
   if (expr.kind == Kind::StringLiteral) return expr.string_value;
   if (expr.kind == Kind::NumberLiteral) return std::to_string(expr.number_value);
@@ -255,7 +302,7 @@ std::optional<std::string> eval_relation_project_expr(
   if (expr.kind == Kind::Coalesce) {
     for (const auto& arg : expr.args) {
       std::optional<std::string> value =
-          eval_relation_project_expr(arg, row, active_alias, bindings);
+          eval_relation_project_expr(arg, row, active_alias, bindings, profile);
       if (!value.has_value()) continue;
       if (util::trim_ws(*value).empty()) continue;
       return value;
@@ -307,7 +354,7 @@ std::optional<std::string> eval_relation_project_expr(
         continue;
       }
       std::optional<std::string> nested =
-          eval_relation_project_expr(arg, row, active_alias, bindings);
+          eval_relation_project_expr(arg, row, active_alias, bindings, profile);
       ScalarExpr scalar_arg;
       if (!nested.has_value()) {
         scalar_arg.kind = ScalarExpr::Kind::NullLiteral;
@@ -317,16 +364,17 @@ std::optional<std::string> eval_relation_project_expr(
       }
       scalar_expr.args.push_back(std::move(scalar_arg));
     }
-    return eval_relation_scalar_expr(scalar_expr, row, active_alias);
+    return eval_relation_scalar_expr(scalar_expr, row, active_alias, profile);
   }
   if (expr.kind == Kind::CaseWhen) {
     for (size_t i = 0; i < expr.case_when_conditions.size() &&
                        i < expr.case_when_values.size(); ++i) {
-      if (!eval_relation_expr(expr.case_when_conditions[i], row, active_alias)) continue;
-      return eval_relation_project_expr(expr.case_when_values[i], row, active_alias, bindings);
+      if (!eval_relation_expr(expr.case_when_conditions[i], row, active_alias, profile)) continue;
+      return eval_relation_project_expr(expr.case_when_values[i], row, active_alias, bindings,
+                                        profile);
     }
     if (expr.case_else != nullptr) {
-      return eval_relation_project_expr(*expr.case_else, row, active_alias, bindings);
+      return eval_relation_project_expr(*expr.case_else, row, active_alias, bindings, profile);
     }
     return std::nullopt;
   }
@@ -335,12 +383,13 @@ std::optional<std::string> eval_relation_project_expr(
 
 bool eval_relation_expr(const Expr& expr,
                         const RelationRow& row,
-                        const std::optional<std::string>& active_alias) {
+                        const std::optional<std::string>& active_alias,
+                        RelationRuntimeCache::Profile* profile) {
   if (std::holds_alternative<CompareExpr>(expr)) {
     const auto& cmp = std::get<CompareExpr>(expr);
     std::optional<std::string> lhs;
     if (cmp.lhs_expr.has_value()) {
-      lhs = eval_relation_scalar_expr(*cmp.lhs_expr, row, active_alias);
+      lhs = eval_relation_scalar_expr(*cmp.lhs_expr, row, active_alias, profile);
     } else {
       lhs = relation_operand_value(cmp.lhs, row, active_alias);
     }
@@ -355,7 +404,8 @@ bool eval_relation_expr(const Expr& expr,
       std::vector<std::string> candidates;
       if (!cmp.rhs_expr_list.empty()) {
         for (const auto& rhs_expr : cmp.rhs_expr_list) {
-          std::optional<std::string> rhs = eval_relation_scalar_expr(rhs_expr, row, active_alias);
+          std::optional<std::string> rhs =
+              eval_relation_scalar_expr(rhs_expr, row, active_alias, profile);
           if (rhs.has_value()) candidates.push_back(*rhs);
         }
       } else {
@@ -378,7 +428,7 @@ bool eval_relation_expr(const Expr& expr,
     }
     std::optional<std::string> rhs;
     if (cmp.rhs_expr.has_value()) {
-      rhs = eval_relation_scalar_expr(*cmp.rhs_expr, row, active_alias);
+      rhs = eval_relation_scalar_expr(*cmp.rhs_expr, row, active_alias, profile);
     } else if (!cmp.rhs.values.empty()) {
       rhs = cmp.rhs.values.front();
     }
@@ -408,8 +458,8 @@ bool eval_relation_expr(const Expr& expr,
     return false;
   }
   const auto& bin = *std::get<std::shared_ptr<BinaryExpr>>(expr);
-  bool left = eval_relation_expr(bin.left, row, active_alias);
-  bool right = eval_relation_expr(bin.right, row, active_alias);
+  bool left = eval_relation_expr(bin.left, row, active_alias, profile);
+  bool right = eval_relation_expr(bin.right, row, active_alias, profile);
   return (bin.op == BinaryExpr::Op::And) ? (left && right) : (left || right);
 }
 

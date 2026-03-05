@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <stdexcept>
@@ -37,6 +38,67 @@ bool query_uses_relation_runtime(const Query& query,
     if (order.field.find('.') != std::string::npos) return true;
   }
   return false;
+}
+
+bool relation_runtime_profile_enabled() {
+  static const bool enabled = []() {
+    const char* raw = std::getenv("MARKQL_REL_PROFILE");
+    if (raw == nullptr) return false;
+    std::string value = util::to_lower(util::trim_ws(raw));
+    return !value.empty() && value != "0" && value != "false" &&
+           value != "no" && value != "off";
+  }();
+  return enabled;
+}
+
+double ns_to_ms(uint64_t value_ns) {
+  return static_cast<double>(value_ns) / 1000000.0;
+}
+
+std::string join_type_name(Query::JoinItem::Type type) {
+  if (type == Query::JoinItem::Type::Inner) return "inner";
+  if (type == Query::JoinItem::Type::Left) return "left";
+  return "cross";
+}
+
+std::string join_label_for_index(const Query::JoinItem& join, size_t index) {
+  std::string label = "join#" + std::to_string(index + 1);
+  label += ":" + join_type_name(join.type);
+  if (join.right_source.alias.has_value()) {
+    label += ":" + lower_alias_name(*join.right_source.alias);
+  }
+  return label;
+}
+
+void maybe_emit_relation_runtime_profile(const RelationRuntimeCache::Profile& profile) {
+  if (!profile.enabled) return;
+  std::fprintf(
+      stderr,
+      "[markql rel_profile] timings_ms join=%.3f projection=%.3f scalar_expr=%.3f\n",
+      ns_to_ms(profile.join_time_ns),
+      ns_to_ms(profile.projection_time_ns),
+      ns_to_ms(profile.scalar_eval_time_ns));
+  std::fprintf(
+      stderr,
+      "[markql rel_profile] relation_indexes builds=%llu hits=%llu\n",
+      static_cast<unsigned long long>(profile.relation_index_builds),
+      static_cast<unsigned long long>(profile.relation_index_hits));
+  for (const auto& cte : profile.cte_sizes) {
+    std::fprintf(stderr,
+                 "[markql rel_profile] cte=%s rows=%zu\n",
+                 cte.name.c_str(),
+                 cte.rows);
+  }
+  for (const auto& join : profile.joins) {
+    std::fprintf(stderr,
+                 "[markql rel_profile] %s strategy=%s left_rows=%zu right_rows=%zu output_rows=%zu pairs=%llu\n",
+                 join.label.c_str(),
+                 join.strategy.c_str(),
+                 join.left_rows,
+                 join.right_rows,
+                 join.output_rows,
+                 static_cast<unsigned long long>(join.pairs_evaluated));
+  }
 }
 
 bool operand_targets_source_row(const Operand& operand,
@@ -115,11 +177,12 @@ QueryResult execute_query_with_source_context(
     const RelationRow* outer_row,
     RelationRuntimeCache* cache);
 
-Relation relation_from_query_result(const QueryResult& result, const std::string& alias_name) {
+Relation relation_from_query_result(QueryResult result, const std::string& alias_name) {
   Relation out;
   const std::string alias = lower_alias_name(alias_name);
-  out.warnings = result.warnings;
-  for (const auto& row : result.rows) {
+  out.cache_key = "relation_result";
+  out.warnings = std::move(result.warnings);
+  for (auto& row : result.rows) {
     RelationRow rel_row;
     RelationRecord record;
     record.values["node_id"] = std::to_string(row.node_id);
@@ -138,7 +201,7 @@ Relation relation_from_query_result(const QueryResult& result, const std::string
     for (const auto& col : result.columns) {
       record.values[col] = field_value_string(row, col);
     }
-    for (const auto& attr : row.attributes) {
+    for (auto& attr : row.attributes) {
       record.attributes[attr.first] = attr.second;
       record.values[attr.first] = attr.second;
     }
@@ -279,7 +342,7 @@ Relation evaluate_source_relation(const Source& source,
     }
     QueryResult sub = execute_query_with_source_context(
         *source.derived_query, default_html, default_source_uri, ctes, outer_row, cache);
-    return relation_from_query_result(sub, *source.alias);
+    return relation_from_query_result(std::move(sub), *source.alias);
   }
 
   HtmlDocument doc;
@@ -369,14 +432,19 @@ Relation evaluate_query_relation(
     const std::unordered_map<std::string, Relation>* parent_ctes,
     const RelationRow* outer_row,
     RelationRuntimeCache* cache) {
+  RelationRuntimeCache::Profile* profile = cache != nullptr ? &cache->profile : nullptr;
   const std::optional<std::string> active_alias =
       query.source.alias.has_value()
           ? std::optional<std::string>(lower_alias_name(*query.source.alias))
           : std::nullopt;
 
   std::unordered_map<std::string, Relation> local_ctes;
+  size_t expected_cte_count = query.with.has_value() ? query.with->ctes.size() : 0;
   if (parent_ctes != nullptr) {
-    local_ctes = *parent_ctes;
+    local_ctes.reserve(parent_ctes->size() + expected_cte_count);
+    local_ctes.insert(parent_ctes->begin(), parent_ctes->end());
+  } else if (expected_cte_count > 0) {
+    local_ctes.reserve(expected_cte_count);
   }
   std::vector<std::string> warnings;
   if (query.with.has_value()) {
@@ -386,10 +454,18 @@ Relation evaluate_query_relation(
       }
       QueryResult cte_result = execute_query_with_source_context(
           *cte.query, default_html, default_source_uri, &local_ctes, nullptr, cache);
-      Relation cte_relation = relation_from_query_result(cte_result, cte.name);
+      Relation cte_relation = relation_from_query_result(std::move(cte_result), cte.name);
+      if (cache != nullptr) {
+        cte_relation.cache_key =
+            "cte:" + lower_alias_name(cte.name) + "#" + std::to_string(cache->next_relation_cache_id++);
+      }
       warnings.insert(warnings.end(),
                       cte_relation.warnings.begin(),
                       cte_relation.warnings.end());
+      if (profile != nullptr && profile->enabled) {
+        profile->cte_sizes.push_back(RelationRuntimeCache::CteSizeSample{
+            cte.name, cte_relation.rows.size()});
+      }
       local_ctes[lower_alias_name(cte.name)] = std::move(cte_relation);
     }
   }
@@ -412,32 +488,39 @@ Relation evaluate_query_relation(
   warnings.insert(warnings.end(), from_rel.warnings.begin(), from_rel.warnings.end());
 
   Relation current;
-  current.alias_columns = from_rel.alias_columns;
-  current.rows.reserve(from_rel.rows.size());
-  for (const auto& base_row : from_rel.rows) {
-    RelationRow merged;
-    if (outer_row != nullptr) {
+  if (outer_row == nullptr) {
+    current = std::move(from_rel);
+  } else {
+    current.alias_columns = from_rel.alias_columns;
+    current.cache_key = from_rel.cache_key;
+    current.rows.reserve(from_rel.rows.size());
+    for (const auto& base_row : from_rel.rows) {
+      RelationRow merged;
       std::string duplicate;
       if (!merge_row_aliases(merged, *outer_row, &duplicate)) {
         throw std::runtime_error("Duplicate source alias '" + duplicate + "' in FROM");
       }
+      if (!merge_row_aliases(merged, base_row, &duplicate)) {
+        throw std::runtime_error("Duplicate source alias '" + duplicate + "' in FROM");
+      }
+      current.rows.push_back(std::move(merged));
     }
-    std::string duplicate;
-    if (!merge_row_aliases(merged, base_row, &duplicate)) {
-      throw std::runtime_error("Duplicate source alias '" + duplicate + "' in FROM");
-    }
-    current.rows.push_back(std::move(merged));
-  }
-  if (outer_row != nullptr) {
     for (const auto& alias_entry : outer_row->aliases) {
       merge_alias_columns(current, alias_entry.first, alias_entry.second);
     }
   }
 
-  for (const auto& join : query.joins) {
+  for (size_t join_index = 0; join_index < query.joins.size(); ++join_index) {
+    const auto& join = query.joins[join_index];
+    const std::string join_label = join_label_for_index(join, join_index);
     if (join.lateral) {
+      const bool profiling_enabled = profile != nullptr && profile->enabled;
+      const auto started_at = profiling_enabled ? std::chrono::steady_clock::now()
+                                                : std::chrono::steady_clock::time_point{};
+      uint64_t pairs_evaluated = 0;
       Relation next;
       next.alias_columns = current.alias_columns;
+      next.cache_key = current.cache_key;
       for (const auto& left_row : current.rows) {
         Relation right_rel = evaluate_source_relation(
             join.right_source, default_html, default_source_uri, &local_ctes, &left_row, cache,
@@ -448,6 +531,7 @@ Relation evaluate_query_relation(
               alias_cols.second.begin(), alias_cols.second.end());
         }
         for (const auto& right_row : right_rel.rows) {
+          ++pairs_evaluated;
           RelationRow merged = left_row;
           std::string duplicate;
           if (!merge_row_aliases(merged, right_row, &duplicate)) {
@@ -455,6 +539,20 @@ Relation evaluate_query_relation(
           }
           next.rows.push_back(std::move(merged));
         }
+      }
+      if (profiling_enabled) {
+        const auto finished_at = std::chrono::steady_clock::now();
+        const uint64_t elapsed_ns = static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                finished_at - started_at).count());
+        profile->join_time_ns += elapsed_ns;
+        profile->joins.push_back(RelationRuntimeCache::JoinSample{
+            join_label,
+            "lateral_nested_loop",
+            current.rows.size(),
+            0,
+            next.rows.size(),
+            pairs_evaluated});
       }
       current = std::move(next);
       continue;
@@ -464,15 +562,18 @@ Relation evaluate_query_relation(
         join.right_source, default_html, default_source_uri, &local_ctes, nullptr, cache,
         nullptr);
     warnings.insert(warnings.end(), right_rel.warnings.begin(), right_rel.warnings.end());
-    current = execute_relation_join_non_lateral(join, current, right_rel, active_alias);
+    current = execute_relation_join_non_lateral(
+        join, current, right_rel, active_alias, join_label, cache);
   }
 
   if (query.where.has_value()) {
     Relation filtered;
     filtered.alias_columns = current.alias_columns;
-    for (const auto& row : current.rows) {
-      if (eval_relation_expr(*query.where, row, active_alias)) {
-        filtered.rows.push_back(row);
+    filtered.cache_key = current.cache_key;
+    filtered.rows.reserve(current.rows.size());
+    for (auto& row : current.rows) {
+      if (eval_relation_expr(*query.where, row, active_alias, profile)) {
+        filtered.rows.push_back(std::move(row));
       }
     }
     current = std::move(filtered);
@@ -508,11 +609,20 @@ QueryResult execute_query_with_source_context(
   if (!query_uses_relation_runtime(query, ctes, outer_row)) {
     return execute_query_with_source_legacy(query, default_html, default_source_uri);
   }
+  const bool is_top_level_relation_query = (cache == nullptr);
   RelationRuntimeCache local_cache;
   RelationRuntimeCache* active_cache = cache != nullptr ? cache : &local_cache;
+  if (is_top_level_relation_query) {
+    active_cache->profile = RelationRuntimeCache::Profile{};
+    active_cache->profile.enabled = relation_runtime_profile_enabled();
+  }
   Relation relation = evaluate_query_relation(
       query, default_html, default_source_uri, ctes, outer_row, active_cache);
-  return query_result_from_relation(query, relation);
+  QueryResult out = query_result_from_relation(query, relation, &active_cache->profile);
+  if (is_top_level_relation_query) {
+    maybe_emit_relation_runtime_profile(active_cache->profile);
+  }
+  return out;
 }
 
 

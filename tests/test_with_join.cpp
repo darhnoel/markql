@@ -328,6 +328,132 @@ void test_with_left_equi_join_preserves_unmatched_rows() {
               "left equi join unmatched row remains NULL");
 }
 
+void test_with_hash_join_preserves_duplicate_multiplicity() {
+  std::string html =
+      "<root>"
+      "<x>dup</x>"
+      "<x>dup</x>"
+      "<y>dup</y>"
+      "<y>dup</y>"
+      "</root>";
+  auto result = run_query(
+      html,
+      "WITH left_vals AS ("
+      "  SELECT n.text AS k "
+      "  FROM doc AS n "
+      "  WHERE n.tag = 'x'"
+      "), "
+      "right_vals AS ("
+      "  SELECT n.text AS k, n.node_id AS rid "
+      "  FROM doc AS n "
+      "  WHERE n.tag = 'y'"
+      ") "
+      "SELECT l.k, r.rid "
+      "FROM left_vals AS l "
+      "JOIN right_vals AS r ON l.k = r.k "
+      "ORDER BY l.k, r.rid");
+  expect_eq(result.rows.size(), 4, "hash join keeps one-to-many duplicate multiplicity");
+  if (result.rows.size() != 4) return;
+  for (const auto& row : result.rows) {
+    expect_true(row.computed_fields.at("k") == "dup", "duplicate join key preserved");
+  }
+  const std::string rid0 = result.rows[0].computed_fields.at("rid");
+  const std::string rid1 = result.rows[1].computed_fields.at("rid");
+  const std::string rid2 = result.rows[2].computed_fields.at("rid");
+  const std::string rid3 = result.rows[3].computed_fields.at("rid");
+  expect_true(rid0 == rid1, "first right row appears once per matching left row");
+  expect_true(rid2 == rid3, "second right row appears once per matching left row");
+  expect_true(rid0 != rid2, "both distinct right duplicates survive join");
+}
+
+void test_with_hash_join_null_keys_do_not_match() {
+  std::string html =
+      "<root>"
+      "<x class='a'></x>"
+      "<x></x>"
+      "<y class='a'></y>"
+      "<y></y>"
+      "</root>";
+  auto result = run_query(
+      html,
+      "WITH left_vals AS ("
+      "  SELECT n.node_id AS lid, n.class AS cls "
+      "  FROM doc AS n "
+      "  WHERE n.tag = 'x'"
+      "), "
+      "right_vals AS ("
+      "  SELECT n.class AS cls, n.node_id AS rid "
+      "  FROM doc AS n "
+      "  WHERE n.tag = 'y'"
+      ") "
+      "SELECT l.lid, l.cls, r.rid "
+      "FROM left_vals AS l "
+      "LEFT JOIN right_vals AS r ON l.cls = r.cls "
+      "ORDER BY l.lid");
+  expect_eq(result.rows.size(), 2, "left join row count with nullable join keys");
+  if (result.rows.size() != 2) return;
+  expect_true(result.rows[0].computed_fields.at("cls") == "a",
+              "non-null key matches expected right row");
+  expect_true(result.rows[0].computed_fields.find("rid") !=
+                  result.rows[0].computed_fields.end(),
+              "non-null key produces a right-side match");
+  expect_true(result.rows[1].computed_fields.find("cls") ==
+                  result.rows[1].computed_fields.end(),
+              "null left key remains null");
+  expect_true(result.rows[1].computed_fields.find("rid") ==
+                  result.rows[1].computed_fields.end(),
+              "null key does not match null key on right side");
+}
+
+void test_with_repeated_cell_nodes_joins_correctness() {
+  std::string html =
+      "<table>"
+      "<tr><td class='team'>Lions</td><td class='w'>10</td><td class='l'>2</td><td class='ot'>1</td><td class='pts'>21</td></tr>"
+      "<tr><td class='team'>Bears</td><td class='w'>8</td><td class='l'>4</td><td class='ot'>0</td><td class='pts'>16</td></tr>"
+      "</table>";
+  auto result = run_query(
+      html,
+      "WITH row_nodes AS ("
+      "  SELECT tr.node_id AS row_id "
+      "  FROM doc AS tr "
+      "  WHERE tr.tag = 'tr'"
+      "), "
+      "cell_nodes AS ("
+      "  SELECT c.parent_id AS row_id, c.class AS cls, TEXT(c) AS text_value "
+      "  FROM doc AS c "
+      "  WHERE c.tag = 'td'"
+      "), "
+      "row_values AS ("
+      "  SELECT r.row_id, "
+      "         team_cell.text_value AS team_value, "
+      "         w_cell.text_value AS w_value, "
+      "         l_cell.text_value AS l_value, "
+      "         ot_cell.text_value AS ot_value, "
+      "         pts_cell.text_value AS pts_value "
+      "  FROM row_nodes AS r "
+      "  LEFT JOIN cell_nodes AS team_cell ON team_cell.row_id = r.row_id AND team_cell.cls = 'team' "
+      "  LEFT JOIN cell_nodes AS w_cell ON w_cell.row_id = r.row_id AND w_cell.cls = 'w' "
+      "  LEFT JOIN cell_nodes AS l_cell ON l_cell.row_id = r.row_id AND l_cell.cls = 'l' "
+      "  LEFT JOIN cell_nodes AS ot_cell ON ot_cell.row_id = r.row_id AND ot_cell.cls = 'ot' "
+      "  LEFT JOIN cell_nodes AS pts_cell ON pts_cell.row_id = r.row_id AND pts_cell.cls = 'pts'"
+      ") "
+      "SELECT rv.row_id, rv.team_value, rv.w_value, rv.l_value, rv.ot_value, rv.pts_value "
+      "FROM row_values AS rv "
+      "ORDER BY rv.row_id");
+  expect_eq(result.rows.size(), 2, "repeated joins row count");
+  if (result.rows.size() != 2) return;
+  expect_true(result.rows[0].computed_fields.at("team_value") == "Lions", "row1 team");
+  expect_true(result.rows[0].computed_fields.at("w_value") == "10", "row1 w");
+  expect_true(result.rows[0].computed_fields.at("l_value") == "2", "row1 l");
+  expect_true(result.rows[0].computed_fields.at("ot_value") == "1", "row1 ot");
+  expect_true(result.rows[0].computed_fields.at("pts_value") == "21", "row1 pts");
+  expect_true(result.rows[1].computed_fields.at("team_value") == "Bears", "row2 team");
+  expect_true(result.rows[1].computed_fields.at("w_value") == "8", "row2 w");
+  expect_true(result.rows[1].computed_fields.at("l_value") == "4", "row2 l");
+  expect_true(result.rows[1].computed_fields.at("ot_value") == "0", "row2 ot");
+  expect_true(result.rows[1].computed_fields.at("pts_value") == "16", "row2 pts");
+}
+
 void test_with_non_equi_join_fallback_behavior() {
   std::string html =
       "<root>"
@@ -380,6 +506,12 @@ void register_with_join_tests(std::vector<TestCase>& tests) {
                    test_with_inner_equi_join_by_cte_field});
   tests.push_back({"with_left_equi_join_preserves_unmatched_rows",
                    test_with_left_equi_join_preserves_unmatched_rows});
+  tests.push_back({"with_hash_join_preserves_duplicate_multiplicity",
+                   test_with_hash_join_preserves_duplicate_multiplicity});
+  tests.push_back({"with_hash_join_null_keys_do_not_match",
+                   test_with_hash_join_null_keys_do_not_match});
+  tests.push_back({"with_repeated_cell_nodes_joins_correctness",
+                   test_with_repeated_cell_nodes_joins_correctness});
   tests.push_back({"with_non_equi_join_fallback_behavior",
                    test_with_non_equi_join_fallback_behavior});
 }
