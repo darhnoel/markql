@@ -73,6 +73,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Also benchmark the CTE-based MarkQL query variant",
     )
+    parser.add_argument(
+        "--markql-cte-big-timeout-sec",
+        type=int,
+        default=60,
+        help="Timeout in seconds for markql_cte on the big fixture (0 disables timeout)",
+    )
     return parser.parse_args()
 
 
@@ -115,11 +121,19 @@ def parse_peak_rss_kb(stderr_text: str) -> int | None:
     return int(match.group(1))
 
 
-def run_command(cmd: list[str]) -> tuple[bytes, str, int, int | None]:
+def run_command(cmd: list[str], timeout_sec: int | None = None) -> tuple[bytes, str, int, int | None]:
     wrapped = [str(TIME_BIN), "-v", *cmd] if TIME_BIN else cmd
     t0 = time.perf_counter_ns()
-    proc = subprocess.run(wrapped, capture_output=True)
-    t1 = time.perf_counter_ns()
+    try:
+        proc = subprocess.run(wrapped, capture_output=True, timeout=timeout_sec)
+        t1 = time.perf_counter_ns()
+    except subprocess.TimeoutExpired as ex:
+        rendered = " ".join(cmd)
+        raise RuntimeError(
+            f"Command timed out after {timeout_sec}s: {rendered}\n"
+            f"stdout:\n{(ex.stdout or b'').decode('utf-8', errors='replace')}\n"
+            f"stderr:\n{(ex.stderr or b'').decode('utf-8', errors='replace')}"
+        ) from ex
 
     stderr_text = proc.stderr.decode("utf-8", errors="replace")
     if proc.returncode != 0:
@@ -177,7 +191,12 @@ def mismatch_hint(expected: bytes, actual: bytes) -> str:
     return "\n".join(hint_lines)
 
 
-def run_markql_once(markql_bin: str, variant: Variant, query_file: Path) -> dict[str, Any]:
+def run_markql_once(
+    markql_bin: str,
+    variant: Variant,
+    query_file: Path,
+    timeout_sec: int | None = None,
+) -> dict[str, Any]:
     output_csv = Path("/tmp/markql_hockey.csv")
 
     if output_csv.exists():
@@ -193,7 +212,7 @@ def run_markql_once(markql_bin: str, variant: Variant, query_file: Path) -> dict
         "--input",
         str(variant.fixture),
     ]
-    _, _, end_to_end_ns, peak_rss_kb = run_command(cmd)
+    _, _, end_to_end_ns, peak_rss_kb = run_command(cmd, timeout_sec=timeout_sec)
 
     if not output_csv.exists():
         raise RuntimeError(f"MarkQL did not create expected CSV output file: {output_csv}")
@@ -279,6 +298,7 @@ def run_engine_variant(
     python_bin: str,
     markql_bin: str,
     bs4_parser: str,
+    markql_cte_big_timeout_sec: int,
 ) -> dict[str, Any]:
     expected = variant.gold.read_bytes()
     measured_samples: list[dict[str, Any]] = []
@@ -288,7 +308,15 @@ def run_engine_variant(
         if engine == "markql":
             sample = run_markql_once(markql_bin, variant, MARKQL_QUERY_BY_ENGINE["markql"])
         elif engine == "markql_cte":
-            sample = run_markql_once(markql_bin, variant, MARKQL_QUERY_BY_ENGINE["markql_cte"])
+            timeout_sec: int | None = None
+            if variant.name == "big" and markql_cte_big_timeout_sec > 0:
+                timeout_sec = markql_cte_big_timeout_sec
+            sample = run_markql_once(
+                markql_bin,
+                variant,
+                MARKQL_QUERY_BY_ENGINE["markql_cte"],
+                timeout_sec=timeout_sec,
+            )
         elif engine == "bs4":
             sample = run_bs4_once(python_bin, variant, bs4_parser)
         elif engine == "lxml":
@@ -484,6 +512,7 @@ def main() -> int:
                 python_bin=args.python,
                 markql_bin=args.markql_bin,
                 bs4_parser=args.bs4_parser,
+                markql_cte_big_timeout_sec=args.markql_cte_big_timeout_sec,
             )
             results.append(item)
 
@@ -503,6 +532,7 @@ def main() -> int:
             "markql_bin": args.markql_bin,
             "bs4_parser": args.bs4_parser,
             "include_markql_cte": args.include_markql_cte,
+            "markql_cte_big_timeout_sec": args.markql_cte_big_timeout_sec,
             "time_binary": str(TIME_BIN) if TIME_BIN else None,
             "cwd": os.getcwd(),
         },
