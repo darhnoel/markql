@@ -5,6 +5,7 @@ use std::process::Command;
 
 use anyhow::{anyhow, bail, Context, Result};
 use cucumber::{given, then, when, World};
+use cucumber::gherkin::Step;
 
 #[derive(Debug, Default, World)]
 struct CliWorld {
@@ -102,6 +103,19 @@ fn given_html_fixture(world: &mut CliWorld, path: String) -> Result<()> {
 fn given_query(world: &mut CliWorld, query: String) {
     world.query = Some(query);
     world.query_file = None;
+}
+
+#[given("the MarkQL query:")]
+fn given_query_docstring(world: &mut CliWorld, step: &Step) -> Result<()> {
+    let query = step
+        .docstring
+        .as_ref()
+        .map(|q| CliWorld::normalize_text(q).trim().to_string())
+        .filter(|q| !q.is_empty())
+        .ok_or_else(|| anyhow!("the MarkQL query: step requires a non-empty docstring"))?;
+    world.query = Some(query);
+    world.query_file = None;
+    Ok(())
 }
 
 #[given(expr = "the MarkQL query file {string}")]
