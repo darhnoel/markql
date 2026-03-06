@@ -2,6 +2,7 @@
 
 #include <cctype>
 #include <optional>
+#include <regex>
 
 namespace xsql::util {
 
@@ -179,6 +180,17 @@ std::string trim_ws(const std::string& s) {
     --end;
   }
   return s.substr(start, end - start);
+}
+
+std::optional<std::string> regex_replace_all(const std::string& input,
+                                             const std::string& pattern,
+                                             const std::string& replacement) {
+  try {
+    std::regex re(pattern, std::regex::ECMAScript);
+    return std::regex_replace(input, re, replacement);
+  } catch (const std::regex_error&) {
+    return std::nullopt;
+  }
 }
 
 std::string minify_html(std::string_view html) {

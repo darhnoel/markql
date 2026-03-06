@@ -45,14 +45,18 @@ void test_show_functions_output() {
   auto result = run_query("", "SHOW FUNCTIONS");
   expect_true(!result.rows.empty(), "SHOW FUNCTIONS returns rows");
   bool saw_text = false;
+  bool saw_regex_replace = false;
   for (const auto& row : result.rows) {
     auto it = row.attributes.find("function");
     if (it != row.attributes.end() && it->second == "text(tag|self)") {
       saw_text = true;
-      break;
+    }
+    if (it != row.attributes.end() && it->second == "regex_replace(str, pattern, repl)") {
+      saw_regex_replace = true;
     }
   }
   expect_true(saw_text, "SHOW FUNCTIONS lists text(tag|self)");
+  expect_true(saw_regex_replace, "SHOW FUNCTIONS lists regex_replace");
 }
 
 void test_describe_language_output() {

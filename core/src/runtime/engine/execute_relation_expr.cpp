@@ -273,6 +273,19 @@ std::optional<std::string> eval_relation_scalar_expr(const ScalarExpr& expr,
     }
     return out;
   }
+  if (fn == "REGEX_REPLACE") {
+    if (expr.args.size() != 3) return std::nullopt;
+    std::optional<std::string> text =
+        eval_relation_scalar_expr(expr.args[0], row, active_alias, profile);
+    std::optional<std::string> pattern =
+        eval_relation_scalar_expr(expr.args[1], row, active_alias, profile);
+    std::optional<std::string> replacement =
+        eval_relation_scalar_expr(expr.args[2], row, active_alias, profile);
+    if (!text.has_value() || !pattern.has_value() || !replacement.has_value()) {
+      return std::nullopt;
+    }
+    return util::regex_replace_all(*text, *pattern, *replacement);
+  }
   return std::nullopt;
 }
 

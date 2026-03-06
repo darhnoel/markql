@@ -688,22 +688,55 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
       if (!consume(TokenType::RParen, "Expected ) after text argument")) return false;
       item.span = Span{text_start, current_.pos};
     } else {
-      if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordTable) {
-        return set_error("Expected tag identifier inside TRIM()");
+      if ((current_.type == TokenType::Identifier || current_.type == TokenType::KeywordTable) &&
+          peek().type == TokenType::Dot) {
+        item.tag = current_.text;
+        advance();
+        advance();
+        if (current_.type != TokenType::Identifier) {
+          return set_error("Expected field identifier after '.'");
+        }
+        item.field = current_.text;
+        advance();
+      } else {
+        ScalarExpr trim_arg;
+        if (!parse_scalar_expr(trim_arg)) return false;
+        if (!consume(TokenType::RParen, "Expected ) after TRIM argument")) return false;
+
+        Query::SelectItem expr_item;
+        expr_item.expr_projection = true;
+        ScalarExpr trim_expr;
+        trim_expr.kind = ScalarExpr::Kind::FunctionCall;
+        trim_expr.function_name = "TRIM";
+        trim_expr.args.push_back(std::move(trim_arg));
+        trim_expr.span = Span{start, current_.pos};
+        expr_item.expr = std::move(trim_expr);
+        std::string column = "trim";
+        if (current_.type == TokenType::KeywordAs) {
+          advance();
+          if (current_.type != TokenType::Identifier) {
+            return set_error("Expected alias identifier after AS");
+          }
+          column = current_.text;
+          advance();
+        }
+        expr_item.field = column;
+        expr_item.tag = "*";
+        expr_item.span = Span{start, current_.pos};
+        items.push_back(std::move(expr_item));
+        saw_field = true;
+        return true;
       }
-      item.tag = current_.text;
-      advance();
-      if (current_.type != TokenType::Dot) {
-        return set_error("Expected field after tag inside TRIM()");
-      }
+    }
+    if (!consume(TokenType::RParen, "Expected ) after TRIM argument")) return false;
+    if (current_.type == TokenType::KeywordAs) {
       advance();
       if (current_.type != TokenType::Identifier) {
-        return set_error("Expected field identifier after '.'");
+        return set_error("Expected alias identifier after AS");
       }
       item.field = current_.text;
       advance();
     }
-    if (!consume(TokenType::RParen, "Expected ) after TRIM argument")) return false;
     item.trim = true;
     item.span = Span{start, current_.pos};
     items.push_back(item);
@@ -783,7 +816,8 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
         fn == "LENGTH" || fn == "CHAR_LENGTH" || fn == "POSITION" ||
         fn == "LOCATE" || fn == "REPLACE" || fn == "LOWER" ||
         fn == "UPPER" || fn == "LTRIM" || fn == "RTRIM" ||
-        fn == "TRIM" || fn == "DIRECT_TEXT" || fn == "COALESCE" ||
+        fn == "TRIM" || fn == "REGEX_REPLACE" ||
+        fn == "DIRECT_TEXT" || fn == "COALESCE" ||
         fn == "ATTR";
     if (scalar_fn) {
       Query::SelectItem item;

@@ -32,3 +32,14 @@ def test_summarize_output_shape() -> None:
     assert "total_nodes" in summary
     assert "tag_counts" in summary
     assert "attribute_keys" in summary
+
+
+def test_regex_replace_in_python_execute() -> None:
+    doc = xsql.load("<html><body><div class='price'> ¥278,120 </div></body></html>")
+    result = xsql.execute(
+        "SELECT REGEX_REPLACE(TRIM(TEXT(div)), '[^0-9]', '') AS digits "
+        "FROM document WHERE tag = 'div' AND attributes.class IS NOT NULL",
+        doc=doc,
+    )
+    assert len(result.rows) == 1
+    assert result.rows[0]["digits"] == "278120"

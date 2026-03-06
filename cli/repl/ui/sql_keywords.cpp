@@ -30,8 +30,8 @@ const std::vector<std::string>& markql_completion_keywords() {
       "null_only", "blank_only", "trailing", "rect", "sparse", "long", "wide", "show",
       "describe", "input", "inputs", "functions", "axes", "operators", "language", "case",
       "when", "then", "else", "end", "coalesce", "concat", "substring", "substr", "length",
-      "char_length", "position", "locate", "replace", "lower", "upper", "trim", "ltrim",
-      "rtrim", "first_text", "last_text", "first_attr", "last_attr"};
+      "char_length", "position", "locate", "replace", "regex_replace", "lower", "upper",
+      "trim", "ltrim", "rtrim", "first_text", "last_text", "first_attr", "last_attr"};
   return keywords;
 }
 

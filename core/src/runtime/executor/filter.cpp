@@ -875,6 +875,15 @@ ScalarValue eval_scalar_expr_impl(const ScalarExpr& expr,
     }
     return make_string(text);
   }
+  if (fn == "REGEX_REPLACE") {
+    if (args.size() != 3 || is_null(args[0]) || is_null(args[1]) || is_null(args[2])) {
+      return make_null();
+    }
+    std::optional<std::string> replaced = util::regex_replace_all(
+        to_string_value(args[0]), to_string_value(args[1]), to_string_value(args[2]));
+    if (!replaced.has_value()) return make_null();
+    return make_string(*replaced);
+  }
   if (fn == "LENGTH" || fn == "CHAR_LENGTH") {
     if (args.size() != 1 || is_null(args[0])) return make_null();
     return make_number(static_cast<int64_t>(to_string_value(args[0]).size()));

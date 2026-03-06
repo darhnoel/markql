@@ -387,6 +387,7 @@ Available in `SELECT`, `WHERE`, and inside `PROJECT(...)` expressions:
 - `LENGTH(str)` and `CHAR_LENGTH(str)` (UTF-8 byte length)
 - `POSITION(substr IN str)` and `LOCATE(substr, str[, start])`
 - `REPLACE(str, from, to)`
+- `REGEX_REPLACE(str, pattern, repl)` (ECMAScript regex)
 - `LOWER(str)`, `UPPER(str)`
 - `LTRIM(str)`, `RTRIM(str)`, `TRIM(str)`
 - `DIRECT_TEXT(tag)`
@@ -402,6 +403,12 @@ WHERE tag = 'div';
 SELECT SUBSTRING(TRIM(TEXT(div)), 1, 10) AS preview
 FROM doc
 WHERE attributes.id = 'card';
+```
+
+```sql
+SELECT REGEX_REPLACE(TRIM(TEXT(div)), '[^0-9]', '') AS digits
+FROM doc
+WHERE attributes.class = 'price';
 ```
 
 ## FLATTEN_TEXT / FLATTEN

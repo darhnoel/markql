@@ -103,6 +103,45 @@ void test_eval_string_functions_in_select() {
   }
 }
 
+void test_eval_top_level_trim_accepts_nested_expr_chain() {
+  std::string html = "<div class='a'>  Hello World  </div>";
+  auto result = run_query(
+      html,
+      "SELECT TRIM(REPLACE(TEXT(div), 'World', 'MarkQL')) AS cleaned "
+      "FROM document WHERE tag = 'div' AND attributes.class IS NOT NULL");
+  expect_eq(result.rows.size(), 1, "top-level trim nested expression row count");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].computed_fields["cleaned"] == "Hello MarkQL",
+                "top-level trim should accept nested expression chain");
+  }
+}
+
+void test_eval_regex_replace_in_select() {
+  std::string html = "<div class='price'>  ¥278,120  </div>";
+  auto result = run_query(
+      html,
+      "SELECT REGEX_REPLACE(TRIM(TEXT(div)), '[^0-9]', '') AS digits "
+      "FROM document WHERE tag = 'div' AND attributes.class IS NOT NULL");
+  expect_eq(result.rows.size(), 1, "regex_replace row count");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].computed_fields["digits"] == "278120",
+                "regex_replace should strip non-digits");
+  }
+}
+
+void test_eval_regex_replace_invalid_pattern_returns_null() {
+  std::string html = "<div class='price'>123</div>";
+  auto result = run_query(
+      html,
+      "SELECT REGEX_REPLACE(TEXT(div), '[', '') AS bad "
+      "FROM document WHERE tag = 'div' AND attributes.class IS NOT NULL");
+  expect_eq(result.rows.size(), 1, "regex_replace invalid-pattern row count");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].computed_fields.find("bad") == result.rows[0].computed_fields.end(),
+                "regex_replace invalid pattern returns NULL");
+  }
+}
+
 void test_eval_length_byte_semantics() {
   std::string html = "<div>é</div>";
   auto result = run_query(html, "SELECT LENGTH(TEXT(div)) AS len FROM document WHERE tag = 'div'");
@@ -331,6 +370,11 @@ void register_string_sql_tests(std::vector<TestCase>& tests) {
   tests.push_back({"parse_parse_source_forms", test_parse_parse_source_forms});
   tests.push_back({"eval_like_wildcards", test_eval_like_wildcards});
   tests.push_back({"eval_string_functions_in_select", test_eval_string_functions_in_select});
+  tests.push_back({"eval_top_level_trim_accepts_nested_expr_chain",
+                   test_eval_top_level_trim_accepts_nested_expr_chain});
+  tests.push_back({"eval_regex_replace_in_select", test_eval_regex_replace_in_select});
+  tests.push_back({"eval_regex_replace_invalid_pattern_returns_null",
+                   test_eval_regex_replace_invalid_pattern_returns_null});
   tests.push_back({"eval_length_byte_semantics", test_eval_length_byte_semantics});
   tests.push_back({"eval_position_found_and_not_found", test_eval_position_found_and_not_found});
   tests.push_back({"eval_direct_text_excludes_descendants", test_eval_direct_text_excludes_descendants});

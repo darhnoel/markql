@@ -469,6 +469,17 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr,
     }
     return make_string_projection(out);
   }
+  if (fn == "REGEX_REPLACE") {
+    if (args.size() != 3 || projection_is_null(args[0]) || projection_is_null(args[1]) || projection_is_null(args[2])) {
+      return make_null_projection();
+    }
+    std::optional<std::string> out = util::regex_replace_all(
+        projection_to_string(args[0]),
+        projection_to_string(args[1]),
+        projection_to_string(args[2]));
+    if (!out.has_value()) return make_null_projection();
+    return make_string_projection(*out);
+  }
   if (fn == "LENGTH" || fn == "CHAR_LENGTH") {
     if (args.size() != 1 || projection_is_null(args[0])) return make_null_projection();
     return make_number_projection(static_cast<int64_t>(projection_to_string(args[0]).size()));
@@ -627,6 +638,12 @@ std::optional<std::string> eval_flatten_extract_expr(
         pos += args[2]->size();
       }
       return out;
+    }
+    if (fn == "REGEX_REPLACE") {
+      if (args.size() != 3 || !args[0].has_value() || !args[1].has_value() || !args[2].has_value()) {
+        return std::nullopt;
+      }
+      return util::regex_replace_all(*args[0], *args[1], *args[2]);
     }
     if (fn == "LENGTH" || fn == "CHAR_LENGTH") {
       if (args.size() != 1 || !args[0].has_value()) return std::nullopt;

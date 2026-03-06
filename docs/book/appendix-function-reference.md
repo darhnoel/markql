@@ -30,6 +30,7 @@ You can inspect the runtime list with:
 - `TRIM`, `LTRIM`, `RTRIM`
 - `LOWER`, `UPPER`
 - `REPLACE`
+- `REGEX_REPLACE`
 - `CONCAT`
 - `SUBSTRING` / `SUBSTR`
 - `LENGTH` / `CHAR_LENGTH`
