@@ -66,3 +66,8 @@ bench/results/*
 
 # cucumber rustt
 tests/integration/rust/target
+tools/html_inspector/target
+
+# Lean formal verification
+formal/lean/.lake/
+formal/lean/lake-manifest.json

@@ -1,0 +1,57 @@
+[
+  {
+    "query": "SELECT div FROM doc",
+    "expected_verdict": "accept",
+    "note": "canonical identifier projection"
+  },
+  {
+    "query": "SELECT * FROM doc",
+    "expected_verdict": "accept",
+    "note": "canonical star projection"
+  },
+  {
+    "query": "SELECT div FROM doc AS n",
+    "expected_verdict": "accept",
+    "note": "canonical alias form"
+  },
+  {
+    "query": "SELECT title FROM doc",
+    "expected_verdict": "accept",
+    "note": "single identifier projection"
+  },
+  {
+    "query": "SELECT * FROM doc AS node_row",
+    "expected_verdict": "accept",
+    "note": "star projection with alias"
+  },
+  {
+    "query": "SELECT FROM doc",
+    "expected_verdict": "reject",
+    "note": "missing projection"
+  },
+  {
+    "query": "SELECT div doc",
+    "expected_verdict": "reject",
+    "note": "missing FROM keyword"
+  },
+  {
+    "query": "FROM doc SELECT div",
+    "expected_verdict": "reject",
+    "note": "wrong clause order"
+  },
+  {
+    "query": "SELECT div FROM",
+    "expected_verdict": "reject",
+    "note": "missing source"
+  },
+  {
+    "query": "SELECT div AS n",
+    "expected_verdict": "reject",
+    "note": "missing FROM doc before alias"
+  },
+  {
+    "query": "SELECT div FROM doc AS self",
+    "expected_verdict": "reject",
+    "note": "reserved alias inside the formal subset"
+  }
+]
