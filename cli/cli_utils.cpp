@@ -16,15 +16,12 @@
 #include "lang/markql_parser.h"
 #include "lang/parser/lexer.h"
 #include "render/duckbox_renderer.h"
+#include "runtime/engine/xsql_internal.h"
 #include "ui/color.h"
 
 #ifdef XSQL_USE_NLOHMANN_JSON
 #include <nlohmann/json.hpp>
 #endif
-#ifdef XSQL_USE_CURL
-#include <curl/curl.h>
-#endif
-
 namespace xsql::cli {
 
 namespace {
@@ -142,59 +139,6 @@ void print_field(std::ostream& os, const std::string& field, const xsql::QueryRe
     }
   }
 }
-
-#ifdef XSQL_USE_CURL
-/// Appends curl response chunks into the caller-owned buffer.
-/// MUST return the full byte count or curl will treat it as an error.
-/// Inputs are raw buffer pointers; side effects include buffer writes.
-size_t write_to_string(void* contents, size_t size, size_t nmemb, void* userp) {
-  size_t total = size * nmemb;
-  auto* out = static_cast<std::string*>(userp);
-  out->append(static_cast<const char*>(contents), total);
-  return total;
-}
-
-std::string normalize_content_type(const char* raw) {
-  if (!raw) return "";
-  std::string value(raw);
-  size_t end = value.find(';');
-  if (end != std::string::npos) {
-    value = value.substr(0, end);
-  }
-  size_t start = 0;
-  while (start < value.size() && std::isspace(static_cast<unsigned char>(value[start]))) {
-    ++start;
-  }
-  size_t finish = value.size();
-  while (finish > start && std::isspace(static_cast<unsigned char>(value[finish - 1]))) {
-    --finish;
-  }
-  value = value.substr(start, finish - start);
-  for (char& c : value) {
-    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-  }
-  return value;
-}
-
-void validate_content_type(CURL* curl) {
-  const char* raw = nullptr;
-  CURLcode info = curl_easy_getinfo(curl, CURLINFO_CONTENT_TYPE, &raw);
-  if (info != CURLE_OK) {
-    throw std::runtime_error("Failed to read Content-Type for URL");
-  }
-  std::string content_type = normalize_content_type(raw);
-  if (content_type.empty()) {
-    throw std::runtime_error("Missing Content-Type for URL");
-  }
-  if (content_type == "text/html" ||
-      content_type == "application/xhtml+xml" ||
-      content_type == "application/xml" ||
-      content_type == "text/xml") {
-    return;
-  }
-  throw std::runtime_error("Unsupported Content-Type for HTML fetch: " + content_type);
-}
-#endif
 
 }  // namespace
 
@@ -330,31 +274,7 @@ bool is_url(const std::string& value) {
 
 std::string load_html_input(const std::string& input, int timeout_ms) {
   if (is_url(input)) {
-#ifdef XSQL_USE_CURL
-    CURL* curl = curl_easy_init();
-    if (!curl) {
-      throw std::runtime_error("Failed to initialize curl");
-    }
-    std::string buffer;
-    curl_easy_setopt(curl, CURLOPT_URL, input.c_str());
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, "");
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_to_string);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buffer);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, timeout_ms);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "markql/0.1");
-    CURLcode res = curl_easy_perform(curl);
-    if (res != CURLE_OK) {
-      curl_easy_cleanup(curl);
-      throw std::runtime_error(std::string("Failed to fetch URL: ") + curl_easy_strerror(res));
-    }
-    validate_content_type(curl);
-    curl_easy_cleanup(curl);
-    return buffer;
-#else
-    (void)timeout_ms;
-    throw std::runtime_error("URL fetching is disabled (libcurl not available)");
-#endif
+    return xsql::xsql_internal::fetch_url(input, timeout_ms);
   }
   return read_file(input);
 }

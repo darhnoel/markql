@@ -1,6 +1,7 @@
 #include "xsql_internal.h"
 
 #include <cctype>
+#include <cstdio>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -26,6 +27,77 @@ std::string read_file(const std::string& path) {
 
 #ifdef XSQL_USE_CURL
 namespace {
+
+void ensure_curl_global_init() {
+  static const auto init_result = []() {
+    return curl_global_init(CURL_GLOBAL_DEFAULT);
+  }();
+  if (init_result != CURLE_OK) {
+    throw std::runtime_error("Failed to initialize curl globals");
+  }
+}
+
+std::string shell_quote_single(const std::string& value) {
+  std::string quoted;
+  quoted.reserve(value.size() + 2);
+  quoted.push_back('\'');
+  for (char c : value) {
+    if (c == '\'') {
+      quoted += "'\\''";
+    } else {
+      quoted.push_back(c);
+    }
+  }
+  quoted.push_back('\'');
+  return quoted;
+}
+
+std::string run_command_capture(const std::string& command) {
+#ifdef _WIN32
+  (void)command;
+  throw std::runtime_error("System curl fallback is not supported on Windows");
+#else
+  FILE* pipe = popen(command.c_str(), "r");
+  if (!pipe) {
+    throw std::runtime_error("Failed to start system curl fallback");
+  }
+  std::string output;
+  char buffer[8192];
+  while (true) {
+    size_t read = std::fread(buffer, 1, sizeof(buffer), pipe);
+    if (read > 0) {
+      output.append(buffer, read);
+    }
+    if (read < sizeof(buffer)) {
+      if (std::feof(pipe)) break;
+      if (std::ferror(pipe)) {
+        pclose(pipe);
+        throw std::runtime_error("Failed to read system curl output");
+      }
+    }
+  }
+  int status = pclose(pipe);
+  if (status != 0) {
+    throw std::runtime_error("System curl fallback failed");
+  }
+  return output;
+#endif
+}
+
+bool looks_like_browser_challenge_page(const std::string& html) {
+  return html.find("Just a moment...") != std::string::npos ||
+         html.find("Enable JavaScript and cookies to continue") != std::string::npos ||
+         html.find("_cf_chl_opt") != std::string::npos ||
+         html.find("/cdn-cgi/challenge-platform/") != std::string::npos;
+}
+
+std::string fetch_url_with_system_curl(const std::string& url, int timeout_ms) {
+  int timeout_seconds = timeout_ms <= 0 ? 5 : (timeout_ms + 999) / 1000;
+  std::ostringstream command;
+  command << "curl -LfsS --compressed --max-time " << timeout_seconds << " "
+          << shell_quote_single(url);
+  return run_command_capture(command.str());
+}
 
 /// Appends curl response bytes into a caller-provided buffer.
 /// MUST return the full byte count or curl treats it as an error.
@@ -86,6 +158,7 @@ void validate_content_type(CURL* curl) {
 /// Inputs are URL/timeout; outputs are contents with network side effects.
 std::string fetch_url(const std::string& url, int timeout_ms) {
 #ifdef XSQL_USE_CURL
+  ensure_curl_global_init();
   CURL* curl = curl_easy_init();
   if (!curl) {
     throw std::runtime_error("Failed to initialize curl");
@@ -105,6 +178,16 @@ std::string fetch_url(const std::string& url, int timeout_ms) {
   }
   validate_content_type(curl);
   curl_easy_cleanup(curl);
+  if (looks_like_browser_challenge_page(buffer)) {
+    try {
+      std::string fallback = fetch_url_with_system_curl(url, timeout_ms);
+      if (!fallback.empty() && !looks_like_browser_challenge_page(fallback)) {
+        return fallback;
+      }
+    } catch (const std::exception&) {
+      // WHY: preserve the libcurl result if system curl fallback is unavailable.
+    }
+  }
   return buffer;
 #else
   (void)url;
