@@ -181,6 +181,32 @@ void test_json_ndjson_stdout_fallback() {
   }
 }
 
+void test_csv_stdout_fallback() {
+  std::string html =
+      "<a href='x'>One</a>"
+      "<a href='y'>Two,Too</a>";
+  auto result = run_query(html, "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL");
+  std::ostringstream captured;
+  auto* old = std::cout.rdbuf(captured.rdbuf());
+  std::string error;
+  bool ok = xsql::cli::write_csv(result, "", error);
+  std::cout.rdbuf(old);
+  expect_true(ok, "csv stdout export ok");
+  expect_true(error.empty(), "csv stdout export no error");
+  expect_true(captured.str() == "href,text\nx,One\ny,\"Two,Too\"\n", "csv stdout export content");
+}
+
+void test_csv_export_rejects_table_results() {
+  xsql::QueryResult result;
+  result.to_table = true;
+  std::ostringstream captured;
+  std::string error;
+  bool ok = xsql::cli::write_csv(captured, result, error);
+  expect_true(!ok, "csv rejects table results");
+  expect_true(error.find("TO TABLE() results") != std::string::npos,
+              "csv table rejection has clear error");
+}
+
 #ifdef XSQL_USE_ARROW
 void test_parquet_export_smoke() {
   std::string html = "<div id='x'>Hi</div>";
@@ -211,6 +237,8 @@ void register_export_tests(std::vector<TestCase>& tests) {
   tests.push_back({"json_export_integration", test_json_export_integration});
   tests.push_back({"ndjson_export_integration", test_ndjson_export_integration});
   tests.push_back({"json_ndjson_stdout_fallback", test_json_ndjson_stdout_fallback});
+  tests.push_back({"csv_stdout_fallback", test_csv_stdout_fallback});
+  tests.push_back({"csv_export_rejects_table_results", test_csv_export_rejects_table_results});
 #ifdef XSQL_USE_ARROW
   tests.push_back({"parquet_export_smoke", test_parquet_export_smoke});
 #endif

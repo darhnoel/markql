@@ -75,8 +75,8 @@ int main(int argc, char** argv) {
   const xsql::ColumnNameMode colname_mode = xsql::ColumnNameMode::Normalize;
 
   // WHY: reject unknown modes to avoid silently changing output contracts.
-  if (output_mode != "duckbox" && output_mode != "json" && output_mode != "plain") {
-    std::cerr << "Invalid --mode value (use duckbox|json|plain)\n";
+  if (!xsql::cli::is_supported_output_mode(output_mode)) {
+    std::cerr << "Invalid --mode value (use duckbox|json|plain|csv)\n";
     return 2;
   }
 
@@ -281,6 +281,15 @@ int main(int argc, char** argv) {
           }
           std::cout << "Rows: " << count_result_rows(result) << std::endl;
           emit_runtime_summary();
+        }
+      } else if (output_mode == "csv") {
+        if (result.to_table) {
+          throw std::runtime_error(
+              "CSV output mode does not support TO TABLE() results; use TO TABLE(EXPORT='file.csv') instead");
+        }
+        std::string error;
+        if (!xsql::cli::write_csv(std::cout, result, error, colname_mode)) {
+          throw std::runtime_error(error);
         }
       } else {
         std::string json_out =

@@ -11,6 +11,7 @@
 #include "repl/commands/describe_last_command.h"
 #include "repl/commands/explore_command.h"
 #include "repl/commands/lint_command.h"
+#include "repl/commands/mode_command.h"
 #include "repl/commands/set_command.h"
 #include "repl/commands/summarize_content_command.h"
 #include "repl/core/line_editor.h"
@@ -208,6 +209,39 @@ static void test_set_colnames_command() {
   expect_true(config.colname_mode == xsql::ColumnNameMode::Raw, "set command updates mode");
 }
 
+static void test_mode_command_accepts_csv() {
+  StreamCapture capture(std::cout);
+  xsql::cli::ReplConfig config;
+  config.output_mode = "duckbox";
+  xsql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
+  std::string active_alias = "doc";
+  std::string last_full_output;
+  bool display_full = true;
+  size_t max_rows = 40;
+  std::vector<xsql::ColumnNameMapping> last_schema_map;
+  xsql::cli::CommandRegistry registry;
+  xsql::cli::PluginManager plugin_manager(registry);
+  xsql::cli::CommandContext ctx{
+      config,
+      editor,
+      sources,
+      active_alias,
+      last_full_output,
+      display_full,
+      max_rows,
+      last_schema_map,
+      plugin_manager,
+  };
+
+  auto handler = xsql::cli::make_mode_command();
+  bool handled = handler(".mode csv", ctx);
+  expect_true(handled, "mode command handles csv");
+  expect_true(config.output_mode == "csv", "mode command sets csv mode");
+  expect_true(capture.str().find("Output mode: csv") != std::string::npos,
+              "mode command confirms csv mode");
+}
+
 static void test_lint_command_toggles_on_and_off() {
   StreamCapture capture(std::cout);
   xsql::cli::ReplConfig config;
@@ -324,6 +358,43 @@ static void test_describe_last_command_outputs_map() {
   expect_true(output.find("data_id__2") != std::string::npos, "describe last output value");
 }
 
+static void test_describe_last_command_outputs_csv() {
+  StreamCapture capture(std::cout);
+  xsql::cli::ReplConfig config;
+  config.output_mode = "csv";
+  config.color = false;
+  config.highlight = false;
+  xsql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
+  std::string active_alias = "doc";
+  std::string last_full_output;
+  bool display_full = true;
+  size_t max_rows = 40;
+  std::vector<xsql::ColumnNameMapping> last_schema_map = {
+      {"data-id", "data_id"},
+  };
+  xsql::cli::CommandRegistry registry;
+  xsql::cli::PluginManager plugin_manager(registry);
+  xsql::cli::CommandContext ctx{
+      config,
+      editor,
+      sources,
+      active_alias,
+      last_full_output,
+      display_full,
+      max_rows,
+      last_schema_map,
+      plugin_manager,
+  };
+  auto handler = xsql::cli::make_describe_last_command();
+  bool handled = handler("DESCRIBE LAST;", ctx);
+  expect_true(handled, "describe last command handles csv output");
+  std::string output = capture.str();
+  expect_true(output.find("raw_name,output_name") != std::string::npos, "describe last csv header");
+  expect_true(output.find("data-id,data_id") != std::string::npos, "describe last csv row");
+  expect_true(output.find("Rows: 1") != std::string::npos, "describe last csv row count");
+}
+
 static void test_explore_command_uses_active_alias_by_default() {
   StreamCapture err_capture(std::cerr);
   xsql::cli::ReplConfig config;
@@ -402,9 +473,11 @@ void register_repl_tests(std::vector<TestCase>& tests) {
   tests.push_back({"sql_keyword_catalog_includes_new_tokens",
                    test_sql_keyword_catalog_includes_new_tokens});
   tests.push_back({"set_colnames_command", test_set_colnames_command});
+  tests.push_back({"mode_command_accepts_csv", test_mode_command_accepts_csv});
   tests.push_back({"lint_command_toggles_on_and_off", test_lint_command_toggles_on_and_off});
   tests.push_back({"lint_command_rejects_invalid_value", test_lint_command_rejects_invalid_value});
   tests.push_back({"describe_last_command_outputs_map", test_describe_last_command_outputs_map});
+  tests.push_back({"describe_last_command_outputs_csv", test_describe_last_command_outputs_csv});
   tests.push_back({"explore_command_uses_active_alias_by_default",
                    test_explore_command_uses_active_alias_by_default});
   tests.push_back({"explore_command_accepts_direct_target_and_alias_target",

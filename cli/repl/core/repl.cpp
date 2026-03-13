@@ -273,6 +273,18 @@ int run_repl(ReplConfig& config) {
         std::cout << "Rows: " << count_result_rows(result) << std::endl;
         emit_runtime_summary();
       }
+    } else if (config.output_mode == "csv") {
+      if (result.to_table) {
+        throw std::runtime_error(
+            "CSV output mode does not support TO TABLE() results; use TO TABLE(EXPORT='file.csv') instead");
+      }
+      std::ostringstream csv_out;
+      std::string error;
+      if (!xsql::cli::write_csv(csv_out, result, error, config.colname_mode)) {
+        throw std::runtime_error(error);
+      }
+      last_full_output = csv_out.str();
+      std::cout << last_full_output;
     } else {
       std::string json_out =
           result.to_table

@@ -174,17 +174,12 @@ std::vector<xsql::ColumnNameMapping> result_schema(const xsql::QueryResult& resu
 
 static std::vector<std::string> table_columns(const xsql::QueryResult::TableResult& table);
 
-bool write_csv(const xsql::QueryResult& result,
-               const std::string& path,
+bool write_csv(std::ostream& out,
+               const xsql::QueryResult& result,
                std::string& error,
                xsql::ColumnNameMode colname_mode) {
   if (!validate_rectangular(result, error)) return false;
   std::vector<xsql::ColumnNameMapping> schema = result_schema(result, colname_mode);
-  std::ofstream out(path, std::ios::binary);
-  if (!out) {
-    error = "Failed to open file for writing: " + path;
-    return false;
-  }
   for (size_t i = 0; i < schema.size(); ++i) {
     if (i > 0) out << ",";
     out << csv_escape(schema[i].output_name);
@@ -200,6 +195,23 @@ bool write_csv(const xsql::QueryResult& result,
     out << "\n";
   }
   return true;
+}
+
+bool write_csv(const xsql::QueryResult& result,
+               const std::string& path,
+               std::string& error,
+               xsql::ColumnNameMode colname_mode) {
+  std::ofstream file;
+  std::ostream* out = &std::cout;
+  if (!path.empty()) {
+    file.open(path, std::ios::binary);
+    if (!file) {
+      error = "Failed to open file for writing: " + path;
+      return false;
+    }
+    out = &file;
+  }
+  return write_csv(*out, result, error, colname_mode);
 }
 
 bool write_json(const xsql::QueryResult& result,

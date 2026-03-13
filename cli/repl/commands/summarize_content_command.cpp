@@ -5,10 +5,12 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
 
 #include "../../cli_utils.h"
+#include "../../export/export_sinks.h"
 #include "../../render/duckbox_renderer.h"
 #include "../../ui/color.h"
 #include "../plugin_manager.h"
@@ -304,21 +306,21 @@ CommandHandler make_summarize_content_command() {
                   return a.token < b.token;
                 });
       size_t limit = std::min<size_t>(scores.size(), max_tokens);
+      xsql::QueryResult result;
+      result.columns = {"token", "count", "score"};
+      for (size_t i = 0; i < limit; ++i) {
+        const auto& entry = scores[i];
+        xsql::QueryResultRow row;
+        row.node_id = static_cast<int64_t>(entry.count);
+        row.attributes["token"] = entry.token;
+        std::ostringstream oss;
+        oss.setf(std::ios::fixed);
+        oss.precision(3);
+        oss << entry.score;
+        row.attributes["score"] = oss.str();
+        result.rows.push_back(std::move(row));
+      }
       if (ctx.config.output_mode == "duckbox") {
-        xsql::QueryResult result;
-        result.columns = {"token", "count", "score"};
-        for (size_t i = 0; i < limit; ++i) {
-          const auto& entry = scores[i];
-          xsql::QueryResultRow row;
-          row.node_id = static_cast<int64_t>(entry.count);
-          row.attributes["token"] = entry.token;
-          std::ostringstream oss;
-          oss.setf(std::ios::fixed);
-          oss.precision(3);
-          oss << entry.score;
-          row.attributes["score"] = oss.str();
-          result.rows.push_back(std::move(row));
-        }
         xsql::render::DuckboxOptions options;
         options.max_width = 0;
         options.max_rows = ctx.max_rows;
@@ -326,6 +328,14 @@ CommandHandler make_summarize_content_command() {
         options.is_tty = ctx.config.color;
         options.colname_mode = ctx.config.colname_mode;
         std::cout << xsql::render::render_duckbox(result, options) << std::endl;
+      } else if (ctx.config.output_mode == "csv") {
+        std::ostringstream csv_out;
+        std::string error;
+        if (!write_csv(csv_out, result, error, ctx.config.colname_mode)) {
+          throw std::runtime_error(error);
+        }
+        ctx.last_full_output = csv_out.str();
+        std::cout << ctx.last_full_output;
       } else {
         std::ostringstream out;
         out << "[";

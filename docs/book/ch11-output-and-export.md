@@ -133,6 +133,16 @@ node_id,name,note
 11,Gamma,Budget
 ```
 
+If you want CSV on stdout for a regular rectangular query, you can also use CLI output mode:
+
+```bash
+./build/markql --mode csv --color=disabled \
+  --query "SELECT li.node_id, PROJECT(li) AS (name: TEXT(h2), note: COALESCE(TEXT(p), 'n/a')) FROM doc WHERE tag = 'li' ORDER BY node_id;" \
+  --input docs/fixtures/products.html
+```
+
+Use `TO TABLE(EXPORT='file.csv')` for extracted HTML tables; `--mode csv` does not render `TO TABLE()` results.
+
 ## Listing 11-4: Deliberate failure (`TO LIST` shape)
 
 <!-- VERIFY: ch11-listing-4-fail -->

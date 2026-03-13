@@ -557,7 +557,7 @@ Both also accept empty destination (`TO JSON()` / `TO NDJSON()`) to stream to st
 Useful commands:
 - `.help`
 - `.load <path|url> [--alias <name>]`
-- `.mode duckbox|json|plain`
+- `.mode duckbox|json|plain|csv`
 - `.set colnames raw|normalize`
 - `.lint on|off`
 - `.display_mode more|less`
@@ -566,6 +566,8 @@ Useful commands:
 - `.summarize [doc|alias|path|url]`
 - `.reload_config`
 - `.quit`
+
+`csv` mode writes rectangular query results directly to stdout. It does not render `TO TABLE()` results; for extracted HTML tables, use `TO TABLE(EXPORT='file.csv')`.
 
 Column-name modes:
 - `normalize` (default): use identifier-safe output headers/keys.

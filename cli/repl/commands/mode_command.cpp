@@ -3,6 +3,8 @@
 #include <iostream>
 #include <sstream>
 
+#include "../../cli_args.h"
+
 namespace xsql::cli {
 
 CommandHandler make_mode_command() {
@@ -14,11 +16,11 @@ CommandHandler make_mode_command() {
     std::string cmd;
     std::string mode;
     iss >> cmd >> mode;
-    if (mode == "duckbox" || mode == "json" || mode == "plain") {
+    if (is_supported_output_mode(mode)) {
       ctx.config.output_mode = mode;
       std::cout << "Output mode: " << ctx.config.output_mode << std::endl;
     } else {
-      std::cerr << "Usage: .mode duckbox|json|plain" << std::endl;
+      std::cerr << "Usage: .mode duckbox|json|plain|csv" << std::endl;
     }
     return true;
   };

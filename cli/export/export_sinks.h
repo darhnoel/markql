@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ostream>
 #include <string>
 
 #include "xsql/column_names.h"
@@ -10,6 +11,10 @@ namespace xsql::cli {
 bool export_result(const xsql::QueryResult& result,
                    std::string& error,
                    xsql::ColumnNameMode colname_mode = xsql::ColumnNameMode::Normalize);
+bool write_csv(std::ostream& out,
+               const xsql::QueryResult& result,
+               std::string& error,
+               xsql::ColumnNameMode colname_mode = xsql::ColumnNameMode::Normalize);
 bool write_csv(const xsql::QueryResult& result,
                const std::string& path,
                std::string& error,

@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <unordered_map>
 
 #include "../../cli_utils.h"
+#include "../../export/export_sinks.h"
 #include "../../render/duckbox_renderer.h"
 #include "../../ui/color.h"
 #include "dom/html_parser.h"
@@ -66,15 +68,15 @@ CommandHandler make_summarize_command() {
                   if (a.second != b.second) return a.second > b.second;
                   return a.first < b.first;
                 });
+      xsql::QueryResult result;
+      result.columns = {"tag", "count"};
+      for (const auto& item : summary) {
+        xsql::QueryResultRow row;
+        row.tag = item.first;
+        row.node_id = static_cast<int64_t>(item.second);
+        result.rows.push_back(std::move(row));
+      }
       if (ctx.config.output_mode == "duckbox") {
-        xsql::QueryResult result;
-        result.columns = {"tag", "count"};
-        for (const auto& item : summary) {
-          xsql::QueryResultRow row;
-          row.tag = item.first;
-          row.node_id = static_cast<int64_t>(item.second);
-          result.rows.push_back(std::move(row));
-        }
         xsql::render::DuckboxOptions options;
         options.max_width = 0;
         options.max_rows = ctx.max_rows;
@@ -82,6 +84,14 @@ CommandHandler make_summarize_command() {
         options.is_tty = ctx.config.color;
         options.colname_mode = ctx.config.colname_mode;
         std::cout << xsql::render::render_duckbox(result, options) << std::endl;
+      } else if (ctx.config.output_mode == "csv") {
+        std::ostringstream csv_out;
+        std::string error;
+        if (!write_csv(csv_out, result, error, ctx.config.colname_mode)) {
+          throw std::runtime_error(error);
+        }
+        ctx.last_full_output = csv_out.str();
+        std::cout << ctx.last_full_output;
       } else {
         std::string json_out = build_summary_json(summary);
         ctx.last_full_output = json_out;

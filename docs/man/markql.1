@@ -6,7 +6,7 @@ markql \- query HTML documents using SQL-like syntax
 [\fB\-\-query\fR \fIQUERY\fR]
 [\fB\-\-query\-file\fR \fIFILE\fR]
 [\fB\-\-input\fR \fIPATH_OR_URL\fR]
-[\fB\-\-mode\fR \fIduckbox|json|plain\fR]
+[\fB\-\-mode\fR \fIduckbox|json|plain|csv\fR]
 [\fB\-\-display_mode\fR \fImore|less\fR]
 [\fB\-\-highlight\fR \fIon|off\fR]
 [\fB\-\-timeout\-ms\fR \fIN\fR]
@@ -28,7 +28,7 @@ markql \- query HTML documents using SQL-like syntax
 \fB\-\-version\fR
 .SH DESCRIPTION
 \fBmarkql\fR runs SQL-style queries on HTML. It can read input from files, URLs,
-or standard input and outputs rows in table, JSON, or plain formats.
+or standard input and outputs rows in table, JSON, plain, or CSV formats.
 .SH OPTIONS
 .TP
 \fB\-\-query\fR \fIQUERY\fR
@@ -50,7 +50,7 @@ You can pass query text directly or combine with \fB\-\-query\fR/\fB\-\-query\-f
 \fB\-\-format\fR \fItext|json\fR
 Output format for lint diagnostics. Valid only with \fB\-\-lint\fR.
 .TP
-\fB\-\-mode\fR \fIduckbox|json|plain\fR
+\fB\-\-mode\fR \fIduckbox|json|plain|csv\fR
 Output renderer for query results.
 .TP
 \fB\-\-display_mode\fR \fImore|less\fR
@@ -91,6 +91,8 @@ Export sinks are available in query text:
 \fBTO JSON('file.json')\fR,
 \fBTO NDJSON('file.ndjson')\fR,
 and \fBTO PARQUET('file.parquet')\fR (when built with Arrow/Parquet support).
+CSV mode renders rectangular results to stdout. For \fBTO TABLE()\fR extraction, use
+\fBTO TABLE(EXPORT='file.csv')\fR instead of \fB\-\-mode csv\fR.
 .SH EXIT STATUS
 .TP
 \fB0\fR

@@ -207,6 +207,14 @@ void test_output_color_policy_auto_and_no_color() {
               "NO_COLOR disables output color");
 }
 
+void test_supported_output_mode_includes_csv() {
+  expect_true(xsql::cli::is_supported_output_mode("duckbox"), "duckbox mode supported");
+  expect_true(xsql::cli::is_supported_output_mode("json"), "json mode supported");
+  expect_true(xsql::cli::is_supported_output_mode("plain"), "plain mode supported");
+  expect_true(xsql::cli::is_supported_output_mode("csv"), "csv mode supported");
+  expect_true(!xsql::cli::is_supported_output_mode("yaml"), "unsupported mode rejected");
+}
+
 }  // namespace
 
 void register_cli_args_tests(std::vector<TestCase>& tests) {
@@ -231,4 +239,6 @@ void register_cli_args_tests(std::vector<TestCase>& tests) {
                    test_diagnostics_color_policy_modes_and_no_color_precedence});
   tests.push_back({"output_color_policy_auto_and_no_color",
                    test_output_color_policy_auto_and_no_color});
+  tests.push_back({"supported_output_mode_includes_csv",
+                   test_supported_output_mode_includes_csv});
 }

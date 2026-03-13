@@ -17,7 +17,7 @@ void print_startup_help(std::ostream& os) {
   os << "  markql --lint \"<query>\" [--format text|json]\n";
   os << "  markql --interactive [--input <path>]\n";
   os << "  markql explore <input.html>\n";
-  os << "  markql --mode duckbox|json|plain\n";
+  os << "  markql --mode duckbox|json|plain|csv\n";
   os << "  markql --display_mode more|less\n";
   os << "  markql --highlight on|off\n";
   os << "  markql --timeout-ms <n>\n";
@@ -48,7 +48,7 @@ void print_help(std::ostream& os) {
   os << "       markql --lint \"<query>\" [--format text|json]\n";
   os << "       markql --interactive [--input <path>]\n";
   os << "       markql explore <input.html>\n";
-  os << "       markql --mode duckbox|json|plain\n";
+  os << "       markql --mode duckbox|json|plain|csv\n";
   os << "       markql --display_mode more|less\n";
   os << "       markql --highlight on|off\n";
   os << "       markql --timeout-ms <n>\n";
@@ -197,6 +197,10 @@ bool parse_cli_args(int argc, char** argv, CliOptions& options, std::string& err
     return false;
   }
   return true;
+}
+
+bool is_supported_output_mode(const std::string& mode) {
+  return mode == "duckbox" || mode == "json" || mode == "plain" || mode == "csv";
 }
 
 bool resolve_output_color_enabled(const CliOptions& options,

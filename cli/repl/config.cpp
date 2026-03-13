@@ -7,6 +7,7 @@
 #include <fstream>
 #include <sstream>
 
+#include "../cli_args.h"
 #include "repl/core/line_editor.h"
 
 namespace xsql::cli {
@@ -217,7 +218,15 @@ bool load_repl_config(const std::string& path, ReplSettings& out, std::string& e
         error = "Invalid repl.output_mode at line " + std::to_string(line_no);
         return false;
       }
-      out.output_mode = parsed;
+      std::string lower;
+      lower.reserve(parsed.size());
+      for (unsigned char c : parsed) lower.push_back(static_cast<char>(std::tolower(c)));
+      if (!is_supported_output_mode(lower)) {
+        error = "Invalid repl.output_mode value at line " + std::to_string(line_no) +
+                " (expected duckbox|json|plain|csv)";
+        return false;
+      }
+      out.output_mode = lower;
     } else if (full_key == "repl.colnames") {
       std::string parsed = parse_string_value(value, ok);
       if (!ok) {

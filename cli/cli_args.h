@@ -47,6 +47,8 @@ void print_help(std::ostream& os);
 /// MUST leave options in a valid state and MUST return false on invalid flags.
 /// Inputs are argc/argv; outputs are options/error with no external side effects.
 bool parse_cli_args(int argc, char** argv, CliOptions& options, std::string& error);
+/// Returns true when a result output mode is supported by CLI and REPL.
+bool is_supported_output_mode(const std::string& mode);
 
 /// Resolves whether general CLI color output should be enabled.
 /// MUST honor NO_COLOR and TTY-aware auto mode.

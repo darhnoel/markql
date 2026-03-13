@@ -3,9 +3,12 @@
 #include <algorithm>
 #include <cctype>
 #include <iostream>
+#include <sstream>
 
 #include "../../cli_utils.h"
+#include "../../export/export_sinks.h"
 #include "../../render/duckbox_renderer.h"
+#include "../../ui/color.h"
 
 namespace xsql::cli {
 
@@ -42,6 +45,18 @@ CommandHandler make_describe_last_command() {
       options.is_tty = ctx.config.color;
       options.colname_mode = ctx.config.colname_mode;
       std::cout << xsql::render::render_duckbox(result, options) << std::endl;
+      std::cout << "Rows: " << count_result_rows(result) << std::endl;
+    } else if (ctx.config.output_mode == "csv") {
+      std::ostringstream csv_out;
+      std::string error;
+      if (!write_csv(csv_out, result, error, ctx.config.colname_mode)) {
+        if (ctx.config.color) std::cerr << kColor.red;
+        std::cerr << "Error: " << error << std::endl;
+        if (ctx.config.color) std::cerr << kColor.reset;
+        return true;
+      }
+      ctx.last_full_output = csv_out.str();
+      std::cout << ctx.last_full_output;
       std::cout << "Rows: " << count_result_rows(result) << std::endl;
     } else {
       std::string json_out = build_json(result, ctx.config.colname_mode);
