@@ -172,8 +172,8 @@ This keeps the semantic boundary stable:
 - result behavior stays the same as direct HTML + SQL execution
 - artifacts are versioned and rejected cleanly when major versions are incompatible
 - artifacts are treated as untrusted data and validated before use
-- the outer MarkQL artifact envelope stays custom; only the `.mqd` `DOCN` payload uses FlatBuffers in this branch
-- `.mqp` still uses the existing manual `QAST` payload format in this branch
+- the outer MarkQL artifact envelope stays custom while both `.mqd` `DOCN` and `.mqp` `QAST` payloads now use FlatBuffers
+- older manual-`QAST` `.mqp` files still read through a narrow fallback when the FlatBuffers required-feature bit is absent
 
 Create and inspect them from the CLI:
 
@@ -206,14 +206,15 @@ Security contract:
 - `.mqd` loading is verified in two steps:
   - validate the MarkQL header, section framing, required features, and checksum
   - then verify the `DOCN` FlatBuffers payload before reading any document fields
+- `.mqp` loading is verified in the same two steps, with the verifier applied to the `QAST` FlatBuffers payload before decoding prepared-query fields
 - `--artifact-info` escapes control characters before printing artifact-derived metadata.
 - The checksum is for corruption detection only; it is not an authenticity or signing mechanism.
 
-Why `DOCN` migrated before `QAST`:
+Prepared-query semantic boundary:
 
-- `DOCN` carried the largest manual binary serializer/reader surface.
-- `.mqd` directly targets the repeated HTML parse/load cost that motivated artifact caching.
-- Keeping `.mqp` manual for now avoids changing the prepared-query semantic boundary in the same branch.
+- `.mqp` persists the validated `Query` AST meaning needed for later execution.
+- It does not persist executor-private state or raw memory layouts.
+- Query kind and source kind metadata must still match the decoded query after load.
 
 Build note:
 
@@ -224,9 +225,9 @@ Build note:
 
 Benchmark methodology and current result:
 
-- `tests/bench_artifacts.cpp` runs 31 iterations and reports median values for HTML parse, `.mqd` write, `.mqd` read, raw parsed-document execution, `.mqd`-loaded execution, and artifact file size.
-- On `examples/html/koku_tk.html`, the current medians were `11.219 ms` parse, `62.349 ms` `.mqd` write, `53.796 ms` `.mqd` read, `4.523 ms` raw execution, `4.306 ms` `.mqd`-loaded execution, with `943136` artifact bytes.
-- That means this branch improves payload maintainability and verifier coverage, but it does not yet make `.mqd` document load faster on this fixture.
+- `tests/bench_artifacts.cpp` runs 31 iterations and reports median values for query parse, query prepare, `.mqp` write, `.mqp` load, query-text execution on raw HTML, `.mqp` execution on raw HTML, `.mqp` execution on `.mqd`, and `.mqp` file size.
+- On `examples/html/koku_tk.html`, the current medians were `0.060 ms` parse, `0.074 ms` prepare, `0.090 ms` `.mqp` write, `0.146 ms` `.mqp` load, `9.608 ms` query text on raw HTML, `9.642 ms` `.mqp` on raw HTML, `2.987 ms` `.mqp` on `.mqd`, with `1079` artifact bytes.
+- That means this branch makes prepared-query load cheap, but on this fixture `.mqp` alone does not materially change raw-HTML execution time because HTML parsing still dominates. The larger win appears when `.mqp` is combined with `.mqd`.
 
 ## Before/after diagrams
 

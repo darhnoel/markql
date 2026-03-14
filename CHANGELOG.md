@@ -60,14 +60,16 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 - Marked `.mqd` / `.mqp` artifact workflows as experimental in CLI help and documentation so WIP builds do not imply a fully settled interface.
 - `build.sh` now detects a default `vcpkg` triplet for Linux, macOS, and Windows environments instead of hardcoding `x64-linux`, and it falls back to portable CPU-count detection when `nproc` is unavailable.
 - Artifact persistence now uses explicit file magic, format versioning, producer-major compatibility checks, and additive sectioned payloads instead of private runtime layouts.
-- `.mqd` document artifacts now keep the existing MarkQL outer envelope but store the `DOCN` section as a FlatBuffers payload verified after header/checksum validation. `.mqp` / `QAST` artifacts remain on the existing manual payload format in this release.
+- `.mqd` document artifacts keep the existing MarkQL outer envelope and store the `DOCN` section as a FlatBuffers payload verified after header/checksum validation.
+- `.mqp` prepared-query artifacts now keep the same outer envelope while storing the `QAST` section as a FlatBuffers payload verified after header/checksum validation.
+- `.mqp` readers keep a narrow legacy fallback for older manual-`QAST` artifacts when the FlatBuffers required-feature bit is absent.
 - Artifact readers now treat `.mqd` and `.mqp` as untrusted data:
   - strict UTF-8 validation for all persisted text fields
   - bounded file/section/string/node/attribute/count parsing
   - payload checksum verification
   - rejection of unknown required feature flags
   - terminal-safe escaping for artifact-derived CLI metadata output.
-- Added median-based `.mqd` benchmark reporting for HTML parse, `.mqd` write, `.mqd` read, raw parsed-document execution, `.mqd`-loaded execution, and artifact file size.
+- Added median-based `.mqp` benchmark reporting for query parse, query prepare, `.mqp` write/load, query-text execution on raw HTML, `.mqp` execution on raw HTML, `.mqp` execution on `.mqd`, and artifact size.
 - `execute_query_from_file(...)` now accepts `.mqd` inputs transparently while preserving existing HTML-file behavior.
 - `FROM doc AS <alias>` is now accepted directly (for example `FROM doc AS n`).
 - `SELECT self` is now the documented canonical form for returning the current node in node-stream queries.
@@ -78,7 +80,7 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 - Updated tutorial/grammar/case-study examples to prefer `SELECT self` in node-returning `LATERAL` subqueries.
 - `--lint --format json` remains deterministic and ANSI-free regardless of color mode.
 - Optimized PROJECT/FLATTEN_EXTRACT evaluation by introducing per-row selector scope/tag caching, reducing repeated subtree scans while preserving query results and output formatting.
-- Bumped project/core, Python package metadata, and `vcpkg` manifest version references to `1.14.2`.
+- Bumped project/core, Python package metadata, and `vcpkg` manifest version references to `1.15.0`.
 
 ## [1.8.0] - 2026-02-13
 

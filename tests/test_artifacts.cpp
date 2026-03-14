@@ -107,6 +107,20 @@ size_t find_meta_node_count_offset(const std::string& data) {
   return source_len_offset + 8 + static_cast<size_t>(source_len);
 }
 
+size_t find_prepared_meta_query_kind_offset(const std::string& data) {
+  const size_t meta_payload = find_section_payload_offset(data, "META");
+  const uint64_t producer_len = read_u64_le(data, meta_payload);
+  const size_t language_len_offset = meta_payload + 8 + static_cast<size_t>(producer_len);
+  const uint64_t language_len = read_u64_le(data, language_len_offset);
+  const size_t query_len_offset = language_len_offset + 8 + static_cast<size_t>(language_len);
+  const uint64_t query_len = read_u64_le(data, query_len_offset);
+  return query_len_offset + 8 + static_cast<size_t>(query_len);
+}
+
+size_t find_prepared_meta_source_kind_offset(const std::string& data) {
+  return find_prepared_meta_query_kind_offset(data) + 1;
+}
+
 size_t find_docn_nodes_vector_size_offset(const std::string& data) {
   const size_t docn_payload = find_section_payload_offset(data, "DOCN");
   const char* payload_ptr = data.data() + docn_payload;
@@ -348,6 +362,7 @@ void test_artifact_inspect_reports_metadata() {
       xsql::artifacts::inspect_artifact_file(mqp_path.string());
   expect_true(query_info.header.kind == xsql::artifacts::ArtifactKind::PreparedQuery,
               "inspect mqp kind");
+  expect_true(query_info.header.required_features == 2, "inspect mqp required feature bit");
   expect_true(query_info.original_query == query, "inspect mqp original query");
 
   std::filesystem::remove(mqd_path);
@@ -468,6 +483,60 @@ void test_artifact_node_count_metadata_mismatch_rejected() {
   std::filesystem::remove(path);
 }
 
+void test_artifact_qast_flatbuffer_verifier_rejected() {
+  const std::string query =
+      "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL ORDER BY doc_order";
+  const std::filesystem::path path = temp_path("xsql_qast_verifier.mqp");
+  xsql::artifacts::PreparedQueryArtifact prepared = xsql::artifacts::prepare_query_artifact(query);
+  xsql::artifacts::write_prepared_query_artifact_file(prepared.query, query, path.string());
+  std::string bytes = read_binary(path);
+  const size_t qast_payload = find_section_payload_offset(bytes, "QAST");
+  write_u32_le(bytes, qast_payload, 0x7fffffffu);
+  rewrite_payload_checksum(bytes);
+  write_binary(path, bytes);
+  expect_artifact_error_contains(
+      [&]() { (void)xsql::artifacts::read_prepared_query_artifact_file(path.string()); },
+      "QAST FlatBuffer verification failed",
+      "qast flatbuffer verifier rejects hostile payload");
+  std::filesystem::remove(path);
+}
+
+void test_artifact_query_kind_metadata_mismatch_rejected() {
+  const std::string query =
+      "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL ORDER BY doc_order";
+  const std::filesystem::path path = temp_path("xsql_query_kind_meta.mqp");
+  xsql::artifacts::PreparedQueryArtifact prepared = xsql::artifacts::prepare_query_artifact(query);
+  xsql::artifacts::write_prepared_query_artifact_file(prepared.query, query, path.string());
+  std::string bytes = read_binary(path);
+  bytes[find_prepared_meta_query_kind_offset(bytes)] =
+      static_cast<char>(xsql::Query::Kind::DescribeLanguage);
+  rewrite_payload_checksum(bytes);
+  write_binary(path, bytes);
+  expect_artifact_error_contains(
+      [&]() { (void)xsql::artifacts::read_prepared_query_artifact_file(path.string()); },
+      "query metadata mismatch",
+      "query kind metadata mismatch rejected");
+  std::filesystem::remove(path);
+}
+
+void test_artifact_source_kind_metadata_mismatch_rejected() {
+  const std::string query =
+      "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL ORDER BY doc_order";
+  const std::filesystem::path path = temp_path("xsql_source_kind_meta.mqp");
+  xsql::artifacts::PreparedQueryArtifact prepared = xsql::artifacts::prepare_query_artifact(query);
+  xsql::artifacts::write_prepared_query_artifact_file(prepared.query, query, path.string());
+  std::string bytes = read_binary(path);
+  bytes[find_prepared_meta_source_kind_offset(bytes)] =
+      static_cast<char>(xsql::Source::Kind::DerivedSubquery);
+  rewrite_payload_checksum(bytes);
+  write_binary(path, bytes);
+  expect_artifact_error_contains(
+      [&]() { (void)xsql::artifacts::read_prepared_query_artifact_file(path.string()); },
+      "source metadata mismatch",
+      "source kind metadata mismatch rejected");
+  std::filesystem::remove(path);
+}
+
 void test_artifact_invalid_utf8_rejected() {
   const std::filesystem::path fixture = repo_path("docs/fixtures/basic.html");
   const std::filesystem::path path = temp_path("xsql_utf8.mqd");
@@ -550,6 +619,12 @@ void register_artifact_tests(std::vector<TestCase>& tests) {
                    test_artifact_docn_flatbuffer_verifier_rejected});
   tests.push_back({"artifact_node_count_metadata_mismatch_rejected",
                    test_artifact_node_count_metadata_mismatch_rejected});
+  tests.push_back({"artifact_qast_flatbuffer_verifier_rejected",
+                   test_artifact_qast_flatbuffer_verifier_rejected});
+  tests.push_back({"artifact_query_kind_metadata_mismatch_rejected",
+                   test_artifact_query_kind_metadata_mismatch_rejected});
+  tests.push_back({"artifact_source_kind_metadata_mismatch_rejected",
+                   test_artifact_source_kind_metadata_mismatch_rejected});
   tests.push_back({"artifact_invalid_utf8_rejected", test_artifact_invalid_utf8_rejected});
   tests.push_back({"artifact_terminal_escape_sanitization",
                    test_artifact_terminal_escape_sanitization});

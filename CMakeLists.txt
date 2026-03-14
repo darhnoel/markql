@@ -27,6 +27,8 @@ add_library(xsql_core
   core/src/artifacts/artifacts.cpp
   core/src/artifacts/artifact_internal.cpp
   core/src/artifacts/artifact_document.cpp
+  core/src/artifacts/artifact_query.cpp
+  core/src/artifacts/artifact_query_flatbuffers.cpp
   core/src/lang/ast.cpp
   core/src/lang/diagnostics.cpp
   core/src/lang/markql_parser.cpp
@@ -110,13 +112,22 @@ if (XSQL_WITH_FLATBUFFERS)
     message(FATAL_ERROR "flatbuffers not found. Configure with the repo vcpkg manifest/build path or set XSQL_WITH_FLATBUFFERS=OFF.")
   endif()
   set(XSQL_DOCN_SCHEMA "${CMAKE_CURRENT_SOURCE_DIR}/core/src/artifacts/schema/document.fbs")
+  set(XSQL_QAST_SCHEMA "${CMAKE_CURRENT_SOURCE_DIR}/core/src/artifacts/schema/prepared_query_payload.fbs")
   flatbuffers_generate_headers(
     TARGET xsql_artifact_docn_flatbuffers
     SCHEMAS ${XSQL_DOCN_SCHEMA}
     INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/core/src/artifacts/schema"
   )
+  flatbuffers_generate_headers(
+    TARGET xsql_artifact_qast_flatbuffers
+    SCHEMAS ${XSQL_QAST_SCHEMA}
+    INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/core/src/artifacts/schema"
+  )
   add_dependencies(xsql_core GENERATE_xsql_artifact_docn_flatbuffers)
-  target_link_libraries(xsql_core PUBLIC flatbuffers::flatbuffers xsql_artifact_docn_flatbuffers)
+  add_dependencies(xsql_core GENERATE_xsql_artifact_qast_flatbuffers)
+  target_link_libraries(xsql_core PUBLIC flatbuffers::flatbuffers
+                                         xsql_artifact_docn_flatbuffers
+                                         xsql_artifact_qast_flatbuffers)
 endif()
 
 if (XSQL_ENABLE_KHMER_NUMBER)
@@ -345,7 +356,8 @@ if (XSQL_BUILD_TESTS)
   target_link_libraries(xsql_tests PRIVATE xsql_core)
   target_include_directories(xsql_tests PRIVATE cli core/src core/include tests)
   if (XSQL_WITH_FLATBUFFERS)
-    target_link_libraries(xsql_tests PRIVATE xsql_artifact_docn_flatbuffers)
+    target_link_libraries(xsql_tests PRIVATE xsql_artifact_docn_flatbuffers
+                                             xsql_artifact_qast_flatbuffers)
   endif()
   if (XSQL_ARROW_TARGET AND XSQL_PARQUET_TARGET)
     target_link_libraries(xsql_tests PRIVATE ${XSQL_ARROW_TARGET} ${XSQL_PARQUET_TARGET})
@@ -371,7 +383,8 @@ if (XSQL_BUILD_TESTS)
   target_link_libraries(xsql_bench_artifacts PRIVATE xsql_core)
   target_include_directories(xsql_bench_artifacts PRIVATE cli core/src core/include tests)
   if (XSQL_WITH_FLATBUFFERS)
-    target_link_libraries(xsql_bench_artifacts PRIVATE xsql_artifact_docn_flatbuffers)
+    target_link_libraries(xsql_bench_artifacts PRIVATE xsql_artifact_docn_flatbuffers
+                                                      xsql_artifact_qast_flatbuffers)
   endif()
   set_target_properties(xsql_bench_artifacts PROPERTIES OUTPUT_NAME markql_bench_artifacts)
   add_custom_command(

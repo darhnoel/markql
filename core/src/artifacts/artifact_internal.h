@@ -20,7 +20,9 @@ constexpr uint32_t kSectionHeaderBytes = 12;
 constexpr char kMagicDocument[4] = {'M', 'Q', 'D', '\0'};
 constexpr char kMagicPrepared[4] = {'M', 'Q', 'P', '\0'};
 constexpr uint64_t kRequiredFeatureDocnFlatbuffers = 1ull << 0;
-constexpr uint64_t kKnownRequiredFeatures = kRequiredFeatureDocnFlatbuffers;
+constexpr uint64_t kRequiredFeatureQastFlatbuffers = 1ull << 1;
+constexpr uint64_t kKnownRequiredFeatures =
+    kRequiredFeatureDocnFlatbuffers | kRequiredFeatureQastFlatbuffers;
 constexpr uint64_t kMaxArtifactBytes = 256ull * 1024ull * 1024ull;
 constexpr uint32_t kMaxSectionCount = 16;
 constexpr uint64_t kMaxSectionBytes = kMaxArtifactBytes;

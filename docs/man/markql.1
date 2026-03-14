@@ -113,9 +113,10 @@ Artifact compatibility rules:
 required-feature flags, and a payload checksum.
 Readers treat artifacts as untrusted data: they reject incompatible major versions, unknown required flags,
 malformed UTF-8 text fields, oversized sections/counts, and corrupted payloads with explicit errors.
-The outer MarkQL artifact envelope remains custom. In this release, only the \fBDOCN\fR payload inside
-\fB.mqd\fR uses FlatBuffers with verifier checks; \fB.mqp\fR prepared-query payloads remain on the existing
-manual format. Compression is not used in the MVP artifact format.
+The outer MarkQL artifact envelope remains custom. In this release, both the \fBDOCN\fR payload inside
+\fB.mqd\fR and the \fBQAST\fR payload inside \fB.mqp\fR use FlatBuffers with verifier checks. Older
+manual-\fBQAST\fR \fB.mqp\fR files still read through a compatibility fallback. Compression is not used in the
+MVP artifact format.
 .SH EXIT STATUS
 .TP
 \fB0\fR

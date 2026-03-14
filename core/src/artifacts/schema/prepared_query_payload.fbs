@@ -1,0 +1,307 @@
+namespace xsql.artifacts.qastfb;
+
+enum QueryKind : ubyte {
+  Select = 0,
+  ShowInput = 1,
+  ShowInputs = 2,
+  ShowFunctions = 3,
+  ShowAxes = 4,
+  ShowOperators = 5,
+  DescribeDoc = 6,
+  DescribeLanguage = 7
+}
+
+enum SourceKind : ubyte {
+  Document = 0,
+  Path = 1,
+  Url = 2,
+  RawHtml = 3,
+  Fragments = 4,
+  Parse = 5,
+  CteRef = 6,
+  DerivedSubquery = 7
+}
+
+enum Axis : ubyte {
+  Self = 0,
+  Parent = 1,
+  Child = 2,
+  Ancestor = 3,
+  Descendant = 4
+}
+
+enum OperandFieldKind : ubyte {
+  Attribute = 0,
+  AttributesMap = 1,
+  Tag = 2,
+  Text = 3,
+  NodeId = 4,
+  ParentId = 5,
+  SiblingPos = 6,
+  MaxDepth = 7,
+  DocOrder = 8
+}
+
+enum ScalarExprKind : ubyte {
+  Operand = 0,
+  SelfRef = 1,
+  StringLiteral = 2,
+  NumberLiteral = 3,
+  NullLiteral = 4,
+  FunctionCall = 5
+}
+
+enum CompareOp : ubyte {
+  Eq = 0,
+  In = 1,
+  NotEq = 2,
+  Lt = 3,
+  Lte = 4,
+  Gt = 5,
+  Gte = 6,
+  IsNull = 7,
+  IsNotNull = 8,
+  Regex = 9,
+  Like = 10,
+  Contains = 11,
+  ContainsAll = 12,
+  ContainsAny = 13,
+  HasDirectText = 14
+}
+
+enum BinaryOp : ubyte {
+  And = 0,
+  Or = 1
+}
+
+enum ExprVariant : ubyte {
+  Compare = 0,
+  Exists = 1,
+  Binary = 2
+}
+
+enum JoinType : ubyte {
+  Inner = 0,
+  Left = 1,
+  Cross = 2
+}
+
+enum ExportSinkKind : ubyte {
+  None = 0,
+  Csv = 1,
+  Parquet = 2,
+  Json = 3,
+  Ndjson = 4
+}
+
+enum TrimEmptyCols : ubyte {
+  Off = 0,
+  Trailing = 1,
+  All = 2
+}
+
+enum EmptyIs : ubyte {
+  BlankOrNull = 0,
+  NullOnly = 1,
+  BlankOnly = 2
+}
+
+enum TableFormat : ubyte {
+  Rect = 0,
+  Sparse = 1
+}
+
+enum SparseShape : ubyte {
+  Long = 0,
+  Wide = 1
+}
+
+enum Aggregate : ubyte {
+  None = 0,
+  Count = 1,
+  Summarize = 2,
+  Tfidf = 3
+}
+
+enum TfidfStopwords : ubyte {
+  English = 0,
+  None = 1
+}
+
+enum FlattenExtractKind : ubyte {
+  Text = 0,
+  Attr = 1,
+  Coalesce = 2,
+  FunctionCall = 3,
+  StringLiteral = 4,
+  NumberLiteral = 5,
+  NullLiteral = 6,
+  AliasRef = 7,
+  OperandRef = 8,
+  CaseWhen = 9
+}
+
+table Operand {
+  axis:Axis = Self;
+  field_kind:OperandFieldKind = Attribute;
+  attribute:string;
+  qualifier:string;
+}
+
+table ScalarExpr {
+  kind:ScalarExprKind = Operand;
+  operand:Operand;
+  string_value:string;
+  number_value:long = 0;
+  function_name:string;
+  args:[ScalarExpr];
+}
+
+table CompareExpr {
+  op:CompareOp = Eq;
+  lhs:Operand;
+  rhs_values:[string];
+  lhs_expr:ScalarExpr;
+  rhs_expr:ScalarExpr;
+  rhs_expr_list:[ScalarExpr];
+}
+
+table ExistsExpr {
+  axis:Axis = Self;
+  where_expr:Expr;
+}
+
+table BinaryExpr {
+  op:BinaryOp = And;
+  left:Expr;
+  right:Expr;
+}
+
+table Expr {
+  variant:ExprVariant = Compare;
+  compare:CompareExpr;
+  exists:ExistsExpr;
+  binary:BinaryExpr;
+}
+
+table Source {
+  kind:SourceKind = Document;
+  value:string;
+  alias:string;
+  fragments_query:Query;
+  fragments_raw:string;
+  parse_query:Query;
+  parse_expr:ScalarExpr;
+  derived_query:Query;
+}
+
+table FlattenExtractExpr {
+  kind:FlattenExtractKind = Text;
+  tag:string;
+  attribute:string;
+  where_expr:Expr;
+  selector_index:long = 0;
+  has_selector_index:bool = false;
+  selector_last:bool = false;
+  args:[FlattenExtractExpr];
+  function_name:string;
+  string_value:string;
+  number_value:long = 0;
+  alias_ref:string;
+  operand:Operand;
+  case_when_conditions:[Expr];
+  case_when_values:[FlattenExtractExpr];
+  case_else:FlattenExtractExpr;
+}
+
+table SelectItem {
+  aggregate:Aggregate = None;
+  tfidf_stopwords:TfidfStopwords = English;
+  tag:string;
+  tfidf_tags:[string];
+  field:string;
+  tfidf_all_tags:bool = false;
+  tfidf_top_terms:ulong = 30;
+  tfidf_min_df:ulong = 1;
+  tfidf_max_df:ulong = 0;
+  inner_html_depth:ulong = 0;
+  has_inner_html_depth:bool = false;
+  inner_html_auto_depth:bool = false;
+  inner_html_function:bool = false;
+  raw_inner_html_function:bool = false;
+  text_function:bool = false;
+  trim:bool = false;
+  flatten_text:bool = false;
+  flatten_extract:bool = false;
+  self_node_projection:bool = false;
+  expr_projection:bool = false;
+  flatten_depth:ulong = 0;
+  has_flatten_depth:bool = false;
+  flatten_aliases:[string];
+  flatten_extract_aliases:[string];
+  flatten_extract_exprs:[FlattenExtractExpr];
+  expr:ScalarExpr;
+  project_expr:FlattenExtractExpr;
+}
+
+table WithCte {
+  name:string;
+  query:Query (required);
+}
+
+table WithClause {
+  ctes:[WithCte];
+}
+
+table JoinItem {
+  type:JoinType = Inner;
+  right_source:Source;
+  on_expr:Expr;
+  lateral:bool = false;
+}
+
+table OrderBy {
+  field:string;
+  descending:bool = false;
+}
+
+table TableOptions {
+  trim_empty_cols:TrimEmptyCols = Off;
+  empty_is:EmptyIs = BlankOrNull;
+  format:TableFormat = Rect;
+  sparse_shape:SparseShape = Long;
+  trim_empty_rows:bool = false;
+  stop_after_empty_rows:ulong = 0;
+  header_normalize:bool = true;
+  header_normalize_explicit:bool = false;
+}
+
+table ExportSink {
+  kind:ExportSinkKind = None;
+  path:string;
+}
+
+table Query {
+  kind:QueryKind = Select;
+  with_clause:WithClause;
+  select_items:[SelectItem];
+  source:Source;
+  joins:[JoinItem];
+  where_expr:Expr;
+  order_by:[OrderBy];
+  exclude_fields:[string];
+  limit:ulong = 0;
+  has_limit:bool = false;
+  to_list:bool = false;
+  to_table:bool = false;
+  table_has_header:bool = true;
+  table_options:TableOptions;
+  export_sink:ExportSink;
+}
+
+table PreparedQueryPayload {
+  query:Query (required);
+}
+
+root_type PreparedQueryPayload;
+file_identifier "XQAS";

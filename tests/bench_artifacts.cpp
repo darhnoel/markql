@@ -5,11 +5,13 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
 #include "artifacts/artifacts.h"
 #include "dom/html_parser.h"
+#include "lang/markql_parser.h"
 #include "runtime/engine/engine_execution_internal.h"
 
 namespace {
@@ -65,45 +67,68 @@ int main() {
   const std::string html = read_file(fixture.string());
   const std::filesystem::path mqd_path =
       std::filesystem::temp_directory_path() / "markql_bench_docn_flatbuffers.mqd";
+  const std::filesystem::path mqp_path =
+      std::filesystem::temp_directory_path() / "markql_bench_qast_flatbuffers.mqp";
 
   xsql::HtmlDocument parsed_doc = xsql::parse_html(html);
+  const std::vector<double> query_parse_samples = measure_iterations(iterations, [&]() {
+    auto parsed = xsql::parse_query(query);
+    if (!parsed.query.has_value()) throw std::runtime_error("benchmark parse failure");
+  });
+
+  auto parsed_query = xsql::parse_query(query);
+  if (!parsed_query.query.has_value()) throw std::runtime_error("benchmark parse failure");
+
+  const std::vector<double> query_prepare_samples = measure_iterations(iterations, [&]() {
+    auto prepared = xsql::artifacts::prepare_query_artifact(query);
+    (void)prepared;
+  });
+
   xsql::artifacts::PreparedQueryArtifact prepared = xsql::artifacts::prepare_query_artifact(query);
-
-  const std::vector<double> parse_samples = measure_iterations(iterations, [&]() {
-    (void)xsql::parse_html(html);
+  const std::vector<double> mqp_write_samples = measure_iterations(iterations, [&]() {
+    xsql::artifacts::write_prepared_query_artifact_file(prepared.query, query, mqp_path.string());
   });
 
-  const std::vector<double> write_samples = measure_iterations(iterations, [&]() {
-    xsql::artifacts::write_document_artifact_file(parsed_doc, fixture.string(), mqd_path.string());
+  xsql::artifacts::write_prepared_query_artifact_file(prepared.query, query, mqp_path.string());
+  const uintmax_t mqp_bytes = std::filesystem::file_size(mqp_path);
+
+  const std::vector<double> mqp_load_samples = measure_iterations(iterations, [&]() {
+    (void)xsql::artifacts::read_prepared_query_artifact_file(mqp_path.string());
   });
+  xsql::artifacts::PreparedQueryArtifact loaded_prepared =
+      xsql::artifacts::read_prepared_query_artifact_file(mqp_path.string());
 
   xsql::artifacts::write_document_artifact_file(parsed_doc, fixture.string(), mqd_path.string());
-  const uintmax_t mqd_bytes = std::filesystem::file_size(mqd_path);
-
-  const std::vector<double> read_samples = measure_iterations(iterations, [&]() {
-    (void)xsql::artifacts::read_document_artifact_file(mqd_path.string());
-  });
-
   xsql::artifacts::DocumentArtifact loaded_doc =
       xsql::artifacts::read_document_artifact_file(mqd_path.string());
 
-  const std::vector<double> raw_exec_samples = measure_iterations(iterations, [&]() {
-    (void)xsql::execute_query_with_source(prepared.query, nullptr, &parsed_doc, fixture.string());
+  const std::vector<double> query_text_raw_html_samples = measure_iterations(iterations, [&]() {
+    auto parsed = xsql::parse_query(query);
+    if (!parsed.query.has_value()) throw std::runtime_error("benchmark parse failure");
+    xsql::validate_query_for_execution(*parsed.query);
+    (void)xsql::execute_query_with_source(*parsed.query, &html, nullptr, fixture.string());
   });
 
-  const std::vector<double> mqd_exec_samples = measure_iterations(iterations, [&]() {
-    (void)xsql::artifacts::execute_prepared_query_on_document(prepared, loaded_doc);
+  const std::vector<double> mqp_raw_html_samples = measure_iterations(iterations, [&]() {
+    (void)xsql::artifacts::execute_prepared_query_on_html(loaded_prepared, html, fixture.string());
+  });
+
+  const std::vector<double> mqp_mqd_samples = measure_iterations(iterations, [&]() {
+    (void)xsql::artifacts::execute_prepared_query_on_document(loaded_prepared, loaded_doc);
   });
 
   std::cout << std::fixed << std::setprecision(3);
   std::cout << "fixture=" << fixture.string() << " iterations=" << iterations << "\n";
-  std::cout << "phase html_parse_ms_median=" << median_ms(parse_samples) << "\n";
-  std::cout << "phase mqd_write_ms_median=" << median_ms(write_samples) << "\n";
-  std::cout << "phase mqd_read_ms_median=" << median_ms(read_samples) << "\n";
-  std::cout << "phase raw_document_execute_ms_median=" << median_ms(raw_exec_samples) << "\n";
-  std::cout << "phase mqd_loaded_execute_ms_median=" << median_ms(mqd_exec_samples) << "\n";
-  std::cout << "artifact mqd_bytes=" << mqd_bytes << "\n";
+  std::cout << "phase query_parse_ms_median=" << median_ms(query_parse_samples) << "\n";
+  std::cout << "phase query_prepare_ms_median=" << median_ms(query_prepare_samples) << "\n";
+  std::cout << "phase mqp_write_ms_median=" << median_ms(mqp_write_samples) << "\n";
+  std::cout << "phase mqp_load_ms_median=" << median_ms(mqp_load_samples) << "\n";
+  std::cout << "phase query_text_on_raw_html_ms_median=" << median_ms(query_text_raw_html_samples) << "\n";
+  std::cout << "phase mqp_on_raw_html_ms_median=" << median_ms(mqp_raw_html_samples) << "\n";
+  std::cout << "phase mqp_on_mqd_ms_median=" << median_ms(mqp_mqd_samples) << "\n";
+  std::cout << "artifact mqp_bytes=" << mqp_bytes << "\n";
 
   std::filesystem::remove(mqd_path);
+  std::filesystem::remove(mqp_path);
   return 0;
 }
