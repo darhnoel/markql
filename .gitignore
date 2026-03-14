@@ -1,5 +1,7 @@
 # Build artifacts
 /build/
+/.vcpkg/
+/vcpkg_installed/
 *.deb
 CMakeFiles/
 CMakeCache.txt

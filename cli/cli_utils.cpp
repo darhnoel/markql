@@ -574,6 +574,26 @@ bool is_valid_utf8(const std::string& text) {
   return true;
 }
 
+std::string escape_control_for_terminal(const std::string& text) {
+  std::ostringstream out;
+  out << std::uppercase << std::hex;
+  for (unsigned char ch : text) {
+    if (ch == '\n') {
+      out << "\\n";
+    } else if (ch == '\r') {
+      out << "\\r";
+    } else if (ch == '\t') {
+      out << "\\t";
+    } else if (ch < 0x20 || ch == 0x7F) {
+      out << "\\x" << std::setw(2) << std::setfill('0') << static_cast<int>(ch);
+      out << std::setfill(' ');
+    } else {
+      out << static_cast<char>(ch);
+    }
+  }
+  return out.str();
+}
+
 std::vector<std::string> collect_source_uris(const xsql::QueryResult& result) {
   std::vector<std::string> sources;
   std::unordered_set<std::string> seen;

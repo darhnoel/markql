@@ -39,6 +39,7 @@ def core_sources() -> list[str]:
     sources = [
         "python/xsql/_core.cpp",
         "core/src/version.cpp",
+        "core/src/artifacts/artifacts.cpp",
         "core/src/lang/ast.cpp",
         "core/src/lang/diagnostics.cpp",
         "core/src/lang/markql_parser.cpp",

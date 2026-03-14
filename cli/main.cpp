@@ -6,6 +6,8 @@
 #include <unistd.h>
 
 #include "xsql/xsql.h"
+#include "artifacts/artifacts.h"
+#include "dom/html_parser.h"
 #include "export/export_sinks.h"
 #include "render/duckbox_renderer.h"
 #include "cli_args.h"
@@ -13,6 +15,7 @@
 #include "explore/dom_explorer.h"
 #include "script_runner.h"
 #include "repl/core/repl.h"
+#include "runtime/engine/xsql_internal.h"
 #include "ui/color.h"
 
 using namespace xsql::cli;
@@ -81,6 +84,88 @@ int main(int argc, char** argv) {
   }
 
   try {
+    if (!options.artifact_info.empty()) {
+      auto query_kind_name = [](xsql::Query::Kind kind) {
+        switch (kind) {
+          case xsql::Query::Kind::Select:
+            return "select";
+          case xsql::Query::Kind::ShowInput:
+            return "show_input";
+          case xsql::Query::Kind::ShowInputs:
+            return "show_inputs";
+          case xsql::Query::Kind::ShowFunctions:
+            return "show_functions";
+          case xsql::Query::Kind::ShowAxes:
+            return "show_axes";
+          case xsql::Query::Kind::ShowOperators:
+            return "show_operators";
+          case xsql::Query::Kind::DescribeDoc:
+            return "describe_doc";
+          case xsql::Query::Kind::DescribeLanguage:
+            return "describe_language";
+        }
+        return "unknown";
+      };
+      auto source_kind_name = [](xsql::Source::Kind kind) {
+        switch (kind) {
+          case xsql::Source::Kind::Document:
+            return "document";
+          case xsql::Source::Kind::Path:
+            return "path";
+          case xsql::Source::Kind::Url:
+            return "url";
+          case xsql::Source::Kind::RawHtml:
+            return "raw_html";
+          case xsql::Source::Kind::Fragments:
+            return "fragments";
+          case xsql::Source::Kind::Parse:
+            return "parse";
+          case xsql::Source::Kind::CteRef:
+            return "cte_ref";
+          case xsql::Source::Kind::DerivedSubquery:
+            return "derived_subquery";
+        }
+        return "unknown";
+      };
+      xsql::artifacts::ArtifactInfo info = xsql::artifacts::inspect_artifact_file(options.artifact_info);
+      const std::string compatibility_error =
+          xsql::artifacts::artifact_compatibility_error(info.header);
+      const bool compatible = compatibility_error.empty();
+      std::cout << "Type: "
+                << (info.header.kind == xsql::artifacts::ArtifactKind::DocumentSnapshot ? "mqd"
+                                                                                         : "mqp")
+                << std::endl;
+      std::cout << "Format: " << info.header.format_major << "." << info.header.format_minor
+                << std::endl;
+      std::cout << "Producer version: "
+                << escape_control_for_terminal(info.producer_version) << std::endl;
+      std::cout << "Producer major: " << info.header.producer_major << std::endl;
+      std::cout << "Language version: "
+                << escape_control_for_terminal(info.language_version) << std::endl;
+      std::cout << "Language major: " << info.header.language_major << std::endl;
+      std::cout << "Required features: " << info.header.required_features << std::endl;
+      std::cout << "Sections: " << info.header.section_count << std::endl;
+      std::cout << "Payload bytes: " << info.header.payload_bytes << std::endl;
+      std::cout << "Payload checksum: " << info.header.payload_checksum << std::endl;
+      std::cout << "Compatible: " << (compatible ? "yes" : "no") << std::endl;
+      if (!compatible) {
+        std::cout << "Compatibility note: " << compatibility_error << std::endl;
+      }
+      if (info.metadata_available) {
+        if (info.header.kind == xsql::artifacts::ArtifactKind::DocumentSnapshot) {
+          std::cout << "Source URI: " << escape_control_for_terminal(info.source_uri) << std::endl;
+          std::cout << "Nodes: " << info.node_count << std::endl;
+        } else {
+          std::cout << "Query kind: " << query_kind_name(info.query_kind) << std::endl;
+          std::cout << "Source kind: " << source_kind_name(info.source_kind) << std::endl;
+          std::cout << "Original query bytes: " << info.original_query.size() << std::endl;
+        }
+      } else {
+        std::cout << "Metadata: unavailable for this artifact format" << std::endl;
+      }
+      return 0;
+    }
+
     if (options.lint) {
       std::vector<xsql::Diagnostic> diagnostics;
 
@@ -98,6 +183,11 @@ int main(int argc, char** argv) {
       };
 
       if (!query_file.empty()) {
+        if (xsql::artifacts::path_has_artifact_magic(query_file)) {
+          std::cerr << "Error: --lint expects SQL text, not prepared query artifacts (.mqp)"
+                    << std::endl;
+          return 2;
+        }
         std::string script;
         try {
           script = read_file(query_file);
@@ -137,6 +227,57 @@ int main(int argc, char** argv) {
       return xsql::has_error_diagnostics(diagnostics) ? 1 : 0;
     }
 
+    auto load_default_html = [&]() -> std::pair<std::string, std::string> {
+      if (input.empty() || input == "document") {
+        return {read_stdin(), "document"};
+      }
+      if (is_url(input)) {
+        return {xsql::xsql_internal::fetch_url(input, timeout_ms), input};
+      }
+      return {xsql::xsql_internal::read_file(input), input};
+    };
+
+    if (!options.write_mqd.empty()) {
+      auto [html, source_uri] = load_default_html();
+      xsql::HtmlDocument document = xsql::parse_html(html);
+      xsql::artifacts::write_document_artifact_file(document, source_uri, options.write_mqd);
+      std::cout << "Wrote MQD: " << options.write_mqd << std::endl;
+      return 0;
+    }
+
+    if (!options.write_mqp.empty()) {
+      if (!query_file.empty() && xsql::artifacts::path_has_artifact_magic(query_file)) {
+        std::cerr << "Error: --write-mqp expects SQL text, not an existing artifact" << std::endl;
+        return 2;
+      }
+      std::string artifact_query = query;
+      if (!query_file.empty()) {
+        std::string script = read_file(query_file);
+        if (!is_valid_utf8(script)) {
+          std::cerr << "Error: query file is not valid UTF-8: " << query_file << std::endl;
+          return 2;
+        }
+        ScriptSplitResult split = split_sql_script(script);
+        if (split.error_message.has_value()) {
+          auto [line, col] = line_col_from_offset(script, split.error_position);
+          std::cerr << "Error: " << *split.error_message
+                    << " at line " << line << ", column " << col << std::endl;
+          return 1;
+        }
+        if (split.statements.size() != 1) {
+          std::cerr << "Error: --write-mqp requires exactly one SQL statement" << std::endl;
+          return 2;
+        }
+        artifact_query = split.statements.front().text;
+      }
+      xsql::artifacts::PreparedQueryArtifact artifact =
+          xsql::artifacts::prepare_query_artifact(artifact_query);
+      xsql::artifacts::write_prepared_query_artifact_file(
+          artifact.query, artifact.info.original_query, options.write_mqp);
+      std::cout << "Wrote MQP: " << options.write_mqp << std::endl;
+      return 0;
+    }
+
     if (interactive) {
       ReplConfig repl_config;
       repl_config.input = input;
@@ -149,9 +290,9 @@ int main(int argc, char** argv) {
     }
 
     std::optional<std::string> stdin_cache;
-    auto execute_and_render = [&](const std::string& raw_query) {
-      const auto started_at = std::chrono::steady_clock::now();
-      const auto rss_before_bytes = read_process_rss_bytes();
+    auto render_result = [&](xsql::QueryResult& result,
+                             const std::chrono::steady_clock::time_point& started_at,
+                             const std::optional<size_t>& rss_before_bytes) {
       bool runtime_summary_printed = false;
       auto emit_runtime_summary = [&]() {
         if (runtime_summary_printed) return;
@@ -163,46 +304,8 @@ int main(int argc, char** argv) {
         print_query_runtime_summary(rss_before_bytes, rss_after_bytes, elapsed_ms);
       };
 
-      std::string statement = rewrite_from_path_if_needed(raw_query);
-      xsql::QueryResult result;
-      auto source = parse_query_source(statement);
-      if (source.has_value() && source->statement_kind != xsql::Query::Kind::Select) {
-        std::string meta_error;
-        if (source->statement_kind == xsql::Query::Kind::ShowInput) {
-          if (!build_show_input_result(input, result, meta_error)) {
-            throw std::runtime_error(meta_error);
-          }
-        } else if (source->statement_kind == xsql::Query::Kind::ShowInputs) {
-          if (!build_show_inputs_result({}, input, result, meta_error)) {
-            throw std::runtime_error(meta_error);
-          }
-        } else {
-          result = xsql::execute_query_from_document("", statement);
-        }
-      } else {
-        if (source.has_value() && source->kind == xsql::Source::Kind::Url) {
-          result = xsql::execute_query_from_url(source->value, statement, timeout_ms);
-        } else if (source.has_value() && source->kind == xsql::Source::Kind::Path) {
-          result = xsql::execute_query_from_file(source->value, statement);
-        } else if (source.has_value() && source->kind == xsql::Source::Kind::RawHtml) {
-          result = xsql::execute_query_from_document("", statement);
-        } else if (source.has_value() && !source->needs_input) {
-          result = xsql::execute_query_from_document("", statement);
-        } else if (input.empty() || input == "document") {
-          if (!stdin_cache.has_value()) {
-            stdin_cache = read_stdin();
-          }
-          result = xsql::execute_query_from_document(*stdin_cache, statement);
-        } else {
-          if (is_url(input)) {
-            result = xsql::execute_query_from_url(input, statement, timeout_ms);
-          } else {
-            result = xsql::execute_query_from_file(input, statement);
-          }
-        }
-        auto sources = collect_source_uris(result);
-        apply_source_uri_policy(result, sources);
-      }
+      auto sources = collect_source_uris(result);
+      apply_source_uri_policy(result, sources);
       for (const auto& warning : result.warnings) {
         if (stderr_color) std::cerr << kColor.yellow;
         std::cerr << "Warning: " << warning << std::endl;
@@ -307,6 +410,86 @@ int main(int argc, char** argv) {
         }
       }
     };
+
+    auto execute_and_render = [&](const std::string& raw_query) {
+      const auto started_at = std::chrono::steady_clock::now();
+      const auto rss_before_bytes = read_process_rss_bytes();
+      std::string statement = rewrite_from_path_if_needed(raw_query);
+      xsql::QueryResult result;
+      auto source = parse_query_source(statement);
+      if (source.has_value() && source->statement_kind != xsql::Query::Kind::Select) {
+        std::string meta_error;
+        if (source->statement_kind == xsql::Query::Kind::ShowInput) {
+          if (!build_show_input_result(input, result, meta_error)) {
+            throw std::runtime_error(meta_error);
+          }
+        } else if (source->statement_kind == xsql::Query::Kind::ShowInputs) {
+          if (!build_show_inputs_result({}, input, result, meta_error)) {
+            throw std::runtime_error(meta_error);
+          }
+        } else {
+          result = xsql::execute_query_from_document("", statement);
+        }
+      } else {
+        if (source.has_value() && source->kind == xsql::Source::Kind::Url) {
+          result = xsql::execute_query_from_url(source->value, statement, timeout_ms);
+        } else if (source.has_value() && source->kind == xsql::Source::Kind::Path) {
+          result = xsql::execute_query_from_file(source->value, statement);
+        } else if (source.has_value() && source->kind == xsql::Source::Kind::RawHtml) {
+          result = xsql::execute_query_from_document("", statement);
+        } else if (source.has_value() && !source->needs_input) {
+          result = xsql::execute_query_from_document("", statement);
+        } else if (input.empty() || input == "document") {
+          if (!stdin_cache.has_value()) {
+            stdin_cache = read_stdin();
+          }
+          result = xsql::execute_query_from_document(*stdin_cache, statement);
+        } else {
+          if (is_url(input)) {
+            result = xsql::execute_query_from_url(input, statement, timeout_ms);
+          } else {
+            result = xsql::execute_query_from_file(input, statement);
+          }
+        }
+      }
+      render_result(result, started_at, rss_before_bytes);
+    };
+
+    if (!query_file.empty() && xsql::artifacts::path_has_artifact_magic(query_file)) {
+      xsql::artifacts::PreparedQueryArtifact artifact =
+          xsql::artifacts::read_prepared_query_artifact_file(query_file);
+      const auto started_at = std::chrono::steady_clock::now();
+      const auto rss_before_bytes = read_process_rss_bytes();
+      xsql::QueryResult result;
+      if (artifact.query.kind != xsql::Query::Kind::Select) {
+        result = xsql::artifacts::execute_prepared_query_on_html(artifact, "", "document");
+      } else if (artifact.query.source.kind == xsql::Source::Kind::Url ||
+                 artifact.query.source.kind == xsql::Source::Kind::Path ||
+                 artifact.query.source.kind == xsql::Source::Kind::RawHtml ||
+                 artifact.query.source.kind == xsql::Source::Kind::Fragments ||
+                 artifact.query.source.kind == xsql::Source::Kind::Parse) {
+        result = xsql::artifacts::execute_prepared_query_on_html(artifact, "", "document");
+      } else if (input.empty() || input == "document") {
+        if (!stdin_cache.has_value()) stdin_cache = read_stdin();
+        result = xsql::artifacts::execute_prepared_query_on_html(artifact, *stdin_cache, "document");
+      } else if (is_url(input)) {
+        std::string html = xsql::xsql_internal::fetch_url(input, timeout_ms);
+        result = xsql::artifacts::execute_prepared_query_on_html(artifact, html, input);
+      } else if (xsql::artifacts::path_has_artifact_magic(input)) {
+        xsql::artifacts::ArtifactInfo info = xsql::artifacts::inspect_artifact_file(input);
+        if (info.header.kind != xsql::artifacts::ArtifactKind::DocumentSnapshot) {
+          throw std::runtime_error("Prepared query artifacts (.mqp) cannot be used as input documents");
+        }
+        xsql::artifacts::DocumentArtifact document =
+            xsql::artifacts::read_document_artifact_file(input);
+        result = xsql::artifacts::execute_prepared_query_on_document(artifact, document);
+      } else {
+        std::string html = xsql::xsql_internal::read_file(input);
+        result = xsql::artifacts::execute_prepared_query_on_html(artifact, html, input);
+      }
+      render_result(result, started_at, rss_before_bytes);
+      return 0;
+    }
 
     if (!query_file.empty()) {
       std::string script;

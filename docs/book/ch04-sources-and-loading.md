@@ -19,6 +19,8 @@ This may feel unfamiliar if you normally tie scraping logic to browser state dir
 - Use `RAW(...)` for tiny inline fixtures in docs/tests.
 - Use `PARSE(...)` when your snippet has sibling roots or when HTML comes from query output.
 - Use stdin when piping dynamic HTML from another command.
+- Use `.mqd` when you want a stable parsed-document snapshot for repeated CLI runs.
+- Use `.mqp` when you want a stable prepared query for repeated CLI runs.
 
 ## Scope
 
@@ -27,6 +29,17 @@ CLI input path
   --input file.html
       -> parsed DOM
       -> available as table: doc
+```
+
+```text
+Artifact path
+  --input file.mqd
+      -> load parsed DOM snapshot
+      -> available as table: doc
+
+  --query-file file.mqp
+      -> load prepared query
+      -> execute against html/stdin/url/mqd input
 ```
 
 ```text
@@ -141,6 +154,80 @@ Compatibility note:
 - `FRAGMENTS(...)` is still supported but deprecated.
 - Migration: `FRAGMENTS(x)` -> `PARSE(x)`.
 
+## Versioned Artifacts
+
+Experimental status:
+
+- `.mqd` / `.mqp` artifact support is still experimental in this branch.
+- Treat the feature as WIP even though the files are versioned and validated.
+
+MarkQL's artifact MVP adds two explicit cacheable boundaries:
+
+- `.mqd` stores the parsed node-table facts needed for execution
+- `.mqp` stores a prepared query after parse + validate
+
+This keeps the semantic boundary stable:
+
+- MarkQL still executes against the same `doc` node-table model
+- result behavior stays the same as direct HTML + SQL execution
+- artifacts are versioned and rejected cleanly when major versions are incompatible
+- artifacts are treated as untrusted data and validated before use
+- the outer MarkQL artifact envelope stays custom; only the `.mqd` `DOCN` payload uses FlatBuffers in this branch
+- `.mqp` still uses the existing manual `QAST` payload format in this branch
+
+Create and inspect them from the CLI:
+
+```bash
+./build/markql --input docs/fixtures/basic.html --write-mqd /tmp/basic.mqd
+./build/markql --query "SELECT a.href FROM doc WHERE href IS NOT NULL" --write-mqp /tmp/links.mqp
+./build/markql --artifact-info /tmp/basic.mqd
+```
+
+Run a prepared query against a prepared document:
+
+```bash
+./build/markql --query-file /tmp/links.mqp --input /tmp/basic.mqd
+```
+
+MVP limits:
+
+- artifact loading is only exposed through CLI `--input` / `--query-file`
+- `--lint` still works on SQL text only
+- `.mqp` is single-statement only
+- compression is not used in the MVP artifact format
+
+Security contract:
+
+- `.mqd` and `.mqp` are untrusted files, not trusted serialized objects.
+- The reader parses fields one-by-one instead of deserializing private C++ structs.
+- Every textual field in the current format is strict UTF-8; malformed text is rejected.
+- The reader enforces hard bounds on file size, section count, section size, string bytes, node count, attribute count, and collection counts before allocation.
+- Payload checksum verification detects corruption/tampering before section payloads are trusted.
+- `.mqd` loading is verified in two steps:
+  - validate the MarkQL header, section framing, required features, and checksum
+  - then verify the `DOCN` FlatBuffers payload before reading any document fields
+- `--artifact-info` escapes control characters before printing artifact-derived metadata.
+- The checksum is for corruption detection only; it is not an authenticity or signing mechanism.
+
+Why `DOCN` migrated before `QAST`:
+
+- `DOCN` carried the largest manual binary serializer/reader surface.
+- `.mqd` directly targets the repeated HTML parse/load cost that motivated artifact caching.
+- Keeping `.mqp` manual for now avoids changing the prepared-query semantic boundary in the same branch.
+
+Build note:
+
+- The repo now carries a `vcpkg.json` manifest entry for FlatBuffers.
+- `build.sh` installs FlatBuffers into `./vcpkg_installed` and uses the repo-local `flatc` during CMake generation.
+- The build does not require system-wide FlatBuffers packages.
+- `build.sh` auto-selects a default `vcpkg` triplet for Linux, macOS, and Windows shell environments, and you can override `VCPKG_TARGET_TRIPLET` / `VCPKG_HOST_TRIPLET` explicitly for cross-target builds.
+
+Benchmark methodology and current result:
+
+- `tests/bench_artifacts.cpp` runs 31 iterations and reports median values for HTML parse, `.mqd` write, `.mqd` read, raw parsed-document execution, `.mqd`-loaded execution, and artifact file size.
+- On `examples/html/koku_tk.html`, the current medians were `11.219 ms` parse, `62.349 ms` `.mqd` write, `53.796 ms` `.mqd` read, `4.523 ms` raw execution, `4.306 ms` `.mqd`-loaded execution, with `943136` artifact bytes.
+- That means this branch improves payload maintainability and verifier coverage, but it does not yet make `.mqd` document load faster on this fixture.
+
 ## Before/after diagrams
 
 ```text
@@ -160,4 +247,4 @@ After
   Fix: keep explicit row narrowing in outer `WHERE`.
 
 ## Chapter takeaway
-Good extraction starts before query syntax: choose input sources that make behavior repeatable.
+Good extraction starts before query syntax: choose input sources that make behavior repeatable, and freeze parsed inputs or prepared queries when repeated-work cost matters more than one-off setup cost.

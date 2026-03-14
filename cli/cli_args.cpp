@@ -14,6 +14,9 @@ void print_startup_help(std::ostream& os) {
   os << "  markql --query <query> [--input <path>]\n";
   os << "  markql --query-file <file> [--input <path>]\n";
   os << "         [--continue-on-error] [--quiet]\n";
+  os << "  markql --input <path> --write-mqd <file.mqd>        (experimental)\n";
+  os << "  markql (--query <query> | --query-file <file.sql>) --write-mqp <file.mqp>  (experimental)\n";
+  os << "  markql --artifact-info <file.mqd|file.mqp>          (experimental)\n";
   os << "  markql --lint \"<query>\" [--format text|json]\n";
   os << "  markql --interactive [--input <path>]\n";
   os << "  markql explore <input.html>\n";
@@ -27,6 +30,9 @@ void print_startup_help(std::ostream& os) {
   os << "  - Legacy `xsql` binary name is still available for compatibility.\n";
   os << "  - If --input is omitted, HTML is read from stdin.\n";
   os << "  - URLs are supported when libcurl is available.\n";
+  os << "  - --input accepts HTML or experimental .mqd document snapshots.\n";
+  os << "  - --query-file accepts SQL text files or experimental .mqp prepared-query artifacts.\n";
+  os << "  - Artifact workflows are experimental and may change across upcoming releases.\n";
   os << "  - TO LIST() outputs a JSON list for a single projected column.\n";
   os << "  - TO TABLE() extracts HTML tables into rows.\n";
   os << "  - SQL comments are supported: -- line comments, /* block comments */.\n";
@@ -45,6 +51,9 @@ void print_help(std::ostream& os) {
   os << "Usage: markql --query <query> [--input <path>]\n";
   os << "       markql --query-file <file> [--input <path>]\n";
   os << "              [--continue-on-error] [--quiet]\n";
+  os << "       markql --input <path> --write-mqd <file.mqd>        (experimental)\n";
+  os << "       markql (--query <query> | --query-file <file.sql>) --write-mqp <file.mqp>  (experimental)\n";
+  os << "       markql --artifact-info <file.mqd|file.mqp>          (experimental)\n";
   os << "       markql --lint \"<query>\" [--format text|json]\n";
   os << "       markql --interactive [--input <path>]\n";
   os << "       markql explore <input.html>\n";
@@ -59,6 +68,9 @@ void print_help(std::ostream& os) {
   os << "Scripts and REPL input support SQL comments: -- ... and /* ... */.\n";
   os << "Use TO CSV('file.csv'), TO PARQUET('file.parquet'), TO JSON('file.json'), or\n"
         "TO NDJSON('file.ndjson') in queries to export.\n";
+  os << "Use --write-mqd/--write-mqp to cache parsed documents or prepared queries.\n";
+  os << "Artifact workflows are experimental and may change across upcoming releases.\n";
+  os << "--artifact-info prints artifact metadata and compatibility details.\n";
   os << "--lint validates syntax + semantic rules without executing the query.\n";
   os << "--format json emits lint diagnostics as a JSON array.\n";
   os << "NO_COLOR disables ANSI color output even when --color=always/auto is set.\n";
@@ -91,6 +103,24 @@ bool parse_cli_args(int argc, char** argv, CliOptions& options, std::string& err
         return false;
       }
       options.input = argv[++i];
+    } else if (arg == "--write-mqd") {
+      if (i + 1 >= argc) {
+        error = "Missing value for --write-mqd";
+        return false;
+      }
+      options.write_mqd = argv[++i];
+    } else if (arg == "--write-mqp") {
+      if (i + 1 >= argc) {
+        error = "Missing value for --write-mqp";
+        return false;
+      }
+      options.write_mqp = argv[++i];
+    } else if (arg == "--artifact-info") {
+      if (i + 1 >= argc) {
+        error = "Missing value for --artifact-info";
+        return false;
+      }
+      options.artifact_info = argv[++i];
     } else if (arg == "--interactive") {
       options.interactive = true;
     } else if (arg == "--lint") {
@@ -184,6 +214,15 @@ bool parse_cli_args(int argc, char** argv, CliOptions& options, std::string& err
     error = "Error: --query and --query-file are mutually exclusive";
     return false;
   }
+  const bool artifact_mode =
+      !options.write_mqd.empty() || !options.write_mqp.empty() || !options.artifact_info.empty();
+  const int artifact_mode_count = (!options.write_mqd.empty() ? 1 : 0) +
+                                  (!options.write_mqp.empty() ? 1 : 0) +
+                                  (!options.artifact_info.empty() ? 1 : 0);
+  if (artifact_mode_count > 1) {
+    error = "Artifact commands are mutually exclusive";
+    return false;
+  }
   if (!options.lint && options.lint_format != "text") {
     error = "--format is only supported with --lint";
     return false;
@@ -195,6 +234,36 @@ bool parse_cli_args(int argc, char** argv, CliOptions& options, std::string& err
   if (options.lint && options.interactive) {
     error = "--lint and --interactive are mutually exclusive";
     return false;
+  }
+  if (artifact_mode && options.lint) {
+    error = "Artifact commands are not supported with --lint";
+    return false;
+  }
+  if (artifact_mode && options.interactive) {
+    error = "Artifact commands are not supported with --interactive";
+    return false;
+  }
+  if (!options.write_mqd.empty()) {
+    if (!options.write_mqp.empty() || !options.artifact_info.empty()) {
+      error = "Artifact commands are mutually exclusive";
+      return false;
+    }
+    if (!options.query.empty() || !options.query_file.empty()) {
+      error = "--write-mqd does not accept --query or --query-file";
+      return false;
+    }
+  }
+  if (!options.write_mqp.empty()) {
+    if (options.query.empty() && options.query_file.empty()) {
+      error = "--write-mqp requires --query or --query-file";
+      return false;
+    }
+  }
+  if (!options.artifact_info.empty()) {
+    if (!options.query.empty() || !options.query_file.empty() || !options.input.empty()) {
+      error = "--artifact-info does not accept --query, --query-file, or --input";
+      return false;
+    }
   }
   return true;
 }

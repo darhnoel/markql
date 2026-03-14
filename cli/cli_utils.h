@@ -99,6 +99,9 @@ std::pair<size_t, size_t> line_col_from_offset(const std::string& text, size_t o
 /// Validates that text is well-formed UTF-8.
 /// MUST return false on malformed byte sequences.
 bool is_valid_utf8(const std::string& text);
+/// Escapes terminal control characters while preserving printable UTF-8 bytes.
+/// MUST prevent artifact-derived escape injection in CLI/log output.
+std::string escape_control_for_terminal(const std::string& text);
 
 /// Serializes full query rows into JSON objects for CLI output modes.
 /// MUST preserve column ordering semantics and MUST escape content correctly.

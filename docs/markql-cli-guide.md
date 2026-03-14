@@ -51,6 +51,27 @@ Build:
 ./build.sh
 ```
 
+Build note:
+- `build.sh` now uses the repo `vcpkg.json` manifest to install FlatBuffers into `./vcpkg_installed` and to provide `flatc` during the build.
+- This keeps the FlatBuffers dependency path local to the repo. System-wide `apt` packages are not required for the `DOCN` migration.
+- `build.sh` now auto-detects a default `vcpkg` triplet for Linux, macOS, and Windows shell environments. Override with `VCPKG_TARGET_TRIPLET` / `VCPKG_HOST_TRIPLET` when cross-compiling to a non-default target.
+
+Create a parsed document snapshot once:
+```bash
+./build/markql --input ./data/index.html --write-mqd ./cache/index.mqd
+```
+
+Create a prepared query once:
+```bash
+./build/markql --query "SELECT a.href, TEXT(a) FROM doc WHERE href IS NOT NULL" \
+  --write-mqp ./cache/links.mqp
+```
+
+Inspect artifact metadata:
+```bash
+./build/markql --artifact-info ./cache/index.mqd
+```
+
 Run one query:
 ```bash
 ./build/markql --query "SELECT a FROM doc WHERE href CONTAINS 'https'" --input ./data/index.html
@@ -83,6 +104,72 @@ Check version + provenance:
 
 Compatibility note:
 - `./build/xsql` remains available as a legacy command name.
+
+## Artifact Workflow
+
+Experimental status:
+- `.mqd` / `.mqp` artifact support is still experimental in this branch.
+- The current files are versioned and validated, but the workflow and internal payload choices are not yet presented as a long-term frozen interface.
+
+MarkQL can cache two conservative, versioned artifacts:
+
+- `.mqd`: a serialized parsed `doc` snapshot
+- `.mqp`: a serialized prepared query
+
+These artifacts only remove repeated work:
+
+- `.mqd` avoids reparsing the same HTML into the node-table form
+- `.mqp` avoids reparsing and revalidating the same query text
+
+They do not change query semantics. A direct HTML + SQL run and an equivalent `.mqd` + `.mqp` run should produce the same rows.
+
+Recommended usage:
+
+```bash
+./build/markql --input ./data/index.html --write-mqd ./cache/index.mqd
+./build/markql --query-file ./queries/links.sql --write-mqp ./cache/links.mqp
+./build/markql --query-file ./cache/links.mqp --input ./cache/index.mqd
+```
+
+Compatibility rules for the MVP:
+
+- Artifact files have explicit magic bytes and a format version.
+- Readers reject incompatible artifact format major versions.
+- Readers also reject artifacts produced by a different MarkQL major version.
+- Readers reject unknown required feature flags.
+- Readers verify a payload checksum before parsing sections.
+- Unknown future sections are skipped so minor/additive format growth is possible.
+- `.mqd` keeps the existing MarkQL artifact envelope, but the `DOCN` payload is now encoded with FlatBuffers.
+- `.mqp` keeps the current custom `QAST` payload format in this branch.
+
+Current limitations:
+
+- Artifact loading is a CLI `--input` / `--query-file` feature. Query-level `FROM 'file.mqd'` is not part of this MVP.
+- `--lint` only accepts SQL text, not `.mqp`.
+- `.mqp` creation accepts exactly one SQL statement.
+- Compression is not used in the MVP artifact format.
+- Only the `.mqd` `DOCN` payload moved to FlatBuffers here. `.mqp` / `QAST` migration is deferred.
+
+Security / trust model:
+
+- Treat `.mqd` and `.mqp` as untrusted files.
+- All textual artifact fields are strict UTF-8. Malformed text is rejected.
+- Readers bound file bytes, section count, section size, string bytes, node count, attribute count, and collection counts before allocating.
+- `.mqd` verification is two-stage:
+  - MarkQL validates the outer header, section table, required features, and checksum first.
+  - Then the `DOCN` payload is verified with the FlatBuffers verifier and file identifier before any fields are read.
+- `--artifact-info` escapes control characters before printing artifact-derived text such as `source_uri`.
+- The checksum is a corruption/tamper detector, not an authenticity guarantee.
+
+Why `DOCN` first:
+- The largest manual serializer/reader complexity was in the document payload, and `.mqd` is the artifact that directly targets repeated HTML parse cost.
+- The outer MarkQL artifact format already provided the compatibility boundary, so this branch keeps that stable and swaps only the internal `DOCN` payload.
+- `.mqp` stays manual for now to avoid mixing document-format migration with prepared-query semantic persistence changes in one step.
+
+Benchmark snapshot on `examples/html/koku_tk.html`:
+- Method: `tests/bench_artifacts.cpp` runs 31 iterations and reports medians for HTML parse, `.mqd` write, `.mqd` read, raw parsed-document execution, `.mqd`-loaded execution, and artifact size.
+- Current result on this fixture: `html_parse_ms_median=11.219`, `mqd_write_ms_median=62.349`, `mqd_read_ms_median=53.796`, `raw_document_execute_ms_median=4.523`, `mqd_loaded_execute_ms_median=4.306`, `mqd_bytes=943136`.
+- Exact reading: this branch improves `DOCN` schema maintainability and payload verification, but on this fixture it did not make `.mqd` load faster than reparsing HTML.
 
 ## Diagnostics and Lint
 
@@ -140,6 +227,15 @@ print(xsql.core_version())
 print(xsql.core_version_info())
 ```
 
+Artifact files also record producer version metadata. `--artifact-info` shows:
+
+- artifact type (`mqd` or `mqp`)
+- artifact format version
+- producer version/major
+- language version/major
+- compatibility verdict
+- document source URI + node count, or prepared query kind/source kind
+
 ## Fast Start: 5 Queries
 
 ```sql
@@ -172,6 +268,13 @@ SELECT div FROM 'page.html';
 SELECT div FROM 'https://example.com';
 SELECT div FROM RAW('<div class="x">hello</div>');
 SELECT li FROM PARSE('<ul><li>1</li><li>2</li></ul>') AS node_fragment;
+```
+
+For repeated CLI runs, you can also treat a `.mqd` snapshot as the `--input` source:
+
+```bash
+./build/markql --query "SELECT a.href FROM doc WHERE href IS NOT NULL" \
+  --input ./cache/index.mqd
 ```
 
 Alias sources:

@@ -29,13 +29,16 @@ QueryResult execute_query_ast(const Query& query,
                               const HtmlDocument& doc,
                               const std::string& source_uri);
 QueryResult execute_query_with_source_legacy(const Query& query,
-                                             const std::string& default_html,
+                                             const std::string* default_html,
+                                             const HtmlDocument* default_document,
                                              const std::string& default_source_uri);
 QueryResult execute_query_with_source(const Query& query,
-                                      const std::string& default_html,
+                                      const std::string* default_html,
+                                      const HtmlDocument* default_document,
                                       const std::string& default_source_uri);
 QueryResult execute_query_with_source_relation_entry(const Query& query,
-                                                     const std::string& default_html,
+                                                     const std::string* default_html,
+                                                     const HtmlDocument* default_document,
                                                      const std::string& default_source_uri);
 
 std::optional<int64_t> parse_int64_value(const std::string& value);

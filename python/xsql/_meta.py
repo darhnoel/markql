@@ -1,3 +1,3 @@
 """Package metadata shared across build/runtime entry points."""
 
-__version__ = "1.12.2"
+__version__ = "1.14.2"

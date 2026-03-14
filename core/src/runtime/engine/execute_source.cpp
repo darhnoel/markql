@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "../../artifacts/artifacts.h"
 #include "../../dom/html_parser.h"
 #include "../../lang/markql_parser.h"
 #include "../../util/string_util.h"
@@ -49,12 +50,15 @@ QueryResult build_count_star_result(const Query& query,
 }  // namespace
 
 QueryResult execute_query_with_source_legacy(const Query& query,
-                                             const std::string& default_html,
+                                             const std::string* default_html,
+                                             const HtmlDocument* default_document,
                                              const std::string& default_source_uri) {
   std::string effective_source_uri = default_source_uri;
   if (is_plain_count_star_document_query(query)) {
     // WHY: COUNT(*) FROM doc does not need per-node inner_html/text materialization.
-    int64_t count = count_html_nodes_fast(default_html);
+    int64_t count = default_document != nullptr
+                        ? static_cast<int64_t>(default_document->nodes.size())
+                        : count_html_nodes_fast(*default_html);
     return build_count_star_result(query, count, effective_source_uri);
   }
   if (query.source.kind == Source::Kind::RawHtml) {
@@ -79,7 +83,7 @@ QueryResult execute_query_with_source_legacy(const Query& query,
         throw std::runtime_error("FRAGMENTS subquery cannot use URL or file sources");
       }
       QueryResult sub_result =
-          execute_query_with_source(subquery, default_html, default_source_uri);
+          execute_query_with_source(subquery, default_html, default_document, default_source_uri);
       fragments = collect_html_fragments(sub_result, "FRAGMENTS");
     } else {
       throw std::runtime_error("FRAGMENTS requires a subquery or RAW('<...>') input");
@@ -115,7 +119,7 @@ QueryResult execute_query_with_source_legacy(const Query& query,
         throw std::runtime_error("PARSE() subquery cannot use URL or file sources");
       }
       QueryResult sub_result =
-          execute_query_with_source(subquery, default_html, default_source_uri);
+          execute_query_with_source(subquery, default_html, default_document, default_source_uri);
       fragments = collect_html_fragments(sub_result, "PARSE()");
     } else {
       throw std::runtime_error("PARSE() requires a scalar expression or subquery input");
@@ -124,7 +128,7 @@ QueryResult execute_query_with_source_legacy(const Query& query,
     effective_source_uri = "parse";
     return execute_query_ast(query, doc, effective_source_uri);
   }
-  HtmlDocument doc = parse_html(default_html);
+  HtmlDocument doc = default_document != nullptr ? *default_document : parse_html(*default_html);
   return execute_query_ast(query, doc, effective_source_uri);
 }
 
@@ -142,7 +146,7 @@ QueryResult execute_query_from_html(const std::string& html,
   if (parsed.query->kind != Query::Kind::Select) {
     return execute_meta_query(*parsed.query, source_uri);
   }
-  return execute_query_with_source(*parsed.query, html, source_uri);
+  return execute_query_with_source(*parsed.query, &html, nullptr, source_uri);
 }
 
 /// Executes a query over in-memory HTML with document as the source label.
@@ -156,6 +160,14 @@ QueryResult execute_query_from_document(const std::string& html, const std::stri
 /// MUST read from disk and MUST propagate IO failures as exceptions.
 /// Inputs are path/query; outputs are QueryResult with file IO side effects.
 QueryResult execute_query_from_file(const std::string& path, const std::string& query) {
+  if (artifacts::path_has_artifact_magic(path)) {
+    artifacts::ArtifactInfo info = artifacts::inspect_artifact_file(path);
+    if (info.header.kind == artifacts::ArtifactKind::DocumentSnapshot) {
+      artifacts::DocumentArtifact document = artifacts::read_document_artifact_file(path);
+      return artifacts::execute_query_text_on_document(query, document);
+    }
+    throw std::runtime_error("Prepared query artifacts (.mqp) cannot be used as input documents");
+  }
   std::string html = xsql_internal::read_file(path);
   return execute_query_from_html(html, path, query);
 }

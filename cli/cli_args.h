@@ -19,6 +19,9 @@ struct CliOptions {
   std::string query;
   std::string query_file;
   std::string input;
+  std::string write_mqd;
+  std::string write_mqp;
+  std::string artifact_info;
   bool interactive = false;
   bool color = true;
   std::string output_mode = "duckbox";

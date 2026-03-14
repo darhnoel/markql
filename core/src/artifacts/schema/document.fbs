@@ -1,0 +1,25 @@
+namespace xsql.artifacts.docnfb;
+
+table Attribute {
+  key:string;
+  value:string;
+}
+
+table Node {
+  id:long;
+  tag:string;
+  text:string;
+  inner_html:string;
+  attributes:[Attribute];
+  parent_id:long;
+  has_parent:bool = false;
+  max_depth:long;
+  doc_order:long;
+}
+
+table Document {
+  nodes:[Node];
+}
+
+root_type Document;
+file_identifier "XDOC";

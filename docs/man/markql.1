@@ -6,6 +6,9 @@ markql \- query HTML documents using SQL-like syntax
 [\fB\-\-query\fR \fIQUERY\fR]
 [\fB\-\-query\-file\fR \fIFILE\fR]
 [\fB\-\-input\fR \fIPATH_OR_URL\fR]
+[\fB\-\-write\-mqd\fR \fIFILE.mqd\fR]
+[\fB\-\-write\-mqp\fR \fIFILE.mqp\fR]
+[\fB\-\-artifact\-info\fR \fIFILE\fR]
 [\fB\-\-mode\fR \fIduckbox|json|plain|csv\fR]
 [\fB\-\-display_mode\fR \fImore|less\fR]
 [\fB\-\-highlight\fR \fIon|off\fR]
@@ -29,6 +32,8 @@ markql \- query HTML documents using SQL-like syntax
 .SH DESCRIPTION
 \fBmarkql\fR runs SQL-style queries on HTML. It can read input from files, URLs,
 or standard input and outputs rows in table, JSON, plain, or CSV formats.
+It also supports versioned `.mqd` document snapshots and `.mqp` prepared queries.
+These artifact workflows are currently experimental.
 .SH OPTIONS
 .TP
 \fB\-\-query\fR \fIQUERY\fR
@@ -38,7 +43,16 @@ Execute a single inline query.
 Execute queries from a SQL script file.
 .TP
 \fB\-\-input\fR \fIPATH_OR_URL\fR
-HTML input source. If omitted, input is read from standard input.
+HTML input source. If omitted, input is read from standard input. `.mqd` document snapshots are also accepted.
+.TP
+\fB\-\-write\-mqd\fR \fIFILE.mqd\fR
+Parse the active input once and persist it as a versioned document snapshot.
+.TP
+\fB\-\-write\-mqp\fR \fIFILE.mqp\fR
+Parse and validate one SQL statement once and persist it as a versioned prepared-query artifact.
+.TP
+\fB\-\-artifact\-info\fR \fIFILE\fR
+Inspect experimental artifact metadata and compatibility information.
 .TP
 \fB\-\-interactive\fR
 Start REPL mode.
@@ -93,6 +107,15 @@ Export sinks are available in query text:
 and \fBTO PARQUET('file.parquet')\fR (when built with Arrow/Parquet support).
 CSV mode renders rectangular results to stdout. For \fBTO TABLE()\fR extraction, use
 \fBTO TABLE(EXPORT='file.csv')\fR instead of \fB\-\-mode csv\fR.
+
+Artifact compatibility rules:
+\fB.mqd\fR and \fB.mqp\fR files embed magic bytes, format versions, producer/language version metadata,
+required-feature flags, and a payload checksum.
+Readers treat artifacts as untrusted data: they reject incompatible major versions, unknown required flags,
+malformed UTF-8 text fields, oversized sections/counts, and corrupted payloads with explicit errors.
+The outer MarkQL artifact envelope remains custom. In this release, only the \fBDOCN\fR payload inside
+\fB.mqd\fR uses FlatBuffers with verifier checks; \fB.mqp\fR prepared-query payloads remain on the existing
+manual format. Compression is not used in the MVP artifact format.
 .SH EXIT STATUS
 .TP
 \fB0\fR
@@ -116,6 +139,13 @@ Lint and output JSON diagnostics:
 .TP
 Run in REPL mode:
 \fBmarkql \-\-interactive \-\-input ./data/index.html\fR
+.TP
+Create and run artifacts:
+\fBmarkql \-\-input ./data/index.html \-\-write\-mqd ./cache/index.mqd\fR
+
+\fBmarkql \-\-query "SELECT a.href FROM doc WHERE href IS NOT NULL" \-\-write\-mqp ./cache/links.mqp\fR
+
+\fBmarkql \-\-query\-file ./cache/links.mqp \-\-input ./cache/index.mqd\fR
 .SH FILES
 .TP
 \fI/usr/bin/markql\fR

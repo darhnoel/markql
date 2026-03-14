@@ -30,6 +30,7 @@ void register_cli_utils_tests(std::vector<TestCase>& tests);
 void register_lexer_comment_tests(std::vector<TestCase>& tests);
 void register_script_runner_tests(std::vector<TestCase>& tests);
 void register_cli_args_tests(std::vector<TestCase>& tests);
+void register_artifact_tests(std::vector<TestCase>& tests);
 void register_string_sql_tests(std::vector<TestCase>& tests);
 void register_column_name_tests(std::vector<TestCase>& tests);
 void register_self_ref_tests(std::vector<TestCase>& tests);
@@ -90,6 +91,7 @@ int main(int argc, char** argv) {
   register_lexer_comment_tests(tests);
   register_script_runner_tests(tests);
   register_cli_args_tests(tests);
+  register_artifact_tests(tests);
   register_string_sql_tests(tests);
   register_column_name_tests(tests);
   register_self_ref_tests(tests);

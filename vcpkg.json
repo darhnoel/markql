@@ -1,0 +1,12 @@
+{
+  "name": "markql",
+  "version-string": "1.14.2",
+  "builtin-baseline": "af752f21c9d79ba3df9cb0250ce2233933f58486",
+  "dependencies": [
+    "flatbuffers",
+    {
+      "name": "flatbuffers",
+      "host": true
+    }
+  ]
+}

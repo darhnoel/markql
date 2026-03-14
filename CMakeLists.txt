@@ -15,6 +15,7 @@ option(XSQL_WITH_LIBXML2 "Use libxml2 for HTML parsing" ON)
 option(XSQL_WITH_NLOHMANN_JSON "Use nlohmann/json for CLI output" ON)
 option(XSQL_WITH_CURL "Use libcurl for URL fetching" ON)
 option(XSQL_WITH_ARROW "Enable Apache Arrow for Parquet export" ON)
+option(XSQL_WITH_FLATBUFFERS "Use FlatBuffers for DOCN artifact payloads" ON)
 option(XSQL_ENABLE_KHMER_NUMBER "Enable built-in Khmer number module" ON)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -23,6 +24,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(xsql_core
   core/src/version.cpp
+  core/src/artifacts/artifacts.cpp
+  core/src/artifacts/artifact_internal.cpp
+  core/src/artifacts/artifact_document.cpp
   core/src/lang/ast.cpp
   core/src/lang/diagnostics.cpp
   core/src/lang/markql_parser.cpp
@@ -99,6 +103,21 @@ target_compile_definitions(xsql_core
     XSQL_GIT_COMMIT="${XSQL_GIT_COMMIT}"
     XSQL_GIT_DIRTY=${XSQL_GIT_DIRTY}
 )
+
+if (XSQL_WITH_FLATBUFFERS)
+  find_package(flatbuffers CONFIG QUIET)
+  if (NOT flatbuffers_FOUND)
+    message(FATAL_ERROR "flatbuffers not found. Configure with the repo vcpkg manifest/build path or set XSQL_WITH_FLATBUFFERS=OFF.")
+  endif()
+  set(XSQL_DOCN_SCHEMA "${CMAKE_CURRENT_SOURCE_DIR}/core/src/artifacts/schema/document.fbs")
+  flatbuffers_generate_headers(
+    TARGET xsql_artifact_docn_flatbuffers
+    SCHEMAS ${XSQL_DOCN_SCHEMA}
+    INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/core/src/artifacts/schema"
+  )
+  add_dependencies(xsql_core GENERATE_xsql_artifact_docn_flatbuffers)
+  target_link_libraries(xsql_core PUBLIC flatbuffers::flatbuffers xsql_artifact_docn_flatbuffers)
+endif()
 
 if (XSQL_ENABLE_KHMER_NUMBER)
   target_sources(xsql_core PRIVATE core/src/khmer_number.cpp)
@@ -257,6 +276,7 @@ if (XSQL_BUILD_TESTS)
     tests/test_order_by.cpp
     tests/test_duckbox.cpp
     tests/test_exports.cpp
+    tests/test_artifacts.cpp
     tests/test_malformed_html.cpp
     tests/test_flatten_text.cpp
     tests/test_flatten_extract.cpp
@@ -324,6 +344,9 @@ if (XSQL_BUILD_TESTS)
   endif()
   target_link_libraries(xsql_tests PRIVATE xsql_core)
   target_include_directories(xsql_tests PRIVATE cli core/src core/include tests)
+  if (XSQL_WITH_FLATBUFFERS)
+    target_link_libraries(xsql_tests PRIVATE xsql_artifact_docn_flatbuffers)
+  endif()
   if (XSQL_ARROW_TARGET AND XSQL_PARQUET_TARGET)
     target_link_libraries(xsql_tests PRIVATE ${XSQL_ARROW_TARGET} ${XSQL_PARQUET_TARGET})
     target_compile_definitions(xsql_tests PRIVATE XSQL_USE_ARROW)
@@ -343,6 +366,21 @@ if (XSQL_BUILD_TESTS)
             "$<TARGET_FILE:xsql_bench_inner_html>"
             "$<TARGET_FILE_DIR:xsql_bench_inner_html>/xsql_bench_inner_html${CMAKE_EXECUTABLE_SUFFIX}"
     COMMENT "Creating compatibility binary: xsql_bench_inner_html -> markql_bench_inner_html"
+  )
+  add_executable(xsql_bench_artifacts tests/bench_artifacts.cpp)
+  target_link_libraries(xsql_bench_artifacts PRIVATE xsql_core)
+  target_include_directories(xsql_bench_artifacts PRIVATE cli core/src core/include tests)
+  if (XSQL_WITH_FLATBUFFERS)
+    target_link_libraries(xsql_bench_artifacts PRIVATE xsql_artifact_docn_flatbuffers)
+  endif()
+  set_target_properties(xsql_bench_artifacts PROPERTIES OUTPUT_NAME markql_bench_artifacts)
+  add_custom_command(
+    TARGET xsql_bench_artifacts
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:xsql_bench_artifacts>"
+            "$<TARGET_FILE_DIR:xsql_bench_artifacts>/xsql_bench_artifacts${CMAKE_EXECUTABLE_SUFFIX}"
+    COMMENT "Creating compatibility binary: xsql_bench_artifacts -> markql_bench_artifacts"
   )
   set(XSQL_TESTS
     select_ul_by_id
@@ -441,6 +479,17 @@ if (XSQL_BUILD_TESTS)
     json_export_integration
     ndjson_export_integration
     json_ndjson_stdout_fallback
+    artifact_cli_args
+    artifact_html_and_mqd_results_match
+    artifact_query_and_mqp_results_match
+    artifact_mqp_on_mqd_matches_direct
+    artifact_lint_behavior_unchanged
+    artifact_document_round_trip_is_deterministic
+    artifact_query_round_trip_is_deterministic
+    artifact_document_major_version_rejected
+    artifact_query_major_version_rejected
+    artifact_corrupted_files_fail_safely
+    artifact_inspect_reports_metadata
     raw_source_literal
     fragments_from_raw
     fragments_from_inner_html
