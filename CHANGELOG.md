@@ -69,7 +69,12 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
   - payload checksum verification
   - rejection of unknown required feature flags
   - terminal-safe escaping for artifact-derived CLI metadata output.
-- Added median-based `.mqp` benchmark reporting for query parse, query prepare, `.mqp` write/load, query-text execution on raw HTML, `.mqp` execution on raw HTML, `.mqp` execution on `.mqd`, and artifact size.
+- Added truth-first artifact benchmark reporting for cold-path comparisons between:
+  - raw HTML + query text
+  - raw HTML + `.mqp`
+  - `.mqd` + query text
+  - `.mqd` + `.mqp`
+  along with separated phase timings for HTML read/parse, `.mqd` load, query parse/prepare, `.mqp` load, and execution on parsed-vs-loaded documents.
 - `execute_query_from_file(...)` now accepts `.mqd` inputs transparently while preserving existing HTML-file behavior.
 - `FROM doc AS <alias>` is now accepted directly (for example `FROM doc AS n`).
 - `SELECT self` is now the documented canonical form for returning the current node in node-stream queries.
