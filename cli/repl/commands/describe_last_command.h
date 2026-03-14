@@ -2,8 +2,8 @@
 
 #include "registry.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 CommandHandler make_describe_last_command();
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

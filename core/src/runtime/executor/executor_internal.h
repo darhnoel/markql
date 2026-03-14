@@ -5,7 +5,7 @@
 
 #include "../executor.h"
 
-namespace xsql::executor_internal {
+namespace markql::executor_internal {
 
 /// Compares two nodes by a supported field for ORDER BY sorting.
 /// MUST implement stable comparisons and MUST return 0 for equality.
@@ -27,4 +27,4 @@ bool eval_expr_flatten_base(const Expr& expr,
 /// Inputs are value/list; outputs are boolean with no side effects.
 bool string_in_list(const std::string& value, const std::vector<std::string>& list);
 
-}  // namespace xsql::executor_internal
+}  // namespace markql::executor_internal

@@ -6,7 +6,7 @@
 #include "repl/input/text_util.h"
 #include "ui/color.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 inline constexpr char kPromptNormalPlain[] = "┌─(markql)\n└─▪ ";
 inline constexpr char kPromptVimNormalPlain[] = "┌─(markql)[vim:normal]\n└─▪ ";
@@ -51,4 +51,4 @@ inline void configure_repl_editor(LineEditor& editor, bool color_enabled, bool h
   editor.set_cont_prompt(kPromptContinuationPlain, kPromptContinuationVisibleLen);
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

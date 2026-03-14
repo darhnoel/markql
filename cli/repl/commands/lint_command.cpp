@@ -8,7 +8,7 @@
 
 #include "../../cli_utils.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 namespace {
 
@@ -65,4 +65,4 @@ CommandHandler make_lint_command() {
   };
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

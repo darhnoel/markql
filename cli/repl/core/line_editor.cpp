@@ -11,7 +11,7 @@
 #include "repl/input/text_util.h"
 #include "repl/core/vim_normal.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 namespace {
 
@@ -642,4 +642,4 @@ void LineEditor::redraw_line(const std::string& buffer, size_t cursor) {
   std::cout << std::flush;
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

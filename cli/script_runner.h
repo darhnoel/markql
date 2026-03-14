@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace xsql::cli {
+namespace markql::cli {
 
 struct ScriptStatement {
   std::string text;
@@ -37,4 +37,4 @@ int run_sql_script(const std::string& script,
                    std::ostream& out,
                    std::ostream& err);
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

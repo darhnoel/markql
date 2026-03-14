@@ -4,7 +4,7 @@
 
 #include "backend/parser_impl.h"
 
-namespace xsql {
+namespace markql {
 
 namespace {
 
@@ -88,7 +88,7 @@ void compute_document_metadata(HtmlDocument& doc) {
 /// MUST choose libxml2 when enabled and MUST fall back deterministically otherwise.
 /// Inputs are HTML strings; outputs are HtmlDocument with no side effects.
 HtmlDocument parse_html(const std::string& html) {
-#ifdef XSQL_USE_LIBXML2
+#ifdef MARKQL_USE_LIBXML2
   HtmlDocument doc = parse_html_libxml2(html);
 #else
   // WHY: fallback parser keeps offline builds working without libxml2.
@@ -99,11 +99,11 @@ HtmlDocument parse_html(const std::string& html) {
 }
 
 int64_t count_html_nodes_fast(const std::string& html) {
-#ifdef XSQL_USE_LIBXML2
+#ifdef MARKQL_USE_LIBXML2
   return count_html_nodes_libxml2(html);
 #else
   return count_html_nodes_naive(html);
 #endif
 }
 
-}  // namespace xsql
+}  // namespace markql

@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace xsql {
+namespace markql {
 
 /// Captures core build version and source provenance details.
 /// MUST be stable and available in CLI and Python bindings.
@@ -19,5 +19,5 @@ VersionInfo get_version_info();
 /// MUST include at least version and commit hash.
 std::string version_string();
 
-}  // namespace xsql
+}  // namespace markql
 

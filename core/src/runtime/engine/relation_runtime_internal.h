@@ -1,6 +1,6 @@
 #pragma once
 
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 
 #include <optional>
 #include <cstdint>
@@ -12,7 +12,7 @@
 #include "../../dom/html_parser.h"
 #include "../../lang/markql_parser.h"
 
-namespace xsql {
+namespace markql {
 
 struct RelationRecord {
   std::unordered_map<std::string, std::optional<std::string>> values;
@@ -115,4 +115,4 @@ Relation execute_relation_join_non_lateral(const Query::JoinItem& join,
                                            const std::string& join_label,
                                            RelationRuntimeCache* cache);
 
-}  // namespace xsql
+}  // namespace markql

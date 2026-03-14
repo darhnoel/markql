@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <fstream>
 
-namespace xsql::cli {
+namespace markql::cli {
 
 History::History(size_t max_entries) : max_entries_(max_entries) {}
 
@@ -118,4 +118,4 @@ bool History::next(std::string& buffer) {
   return true;
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

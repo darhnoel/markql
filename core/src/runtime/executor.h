@@ -5,7 +5,7 @@
 #include "dom/html_parser.h"
 #include "lang/ast.h"
 
-namespace xsql {
+namespace markql {
 
 struct ExecuteError {
   std::string message;
@@ -18,4 +18,4 @@ struct ExecuteResult {
 
 ExecuteResult execute_query(const Query& query, const HtmlDocument& doc, const std::string& source_uri);
 
-}  // namespace xsql
+}  // namespace markql

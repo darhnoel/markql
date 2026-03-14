@@ -11,7 +11,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "xsql/column_names.h"
+#include "markql/column_names.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -20,7 +20,7 @@
 #include <unistd.h>
 #endif
 
-namespace xsql::render {
+namespace markql::render {
 
 namespace {
 
@@ -201,7 +201,7 @@ std::string term_scores_to_string(const std::unordered_map<std::string, double>&
   return oss.str();
 }
 
-std::string field_value(const xsql::QueryResultRow& row, const std::string& field) {
+std::string field_value(const markql::QueryResultRow& row, const std::string& field) {
   if (field == "node_id") return std::to_string(row.node_id);
   if (field == "count") return std::to_string(row.node_id);
   if (field == "tag") return row.tag;
@@ -244,11 +244,11 @@ std::string build_separator(const std::vector<size_t>& widths,
 
 }  // namespace
 
-std::string render_duckbox(const xsql::QueryResult& result, const DuckboxOptions& options) {
+std::string render_duckbox(const markql::QueryResult& result, const DuckboxOptions& options) {
   std::vector<std::string> raw_columns =
       result.columns.empty() ? default_columns() : result.columns;
-  std::vector<xsql::ColumnNameMapping> schema =
-      xsql::build_column_name_map(raw_columns, options.colname_mode);
+  std::vector<markql::ColumnNameMapping> schema =
+      markql::build_column_name_map(raw_columns, options.colname_mode);
   std::vector<std::string> columns;
   columns.reserve(schema.size());
   for (const auto& item : schema) {
@@ -343,4 +343,4 @@ std::string render_duckbox(const xsql::QueryResult& result, const DuckboxOptions
   return oss.str();
 }
 
-}  // namespace xsql::render
+}  // namespace markql::render

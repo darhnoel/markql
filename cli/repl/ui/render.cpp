@@ -7,7 +7,7 @@
 #include "repl/input/text_util.h"
 #include "sql_keywords.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 namespace {
 
 }  // namespace
@@ -157,4 +157,4 @@ void render_buffer(const std::string& buffer,
   }
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

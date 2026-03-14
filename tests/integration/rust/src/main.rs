@@ -56,7 +56,7 @@ impl CliWorld {
             return Ok(primary);
         }
 
-        let legacy = root.join("build/xsql");
+        let legacy = root.join("build/markql");
         if legacy.exists() {
             return Ok(legacy);
         }

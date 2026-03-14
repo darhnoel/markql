@@ -8,7 +8,7 @@
 #include "plugin_install_command.h"
 #include "plugin_registry.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 namespace {
 
 std::string shared_library_suffix() {
@@ -159,4 +159,4 @@ CommandHandler make_plugin_command() {
   };
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

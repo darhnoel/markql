@@ -1,4 +1,4 @@
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 
 #include <string>
 #include <utility>
@@ -7,7 +7,7 @@
 #include "../../lang/markql_parser.h"
 #include "engine_execution_internal.h"
 
-namespace xsql {
+namespace markql {
 
 namespace {
 
@@ -230,4 +230,4 @@ QueryResult execute_meta_query(const Query& query, const std::string& source_uri
   }
 }
 
-}  // namespace xsql
+}  // namespace markql

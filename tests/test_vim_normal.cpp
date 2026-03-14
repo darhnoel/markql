@@ -29,8 +29,8 @@ size_t line_end(const Harness& h) {
   return (end == std::string::npos) ? h.buffer.size() : end;
 }
 
-xsql::cli::VimNormalContext make_ctx(Harness& h) {
-  return xsql::cli::VimNormalContext{
+markql::cli::VimNormalContext make_ctx(Harness& h) {
+  return markql::cli::VimNormalContext{
       h.buffer,
       h.cursor,
       [&]() { return line_start(h); },
@@ -51,9 +51,9 @@ void test_vim_normal_sequence_count_then_x() {
   h.buffer = "abcdef";
   h.cursor = 1;
   auto ctx = make_ctx(h);
-  xsql::cli::VimNormalState state;
-  xsql::cli::handle_vim_normal_key('3', state, ctx);
-  xsql::cli::handle_vim_normal_key('x', state, ctx);
+  markql::cli::VimNormalState state;
+  markql::cli::handle_vim_normal_key('3', state, ctx);
+  markql::cli::handle_vim_normal_key('x', state, ctx);
   expect_true(h.buffer == "aef", "3x deletes three chars");
   expect_eq(h.cursor, static_cast<size_t>(1), "cursor stable after 3x");
   expect_eq(h.undo_snapshots.size(), static_cast<size_t>(1), "3x records one undo snapshot");
@@ -64,10 +64,10 @@ void test_vim_normal_sequence_d2w() {
   h.buffer = "alpha beta gamma";
   h.cursor = 0;
   auto ctx = make_ctx(h);
-  xsql::cli::VimNormalState state;
-  xsql::cli::handle_vim_normal_key('d', state, ctx);
-  xsql::cli::handle_vim_normal_key('2', state, ctx);
-  xsql::cli::handle_vim_normal_key('w', state, ctx);
+  markql::cli::VimNormalState state;
+  markql::cli::handle_vim_normal_key('d', state, ctx);
+  markql::cli::handle_vim_normal_key('2', state, ctx);
+  markql::cli::handle_vim_normal_key('w', state, ctx);
   expect_true(h.buffer == "gamma", "d2w deletes first two words");
   expect_eq(h.cursor, static_cast<size_t>(0), "cursor moved to delete start");
   expect_eq(h.undo_snapshots.size(), static_cast<size_t>(1), "d2w records undo snapshot");
@@ -78,8 +78,8 @@ void test_vim_normal_zero_moves_to_line_start_without_prefix() {
   h.buffer = "abc\ndef";
   h.cursor = 2;
   auto ctx = make_ctx(h);
-  xsql::cli::VimNormalState state;
-  xsql::cli::handle_vim_normal_key('0', state, ctx);
+  markql::cli::VimNormalState state;
+  markql::cli::handle_vim_normal_key('0', state, ctx);
   expect_eq(h.cursor, static_cast<size_t>(0), "0 moves to current line start");
 }
 
@@ -88,11 +88,11 @@ void test_vim_normal_jk_count_delegates_to_move_callbacks() {
   h.buffer = "one";
   h.cursor = 0;
   auto ctx = make_ctx(h);
-  xsql::cli::VimNormalState state;
-  xsql::cli::handle_vim_normal_key('2', state, ctx);
-  xsql::cli::handle_vim_normal_key('j', state, ctx);
-  xsql::cli::handle_vim_normal_key('3', state, ctx);
-  xsql::cli::handle_vim_normal_key('k', state, ctx);
+  markql::cli::VimNormalState state;
+  markql::cli::handle_vim_normal_key('2', state, ctx);
+  markql::cli::handle_vim_normal_key('j', state, ctx);
+  markql::cli::handle_vim_normal_key('3', state, ctx);
+  markql::cli::handle_vim_normal_key('k', state, ctx);
   expect_eq(h.move_down_calls, static_cast<size_t>(2), "<n>j dispatches repeated move_down");
   expect_eq(h.move_up_calls, static_cast<size_t>(3), "<n>k dispatches repeated move_up");
 }
@@ -102,8 +102,8 @@ void test_vim_normal_insert_commands_trigger_enter_insert() {
   h.buffer = "abc";
   h.cursor = 1;
   auto ctx = make_ctx(h);
-  xsql::cli::VimNormalState state;
-  xsql::cli::handle_vim_normal_key('i', state, ctx);
+  markql::cli::VimNormalState state;
+  markql::cli::handle_vim_normal_key('i', state, ctx);
   expect_true(h.entered_insert, "i enters insert mode");
 }
 
@@ -112,9 +112,9 @@ void test_vim_normal_sequence_dd_deletes_current_line() {
   h.buffer = "one\ntwo\nthree";
   h.cursor = 4;  // start of "two"
   auto ctx = make_ctx(h);
-  xsql::cli::VimNormalState state;
-  xsql::cli::handle_vim_normal_key('d', state, ctx);
-  xsql::cli::handle_vim_normal_key('d', state, ctx);
+  markql::cli::VimNormalState state;
+  markql::cli::handle_vim_normal_key('d', state, ctx);
+  markql::cli::handle_vim_normal_key('d', state, ctx);
   expect_true(h.buffer == "one\nthree", "dd deletes current line");
   expect_eq(h.cursor, static_cast<size_t>(4), "cursor moves to replacement line start");
   expect_eq(h.undo_snapshots.size(), static_cast<size_t>(1), "dd records one undo snapshot");
@@ -125,10 +125,10 @@ void test_vim_normal_sequence_d2d_deletes_two_lines() {
   h.buffer = "one\ntwo\nthree";
   h.cursor = 0;
   auto ctx = make_ctx(h);
-  xsql::cli::VimNormalState state;
-  xsql::cli::handle_vim_normal_key('d', state, ctx);
-  xsql::cli::handle_vim_normal_key('2', state, ctx);
-  xsql::cli::handle_vim_normal_key('d', state, ctx);
+  markql::cli::VimNormalState state;
+  markql::cli::handle_vim_normal_key('d', state, ctx);
+  markql::cli::handle_vim_normal_key('2', state, ctx);
+  markql::cli::handle_vim_normal_key('d', state, ctx);
   expect_true(h.buffer == "three", "d2d deletes two lines");
   expect_eq(h.cursor, static_cast<size_t>(0), "cursor lands at remaining line start");
   expect_eq(h.undo_snapshots.size(), static_cast<size_t>(1), "d2d records one undo snapshot");

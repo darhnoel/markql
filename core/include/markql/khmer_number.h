@@ -3,7 +3,7 @@
 #include <string>
 #include <string_view>
 
-namespace xsql::khmer_number {
+namespace markql::khmer_number {
 
 template <typename T>
 struct Result {
@@ -26,4 +26,4 @@ Result<std::string> number_to_khmer_words(std::string_view number_string);
 Result<std::string> number_to_khmer_numerals(std::string_view number_string);
 Result<std::string> khmer_words_to_number(std::string_view text);
 
-}  // namespace xsql::khmer_number
+}  // namespace markql::khmer_number

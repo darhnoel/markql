@@ -59,9 +59,9 @@ BUILD_JOBS="${BUILD_JOBS:-$(detect_parallel_jobs)}"
 cmake_args=(
   -S .
   -B build
-  -DXSQL_WITH_LIBXML2=ON
-  -DXSQL_WITH_CURL=ON
-  -DXSQL_WITH_ARROW=ON
+  -DMARKQL_WITH_LIBXML2=ON
+  -DMARKQL_WITH_CURL=ON
+  -DMARKQL_WITH_ARROW=ON
 )
 
 if [[ -n "${VCPKG_ROOT:-}" ]]; then

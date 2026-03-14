@@ -9,7 +9,7 @@
 #include "../markql_parser.h"
 #include "lexer.h"
 
-namespace xsql {
+namespace markql {
 
 class Parser {
  public:
@@ -63,4 +63,4 @@ class Parser {
   std::unordered_set<std::string> cte_names_;
 };
 
-}  // namespace xsql
+}  // namespace markql

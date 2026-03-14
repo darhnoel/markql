@@ -9,10 +9,10 @@ from setuptools import setup
 
 
 def package_version() -> str:
-    meta = Path("python/xsql/_meta.py").read_text(encoding="utf-8")
+    meta = Path("python/markql/_meta.py").read_text(encoding="utf-8")
     match = re.search(r'__version__\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"', meta)
     if not match:
-        raise RuntimeError("Could not parse __version__ from python/xsql/_meta.py")
+        raise RuntimeError("Could not parse __version__ from python/markql/_meta.py")
     return match.group(1)
 
 
@@ -37,7 +37,7 @@ def git_dirty_flag() -> str:
 
 def core_sources() -> list[str]:
     sources = [
-        "python/xsql/_core.cpp",
+        "python/markql/_core.cpp",
         "core/src/version.cpp",
         "core/src/artifacts/artifacts.cpp",
         "core/src/lang/ast.cpp",
@@ -84,7 +84,7 @@ def core_sources() -> list[str]:
 
 ext_modules = [
     Pybind11Extension(
-        "xsql._core",
+        "markql._core",
         core_sources(),
         include_dirs=[
             "core/include",
@@ -95,9 +95,9 @@ ext_modules = [
             "core/src/util",
         ],
         define_macros=[
-            ("XSQL_VERSION", f'"{PACKAGE_VERSION}"'),
-            ("XSQL_GIT_COMMIT", f'"{git_commit_short()}"'),
-            ("XSQL_GIT_DIRTY", git_dirty_flag()),
+            ("MARKQL_VERSION", f'"{PACKAGE_VERSION}"'),
+            ("MARKQL_GIT_COMMIT", f'"{git_commit_short()}"'),
+            ("MARKQL_GIT_DIRTY", git_dirty_flag()),
         ],
         cxx_std=20,
     )

@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace xsql::cli {
+namespace markql::cli {
 
 struct PluginRegistryEntry {
   std::string name;
@@ -17,4 +17,4 @@ bool load_plugin_registry(std::vector<PluginRegistryEntry>& entries, std::string
 const PluginRegistryEntry* find_plugin_entry(const std::vector<PluginRegistryEntry>& entries,
                                              const std::string& name);
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

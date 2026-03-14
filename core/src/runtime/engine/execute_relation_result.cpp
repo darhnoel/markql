@@ -1,4 +1,4 @@
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 
 #include <chrono>
 #include <optional>
@@ -7,9 +7,9 @@
 #include "../../util/string_util.h"
 #include "engine_execution_internal.h"
 #include "relation_runtime_internal.h"
-#include "xsql_internal.h"
+#include "markql_internal.h"
 
-namespace xsql {
+namespace markql {
 
 namespace {
 
@@ -91,8 +91,8 @@ QueryResult query_result_from_relation(const Query& query,
   ScopedProfileTimer projection_timer(
       profile, profile != nullptr ? &profile->projection_time_ns : nullptr);
   QueryResult out;
-  out.columns = xsql_internal::build_columns(query);
-  out.columns_implicit = !xsql_internal::is_projection_query(query);
+  out.columns = markql_internal::build_columns(query);
+  out.columns_implicit = !markql_internal::is_projection_query(query);
   out.to_list = query.to_list;
   out.to_table = query.to_table;
   out.table_has_header = query.table_has_header;
@@ -127,7 +127,7 @@ QueryResult query_result_from_relation(const Query& query,
           ? std::optional<std::string>(lower_alias_name(*query.source.alias))
           : std::nullopt;
 
-  if (!xsql_internal::is_projection_query(query)) {
+  if (!markql_internal::is_projection_query(query)) {
     for (const auto& rel_row : relation.rows) {
       const RelationRecord* selected = nullptr;
       for (const auto& item : query.select_items) {
@@ -210,4 +210,4 @@ QueryResult query_result_from_relation(const Query& query,
   return out;
 }
 
-}  // namespace xsql
+}  // namespace markql

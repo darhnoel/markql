@@ -69,7 +69,7 @@ if ! command -v cmake >/dev/null 2>&1; then
   exit 2
 fi
 
-VERSION="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' "${REPO_ROOT}/python/xsql/_meta.py" | head -n 1)"
+VERSION="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' "${REPO_ROOT}/python/markql/_meta.py" | head -n 1)"
 if [[ -z "${VERSION}" ]]; then
   VERSION="0.0.0"
 fi

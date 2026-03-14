@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-namespace xsql {
+namespace markql {
 
 /// Represents a single materialized row so callers can format or export results consistently.
 /// MUST keep fields aligned with the executor/output contract to avoid schema drift.
@@ -88,7 +88,7 @@ QueryResult execute_query_from_file(const std::string& path, const std::string& 
 /// Inputs are url/query/timeout; side effects include network IO and thrown errors.
 QueryResult execute_query_from_url(const std::string& url, const std::string& query, int timeout_ms);
 
-}  // namespace xsql
+}  // namespace markql
 
 #include "diagnostics.h"
 #include "version.h"

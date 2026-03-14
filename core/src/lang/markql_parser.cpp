@@ -2,7 +2,7 @@
 
 #include "parser/query_parser_impl.h"
 
-namespace xsql {
+namespace markql {
 
 /// Delegates public parse_query calls to the internal parser implementation.
 /// MUST preserve error reporting behavior and MUST not throw on syntax errors.
@@ -11,4 +11,4 @@ ParseResult parse_query(const std::string& input) {
   return parse_query_impl(input);
 }
 
-}  // namespace xsql
+}  // namespace markql

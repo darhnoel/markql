@@ -1,4 +1,4 @@
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 
 #include <algorithm>
 #include <cctype>
@@ -17,9 +17,9 @@
 #include "../../util/string_util.h"
 #include "engine_execution_internal.h"
 #include "relation_runtime_internal.h"
-#include "xsql_internal.h"
+#include "markql_internal.h"
 
-namespace xsql {
+namespace markql {
 
 namespace {
 
@@ -371,13 +371,13 @@ Relation evaluate_source_relation(const Source& source,
       sibling_pos = &*cache->default_sibling_pos;
     }
   } else if (source.kind == Source::Kind::Path) {
-    doc = parse_html(xsql_internal::read_file(source.value));
+    doc = parse_html(markql_internal::read_file(source.value));
     source_uri = source.value;
   } else if (source.kind == Source::Kind::Url) {
-    doc = parse_html(xsql_internal::fetch_url(source.value, 5000));
+    doc = parse_html(markql_internal::fetch_url(source.value, 5000));
     source_uri = source.value;
   } else if (source.kind == Source::Kind::RawHtml) {
-    if (source.value.size() > xsql_internal::kMaxRawHtmlBytes) {
+    if (source.value.size() > markql_internal::kMaxRawHtmlBytes) {
       throw std::runtime_error("RAW() HTML exceeds maximum size");
     }
     doc = parse_html(source.value);
@@ -643,4 +643,4 @@ QueryResult execute_query_with_source_relation_entry(const Query& query,
       query, default_html, default_document, default_source_uri, nullptr, nullptr, nullptr);
 }
 
-}  // namespace xsql
+}  // namespace markql

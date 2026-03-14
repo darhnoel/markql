@@ -4,7 +4,7 @@
 #include <functional>
 #include <string>
 
-namespace xsql::cli {
+namespace markql::cli {
 
 struct VimNormalState {
   size_t prefix_count = 0;
@@ -33,4 +33,4 @@ struct VimNormalContext {
 /// MUST consume digits/prefixes and support motions/edits needed by REPL.
 bool handle_vim_normal_key(char key, VimNormalState& state, VimNormalContext& ctx);
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

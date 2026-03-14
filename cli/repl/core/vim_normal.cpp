@@ -5,7 +5,7 @@
 #include "vim_edit.h"
 #include "repl/input/text_util.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 namespace {
 
@@ -217,4 +217,4 @@ bool handle_vim_normal_key(char key, VimNormalState& state, VimNormalContext& ct
   return true;
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

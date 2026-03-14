@@ -19,7 +19,7 @@
 #include "repl/input/terminal.h"
 #include "repl/input/text_util.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 namespace {
 
@@ -756,7 +756,7 @@ size_t find_visible_index_by_node_id(const std::vector<VisibleTreeRow>& rows, in
 
 }  // namespace
 
-std::vector<std::vector<int64_t>> build_dom_children_index(const xsql::HtmlDocument& doc) {
+std::vector<std::vector<int64_t>> build_dom_children_index(const markql::HtmlDocument& doc) {
   std::vector<std::vector<int64_t>> children(doc.nodes.size());
   for (const auto& node : doc.nodes) {
     if (!node.parent_id.has_value()) continue;
@@ -767,7 +767,7 @@ std::vector<std::vector<int64_t>> build_dom_children_index(const xsql::HtmlDocum
   return children;
 }
 
-std::vector<int64_t> collect_dom_root_ids(const xsql::HtmlDocument& doc) {
+std::vector<int64_t> collect_dom_root_ids(const markql::HtmlDocument& doc) {
   std::vector<int64_t> roots;
   roots.reserve(doc.nodes.size());
   for (const auto& node : doc.nodes) {
@@ -804,7 +804,7 @@ std::vector<VisibleTreeRow> flatten_visible_tree(
   return out;
 }
 
-std::vector<std::string> render_attribute_lines(const xsql::HtmlNode& node) {
+std::vector<std::string> render_attribute_lines(const markql::HtmlNode& node) {
   std::vector<std::string> lines;
   lines.push_back("node_id=" + std::to_string(node.id) + " tag=" + node.tag);
   std::string head = compact_whitespace(node.inner_html);
@@ -1510,4 +1510,4 @@ int run_dom_explorer_from_input(const std::string& input, std::ostream& err) {
   return 0;
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

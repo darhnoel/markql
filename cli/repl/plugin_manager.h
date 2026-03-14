@@ -5,9 +5,9 @@
 #include <vector>
 
 #include "commands/registry.h"
-#include "xsql/plugin_api.h"
+#include "markql/plugin_api.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 struct PluginInfo {
   std::string name;
@@ -77,4 +77,4 @@ class PluginManager {
   std::unordered_map<std::string, TokenizerEntry> tokenizers_;
 };
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

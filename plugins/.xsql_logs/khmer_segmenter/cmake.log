@@ -1,0 +1,6 @@
+[ 20%] Building C object CMakeFiles/khmer_segmenter_plugin.dir/home/linak/WorkDir2/1_Learning/1_MyProjects/MARKQL/plugins/src/khmer_segmenter/port/c/src/khmer_segmenter.c.o
+[ 40%] Building C object CMakeFiles/khmer_segmenter_plugin.dir/home/linak/WorkDir2/1_Learning/1_MyProjects/MARKQL/plugins/src/khmer_segmenter/port/c/src/khmer_rule_engine.c.o
+[ 60%] Building C object CMakeFiles/khmer_segmenter_plugin.dir/home/linak/WorkDir2/1_Learning/1_MyProjects/MARKQL/plugins/src/khmer_segmenter/port/c/src/khmer_normalization.c.o
+[ 80%] Building CXX object CMakeFiles/khmer_segmenter_plugin.dir/markql_khmer_plugin.cpp.o
+[100%] Linking CXX shared library libkhmer_segmenter.so
+[100%] Built target khmer_segmenter_plugin

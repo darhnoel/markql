@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-#define XSQL_PLUGIN_API_VERSION 1
+#define MARKQL_PLUGIN_API_VERSION 1
 
 typedef bool (*XsqlPluginCommandFn)(const char* line,
                                     void* user_data,

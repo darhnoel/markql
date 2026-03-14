@@ -2,24 +2,24 @@
 
 #include <vector>
 
-#include "xsql/diagnostics.h"
-#include "xsql/version.h"
+#include "markql/diagnostics.h"
+#include "markql/version.h"
 
 namespace {
 
 void test_lint_syntax_diagnostic_has_stable_code_and_span() {
-  std::vector<xsql::Diagnostic> diagnostics = xsql::lint_query("SELECT FROM doc");
+  std::vector<markql::Diagnostic> diagnostics = markql::lint_query("SELECT FROM doc");
   expect_true(!diagnostics.empty(), "syntax diagnostics produced");
   if (diagnostics.empty()) return;
   const auto& first = diagnostics.front();
-  expect_true(first.severity == xsql::DiagnosticSeverity::Error, "syntax severity is error");
+  expect_true(first.severity == markql::DiagnosticSeverity::Error, "syntax severity is error");
   expect_true(first.code == "MQL-SYN-0001", "syntax code is stable");
   expect_true(first.span.start_line == 1, "syntax span line");
   expect_true(first.span.start_col > 1, "syntax span col");
 }
 
 void test_lint_semantic_diagnostic_has_stable_code() {
-  std::vector<xsql::Diagnostic> diagnostics = xsql::lint_query(
+  std::vector<markql::Diagnostic> diagnostics = markql::lint_query(
       "SELECT TEXT(n) "
       "FROM doc AS n "
       "WHERE n.tag = 'div'");
@@ -34,12 +34,12 @@ void test_lint_semantic_diagnostic_has_stable_code() {
 }
 
 void test_lint_warns_select_from_alias_as_ambiguous_node_value() {
-  std::vector<xsql::Diagnostic> diagnostics = xsql::lint_query(
+  std::vector<markql::Diagnostic> diagnostics = markql::lint_query(
       "SELECT node_row FROM doc AS node_row WHERE node_row.tag = 'div'");
   expect_true(!diagnostics.empty(), "ambiguous alias-select warning produced");
   if (diagnostics.empty()) return;
   const auto& first = diagnostics.front();
-  expect_true(first.severity == xsql::DiagnosticSeverity::Warning, "warning severity is stable");
+  expect_true(first.severity == markql::DiagnosticSeverity::Warning, "warning severity is stable");
   expect_true(first.code == "MQL-LINT-0001", "warning code is stable");
   expect_true(first.message == "Selecting the FROM alias as a value is ambiguous",
               "warning message is stable");
@@ -51,25 +51,25 @@ void test_lint_warns_select_from_alias_as_ambiguous_node_value() {
 }
 
 void test_lint_select_self_has_no_alias_ambiguity_warning() {
-  std::vector<xsql::Diagnostic> diagnostics = xsql::lint_query(
+  std::vector<markql::Diagnostic> diagnostics = markql::lint_query(
       "SELECT self FROM doc AS node_row WHERE node_row.tag = 'div'");
   expect_true(diagnostics.empty(), "canonical select self has no ambiguity warning");
 }
 
 void test_diagnostic_text_renderer_contains_help_and_caret() {
-  std::vector<xsql::Diagnostic> diagnostics = xsql::lint_query("SELECT FROM doc");
+  std::vector<markql::Diagnostic> diagnostics = markql::lint_query("SELECT FROM doc");
   expect_true(!diagnostics.empty(), "diagnostics available");
   if (diagnostics.empty()) return;
-  std::string rendered = xsql::render_diagnostics_text(diagnostics);
+  std::string rendered = markql::render_diagnostics_text(diagnostics);
   expect_true(rendered.find("help:") != std::string::npos, "text renderer has help");
   expect_true(rendered.find("^") != std::string::npos, "text renderer has caret snippet");
 }
 
 void test_diagnostic_json_renderer_contains_stable_fields() {
-  std::vector<xsql::Diagnostic> diagnostics = xsql::lint_query("SELECT FROM doc");
+  std::vector<markql::Diagnostic> diagnostics = markql::lint_query("SELECT FROM doc");
   expect_true(!diagnostics.empty(), "diagnostics available for json");
   if (diagnostics.empty()) return;
-  std::string json = xsql::render_diagnostics_json(diagnostics);
+  std::string json = markql::render_diagnostics_json(diagnostics);
   expect_true(json.find("\"severity\":\"ERROR\"") != std::string::npos, "json severity");
   expect_true(json.find("\"code\":\"MQL-SYN-0001\"") != std::string::npos, "json code");
   expect_true(json.find("\"span\"") != std::string::npos, "json span");
@@ -77,10 +77,10 @@ void test_diagnostic_json_renderer_contains_stable_fields() {
 }
 
 void test_diagnostic_json_renderer_matches_snapshot() {
-  std::vector<xsql::Diagnostic> diagnostics = xsql::lint_query("SELECT FROM doc");
+  std::vector<markql::Diagnostic> diagnostics = markql::lint_query("SELECT FROM doc");
   expect_true(!diagnostics.empty(), "diagnostics available for json snapshot");
   if (diagnostics.empty()) return;
-  std::string json = xsql::render_diagnostics_json(diagnostics);
+  std::string json = markql::render_diagnostics_json(diagnostics);
   const std::string expected =
       "[{\"severity\":\"ERROR\",\"code\":\"MQL-SYN-0001\",\"message\":\"Expected tag identifier\","
       "\"help\":\"Check SQL clause order: WITH ... SELECT ... FROM ... WHERE ... ORDER BY ... LIMIT ... TO ...\","
@@ -92,10 +92,10 @@ void test_diagnostic_json_renderer_matches_snapshot() {
 }
 
 void test_diagnostic_text_renderer_matches_golden_snippet() {
-  std::vector<xsql::Diagnostic> diagnostics = xsql::lint_query("SELECT FROM doc");
+  std::vector<markql::Diagnostic> diagnostics = markql::lint_query("SELECT FROM doc");
   expect_true(!diagnostics.empty(), "diagnostics available for golden text");
   if (diagnostics.empty()) return;
-  std::string rendered = xsql::render_diagnostics_text(diagnostics);
+  std::string rendered = markql::render_diagnostics_text(diagnostics);
   const std::string expected =
       "ERROR[MQL-SYN-0001]: Expected tag identifier\n"
       " --> line 1, col 8\n"
@@ -107,12 +107,12 @@ void test_diagnostic_text_renderer_matches_golden_snippet() {
 }
 
 void test_diagnostic_text_renderer_color_includes_ansi_tokens() {
-  std::vector<xsql::Diagnostic> diagnostics = xsql::lint_query("SELECT FROM doc");
+  std::vector<markql::Diagnostic> diagnostics = markql::lint_query("SELECT FROM doc");
   expect_true(!diagnostics.empty(), "diagnostics available for colorized text");
   if (diagnostics.empty()) return;
-  xsql::DiagnosticTextRenderOptions options;
+  markql::DiagnosticTextRenderOptions options;
   options.use_color = true;
-  std::string rendered = xsql::render_diagnostics_text(diagnostics, options);
+  std::string rendered = markql::render_diagnostics_text(diagnostics, options);
   expect_true(rendered.find("\033[31mERROR\033[0m") != std::string::npos,
               "colorized text renders severity with ansi style");
   expect_true(rendered.find("\033[36mhelp:\033[0m") != std::string::npos,
@@ -120,26 +120,26 @@ void test_diagnostic_text_renderer_color_includes_ansi_tokens() {
 }
 
 void test_diagnostic_json_renderer_never_contains_ansi_sequences() {
-  std::vector<xsql::Diagnostic> diagnostics = xsql::lint_query("SELECT FROM doc");
+  std::vector<markql::Diagnostic> diagnostics = markql::lint_query("SELECT FROM doc");
   expect_true(!diagnostics.empty(), "diagnostics available for json ansi guard");
   if (diagnostics.empty()) return;
-  std::string json = xsql::render_diagnostics_json(diagnostics);
+  std::string json = markql::render_diagnostics_json(diagnostics);
   expect_true(json.find("\033[") == std::string::npos, "json diagnostics remain ansi-free");
 }
 
 void test_diagnose_query_failure_maps_parse_error() {
-  std::vector<xsql::Diagnostic> diagnostics =
-      xsql::diagnose_query_failure("SELECT FROM doc", "Query parse error: Expected tag identifier");
+  std::vector<markql::Diagnostic> diagnostics =
+      markql::diagnose_query_failure("SELECT FROM doc", "Query parse error: Expected tag identifier");
   expect_true(!diagnostics.empty(), "mapped parse failure diagnostics");
   if (diagnostics.empty()) return;
   expect_true(diagnostics.front().code == "MQL-SYN-0001", "mapped parse code");
 }
 
 void test_version_string_contains_provenance() {
-  xsql::VersionInfo info = xsql::get_version_info();
+  markql::VersionInfo info = markql::get_version_info();
   expect_true(!info.version.empty(), "version field available");
   expect_true(!info.git_commit.empty(), "git commit field available");
-  std::string rendered = xsql::version_string();
+  std::string rendered = markql::version_string();
   expect_true(rendered.find(info.version) != std::string::npos, "rendered includes version");
   expect_true(rendered.find(info.git_commit) != std::string::npos, "rendered includes commit");
 }

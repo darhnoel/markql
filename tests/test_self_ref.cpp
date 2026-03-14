@@ -8,26 +8,26 @@
 namespace {
 
 void test_parse_self_projection_and_where() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "SELECT self.node_id, self.tag FROM document WHERE self.parent_id IS NULL LIMIT 5");
   expect_true(parsed.query.has_value(), "parse self.<field> in SELECT and WHERE");
 }
 
 void test_parse_select_self_node_projection() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "SELECT self FROM document WHERE tag = 'div' LIMIT 5");
   expect_true(parsed.query.has_value(), "parse bare self in SELECT");
 }
 
 void test_parse_self_function_predicate() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "SELECT self.node_id, self.tag, DIRECT_TEXT(self) AS dt "
       "FROM document WHERE DIRECT_TEXT(self) LIKE '%needle%'");
   expect_true(parsed.query.has_value(), "parse DIRECT_TEXT(self) in SELECT and WHERE");
 }
 
 void test_parse_self_text_attr_inner_html_functions() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "SELECT TEXT(self) AS t, ATTR(self, id) AS idv, INNER_HTML(self, MAX_DEPTH) AS ih, "
       "RAW_INNER_HTML(self, MAX_DEPTH) AS rh "
       "FROM document WHERE self.attributes.id IS NOT NULL");

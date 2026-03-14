@@ -10,20 +10,20 @@
 namespace {
 
 void test_csv_escaping() {
-  xsql::QueryResult result;
+  markql::QueryResult result;
   result.columns = {"col1", "col2"};
-  xsql::QueryResultRow row1;
+  markql::QueryResultRow row1;
   row1.attributes["col1"] = "a,b";
   row1.attributes["col2"] = "He said \"hi\"";
   result.rows.push_back(row1);
-  xsql::QueryResultRow row2;
+  markql::QueryResultRow row2;
   row2.attributes["col1"] = "line1\nline2";
   row2.attributes["col2"] = "plain";
   result.rows.push_back(row2);
 
-  auto path = std::filesystem::temp_directory_path() / "xsql_csv_escape_test.csv";
+  auto path = std::filesystem::temp_directory_path() / "markql_csv_escape_test.csv";
   std::string error;
-  bool ok = xsql::cli::write_csv(result, path.string(), error);
+  bool ok = markql::cli::write_csv(result, path.string(), error);
   expect_true(ok, "csv escaping write ok");
   expect_true(error.empty(), "csv escaping no error");
   std::string content = read_file_to_string(path);
@@ -37,12 +37,12 @@ void test_csv_escaping() {
 
 void test_csv_export_integration() {
   std::string html = "<a href='x'>Hi</a><a>Skip</a>";
-  auto path = std::filesystem::temp_directory_path() / "xsql_csv_integration_test.csv";
+  auto path = std::filesystem::temp_directory_path() / "markql_csv_integration_test.csv";
   std::string query = "SELECT a.href, TEXT(a) FROM document WHERE attributes.href = 'x' TO CSV(\"" +
                       path.string() + "\")";
   auto result = run_query(html, query);
   std::string error;
-  bool ok = xsql::cli::export_result(result, error);
+  bool ok = markql::cli::export_result(result, error);
   expect_true(ok, "csv export integration ok");
   expect_true(error.empty(), "csv export integration no error");
   std::string content = read_file_to_string(path);
@@ -59,11 +59,11 @@ void test_table_csv_export_integration() {
       "<tr><th>H1</th><th>H2</th></tr>"
       "<tr><td>A</td><td>B</td></tr>"
       "</table>";
-  auto path = std::filesystem::temp_directory_path() / "xsql_table_csv_test.csv";
+  auto path = std::filesystem::temp_directory_path() / "markql_table_csv_test.csv";
   std::string query = "SELECT table FROM document TO TABLE(EXPORT=\"" + path.string() + "\")";
   auto result = run_query(html, query);
   std::string error;
-  bool ok = xsql::cli::export_result(result, error);
+  bool ok = markql::cli::export_result(result, error);
   expect_true(ok, "table csv export integration ok");
   expect_true(error.empty(), "table csv export integration no error");
   std::string content = read_file_to_string(path);
@@ -79,12 +79,12 @@ void test_table_csv_export_header_off() {
       "<table>"
       "<tr><td>A</td><td>B</td></tr>"
       "</table>";
-  auto path = std::filesystem::temp_directory_path() / "xsql_table_csv_header_off.csv";
+  auto path = std::filesystem::temp_directory_path() / "markql_table_csv_header_off.csv";
   std::string query =
       "SELECT table FROM document TO TABLE(EXPORT=\"" + path.string() + "\", HEADER=OFF)";
   auto result = run_query(html, query);
   std::string error;
-  bool ok = xsql::cli::export_result(result, error);
+  bool ok = markql::cli::export_result(result, error);
   expect_true(ok, "table csv header off export ok");
   expect_true(error.empty(), "table csv header off export no error");
   std::string content = read_file_to_string(path);
@@ -101,7 +101,7 @@ void test_table_export_requires_single_table() {
     std::string html =
         "<table><tr><td>A</td></tr></table>"
         "<table><tr><td>B</td></tr></table>";
-    auto path = std::filesystem::temp_directory_path() / "xsql_table_csv_multi.csv";
+    auto path = std::filesystem::temp_directory_path() / "markql_table_csv_multi.csv";
     std::string query = "SELECT table FROM document TO TABLE(EXPORT=\"" + path.string() + "\")";
     run_query(html, query);
   } catch (const std::exception& ex) {
@@ -117,12 +117,12 @@ void test_json_export_integration() {
   std::string html =
       "<a href='x'>He said \"hi\"</a>"
       "<a href='y'>line1\nline2</a>";
-  auto path = std::filesystem::temp_directory_path() / "xsql_json_integration_test.json";
+  auto path = std::filesystem::temp_directory_path() / "markql_json_integration_test.json";
   std::string query =
       "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL TO JSON(\"" + path.string() + "\")";
   auto result = run_query(html, query);
   std::string error;
-  bool ok = xsql::cli::export_result(result, error);
+  bool ok = markql::cli::export_result(result, error);
   expect_true(ok, "json export integration ok");
   expect_true(error.empty(), "json export integration no error");
   std::string content = read_file_to_string(path);
@@ -137,12 +137,12 @@ void test_ndjson_export_integration() {
   std::string html =
       "<a href='x'>One</a>"
       "<a href='y'>Two</a>";
-  auto path = std::filesystem::temp_directory_path() / "xsql_ndjson_integration_test.ndjson";
+  auto path = std::filesystem::temp_directory_path() / "markql_ndjson_integration_test.ndjson";
   std::string query =
       "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL TO NDJSON(\"" + path.string() + "\")";
   auto result = run_query(html, query);
   std::string error;
-  bool ok = xsql::cli::export_result(result, error);
+  bool ok = markql::cli::export_result(result, error);
   expect_true(ok, "ndjson export integration ok");
   expect_true(error.empty(), "ndjson export integration no error");
   std::string content = read_file_to_string(path);
@@ -161,7 +161,7 @@ void test_json_ndjson_stdout_fallback() {
     std::ostringstream captured;
     auto* old = std::cout.rdbuf(captured.rdbuf());
     std::string error;
-    bool ok = xsql::cli::export_result(result, error);
+    bool ok = markql::cli::export_result(result, error);
     std::cout.rdbuf(old);
     expect_true(ok, "json stdout export ok");
     expect_true(error.empty(), "json stdout export no error");
@@ -173,7 +173,7 @@ void test_json_ndjson_stdout_fallback() {
     std::ostringstream captured;
     auto* old = std::cout.rdbuf(captured.rdbuf());
     std::string error;
-    bool ok = xsql::cli::export_result(result, error);
+    bool ok = markql::cli::export_result(result, error);
     std::cout.rdbuf(old);
     expect_true(ok, "ndjson stdout export ok");
     expect_true(error.empty(), "ndjson stdout export no error");
@@ -189,7 +189,7 @@ void test_csv_stdout_fallback() {
   std::ostringstream captured;
   auto* old = std::cout.rdbuf(captured.rdbuf());
   std::string error;
-  bool ok = xsql::cli::write_csv(result, "", error);
+  bool ok = markql::cli::write_csv(result, "", error);
   std::cout.rdbuf(old);
   expect_true(ok, "csv stdout export ok");
   expect_true(error.empty(), "csv stdout export no error");
@@ -197,25 +197,25 @@ void test_csv_stdout_fallback() {
 }
 
 void test_csv_export_rejects_table_results() {
-  xsql::QueryResult result;
+  markql::QueryResult result;
   result.to_table = true;
   std::ostringstream captured;
   std::string error;
-  bool ok = xsql::cli::write_csv(captured, result, error);
+  bool ok = markql::cli::write_csv(captured, result, error);
   expect_true(!ok, "csv rejects table results");
   expect_true(error.find("TO TABLE() results") != std::string::npos,
               "csv table rejection has clear error");
 }
 
-#ifdef XSQL_USE_ARROW
+#ifdef MARKQL_USE_ARROW
 void test_parquet_export_smoke() {
   std::string html = "<div id='x'>Hi</div>";
-  auto path = std::filesystem::temp_directory_path() / "xsql_parquet_smoke.parquet";
+  auto path = std::filesystem::temp_directory_path() / "markql_parquet_smoke.parquet";
   std::string query = "SELECT TEXT(div) FROM document WHERE attributes.id = 'x' TO PARQUET(\"" +
                       path.string() + "\")";
   auto result = run_query(html, query);
   std::string error;
-  bool ok = xsql::cli::export_result(result, error);
+  bool ok = markql::cli::export_result(result, error);
   expect_true(ok, "parquet export smoke ok");
   expect_true(error.empty(), "parquet export smoke no error");
   expect_true(std::filesystem::exists(path), "parquet file created");
@@ -239,7 +239,7 @@ void register_export_tests(std::vector<TestCase>& tests) {
   tests.push_back({"json_ndjson_stdout_fallback", test_json_ndjson_stdout_fallback});
   tests.push_back({"csv_stdout_fallback", test_csv_stdout_fallback});
   tests.push_back({"csv_export_rejects_table_results", test_csv_export_rejects_table_results});
-#ifdef XSQL_USE_ARROW
+#ifdef MARKQL_USE_ARROW
   tests.push_back({"parquet_export_smoke", test_parquet_export_smoke});
 #endif
 }

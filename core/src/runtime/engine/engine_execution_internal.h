@@ -1,6 +1,6 @@
 #pragma once
 
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 
 #include <optional>
 #include <string>
@@ -9,7 +9,7 @@
 #include "../../dom/html_parser.h"
 #include "../../lang/markql_parser.h"
 
-namespace xsql {
+namespace markql {
 
 struct FragmentSource {
   std::vector<std::string> fragments;
@@ -54,4 +54,4 @@ void append_document(HtmlDocument& target, const HtmlDocument& source);
 HtmlDocument build_fragments_document(const FragmentSource& fragments);
 FragmentSource collect_html_fragments(const QueryResult& result, const std::string& source_name);
 
-}  // namespace xsql
+}  // namespace markql

@@ -3,16 +3,16 @@
 #include <fstream>
 #include <sstream>
 
-xsql::QueryResult run_query(const std::string& html, const std::string& query) {
-  return xsql::execute_query_from_document(html, query);
+markql::QueryResult run_query(const std::string& html, const std::string& query) {
+  return markql::execute_query_from_document(html, query);
 }
 
-xsql::QueryResult make_result(const std::vector<std::string>& columns,
+markql::QueryResult make_result(const std::vector<std::string>& columns,
                               const std::vector<std::vector<std::string>>& values) {
-  xsql::QueryResult result;
+  markql::QueryResult result;
   result.columns = columns;
   for (const auto& row_values : values) {
-    xsql::QueryResultRow row;
+    markql::QueryResultRow row;
     for (size_t i = 0; i < columns.size() && i < row_values.size(); ++i) {
       const auto& col = columns[i];
       const auto& value = row_values[i];

@@ -4,7 +4,7 @@
 #include <string_view>
 #include <vector>
 
-namespace xsql::cli {
+namespace markql::cli {
 
 /// Returns reserved MarkQL SQL keywords (used for syntax coloring).
 const std::vector<std::string>& markql_reserved_keywords();
@@ -15,4 +15,4 @@ const std::vector<std::string>& markql_completion_keywords();
 /// Case-insensitive keyword lookup for token coloring.
 bool is_sql_keyword_token(std::string_view word);
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

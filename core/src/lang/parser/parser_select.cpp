@@ -2,7 +2,7 @@
 
 #include <limits>
 
-namespace xsql {
+namespace markql {
 
 /// Parses the SELECT projection list, enforcing projection rules.
 /// MUST reject mixing tag-only and projected fields.
@@ -1130,4 +1130,4 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
   return true;
 }
 
-}  // namespace xsql
+}  // namespace markql

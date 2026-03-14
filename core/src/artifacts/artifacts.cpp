@@ -12,7 +12,7 @@
 #include "../lang/markql_parser.h"
 #include "../runtime/engine/engine_execution_internal.h"
 
-namespace xsql::artifacts {
+namespace markql::artifacts {
 
 namespace {
 
@@ -122,8 +122,8 @@ PreparedQueryArtifact prepare_query_artifact(const std::string& query_text) {
   artifact.info.header.required_features = detail::prepared_query_required_features();
   artifact.info.header.producer_major = detail::current_producer_major();
   artifact.info.header.language_major = detail::current_language_major();
-  artifact.info.producer_version = xsql::get_version_info().version;
-  artifact.info.language_version = xsql::get_version_info().version;
+  artifact.info.producer_version = markql::get_version_info().version;
+  artifact.info.language_version = markql::get_version_info().version;
   artifact.info.original_query = query_text;
   artifact.info.query_kind = parsed.query->kind;
   artifact.info.source_kind = parsed.query->source.kind;
@@ -184,4 +184,4 @@ QueryResult execute_query_text_on_document(const std::string& query_text,
       *parsed.query, nullptr, &document.document, document.info.source_uri);
 }
 
-}  // namespace xsql::artifacts
+}  // namespace markql::artifacts

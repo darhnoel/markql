@@ -1,7 +1,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 
 namespace py = pybind11;
 
@@ -15,7 +15,7 @@ py::dict attributes_to_dict(const std::unordered_map<std::string, std::string>& 
   return out;
 }
 
-py::object field_value(const xsql::QueryResultRow& row, const std::string& field) {
+py::object field_value(const markql::QueryResultRow& row, const std::string& field) {
   if (field == "node_id") return py::int_(row.node_id);
   if (field == "count") return py::int_(row.node_id);
   if (field == "tag") return py::str(row.tag);
@@ -44,7 +44,7 @@ py::object field_value(const xsql::QueryResultRow& row, const std::string& field
   return py::str(it->second);
 }
 
-py::dict row_to_dict(const xsql::QueryResultRow& row, const std::vector<std::string>& columns) {
+py::dict row_to_dict(const markql::QueryResultRow& row, const std::vector<std::string>& columns) {
   py::dict out;
   for (const auto& col : columns) {
     out[py::str(col)] = field_value(row, col);
@@ -52,7 +52,7 @@ py::dict row_to_dict(const xsql::QueryResultRow& row, const std::vector<std::str
   return out;
 }
 
-py::dict diagnostic_span_to_dict(const xsql::DiagnosticSpan& span) {
+py::dict diagnostic_span_to_dict(const markql::DiagnosticSpan& span) {
   py::dict out;
   out["start_line"] = span.start_line;
   out["start_col"] = span.start_col;
@@ -63,19 +63,19 @@ py::dict diagnostic_span_to_dict(const xsql::DiagnosticSpan& span) {
   return out;
 }
 
-std::string severity_to_string(xsql::DiagnosticSeverity severity) {
+std::string severity_to_string(markql::DiagnosticSeverity severity) {
   switch (severity) {
-    case xsql::DiagnosticSeverity::Error:
+    case markql::DiagnosticSeverity::Error:
       return "ERROR";
-    case xsql::DiagnosticSeverity::Warning:
+    case markql::DiagnosticSeverity::Warning:
       return "WARNING";
-    case xsql::DiagnosticSeverity::Note:
+    case markql::DiagnosticSeverity::Note:
       return "NOTE";
   }
   return "ERROR";
 }
 
-py::dict diagnostic_to_dict(const xsql::Diagnostic& diagnostic) {
+py::dict diagnostic_to_dict(const markql::Diagnostic& diagnostic) {
   py::dict out;
   out["severity"] = severity_to_string(diagnostic.severity);
   out["code"] = diagnostic.code;
@@ -98,11 +98,11 @@ py::dict diagnostic_to_dict(const xsql::Diagnostic& diagnostic) {
 }  // namespace
 
 PYBIND11_MODULE(_core, m) {
-  m.doc() = "Native bindings for XSQL query execution.";
+  m.doc() = "Native bindings for MARKQL query execution.";
 
   m.def("execute_from_document",
         [](const std::string& html, const std::string& query) {
-          xsql::QueryResult result = xsql::execute_query_from_document(html, query);
+          markql::QueryResult result = markql::execute_query_from_document(html, query);
           py::dict out;
           out["columns"] = result.columns;
           out["warnings"] = result.warnings;
@@ -124,10 +124,10 @@ PYBIND11_MODULE(_core, m) {
           out["table_has_header"] = result.table_has_header;
           py::dict export_sink;
           switch (result.export_sink.kind) {
-            case xsql::QueryResult::ExportSink::Kind::Csv:
+            case markql::QueryResult::ExportSink::Kind::Csv:
               export_sink["kind"] = "csv";
               break;
-            case xsql::QueryResult::ExportSink::Kind::Parquet:
+            case markql::QueryResult::ExportSink::Kind::Parquet:
               export_sink["kind"] = "parquet";
               break;
             default:
@@ -143,7 +143,7 @@ PYBIND11_MODULE(_core, m) {
 
   m.def("lint_query",
         [](const std::string& query) {
-          std::vector<xsql::Diagnostic> diagnostics = xsql::lint_query(query);
+          std::vector<markql::Diagnostic> diagnostics = markql::lint_query(query);
           py::list out;
           for (const auto& diagnostic : diagnostics) {
             out.append(diagnostic_to_dict(diagnostic));
@@ -154,17 +154,17 @@ PYBIND11_MODULE(_core, m) {
 
   m.def("core_version",
         []() {
-          return xsql::version_string();
+          return markql::version_string();
         });
 
   m.def("core_version_info",
         []() {
-          xsql::VersionInfo info = xsql::get_version_info();
+          markql::VersionInfo info = markql::get_version_info();
           py::dict out;
           out["version"] = info.version;
           out["git_commit"] = info.git_commit;
           out["git_dirty"] = info.git_dirty;
-          out["provenance"] = xsql::version_string();
+          out["provenance"] = markql::version_string();
           return out;
         });
 }

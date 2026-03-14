@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace xsql::cli {
+namespace markql::cli {
 
 /// Manages REPL command history with navigation state.
 /// MUST preserve the current buffer when navigating history.
@@ -61,4 +61,4 @@ class History {
   void trim_to_max();
 };
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

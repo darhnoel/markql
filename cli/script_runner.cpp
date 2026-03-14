@@ -3,15 +3,15 @@
 #include <stdexcept>
 
 #include "cli_utils.h"
-#include "xsql/diagnostics.h"
+#include "markql/diagnostics.h"
 #include "lang/markql_parser.h"
 #include "lang/parser/lexer.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 ScriptSplitResult split_sql_script(const std::string& script) {
   ScriptSplitResult out;
-  xsql::Lexer lexer(script);
+  markql::Lexer lexer(script);
   bool in_statement = false;
   size_t statement_start = 0;
 
@@ -70,7 +70,7 @@ int run_sql_script(const std::string& script,
       out << "== stmt " << statement_index << "/" << total << " ==\n";
     }
 
-    auto parsed = xsql::parse_query(statement.text);
+    auto parsed = markql::parse_query(statement.text);
     if (!parsed.query.has_value()) {
       size_t error_pos = statement.start_pos;
       if (parsed.error.has_value()) {
@@ -82,9 +82,9 @@ int run_sql_script(const std::string& script,
       const std::string parse_message =
           parsed.error.has_value() ? parsed.error->message : "Query parse error";
       const size_t parse_pos = parsed.error.has_value() ? parsed.error->position : 0;
-      std::vector<xsql::Diagnostic> diagnostics;
-      diagnostics.push_back(xsql::make_syntax_diagnostic(statement.text, parse_message, parse_pos));
-      err << xsql::render_diagnostics_text(diagnostics) << "\n";
+      std::vector<markql::Diagnostic> diagnostics;
+      diagnostics.push_back(markql::make_syntax_diagnostic(statement.text, parse_message, parse_pos));
+      err << markql::render_diagnostics_text(diagnostics) << "\n";
       had_error = true;
       if (!options.continue_on_error) return 1;
       continue;
@@ -96,10 +96,10 @@ int run_sql_script(const std::string& script,
       auto [line, col] = line_col_from_offset(script, statement.start_pos);
       err << "Error: statement " << statement_index << "/" << total
           << " at line " << line << ", column " << col << "\n";
-      std::vector<xsql::Diagnostic> diagnostics =
-          xsql::diagnose_query_failure(statement.text, ex.what());
+      std::vector<markql::Diagnostic> diagnostics =
+          markql::diagnose_query_failure(statement.text, ex.what());
       if (!diagnostics.empty()) {
-        err << xsql::render_diagnostics_text(diagnostics) << "\n";
+        err << markql::render_diagnostics_text(diagnostics) << "\n";
       } else {
         err << ex.what() << "\n";
       }
@@ -111,4 +111,4 @@ int run_sql_script(const std::string& script,
   return had_error ? 1 : 0;
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

@@ -31,13 +31,13 @@ void test_inner_html_function() {
 
 void test_minify_html_basic() {
   std::string input = "<div>\n <span> hi </span>\n</div>";
-  std::string got = xsql::util::minify_html(input);
+  std::string got = markql::util::minify_html(input);
   expect_true(got == "<div><span> hi </span></div>", "minify html basic");
 }
 
 void test_minify_html_preserves_attribute_quotes() {
   std::string input = "<a href=\"x y\" title='a b'>   link </a>";
-  std::string got = xsql::util::minify_html(input);
+  std::string got = markql::util::minify_html(input);
   expect_true(got.find("href=\"x y\"") != std::string::npos, "minify keeps double-quoted attribute value");
   expect_true(got.find("title='a b'") != std::string::npos, "minify keeps single-quoted attribute value");
   expect_true(got == "<a href=\"x y\" title='a b'> link </a>", "minify normalizes text spacing");
@@ -45,7 +45,7 @@ void test_minify_html_preserves_attribute_quotes() {
 
 void test_minify_html_preserves_protected_tags() {
   std::string input = "<pre>\n a  b\n</pre><div>\n x   y\n</div>";
-  std::string got = xsql::util::minify_html(input);
+  std::string got = markql::util::minify_html(input);
   expect_true(got == "<pre>\n a  b\n</pre><div> x y </div>", "minify preserves pre and compacts div text");
 }
 
@@ -54,7 +54,7 @@ void test_minify_html_preserves_script_style() {
       "<script>var  x = \"a  b\";\nif (x) { y = 1; }</script>"
       "<style>.a {  color: red; }</style>"
       "<div>\n z   z\n</div>";
-  std::string got = xsql::util::minify_html(input);
+  std::string got = markql::util::minify_html(input);
   expect_true(got.find("<script>var  x = \"a  b\";\nif (x) { y = 1; }</script>") != std::string::npos,
               "minify preserves script content");
   expect_true(got.find("<style>.a {  color: red; }</style>") != std::string::npos,

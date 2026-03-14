@@ -4,7 +4,7 @@
 
 #include "../html_parser.h"
 
-namespace xsql {
+namespace markql {
 
 /// Parses HTML using the minimal fallback parser for environments without libxml2.
 /// MUST be deterministic and MUST not execute scripts.
@@ -17,4 +17,4 @@ HtmlDocument parse_html_libxml2(const std::string& html);
 int64_t count_html_nodes_naive(const std::string& html);
 int64_t count_html_nodes_libxml2(const std::string& html);
 
-}  // namespace xsql
+}  // namespace markql

@@ -1,4 +1,4 @@
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 
 #include <stdexcept>
 #include <string>
@@ -8,9 +8,9 @@
 #include "../../lang/markql_parser.h"
 #include "../../util/string_util.h"
 #include "engine_execution_internal.h"
-#include "xsql_internal.h"
+#include "markql_internal.h"
 
-namespace xsql {
+namespace markql {
 
 namespace {
 
@@ -34,8 +34,8 @@ QueryResult build_count_star_result(const Query& query,
                                     int64_t count,
                                     const std::string& source_uri) {
   QueryResult out;
-  out.columns = xsql_internal::build_columns(query);
-  out.columns_implicit = !xsql_internal::is_projection_query(query);
+  out.columns = markql_internal::build_columns(query);
+  out.columns_implicit = !markql_internal::is_projection_query(query);
   out.to_list = query.to_list;
   out.to_table = query.to_table;
   out.table_has_header = query.table_has_header;
@@ -62,7 +62,7 @@ QueryResult execute_query_with_source_legacy(const Query& query,
     return build_count_star_result(query, count, effective_source_uri);
   }
   if (query.source.kind == Source::Kind::RawHtml) {
-    if (query.source.value.size() > xsql_internal::kMaxRawHtmlBytes) {
+    if (query.source.value.size() > markql_internal::kMaxRawHtmlBytes) {
       throw std::runtime_error("RAW() HTML exceeds maximum size");
     }
     HtmlDocument doc = parse_html(query.source.value);
@@ -72,7 +72,7 @@ QueryResult execute_query_with_source_legacy(const Query& query,
   if (query.source.kind == Source::Kind::Fragments) {
     FragmentSource fragments;
     if (query.source.fragments_raw.has_value()) {
-      if (query.source.fragments_raw->size() > xsql_internal::kMaxRawHtmlBytes) {
+      if (query.source.fragments_raw->size() > markql_internal::kMaxRawHtmlBytes) {
         throw std::runtime_error("FRAGMENTS RAW() input exceeds maximum size");
       }
       fragments.fragments.push_back(*query.source.fragments_raw);
@@ -108,7 +108,7 @@ QueryResult execute_query_with_source_legacy(const Query& query,
       if (!looks_like_html_fragment(trimmed)) {
         throw std::runtime_error("PARSE() expects an HTML string expression");
       }
-      if (trimmed.size() > xsql_internal::kMaxFragmentHtmlBytes) {
+      if (trimmed.size() > markql_internal::kMaxFragmentHtmlBytes) {
         throw std::runtime_error("PARSE() HTML fragment exceeds maximum size");
       }
       fragments.fragments.push_back(std::move(trimmed));
@@ -168,7 +168,7 @@ QueryResult execute_query_from_file(const std::string& path, const std::string& 
     }
     throw std::runtime_error("Prepared query artifacts (.mqp) cannot be used as input documents");
   }
-  std::string html = xsql_internal::read_file(path);
+  std::string html = markql_internal::read_file(path);
   return execute_query_from_html(html, path, query);
 }
 
@@ -176,8 +176,8 @@ QueryResult execute_query_from_file(const std::string& path, const std::string& 
 /// MUST honor timeout_ms and MUST propagate network failures as exceptions.
 /// Inputs are url/query/timeout; outputs are QueryResult with network side effects.
 QueryResult execute_query_from_url(const std::string& url, const std::string& query, int timeout_ms) {
-  std::string html = xsql_internal::fetch_url(url, timeout_ms);
+  std::string html = markql_internal::fetch_url(url, timeout_ms);
   return execute_query_from_html(html, url, query);
 }
 
-}  // namespace xsql
+}  // namespace markql

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 
 #include <cstdint>
 #include <string>
@@ -9,7 +9,7 @@
 #include "../../lang/markql_parser.h"
 #include "../../dom/html_parser.h"
 
-namespace xsql {
+namespace markql {
 
 struct DescendantTagFilter {
   struct Predicate {
@@ -31,4 +31,4 @@ void collect_descendants_any_depth(const std::vector<std::vector<int64_t>>& chil
 bool collect_descendant_tag_filter(const Expr& expr, DescendantTagFilter& filter);
 bool match_descendant_predicate(const HtmlNode& node, const DescendantTagFilter::Predicate& pred);
 
-}  // namespace xsql
+}  // namespace markql

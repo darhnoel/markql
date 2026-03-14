@@ -1,4 +1,4 @@
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 
 #include <memory>
 #include <vector>
@@ -9,7 +9,7 @@
 #include "dom_descendants_internal.h"
 #include "engine_execution_internal.h"
 
-namespace xsql {
+namespace markql {
 
 void collect_descendants_at_depth(const std::vector<std::vector<int64_t>>& children,
                                   int64_t node_id,
@@ -106,4 +106,4 @@ bool match_descendant_predicate(const HtmlNode& node, const DescendantTagFilter:
   return false;
 }
 
-}  // namespace xsql
+}  // namespace markql

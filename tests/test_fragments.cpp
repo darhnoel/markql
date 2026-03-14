@@ -5,7 +5,7 @@
 
 namespace {
 
-void assert_two_li_values(const xsql::QueryResult& result, const std::string& context) {
+void assert_two_li_values(const markql::QueryResult& result, const std::string& context) {
   expect_eq(result.rows.size(), 2, context + " row count");
   if (result.rows.size() < 2) return;
   expect_true(result.rows[0].tag == "li", context + " row1 tag");

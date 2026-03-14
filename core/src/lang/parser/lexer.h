@@ -4,7 +4,7 @@
 
 #include "tokens.h"
 
-namespace xsql {
+namespace markql {
 
 /// Tokenizes query input into a stream for the parser.
 /// MUST be deterministic and MUST not skip meaningful characters.
@@ -69,4 +69,4 @@ class Lexer {
   size_t error_position_ = 0;
 };
 
-}  // namespace xsql
+}  // namespace markql

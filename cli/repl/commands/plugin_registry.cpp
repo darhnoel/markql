@@ -5,7 +5,7 @@
 #include <fstream>
 #include <sstream>
 
-namespace xsql::cli {
+namespace markql::cli {
 namespace {
 
 std::string trim(const std::string& value) {
@@ -175,7 +175,7 @@ bool parse_registry_json(const std::string& json,
 
 std::string plugin_registry_path() {
   std::string path = "plugins/registry.json";
-  if (const char* env = std::getenv("XSQL_PLUGIN_REGISTRY")) {
+  if (const char* env = std::getenv("MARKQL_PLUGIN_REGISTRY")) {
     std::string trimmed = trim(env);
     if (!trimmed.empty()) {
       path = trimmed;
@@ -207,4 +207,4 @@ const PluginRegistryEntry* find_plugin_entry(const std::vector<PluginRegistryEnt
   return nullptr;
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

@@ -5,9 +5,9 @@ This guide is for contributors changing parser/runtime behavior.
 ## A) Project structure and boundaries
 - `core/src/parser/*`: lexer + parser only. Builds AST from query text.
 - `core/src/ast.h`: shared language tree structures.
-- `core/src/xsql/validation.cpp`: semantic validation and guardrails.
+- `core/src/markql/validation.cpp`: semantic validation and guardrails.
 - `core/src/executor/*`: predicate/filter/order evaluation over parsed HTML nodes.
-- `core/src/xsql/execute.cpp`: query planning/execution orchestration and meta commands.
+- `core/src/markql/execute.cpp`: query planning/execution orchestration and meta commands.
 - `cli/*`: REPL and command UX only.
 
 Dependency rules:

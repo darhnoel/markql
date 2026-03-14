@@ -2,8 +2,8 @@
 
 #include "registry.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 CommandHandler make_summarize_content_command();
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

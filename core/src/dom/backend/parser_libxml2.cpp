@@ -2,13 +2,13 @@
 
 #include "../../util/string_util.h"
 
-#ifdef XSQL_USE_LIBXML2
+#ifdef MARKQL_USE_LIBXML2
 
 #include <libxml/HTMLparser.h>
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 
-namespace xsql {
+namespace markql {
 
 namespace {
 
@@ -181,11 +181,11 @@ int64_t count_html_nodes_libxml2(const std::string& html) {
   return count;
 }
 
-}  // namespace xsql
+}  // namespace markql
 
 #else
 
-namespace xsql {
+namespace markql {
 
 HtmlDocument parse_html_libxml2(const std::string&) {
   return {};
@@ -195,6 +195,6 @@ int64_t count_html_nodes_libxml2(const std::string&) {
   return 0;
 }
 
-}  // namespace xsql
+}  // namespace markql
 
 #endif

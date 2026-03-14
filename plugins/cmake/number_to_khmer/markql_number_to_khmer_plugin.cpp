@@ -1,4 +1,4 @@
-#include "xsql/plugin_api.h"
+#include "markql/plugin_api.h"
 
 #include <cctype>
 #include <algorithm>
@@ -7,7 +7,7 @@
 #include <string>
 #include <string_view>
 
-#include "xsql/khmer_number.h"
+#include "markql/khmer_number.h"
 
 namespace {
 
@@ -81,8 +81,8 @@ bool handle_to_words(const char* line,
                        "Usage: .number_to_khmer <number> [--compact] [--khmer-digits]");
   }
   auto result = numerals
-                    ? xsql::khmer_number::number_to_khmer_numerals(arg)
-                    : xsql::khmer_number::number_to_khmer_words(arg);
+                    ? markql::khmer_number::number_to_khmer_numerals(arg)
+                    : markql::khmer_number::number_to_khmer_words(arg);
   if (!result.ok) {
     return write_error(out_error, out_error_size, result.error);
   }
@@ -131,13 +131,13 @@ bool handle_to_number(const char* line,
                        out_error_size,
                        "Usage: .khmer_to_number <khmer_text> [--khmer-digits]");
   }
-  auto result = xsql::khmer_number::khmer_words_to_number(arg);
+  auto result = markql::khmer_number::khmer_words_to_number(arg);
   if (!result.ok) {
     return write_error(out_error, out_error_size, result.error);
   }
   if (numerals) {
     auto numerals_result =
-        xsql::khmer_number::number_to_khmer_numerals(result.value);
+        markql::khmer_number::number_to_khmer_numerals(result.value);
     if (!numerals_result.ok) {
       return write_error(out_error, out_error_size, numerals_result.error);
     }
@@ -150,10 +150,10 @@ bool handle_to_number(const char* line,
 
 }  // namespace
 
-extern "C" bool xsql_register_plugin(const XsqlPluginHost* host,
+extern "C" bool markql_register_plugin(const XsqlPluginHost* host,
                                       char* out_error,
                                       size_t out_error_size) {
-  if (!host || host->api_version != XSQL_PLUGIN_API_VERSION) {
+  if (!host || host->api_version != MARKQL_PLUGIN_API_VERSION) {
     if (out_error && out_error_size > 0) {
       std::snprintf(out_error, out_error_size, "Unsupported plugin API version.");
     }

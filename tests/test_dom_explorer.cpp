@@ -20,20 +20,20 @@ std::string join_lines(const std::vector<std::string>& lines) {
 }
 
 void test_flatten_visible_tree_order_and_depth() {
-  xsql::HtmlDocument doc;
+  markql::HtmlDocument doc;
   doc.nodes = {
-      xsql::HtmlNode{0, "html", "", "", {}, std::nullopt, 0, 0},
-      xsql::HtmlNode{1, "body", "", "", {}, 0, 0, 0},
-      xsql::HtmlNode{2, "div", "", "", {}, 1, 0, 0},
-      xsql::HtmlNode{3, "span", "", "", {}, 2, 0, 0},
-      xsql::HtmlNode{4, "p", "", "", {}, 1, 0, 0},
+      markql::HtmlNode{0, "html", "", "", {}, std::nullopt, 0, 0},
+      markql::HtmlNode{1, "body", "", "", {}, 0, 0, 0},
+      markql::HtmlNode{2, "div", "", "", {}, 1, 0, 0},
+      markql::HtmlNode{3, "span", "", "", {}, 2, 0, 0},
+      markql::HtmlNode{4, "p", "", "", {}, 1, 0, 0},
   };
 
-  auto children = xsql::cli::build_dom_children_index(doc);
-  auto roots = xsql::cli::collect_dom_root_ids(doc);
+  auto children = markql::cli::build_dom_children_index(doc);
+  auto roots = markql::cli::collect_dom_root_ids(doc);
 
   std::unordered_set<int64_t> expanded = {0, 1};
-  auto rows = xsql::cli::flatten_visible_tree(roots, children, expanded);
+  auto rows = markql::cli::flatten_visible_tree(roots, children, expanded);
   std::vector<std::pair<int64_t, int>> expected = {
       {0, 0}, {1, 1}, {2, 2}, {4, 2},
   };
@@ -44,7 +44,7 @@ void test_flatten_visible_tree_order_and_depth() {
   }
 
   expanded.insert(2);
-  rows = xsql::cli::flatten_visible_tree(roots, children, expanded);
+  rows = markql::cli::flatten_visible_tree(roots, children, expanded);
   expected = {{0, 0}, {1, 1}, {2, 2}, {3, 3}, {4, 2}};
   expect_eq(rows.size(), expected.size(), "visible row count for deeper expansion");
   for (size_t i = 0; i < expected.size(); ++i) {
@@ -54,7 +54,7 @@ void test_flatten_visible_tree_order_and_depth() {
 }
 
 void test_render_attribute_lines_sorted_format() {
-  xsql::HtmlNode node;
+  markql::HtmlNode node;
   node.id = 42;
   node.tag = "div";
   node.inner_html = "<td class=\"x\">  hello  </td>";
@@ -63,7 +63,7 @@ void test_render_attribute_lines_sorted_format() {
       {"class", "card featured"},
       {"data-testid", "price-main"},
   };
-  auto lines = xsql::cli::render_attribute_lines(node);
+  auto lines = markql::cli::render_attribute_lines(node);
   std::string actual = join_lines(lines);
   std::string expected =
       "node_id=42 tag=div\n"
@@ -73,10 +73,10 @@ void test_render_attribute_lines_sorted_format() {
       "id = offer-1";
   expect_true(actual == expected, "attribute panel lines sorted and formatted");
 
-  xsql::HtmlNode empty_node;
+  markql::HtmlNode empty_node;
   empty_node.id = 7;
   empty_node.tag = "span";
-  lines = xsql::cli::render_attribute_lines(empty_node);
+  lines = markql::cli::render_attribute_lines(empty_node);
   actual = join_lines(lines);
   expected =
       "node_id=7 tag=span\n"

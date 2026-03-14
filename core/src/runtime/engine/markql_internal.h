@@ -7,9 +7,9 @@
 
 #include "../../dom/html_parser.h"
 #include "../../lang/ast.h"
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 
-namespace xsql::xsql_internal {
+namespace markql::markql_internal {
 
 constexpr size_t kMaxLimit = 100000;
 constexpr size_t kMaxRegexLength = 1024;
@@ -106,4 +106,4 @@ std::string extract_direct_text(const std::string& html);
 /// Inputs are HTML strings; outputs are text-only strings.
 std::string extract_direct_text_strict(const std::string& html);
 
-}  // namespace xsql::xsql_internal
+}  // namespace markql::markql_internal

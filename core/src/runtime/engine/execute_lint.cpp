@@ -1,4 +1,4 @@
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -7,9 +7,9 @@
 
 #include "../../lang/markql_parser.h"
 #include "../../util/string_util.h"
-#include "xsql_internal.h"
+#include "markql_internal.h"
 
-namespace xsql {
+namespace markql {
 
 namespace {
 
@@ -100,16 +100,16 @@ std::vector<Diagnostic> lint_query(const std::string& query) {
         if (ast.to_table) {
           throw std::runtime_error("TO TABLE() is not supported with WITH/JOIN queries");
         }
-        xsql_internal::validate_limits(ast);
-        xsql_internal::validate_predicates(ast);
+        markql_internal::validate_limits(ast);
+        markql_internal::validate_predicates(ast);
       } else {
-        xsql_internal::validate_projection(ast);
-        xsql_internal::validate_order_by(ast);
-        xsql_internal::validate_to_table(ast);
-        xsql_internal::validate_export_sink(ast);
-        xsql_internal::validate_qualifiers(ast);
-        xsql_internal::validate_predicates(ast);
-        xsql_internal::validate_limits(ast);
+        markql_internal::validate_projection(ast);
+        markql_internal::validate_order_by(ast);
+        markql_internal::validate_to_table(ast);
+        markql_internal::validate_export_sink(ast);
+        markql_internal::validate_qualifiers(ast);
+        markql_internal::validate_predicates(ast);
+        markql_internal::validate_limits(ast);
       }
     }
   } catch (const std::exception& ex) {
@@ -120,4 +120,4 @@ std::vector<Diagnostic> lint_query(const std::string& query) {
   return diagnostics;
 }
 
-}  // namespace xsql
+}  // namespace markql

@@ -21,4 +21,4 @@ classifiers = [
 test = ["pytest>=7.4.0"]
 
 [tool.setuptools.dynamic]
-version = {attr = "xsql._meta.__version__"}
+version = {attr = "markql._meta.__version__"}

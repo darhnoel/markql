@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(xsql_khmer_segmenter_plugin LANGUAGES C CXX)
+project(markql_khmer_segmenter_plugin LANGUAGES C CXX)
 
-if (NOT DEFINED XSQL_ROOT)
-  message(FATAL_ERROR "XSQL_ROOT must be set to the XSQL source root.")
+if (NOT DEFINED MARKQL_ROOT)
+  message(FATAL_ERROR "MARKQL_ROOT must be set to the MARKQL source root.")
 endif()
 if (NOT DEFINED PLUGIN_SOURCE)
   message(FATAL_ERROR "PLUGIN_SOURCE must point to the khmer_segmenter repository.")
@@ -33,17 +33,17 @@ endforeach()
 
 add_library(khmer_segmenter_plugin SHARED
   ${SEGMENTER_SOURCES}
-  xsql_khmer_plugin.cpp
+  markql_khmer_plugin.cpp
 )
 
 target_include_directories(khmer_segmenter_plugin PRIVATE
   "${KHMER_PORT_INCLUDE}"
   "${KHMER_COMMON_INCLUDE}"
-  "${XSQL_ROOT}/core/include"
+  "${MARKQL_ROOT}/core/include"
 )
 
 target_compile_definitions(khmer_segmenter_plugin PRIVATE
-  XSQL_KHMER_PLUGIN_SOURCE="${PLUGIN_SOURCE_ABS}"
+  MARKQL_KHMER_PLUGIN_SOURCE="${PLUGIN_SOURCE_ABS}"
 )
 
 set_target_properties(khmer_segmenter_plugin PROPERTIES

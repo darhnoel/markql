@@ -1,4 +1,4 @@
-namespace xsql.artifacts.qastfb;
+namespace markql.artifacts.qastfb;
 
 enum QueryKind : ubyte {
   Select = 0,

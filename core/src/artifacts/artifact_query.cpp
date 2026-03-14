@@ -6,7 +6,7 @@
 #include <memory>
 #include <vector>
 
-namespace xsql::artifacts::detail {
+namespace markql::artifacts::detail {
 
 namespace {
 
@@ -529,8 +529,8 @@ bool prepared_query_uses_flatbuffers(const ArtifactHeader& header) {
 
 std::string build_prepared_meta_payload(const Query& query, const std::string& original_query) {
   BinaryWriter writer;
-  writer.write_string(xsql::get_version_info().version, "producer version");
-  writer.write_string(xsql::get_version_info().version, "language version");
+  writer.write_string(markql::get_version_info().version, "producer version");
+  writer.write_string(markql::get_version_info().version, "language version");
   writer.write_string(original_query, "original query");
   writer.write_u8(to_u8(query.kind));
   writer.write_u8(to_u8(query.source.kind));
@@ -561,4 +561,4 @@ Query parse_prepared_query_payload(const ArtifactHeader& header, const std::stri
                                                  : parse_prepared_query_payload_legacy(payload);
 }
 
-}  // namespace xsql::artifacts::detail
+}  // namespace markql::artifacts::detail

@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <string>
 
-namespace xsql::cli {
+namespace markql::cli {
 
 /// Computes the UTF-8 sequence length from a leading byte.
 /// MUST return 1 for invalid sequences to avoid infinite loops.
@@ -56,4 +56,4 @@ size_t column_width(const std::string& text, size_t start, size_t end);
 /// Inputs are source column/width and target width; outputs are target columns.
 size_t proportional_column(size_t source_col, size_t source_len, size_t target_len);
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

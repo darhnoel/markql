@@ -6,9 +6,9 @@
 #include <sstream>
 #include <string_view>
 
-#include "xsql/khmer_number.h"
+#include "markql/khmer_number.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 namespace {
 
@@ -84,8 +84,8 @@ CommandHandler make_khmer_number_command() {
 
     if (to_words) {
       auto result = numerals
-                        ? xsql::khmer_number::number_to_khmer_numerals(arg)
-                        : xsql::khmer_number::number_to_khmer_words(arg);
+                        ? markql::khmer_number::number_to_khmer_numerals(arg)
+                        : markql::khmer_number::number_to_khmer_words(arg);
       if (!result.ok) {
         std::cerr << "Error: " << result.error << std::endl;
         ctx.editor.reset_render_state();
@@ -101,7 +101,7 @@ CommandHandler make_khmer_number_command() {
       return true;
     }
 
-    auto result = xsql::khmer_number::khmer_words_to_number(arg);
+    auto result = markql::khmer_number::khmer_words_to_number(arg);
     if (!result.ok) {
       std::cerr << "Error: " << result.error << std::endl;
       ctx.editor.reset_render_state();
@@ -109,7 +109,7 @@ CommandHandler make_khmer_number_command() {
     }
     if (numerals) {
       auto numerals_result =
-          xsql::khmer_number::number_to_khmer_numerals(result.value);
+          markql::khmer_number::number_to_khmer_numerals(result.value);
       if (!numerals_result.ok) {
         std::cerr << "Error: " << numerals_result.error << std::endl;
         ctx.editor.reset_render_state();
@@ -125,4 +125,4 @@ CommandHandler make_khmer_number_command() {
   };
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

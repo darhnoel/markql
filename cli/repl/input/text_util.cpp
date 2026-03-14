@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cctype>
 
-namespace xsql::cli {
+namespace markql::cli {
 
 size_t utf8_sequence_length(unsigned char lead) {
   if ((lead & 0x80) == 0x00) return 1;
@@ -154,4 +154,4 @@ size_t proportional_column(size_t source_col, size_t source_len, size_t target_l
   return std::min(mapped, target_len);
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

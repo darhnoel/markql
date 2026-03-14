@@ -6,51 +6,51 @@
 namespace {
 
 void test_parse_like_predicate() {
-  auto parsed = xsql::parse_query("SELECT div FROM document WHERE text LIKE '%foo%'");
+  auto parsed = markql::parse_query("SELECT div FROM document WHERE text LIKE '%foo%'");
   expect_true(parsed.query.has_value(), "parse LIKE predicate");
 }
 
 void test_parse_position_with_in() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "SELECT li FROM document WHERE POSITION('coupon' IN LOWER(TEXT(li))) > 0");
   expect_true(parsed.query.has_value(), "parse POSITION(... IN ...)");
 }
 
 void test_parse_project_nested_string_functions() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "SELECT PROJECT(li) AS (slug: LOWER(REPLACE(TRIM(TEXT(h2)), ' ', '-'))) "
       "FROM document WHERE EXISTS(child WHERE tag = 'h2')");
   expect_true(parsed.query.has_value(), "parse PROJECT nested string functions");
 }
 
 void test_parse_legacy_has_direct_text() {
-  auto parsed = xsql::parse_query("SELECT div FROM document WHERE div HAS_DIRECT_TEXT 'hr'");
+  auto parsed = markql::parse_query("SELECT div FROM document WHERE div HAS_DIRECT_TEXT 'hr'");
   expect_true(parsed.query.has_value(), "parse legacy HAS_DIRECT_TEXT");
 }
 
 void test_parse_scoped_selector_inside_text() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "SELECT PROJECT(li) AS (dur: TEXT(span WHERE span HAS_DIRECT_TEXT 'hr')) "
       "FROM document WHERE EXISTS(child WHERE tag = 'span')");
   expect_true(parsed.query.has_value(), "parse scoped selector inside TEXT()");
 }
 
 void test_parse_project_trailing_comma() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "SELECT PROJECT(li) AS (slug: LOWER(TEXT(h2)),) "
       "FROM document WHERE tag = 'li'");
   expect_true(parsed.query.has_value(), "parse PROJECT trailing comma");
 }
 
 void test_parse_case_expression_in_select() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "SELECT CASE WHEN attributes.id IS NULL THEN 'no_id' ELSE attributes.id END AS id_status "
       "FROM document WHERE tag = 'div'");
   expect_true(parsed.query.has_value(), "parse CASE expression in SELECT");
 }
 
 void test_parse_nested_case_expression() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "SELECT CASE WHEN attributes.id IS NULL THEN "
       "CASE WHEN tag = 'div' THEN 'div_missing' ELSE 'missing' END "
       "ELSE attributes.id END AS id_status "
@@ -59,11 +59,11 @@ void test_parse_nested_case_expression() {
 }
 
 void test_parse_parse_source_forms() {
-  auto parsed_literal = xsql::parse_query(
+  auto parsed_literal = markql::parse_query(
       "SELECT li FROM PARSE('<ul><li>1</li></ul>') AS frag");
   expect_true(parsed_literal.query.has_value(), "parse PARSE() with string expression");
 
-  auto parsed_subquery = xsql::parse_query(
+  auto parsed_subquery = markql::parse_query(
       "SELECT li FROM PARSE(SELECT inner_html(div, 2) FROM document) AS frag");
   expect_true(parsed_subquery.query.has_value(), "parse PARSE() with subquery");
 }

@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <string>
 
-namespace xsql::cli {
+namespace markql::cli {
 
 /// Computes how many terminal rows the buffer occupies with prompts.
 /// MUST match LineEditor rendering rules to keep cursor placement correct.
@@ -35,4 +35,4 @@ void render_buffer(const std::string& buffer,
                    bool keyword_color,
                    const std::string& cont_prompt = "");
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

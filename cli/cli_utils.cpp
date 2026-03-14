@@ -16,13 +16,13 @@
 #include "lang/markql_parser.h"
 #include "lang/parser/lexer.h"
 #include "render/duckbox_renderer.h"
-#include "runtime/engine/xsql_internal.h"
+#include "runtime/engine/markql_internal.h"
 #include "ui/color.h"
 
-#ifdef XSQL_USE_NLOHMANN_JSON
+#ifdef MARKQL_USE_NLOHMANN_JSON
 #include <nlohmann/json.hpp>
 #endif
-namespace xsql::cli {
+namespace markql::cli {
 
 namespace {
 
@@ -45,11 +45,11 @@ std::string json_escape(const std::string& s) {
   return out;
 }
 
-#ifndef XSQL_USE_NLOHMANN_JSON
+#ifndef MARKQL_USE_NLOHMANN_JSON
 /// Serializes attributes without nlohmann/json to keep a minimal dependency set.
 /// MUST escape keys/values and MUST emit a stable object shape.
 /// Inputs are QueryResultRow attributes; outputs are JSON object text.
-std::string attributes_to_json(const xsql::QueryResultRow& row) {
+std::string attributes_to_json(const markql::QueryResultRow& row) {
   std::string out = "{";
   size_t count = 0;
   for (const auto& kv : row.attributes) {
@@ -66,7 +66,7 @@ std::string attributes_to_json(const xsql::QueryResultRow& row) {
 
 /// Serializes term scores without nlohmann/json for deterministic TFIDF output.
 /// MUST emit numeric values and MUST keep keys stable for tests.
-std::string terms_score_to_json(const xsql::QueryResultRow& row) {
+std::string terms_score_to_json(const markql::QueryResultRow& row) {
   std::vector<std::pair<std::string, double>> items(row.term_scores.begin(), row.term_scores.end());
   std::sort(items.begin(), items.end(),
             [](const auto& a, const auto& b) {
@@ -88,7 +88,7 @@ std::string terms_score_to_json(const xsql::QueryResultRow& row) {
 /// Prints a single field as JSON, handling NULLs and attribute projections.
 /// MUST keep output valid JSON and MUST follow QueryResult column semantics.
 /// Inputs are the stream/field/row; side effects are stream writes.
-void print_field(std::ostream& os, const std::string& field, const xsql::QueryResultRow& row) {
+void print_field(std::ostream& os, const std::string& field, const markql::QueryResultRow& row) {
   if (field == "node_id") {
     os << row.node_id;
   } else if (field == "count") {
@@ -114,13 +114,13 @@ void print_field(std::ostream& os, const std::string& field, const xsql::QueryRe
   } else if (field == "source_uri") {
     os << "\"" << json_escape(row.source_uri) << "\"";
   } else if (field == "attributes") {
-#ifndef XSQL_USE_NLOHMANN_JSON
+#ifndef MARKQL_USE_NLOHMANN_JSON
     os << attributes_to_json(row);
 #else
     os << "null";
 #endif
   } else if (field == "terms_score") {
-#ifndef XSQL_USE_NLOHMANN_JSON
+#ifndef MARKQL_USE_NLOHMANN_JSON
     os << terms_score_to_json(row);
 #else
     os << "null";
@@ -274,7 +274,7 @@ bool is_url(const std::string& value) {
 
 std::string load_html_input(const std::string& input, int timeout_ms) {
   if (is_url(input)) {
-    return xsql::xsql_internal::fetch_url(input, timeout_ms);
+    return markql::markql_internal::fetch_url(input, timeout_ms);
   }
   return read_file(input);
 }
@@ -389,7 +389,7 @@ std::string sanitize_pasted_line(std::string line) {
     }
     if (chunk.rfind("markql> ", 0) == 0) {
       chunk = chunk.substr(8);
-    } else if (chunk.rfind("xsql> ", 0) == 0) {
+    } else if (chunk.rfind("markql> ", 0) == 0) {
       chunk = chunk.substr(6);
     } else if (chunk.rfind("> ", 0) == 0) {
       chunk = chunk.substr(2);
@@ -412,7 +412,7 @@ std::string sanitize_pasted_line(std::string line) {
 
 std::optional<QuerySource> parse_query_source(const std::string& query) {
   std::string cleaned = trim_semicolon(query);
-  auto parsed = xsql::parse_query(cleaned);
+  auto parsed = markql::parse_query(cleaned);
   if (!parsed.query.has_value()) return std::nullopt;
 
   auto lower = [](const std::string& in) {
@@ -433,17 +433,17 @@ std::optional<QuerySource> parse_query_source(const std::string& query) {
     return text;
   };
 
-  auto source_needs_input = [&](const xsql::Query& owner,
-                                const xsql::Source& source,
+  auto source_needs_input = [&](const markql::Query& owner,
+                                const markql::Source& source,
                                 const auto& self_source,
                                 const auto& self_query) -> bool {
-    if (source.kind == xsql::Source::Kind::RawHtml) return false;
-    if (source.kind == xsql::Source::Kind::Path || source.kind == xsql::Source::Kind::Url) return false;
-    if (source.kind == xsql::Source::Kind::DerivedSubquery) {
+    if (source.kind == markql::Source::Kind::RawHtml) return false;
+    if (source.kind == markql::Source::Kind::Path || source.kind == markql::Source::Kind::Url) return false;
+    if (source.kind == markql::Source::Kind::DerivedSubquery) {
       if (source.derived_query != nullptr) return self_query(*source.derived_query, self_source, self_query);
       return true;
     }
-    if (source.kind == xsql::Source::Kind::CteRef) {
+    if (source.kind == markql::Source::Kind::CteRef) {
       if (owner.with.has_value()) {
         const std::string target = lower(source.value);
         for (const auto& cte : owner.with->ctes) {
@@ -453,12 +453,12 @@ std::optional<QuerySource> parse_query_source(const std::string& query) {
       }
       return true;
     }
-    if (source.kind == xsql::Source::Kind::Fragments) {
+    if (source.kind == markql::Source::Kind::Fragments) {
       if (source.fragments_raw.has_value()) return false;
       if (source.fragments_query != nullptr) return self_query(*source.fragments_query, self_source, self_query);
       return true;
     }
-    if (source.kind == xsql::Source::Kind::Parse) {
+    if (source.kind == markql::Source::Kind::Parse) {
       if (source.parse_expr != nullptr) return false;
       if (source.parse_query != nullptr) return self_query(*source.parse_query, self_source, self_query);
       return true;
@@ -466,7 +466,7 @@ std::optional<QuerySource> parse_query_source(const std::string& query) {
     return true;
   };
 
-  auto query_needs_input = [&](const xsql::Query& q,
+  auto query_needs_input = [&](const markql::Query& q,
                                const auto& self_source,
                                const auto& self_query) -> bool {
     bool needs_input = source_needs_input(q, q.source, self_source, self_query);
@@ -488,7 +488,7 @@ std::optional<QuerySource> parse_query_source(const std::string& query) {
         parsed.query->source.span.start,
         parsed.query->source.span.end - parsed.query->source.span.start)));
   }
-  if (parsed.query->source.kind == xsql::Source::Kind::Document) {
+  if (parsed.query->source.kind == markql::Source::Kind::Document) {
     if (source.source_token.has_value() &&
         (*source.source_token == "doc" || *source.source_token == "document")) {
       // WHY: `FROM doc [AS x]` should still resolve to the default document input.
@@ -506,7 +506,7 @@ std::optional<QuerySource> parse_query_source(const std::string& query) {
 
 LexInspection inspect_sql_input(const std::string& query) {
   LexInspection out;
-  xsql::Lexer lexer(query);
+  markql::Lexer lexer(query);
   Token token = lexer.next();
   if (token.type == TokenType::Invalid) {
     out.has_error = true;
@@ -594,7 +594,7 @@ std::string escape_control_for_terminal(const std::string& text) {
   return out.str();
 }
 
-std::vector<std::string> collect_source_uris(const xsql::QueryResult& result) {
+std::vector<std::string> collect_source_uris(const markql::QueryResult& result) {
   std::vector<std::string> sources;
   std::unordered_set<std::string> seen;
   for (const auto& row : result.rows) {
@@ -605,7 +605,7 @@ std::vector<std::string> collect_source_uris(const xsql::QueryResult& result) {
   return sources;
 }
 
-void apply_source_uri_policy(xsql::QueryResult& result, const std::vector<std::string>& sources) {
+void apply_source_uri_policy(markql::QueryResult& result, const std::vector<std::string>& sources) {
   if (!result.columns_implicit || result.source_uri_excluded) {
     return;
   }
@@ -621,7 +621,7 @@ void apply_source_uri_policy(xsql::QueryResult& result, const std::vector<std::s
   result.columns.insert(result.columns.begin(), "source_uri");
 }
 
-size_t count_table_rows(const xsql::QueryResult::TableResult& table, bool has_header) {
+size_t count_table_rows(const markql::QueryResult::TableResult& table, bool has_header) {
   if (table.rows.empty()) {
     return 0;
   }
@@ -631,19 +631,19 @@ size_t count_table_rows(const xsql::QueryResult::TableResult& table, bool has_he
   return table.rows.size() > 0 ? table.rows.size() - 1 : 0;
 }
 
-size_t count_result_rows(const xsql::QueryResult& result) {
+size_t count_result_rows(const markql::QueryResult& result) {
   return result.rows.size();
 }
 
 bool build_show_input_result(const std::string& source_uri,
-                             xsql::QueryResult& out,
+                             markql::QueryResult& out,
                              std::string& error) {
   if (source_uri.empty()) {
     error = "No input loaded. Use .load <path|url> or --input <path|url>.";
     return false;
   }
   out.columns = {"key", "value"};
-  xsql::QueryResultRow row;
+  markql::QueryResultRow row;
   row.attributes["key"] = "source_uri";
   row.attributes["value"] = source_uri;
   out.rows.push_back(std::move(row));
@@ -652,7 +652,7 @@ bool build_show_input_result(const std::string& source_uri,
 
 bool build_show_inputs_result(const std::vector<std::string>& sources,
                               const std::string& fallback_source,
-                              xsql::QueryResult& out,
+                              markql::QueryResult& out,
                               std::string& error) {
   std::vector<std::string> effective = sources;
   if (effective.empty() && !fallback_source.empty()) {
@@ -664,22 +664,22 @@ bool build_show_inputs_result(const std::vector<std::string>& sources,
   }
   out.columns = {"source_uri"};
   for (const auto& source : effective) {
-    xsql::QueryResultRow row;
+    markql::QueryResultRow row;
     row.source_uri = source;
     out.rows.push_back(std::move(row));
   }
   return true;
 }
 
-std::string build_json(const xsql::QueryResult& result, xsql::ColumnNameMode colname_mode) {
-#ifdef XSQL_USE_NLOHMANN_JSON
+std::string build_json(const markql::QueryResult& result, markql::ColumnNameMode colname_mode) {
+#ifdef MARKQL_USE_NLOHMANN_JSON
   using nlohmann::json;
   std::vector<std::string> raw_columns = result.columns;
   if (raw_columns.empty()) {
     raw_columns = {"node_id", "tag", "attributes", "parent_id", "max_depth", "doc_order"};
   }
-  std::vector<xsql::ColumnNameMapping> schema =
-      xsql::build_column_name_map(raw_columns, colname_mode);
+  std::vector<markql::ColumnNameMapping> schema =
+      markql::build_column_name_map(raw_columns, colname_mode);
   json out = json::array();
   for (const auto& row : result.rows) {
     json obj = json::object();
@@ -734,8 +734,8 @@ std::string build_json(const xsql::QueryResult& result, xsql::ColumnNameMode col
   if (raw_columns.empty()) {
     raw_columns = {"node_id", "tag", "attributes", "parent_id", "max_depth", "doc_order"};
   }
-  std::vector<xsql::ColumnNameMapping> schema =
-      xsql::build_column_name_map(raw_columns, colname_mode);
+  std::vector<markql::ColumnNameMapping> schema =
+      markql::build_column_name_map(raw_columns, colname_mode);
   std::ostringstream oss;
   oss << "[";
   for (size_t i = 0; i < result.rows.size(); ++i) {
@@ -754,15 +754,15 @@ std::string build_json(const xsql::QueryResult& result, xsql::ColumnNameMode col
 #endif
 }
 
-std::string build_json_list(const xsql::QueryResult& result, xsql::ColumnNameMode colname_mode) {
-#ifdef XSQL_USE_NLOHMANN_JSON
+std::string build_json_list(const markql::QueryResult& result, markql::ColumnNameMode colname_mode) {
+#ifdef MARKQL_USE_NLOHMANN_JSON
   using nlohmann::json;
   std::vector<std::string> raw_columns = result.columns;
   if (raw_columns.size() != 1) {
     throw std::runtime_error("TO LIST() requires a single projected column");
   }
-  std::vector<xsql::ColumnNameMapping> schema =
-      xsql::build_column_name_map(raw_columns, colname_mode);
+  std::vector<markql::ColumnNameMapping> schema =
+      markql::build_column_name_map(raw_columns, colname_mode);
   const std::string& field = schema[0].raw_name;
   json out = json::array();
   for (const auto& row : result.rows) {
@@ -806,8 +806,8 @@ std::string build_json_list(const xsql::QueryResult& result, xsql::ColumnNameMod
   if (raw_columns.size() != 1) {
     throw std::runtime_error("TO LIST() requires a single projected column");
   }
-  std::vector<xsql::ColumnNameMapping> schema =
-      xsql::build_column_name_map(raw_columns, colname_mode);
+  std::vector<markql::ColumnNameMapping> schema =
+      markql::build_column_name_map(raw_columns, colname_mode);
   const std::string& field = schema[0].raw_name;
   std::ostringstream oss;
   oss << "[";
@@ -821,12 +821,12 @@ std::string build_json_list(const xsql::QueryResult& result, xsql::ColumnNameMod
 #endif
 }
 
-std::string build_table_json(const xsql::QueryResult& result) {
+std::string build_table_json(const markql::QueryResult& result) {
   const bool sparse =
-      result.table_options.format == xsql::QueryResult::TableOptions::Format::Sparse;
+      result.table_options.format == markql::QueryResult::TableOptions::Format::Sparse;
   const bool sparse_long =
-      result.table_options.sparse_shape == xsql::QueryResult::TableOptions::SparseShape::Long;
-#ifdef XSQL_USE_NLOHMANN_JSON
+      result.table_options.sparse_shape == markql::QueryResult::TableOptions::SparseShape::Long;
+#ifdef MARKQL_USE_NLOHMANN_JSON
   using nlohmann::json;
   auto parse_index_or_string = [](const std::string& text) -> json {
     try {
@@ -839,7 +839,7 @@ std::string build_table_json(const xsql::QueryResult& result) {
     }
     return text;
   };
-  auto sparse_long_rows_json = [&](const xsql::QueryResult::TableResult& table) -> json {
+  auto sparse_long_rows_json = [&](const markql::QueryResult::TableResult& table) -> json {
     json rows = json::array();
     const bool include_header = result.table_has_header;
     const size_t expected = include_header ? 4 : 3;
@@ -858,7 +858,7 @@ std::string build_table_json(const xsql::QueryResult& result) {
     }
     return rows;
   };
-  auto sparse_wide_rows_json = [](const xsql::QueryResult::TableResult& table) -> json {
+  auto sparse_wide_rows_json = [](const markql::QueryResult::TableResult& table) -> json {
     json rows = json::array();
     for (const auto& row : table.sparse_wide_rows) {
       json obj = json::object();
@@ -898,7 +898,7 @@ std::string build_table_json(const xsql::QueryResult& result) {
   }
   return out.dump(2);
 #else
-  auto sparse_long_rows_json = [&](const xsql::QueryResult::TableResult& table) -> std::string {
+  auto sparse_long_rows_json = [&](const markql::QueryResult::TableResult& table) -> std::string {
     std::ostringstream oss;
     oss << "[";
     const bool include_header = result.table_has_header;
@@ -931,7 +931,7 @@ std::string build_table_json(const xsql::QueryResult& result) {
     oss << "]";
     return oss.str();
   };
-  auto sparse_wide_rows_json = [](const xsql::QueryResult::TableResult& table) -> std::string {
+  auto sparse_wide_rows_json = [](const markql::QueryResult::TableResult& table) -> std::string {
     std::ostringstream oss;
     oss << "[";
     for (size_t i = 0; i < table.sparse_wide_rows.size(); ++i) {
@@ -1006,7 +1006,7 @@ std::string build_table_json(const xsql::QueryResult& result) {
 }
 
 std::string build_summary_json(const std::vector<std::pair<std::string, size_t>>& summary) {
-#ifdef XSQL_USE_NLOHMANN_JSON
+#ifdef MARKQL_USE_NLOHMANN_JSON
   using nlohmann::json;
   json out = json::array();
   for (const auto& item : summary) {
@@ -1025,7 +1025,7 @@ std::string build_summary_json(const std::vector<std::pair<std::string, size_t>>
 #endif
 }
 
-std::string render_table_duckbox(const xsql::QueryResult::TableResult& table,
+std::string render_table_duckbox(const markql::QueryResult::TableResult& table,
                                  bool has_header,
                                  bool highlight,
                                  bool is_tty,
@@ -1039,7 +1039,7 @@ std::string render_table_duckbox(const xsql::QueryResult::TableResult& table,
   if (max_cols == 0) {
     return "(empty table)";
   }
-  xsql::QueryResult view;
+  markql::QueryResult view;
   size_t data_start = 0;
   std::vector<std::string> column_keys;
   column_keys.reserve(max_cols);
@@ -1071,27 +1071,27 @@ std::string render_table_duckbox(const xsql::QueryResult::TableResult& table,
   view.columns = column_keys;
   for (size_t r = data_start; r < table.rows.size(); ++r) {
     const auto& row_values = table.rows[r];
-    xsql::QueryResultRow row;
+    markql::QueryResultRow row;
     size_t limit = std::min(row_values.size(), column_keys.size());
     for (size_t i = 0; i < limit; ++i) {
       row.attributes[column_keys[i]] = row_values[i];
     }
     view.rows.push_back(std::move(row));
   }
-  xsql::render::DuckboxOptions options;
+  markql::render::DuckboxOptions options;
   options.max_width = 0;
   options.max_rows = max_rows;
   options.highlight = highlight;
   options.is_tty = is_tty;
-  return xsql::render::render_duckbox(view, options);
+  return markql::render::render_duckbox(view, options);
 }
 
-std::string export_kind_label(xsql::QueryResult::ExportSink::Kind kind) {
-  if (kind == xsql::QueryResult::ExportSink::Kind::Csv) return "CSV";
-  if (kind == xsql::QueryResult::ExportSink::Kind::Parquet) return "Parquet";
-  if (kind == xsql::QueryResult::ExportSink::Kind::Json) return "JSON";
-  if (kind == xsql::QueryResult::ExportSink::Kind::Ndjson) return "NDJSON";
+std::string export_kind_label(markql::QueryResult::ExportSink::Kind kind) {
+  if (kind == markql::QueryResult::ExportSink::Kind::Csv) return "CSV";
+  if (kind == markql::QueryResult::ExportSink::Kind::Parquet) return "Parquet";
+  if (kind == markql::QueryResult::ExportSink::Kind::Json) return "JSON";
+  if (kind == markql::QueryResult::ExportSink::Kind::Ndjson) return "NDJSON";
   return "Export";
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

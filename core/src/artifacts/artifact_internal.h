@@ -11,7 +11,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace xsql::artifacts::detail {
+namespace markql::artifacts::detail {
 
 constexpr uint16_t kArtifactFormatMajor = 2;
 constexpr uint16_t kArtifactFormatMinor = 1;
@@ -217,4 +217,4 @@ Enum enum_from_u8(uint8_t value, Enum max_value, const std::string& message) {
   return static_cast<Enum>(value);
 }
 
-}  // namespace xsql::artifacts::detail
+}  // namespace markql::artifacts::detail

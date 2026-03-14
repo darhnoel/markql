@@ -66,10 +66,10 @@ std::vector<double> measure_iterations(int iterations, Fn&& fn) {
   return samples;
 }
 
-xsql::Query parse_and_validate_query(const std::string& query_text) {
-  auto parsed = xsql::parse_query(query_text);
+markql::Query parse_and_validate_query(const std::string& query_text) {
+  auto parsed = markql::parse_query(query_text);
   if (!parsed.query.has_value()) throw std::runtime_error("benchmark parse failure");
-  xsql::validate_query_for_execution(*parsed.query);
+  markql::validate_query_for_execution(*parsed.query);
   return *parsed.query;
 }
 
@@ -128,14 +128,14 @@ int main(int argc, char** argv) {
   const std::filesystem::path mqp_path = temp_artifact_path("markql_bench_truth_qast", ".mqp");
 
   const std::string baseline_html = read_file(options.fixture.string());
-  const xsql::HtmlDocument baseline_document = xsql::parse_html(baseline_html);
-  const xsql::Query baseline_query = parse_and_validate_query(options.query);
-  const xsql::artifacts::PreparedQueryArtifact baseline_prepared =
-      xsql::artifacts::prepare_query_artifact(options.query);
+  const markql::HtmlDocument baseline_document = markql::parse_html(baseline_html);
+  const markql::Query baseline_query = parse_and_validate_query(options.query);
+  const markql::artifacts::PreparedQueryArtifact baseline_prepared =
+      markql::artifacts::prepare_query_artifact(options.query);
 
-  xsql::artifacts::write_document_artifact_file(
+  markql::artifacts::write_document_artifact_file(
       baseline_document, options.fixture.string(), mqd_path.string());
-  xsql::artifacts::write_prepared_query_artifact_file(
+  markql::artifacts::write_prepared_query_artifact_file(
       baseline_prepared.query, options.query, mqp_path.string());
 
   const uintmax_t mqd_bytes = std::filesystem::file_size(mqd_path);
@@ -146,89 +146,89 @@ int main(int argc, char** argv) {
   });
 
   const std::vector<double> html_parse_samples = measure_iterations(options.iterations, [&]() {
-    return xsql::parse_html(baseline_html).nodes.size();
+    return markql::parse_html(baseline_html).nodes.size();
   });
 
   const std::vector<double> mqd_load_samples = measure_iterations(options.iterations, [&]() {
-    return xsql::artifacts::read_document_artifact_file(mqd_path.string()).document.nodes.size();
+    return markql::artifacts::read_document_artifact_file(mqd_path.string()).document.nodes.size();
   });
 
   const std::vector<double> query_parse_samples = measure_iterations(options.iterations, [&]() {
-    auto parsed = xsql::parse_query(options.query);
+    auto parsed = markql::parse_query(options.query);
     if (!parsed.query.has_value()) throw std::runtime_error("benchmark parse failure");
     return static_cast<size_t>(parsed.query->select_items.size());
   });
 
   const std::vector<double> query_prepare_samples = measure_iterations(options.iterations, [&]() {
-    return xsql::artifacts::prepare_query_artifact(options.query).query.select_items.size();
+    return markql::artifacts::prepare_query_artifact(options.query).query.select_items.size();
   });
 
   const std::vector<double> mqp_load_samples = measure_iterations(options.iterations, [&]() {
-    return xsql::artifacts::read_prepared_query_artifact_file(mqp_path.string())
+    return markql::artifacts::read_prepared_query_artifact_file(mqp_path.string())
         .query.select_items.size();
   });
 
-  const xsql::artifacts::DocumentArtifact loaded_doc =
-      xsql::artifacts::read_document_artifact_file(mqd_path.string());
-  const xsql::artifacts::PreparedQueryArtifact loaded_prepared =
-      xsql::artifacts::read_prepared_query_artifact_file(mqp_path.string());
+  const markql::artifacts::DocumentArtifact loaded_doc =
+      markql::artifacts::read_document_artifact_file(mqd_path.string());
+  const markql::artifacts::PreparedQueryArtifact loaded_prepared =
+      markql::artifacts::read_prepared_query_artifact_file(mqp_path.string());
 
   const std::vector<double> execute_query_text_on_parsed_html_doc_samples =
       measure_iterations(options.iterations, [&]() {
-        return xsql::execute_query_with_source(
+        return markql::execute_query_with_source(
                    baseline_query, nullptr, &baseline_document, options.fixture.string())
             .rows.size();
       });
 
   const std::vector<double> execute_mqp_on_parsed_html_doc_samples =
       measure_iterations(options.iterations, [&]() {
-        return xsql::artifacts::execute_prepared_query_on_document(
+        return markql::artifacts::execute_prepared_query_on_document(
                    loaded_prepared, {loaded_doc.info, baseline_document})
             .rows.size();
       });
 
   const std::vector<double> execute_query_text_on_loaded_mqd_doc_samples =
       measure_iterations(options.iterations, [&]() {
-        return xsql::artifacts::execute_query_text_on_document(options.query, loaded_doc).rows.size();
+        return markql::artifacts::execute_query_text_on_document(options.query, loaded_doc).rows.size();
       });
 
   const std::vector<double> execute_mqp_on_loaded_mqd_doc_samples =
       measure_iterations(options.iterations, [&]() {
-        return xsql::artifacts::execute_prepared_query_on_document(loaded_prepared, loaded_doc)
+        return markql::artifacts::execute_prepared_query_on_document(loaded_prepared, loaded_doc)
             .rows.size();
       });
 
   const std::vector<double> raw_html_query_text_total_samples =
       measure_iterations(options.iterations, [&]() {
         const std::string html = read_file(options.fixture.string());
-        const xsql::HtmlDocument document = xsql::parse_html(html);
-        const xsql::Query query = parse_and_validate_query(options.query);
-        return xsql::execute_query_with_source(query, nullptr, &document, options.fixture.string())
+        const markql::HtmlDocument document = markql::parse_html(html);
+        const markql::Query query = parse_and_validate_query(options.query);
+        return markql::execute_query_with_source(query, nullptr, &document, options.fixture.string())
             .rows.size();
       });
 
   const std::vector<double> raw_html_mqp_total_samples = measure_iterations(options.iterations, [&]() {
     const std::string html = read_file(options.fixture.string());
-    const xsql::HtmlDocument document = xsql::parse_html(html);
-    const xsql::artifacts::PreparedQueryArtifact prepared =
-        xsql::artifacts::read_prepared_query_artifact_file(mqp_path.string());
-    return xsql::artifacts::execute_prepared_query_on_document(prepared, {loaded_doc.info, document})
+    const markql::HtmlDocument document = markql::parse_html(html);
+    const markql::artifacts::PreparedQueryArtifact prepared =
+        markql::artifacts::read_prepared_query_artifact_file(mqp_path.string());
+    return markql::artifacts::execute_prepared_query_on_document(prepared, {loaded_doc.info, document})
         .rows.size();
   });
 
   const std::vector<double> mqd_query_text_total_samples =
       measure_iterations(options.iterations, [&]() {
-        const xsql::artifacts::DocumentArtifact document =
-            xsql::artifacts::read_document_artifact_file(mqd_path.string());
-        return xsql::artifacts::execute_query_text_on_document(options.query, document).rows.size();
+        const markql::artifacts::DocumentArtifact document =
+            markql::artifacts::read_document_artifact_file(mqd_path.string());
+        return markql::artifacts::execute_query_text_on_document(options.query, document).rows.size();
       });
 
   const std::vector<double> mqd_mqp_total_samples = measure_iterations(options.iterations, [&]() {
-    const xsql::artifacts::DocumentArtifact document =
-        xsql::artifacts::read_document_artifact_file(mqd_path.string());
-    const xsql::artifacts::PreparedQueryArtifact prepared =
-        xsql::artifacts::read_prepared_query_artifact_file(mqp_path.string());
-    return xsql::artifacts::execute_prepared_query_on_document(prepared, document).rows.size();
+    const markql::artifacts::DocumentArtifact document =
+        markql::artifacts::read_document_artifact_file(mqd_path.string());
+    const markql::artifacts::PreparedQueryArtifact prepared =
+        markql::artifacts::read_prepared_query_artifact_file(mqp_path.string());
+    return markql::artifacts::execute_prepared_query_on_document(prepared, document).rows.size();
   });
 
   std::cout << std::fixed << std::setprecision(3);

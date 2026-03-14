@@ -1,13 +1,13 @@
 import pytest
 
-import xsql
+import markql
 
 
 def test_parse_source_in_python_binding(supports_parse_source: bool) -> None:
     if not supports_parse_source:
-        pytest.skip("native xsql._core module does not include PARSE source support yet")
-    doc = xsql.load("<html><body></body></html>")
-    result = xsql.execute(
+        pytest.skip("native markql._core module does not include PARSE source support yet")
+    doc = markql.load("<html><body></body></html>")
+    result = markql.execute(
         "SELECT li FROM PARSE('<ul><li>1</li><li>2</li></ul>') AS frag ORDER BY node_id",
         doc=doc,
     )
@@ -19,9 +19,9 @@ def test_parse_source_in_python_binding(supports_parse_source: bool) -> None:
 
 def test_fragments_deprecation_warning_in_python_binding(supports_fragments_warnings: bool) -> None:
     if not supports_fragments_warnings:
-        pytest.skip("native xsql._core module does not include FRAGMENTS warnings yet")
-    doc = xsql.load("<html><body></body></html>")
-    result = xsql.execute(
+        pytest.skip("native markql._core module does not include FRAGMENTS warnings yet")
+    doc = markql.load("<html><body></body></html>")
+    result = markql.execute(
         "SELECT li FROM FRAGMENTS(RAW('<ul><li>1</li><li>2</li></ul>')) AS frag ORDER BY node_id",
         doc=doc,
     )
@@ -34,14 +34,14 @@ def test_fragments_deprecation_warning_in_python_binding(supports_fragments_warn
 
 def test_execute_project_projection(supports_project: bool) -> None:
     if not supports_project:
-        pytest.skip("native xsql._core module does not include PROJECT support yet")
-    doc = xsql.load(
+        pytest.skip("native markql._core module does not include PROJECT support yet")
+    doc = markql.load(
         "<table><tbody>"
         "<tr><td>2025</td><td><a href='direct.pdf'>PDF</a></td></tr>"
         "<tr><td>2024</td><td>Pending</td></tr>"
         "</tbody></table>"
     )
-    result = xsql.execute(
+    result = markql.execute(
         "SELECT tr.node_id, "
         "PROJECT(tr) AS ("
         "period: TEXT(td WHERE sibling_pos = 1),"
@@ -64,9 +64,9 @@ def test_execute_project_projection(supports_project: bool) -> None:
 
 def test_execute_flatten_extract_alias_compatibility(supports_project: bool) -> None:
     if not supports_project:
-        pytest.skip("native xsql._core module does not include PROJECT support yet")
-    doc = xsql.load("<table><tbody><tr><td>2025</td></tr></tbody></table>")
-    result = xsql.execute(
+        pytest.skip("native markql._core module does not include PROJECT support yet")
+    doc = markql.load("<table><tbody><tr><td>2025</td></tr></tbody></table>")
+    result = markql.execute(
         "SELECT FLATTEN_EXTRACT(tr) AS (period: TEXT(td WHERE sibling_pos = 1)) "
         "FROM document "
         "WHERE EXISTS(child WHERE tag = 'td')",
@@ -78,9 +78,9 @@ def test_execute_flatten_extract_alias_compatibility(supports_project: bool) -> 
 
 def test_describe_language_lists_project(supports_describe_language: bool) -> None:
     if not supports_describe_language:
-        pytest.skip("native xsql._core module does not include DESCRIBE language yet")
-    doc = xsql.load("<html><body></body></html>")
-    result = xsql.execute("DESCRIBE language", doc=doc)
+        pytest.skip("native markql._core module does not include DESCRIBE language yet")
+    doc = markql.load("<html><body></body></html>")
+    result = markql.execute("DESCRIBE language", doc=doc)
     assert any(
         row.get("category") == "function" and row.get("name") == "project"
         for row in result.rows

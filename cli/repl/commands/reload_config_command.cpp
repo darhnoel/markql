@@ -6,7 +6,7 @@
 #include "../config.h"
 #include "../../ui/color.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 CommandHandler make_reload_config_command() {
   return [](const std::string& line, CommandContext& ctx) -> bool {
@@ -41,4 +41,4 @@ CommandHandler make_reload_config_command() {
   };
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

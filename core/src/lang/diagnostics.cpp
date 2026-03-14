@@ -1,4 +1,4 @@
-#include "xsql/diagnostics.h"
+#include "markql/diagnostics.h"
 
 #include <algorithm>
 #include <cctype>
@@ -9,7 +9,7 @@
 
 #include "markql_parser.h"
 
-namespace xsql {
+namespace markql {
 
 namespace {
 
@@ -582,4 +582,4 @@ std::vector<Diagnostic> diagnose_query_failure(const std::string& query,
   return out;
 }
 
-}  // namespace xsql
+}  // namespace markql

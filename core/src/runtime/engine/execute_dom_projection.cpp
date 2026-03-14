@@ -1,4 +1,4 @@
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 
 #include <algorithm>
 #include <cctype>
@@ -16,9 +16,9 @@
 #include "dom_descendants_internal.h"
 #include "dom_projection_internal.h"
 #include "engine_execution_internal.h"
-#include "xsql_internal.h"
+#include "markql_internal.h"
 
-namespace xsql {
+namespace markql {
 
 namespace {
 
@@ -30,10 +30,10 @@ void collect_row_scope_nodes(const std::vector<std::vector<int64_t>>& children,
 }
 
 std::string normalized_extract_text(const HtmlNode& node) {
-  std::string direct = xsql_internal::extract_direct_text_strict(node.inner_html);
+  std::string direct = markql_internal::extract_direct_text_strict(node.inner_html);
   std::string normalized = normalize_flatten_text(direct);
   if (!normalized.empty()) return normalized;
-  direct = xsql_internal::extract_direct_text(node.inner_html);
+  direct = markql_internal::extract_direct_text(node.inner_html);
   normalized = normalize_flatten_text(direct);
   if (!normalized.empty()) return normalized;
   return normalize_flatten_text(node.text);
@@ -109,7 +109,7 @@ std::optional<std::string> selector_value(
       if (it == node.attributes.end() || it->second.empty()) continue;
       value = it->second;
     } else if (direct_text) {
-      std::string direct = util::trim_ws(xsql_internal::extract_direct_text_strict(node.inner_html));
+      std::string direct = util::trim_ws(markql_internal::extract_direct_text_strict(node.inner_html));
       if (direct.empty()) continue;
       value = std::move(direct);
     } else {
@@ -393,7 +393,7 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr,
 
     if (fn == "TEXT") return make_string_projection(target->text);
     if (fn == "DIRECT_TEXT") {
-      return make_string_projection(xsql_internal::extract_direct_text_strict(target->inner_html));
+      return make_string_projection(markql_internal::extract_direct_text_strict(target->inner_html));
     }
     if (fn == "ATTR") {
       ScalarProjectionValue attr_value = eval_select_scalar_expr(expr.args[1], node, doc, children);
@@ -411,7 +411,7 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr,
       if (!parsed.has_value() || *parsed < 0) return make_null_projection();
       depth = static_cast<size_t>(*parsed);
     }
-    std::string html = xsql_internal::limit_inner_html(target->inner_html, depth);
+    std::string html = markql_internal::limit_inner_html(target->inner_html, depth);
     if (fn == "RAW_INNER_HTML") return make_string_projection(html);
     return make_string_projection(util::minify_html(html));
   }
@@ -727,4 +727,4 @@ std::optional<std::string> eval_parse_source_expr(const ScalarExpr& expr) {
   return projection_to_string(value);
 }
 
-}  // namespace xsql
+}  // namespace markql

@@ -1,6 +1,6 @@
 #include "parser_internal.h"
 
-namespace xsql {
+namespace markql {
 
 namespace {
 
@@ -1118,4 +1118,4 @@ bool Parser::parse_string_list(ValueList& values) {
   return set_error("Expected string literal or list");
 }
 
-}  // namespace xsql
+}  // namespace markql

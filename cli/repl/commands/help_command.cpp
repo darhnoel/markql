@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-namespace xsql::cli {
+namespace markql::cli {
 
 CommandHandler make_help_command() {
   return [](const std::string& line, CommandContext&) -> bool {
@@ -19,7 +19,7 @@ CommandHandler make_help_command() {
     std::cout << "  .max_rows <n|inf>        Set duckbox max rows (inf = no limit)\n";
     std::cout << "  .reload_config           Reload REPL config\n";
     std::cout << "  .explore [doc|alias|path|url]  Open DOM Explorer on input\n";
-#ifdef XSQL_ENABLE_KHMER_NUMBER
+#ifdef MARKQL_ENABLE_KHMER_NUMBER
     std::cout << "  .number_to_khmer <number> [--compact] [--khmer-digits]   Convert number to Khmer words or numerals\n";
     std::cout << "  .khmer_to_number <text> [--khmer-digits]   Convert Khmer words to number\n";
 #endif
@@ -43,4 +43,4 @@ CommandHandler make_help_command() {
   };
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

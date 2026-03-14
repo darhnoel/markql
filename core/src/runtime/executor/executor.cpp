@@ -6,7 +6,7 @@
 #include "executor_internal.h"
 #include "../../util/string_util.h"
 
-namespace xsql {
+namespace markql {
 
 /// Executes a query against a parsed HTML document.
 /// MUST respect WHERE, ORDER BY, and LIMIT semantics deterministically.
@@ -90,4 +90,4 @@ ExecuteResult execute_query(const Query& query, const HtmlDocument& doc, const s
   return result;
 }
 
-}  // namespace xsql
+}  // namespace markql

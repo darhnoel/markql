@@ -42,25 +42,25 @@ struct StreamCapture {
 
 static void test_summarize_content_basic() {
   StreamCapture capture(std::cout);
-  xsql::cli::ReplConfig config;
+  markql::cli::ReplConfig config;
   config.output_mode = "duckbox";
   config.color = false;
   config.highlight = false;
   config.input = "";
 
-  xsql::cli::LineEditor editor(5, "markql> ", 8);
-  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
-  sources["doc"] = xsql::cli::LoadedSource{
+  markql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, markql::cli::LoadedSource> sources;
+  sources["doc"] = markql::cli::LoadedSource{
       "inline", std::optional<std::string>("<html><body><div>Hello Khmer World</div></body></html>")};
   std::string active_alias = "doc";
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
-  std::vector<xsql::ColumnNameMapping> last_schema_map;
+  std::vector<markql::ColumnNameMapping> last_schema_map;
 
-  xsql::cli::CommandRegistry registry;
-  xsql::cli::PluginManager plugin_manager(registry);
-  xsql::cli::CommandContext ctx{
+  markql::cli::CommandRegistry registry;
+  markql::cli::PluginManager plugin_manager(registry);
+  markql::cli::CommandContext ctx{
       config,
       editor,
       sources,
@@ -72,7 +72,7 @@ static void test_summarize_content_basic() {
       plugin_manager,
   };
 
-  auto handler = xsql::cli::make_summarize_content_command();
+  auto handler = markql::cli::make_summarize_content_command();
   bool handled = handler(".summarize_content", ctx);
   expect_true(handled, "summarize_content should handle command");
   std::string output = capture.str();
@@ -81,25 +81,25 @@ static void test_summarize_content_basic() {
 
 static void test_summarize_content_khmer_requires_plugin() {
   StreamCapture capture(std::cerr);
-  xsql::cli::ReplConfig config;
+  markql::cli::ReplConfig config;
   config.output_mode = "duckbox";
   config.color = false;
   config.highlight = false;
   config.input = "";
 
-  xsql::cli::LineEditor editor(5, "markql> ", 8);
-  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
-  sources["doc"] = xsql::cli::LoadedSource{
+  markql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, markql::cli::LoadedSource> sources;
+  sources["doc"] = markql::cli::LoadedSource{
       "inline", std::optional<std::string>("<html><body><div>សូមអរគុណ</div></body></html>")};
   std::string active_alias = "doc";
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
-  std::vector<xsql::ColumnNameMapping> last_schema_map;
+  std::vector<markql::ColumnNameMapping> last_schema_map;
 
-  xsql::cli::CommandRegistry registry;
-  xsql::cli::PluginManager plugin_manager(registry);
-  xsql::cli::CommandContext ctx{
+  markql::cli::CommandRegistry registry;
+  markql::cli::PluginManager plugin_manager(registry);
+  markql::cli::CommandContext ctx{
       config,
       editor,
       sources,
@@ -111,7 +111,7 @@ static void test_summarize_content_khmer_requires_plugin() {
       plugin_manager,
   };
 
-  auto handler = xsql::cli::make_summarize_content_command();
+  auto handler = markql::cli::make_summarize_content_command();
   bool handled = handler(".summarize_content --lang khmer", ctx);
   expect_true(handled, "summarize_content should handle khmer command");
   std::string output = capture.str();
@@ -121,26 +121,26 @@ static void test_summarize_content_khmer_requires_plugin() {
 
 static void test_summarize_content_max_tokens() {
   StreamCapture capture(std::cout);
-  xsql::cli::ReplConfig config;
+  markql::cli::ReplConfig config;
   config.output_mode = "duckbox";
   config.color = false;
   config.highlight = false;
   config.input = "";
 
-  xsql::cli::LineEditor editor(5, "markql> ", 8);
-  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
-  sources["doc"] = xsql::cli::LoadedSource{
+  markql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, markql::cli::LoadedSource> sources;
+  sources["doc"] = markql::cli::LoadedSource{
       "inline",
       std::optional<std::string>("<html><body><h3>Alpha Alpha Beta</h3><p>Gamma</p></body></html>")};
   std::string active_alias = "doc";
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
-  std::vector<xsql::ColumnNameMapping> last_schema_map;
+  std::vector<markql::ColumnNameMapping> last_schema_map;
 
-  xsql::cli::CommandRegistry registry;
-  xsql::cli::PluginManager plugin_manager(registry);
-  xsql::cli::CommandContext ctx{
+  markql::cli::CommandRegistry registry;
+  markql::cli::PluginManager plugin_manager(registry);
+  markql::cli::CommandContext ctx{
       config,
       editor,
       sources,
@@ -152,7 +152,7 @@ static void test_summarize_content_max_tokens() {
       plugin_manager,
   };
 
-  auto handler = xsql::cli::make_summarize_content_command();
+  auto handler = markql::cli::make_summarize_content_command();
   bool handled = handler(".summarize_content --max_tokens 1", ctx);
   expect_true(handled, "summarize_content should handle max_tokens");
   std::string output = capture.str();
@@ -162,37 +162,37 @@ static void test_summarize_content_max_tokens() {
 }
 
 static void test_sql_keyword_catalog_includes_new_tokens() {
-  expect_true(xsql::cli::is_sql_keyword_token("case"), "CASE should be highlighted as keyword");
-  expect_true(xsql::cli::is_sql_keyword_token("WHEN"), "WHEN should be highlighted as keyword");
-  expect_true(xsql::cli::is_sql_keyword_token("ndjson"), "NDJSON should be highlighted as keyword");
-  expect_true(!xsql::cli::is_sql_keyword_token("first_text"),
+  expect_true(markql::cli::is_sql_keyword_token("case"), "CASE should be highlighted as keyword");
+  expect_true(markql::cli::is_sql_keyword_token("WHEN"), "WHEN should be highlighted as keyword");
+  expect_true(markql::cli::is_sql_keyword_token("ndjson"), "NDJSON should be highlighted as keyword");
+  expect_true(!markql::cli::is_sql_keyword_token("first_text"),
               "FIRST_TEXT is a function-like identifier, not a reserved keyword");
-  expect_true(!xsql::cli::is_sql_keyword_token("doc"),
+  expect_true(!markql::cli::is_sql_keyword_token("doc"),
               "doc should be treated as a source name, not a reserved keyword");
-  expect_true(!xsql::cli::is_sql_keyword_token("document"),
+  expect_true(!markql::cli::is_sql_keyword_token("document"),
               "document should be treated as a source name, not a reserved keyword");
-  expect_true(!xsql::cli::is_sql_keyword_token("table"),
+  expect_true(!markql::cli::is_sql_keyword_token("table"),
               "table should not be highlighted as a reserved SQL keyword");
-  expect_true(!xsql::cli::is_sql_keyword_token("view"),
+  expect_true(!markql::cli::is_sql_keyword_token("view"),
               "view names should not be highlighted as reserved keywords");
 }
 
 static void test_set_colnames_command() {
   StreamCapture capture(std::cout);
-  xsql::cli::ReplConfig config;
+  markql::cli::ReplConfig config;
   config.output_mode = "duckbox";
   config.color = false;
   config.highlight = false;
-  xsql::cli::LineEditor editor(5, "markql> ", 8);
-  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
+  markql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, markql::cli::LoadedSource> sources;
   std::string active_alias = "doc";
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
-  std::vector<xsql::ColumnNameMapping> last_schema_map;
-  xsql::cli::CommandRegistry registry;
-  xsql::cli::PluginManager plugin_manager(registry);
-  xsql::cli::CommandContext ctx{
+  std::vector<markql::ColumnNameMapping> last_schema_map;
+  markql::cli::CommandRegistry registry;
+  markql::cli::PluginManager plugin_manager(registry);
+  markql::cli::CommandContext ctx{
       config,
       editor,
       sources,
@@ -203,26 +203,26 @@ static void test_set_colnames_command() {
       last_schema_map,
       plugin_manager,
   };
-  auto handler = xsql::cli::make_set_command();
+  auto handler = markql::cli::make_set_command();
   bool handled = handler(".set colnames raw", ctx);
   expect_true(handled, "set command handles colnames raw");
-  expect_true(config.colname_mode == xsql::ColumnNameMode::Raw, "set command updates mode");
+  expect_true(config.colname_mode == markql::ColumnNameMode::Raw, "set command updates mode");
 }
 
 static void test_mode_command_accepts_csv() {
   StreamCapture capture(std::cout);
-  xsql::cli::ReplConfig config;
+  markql::cli::ReplConfig config;
   config.output_mode = "duckbox";
-  xsql::cli::LineEditor editor(5, "markql> ", 8);
-  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
+  markql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, markql::cli::LoadedSource> sources;
   std::string active_alias = "doc";
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
-  std::vector<xsql::ColumnNameMapping> last_schema_map;
-  xsql::cli::CommandRegistry registry;
-  xsql::cli::PluginManager plugin_manager(registry);
-  xsql::cli::CommandContext ctx{
+  std::vector<markql::ColumnNameMapping> last_schema_map;
+  markql::cli::CommandRegistry registry;
+  markql::cli::PluginManager plugin_manager(registry);
+  markql::cli::CommandContext ctx{
       config,
       editor,
       sources,
@@ -234,7 +234,7 @@ static void test_mode_command_accepts_csv() {
       plugin_manager,
   };
 
-  auto handler = xsql::cli::make_mode_command();
+  auto handler = markql::cli::make_mode_command();
   bool handled = handler(".mode csv", ctx);
   expect_true(handled, "mode command handles csv");
   expect_true(config.output_mode == "csv", "mode command sets csv mode");
@@ -244,18 +244,18 @@ static void test_mode_command_accepts_csv() {
 
 static void test_lint_command_toggles_on_and_off() {
   StreamCapture capture(std::cout);
-  xsql::cli::ReplConfig config;
+  markql::cli::ReplConfig config;
   config.color = false;
-  xsql::cli::LineEditor editor(5, "markql> ", 8);
-  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
+  markql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, markql::cli::LoadedSource> sources;
   std::string active_alias = "doc";
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
-  std::vector<xsql::ColumnNameMapping> last_schema_map;
-  xsql::cli::CommandRegistry registry;
-  xsql::cli::PluginManager plugin_manager(registry);
-  xsql::cli::CommandContext ctx{
+  std::vector<markql::ColumnNameMapping> last_schema_map;
+  markql::cli::CommandRegistry registry;
+  markql::cli::PluginManager plugin_manager(registry);
+  markql::cli::CommandContext ctx{
       config,
       editor,
       sources,
@@ -267,7 +267,7 @@ static void test_lint_command_toggles_on_and_off() {
       plugin_manager,
   };
 
-  auto handler = xsql::cli::make_lint_command();
+  auto handler = markql::cli::make_lint_command();
   bool handled_on = handler(".lint on", ctx);
   expect_true(handled_on, ".lint on should be handled");
   expect_true(config.lint_warnings, ".lint on enables lint warnings");
@@ -287,19 +287,19 @@ static void test_lint_command_toggles_on_and_off() {
 
 static void test_lint_command_rejects_invalid_value() {
   StreamCapture capture(std::cerr);
-  xsql::cli::ReplConfig config;
+  markql::cli::ReplConfig config;
   config.color = false;
   config.lint_warnings = true;
-  xsql::cli::LineEditor editor(5, "markql> ", 8);
-  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
+  markql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, markql::cli::LoadedSource> sources;
   std::string active_alias = "doc";
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
-  std::vector<xsql::ColumnNameMapping> last_schema_map;
-  xsql::cli::CommandRegistry registry;
-  xsql::cli::PluginManager plugin_manager(registry);
-  xsql::cli::CommandContext ctx{
+  std::vector<markql::ColumnNameMapping> last_schema_map;
+  markql::cli::CommandRegistry registry;
+  markql::cli::PluginManager plugin_manager(registry);
+  markql::cli::CommandContext ctx{
       config,
       editor,
       sources,
@@ -311,7 +311,7 @@ static void test_lint_command_rejects_invalid_value() {
       plugin_manager,
   };
 
-  auto handler = xsql::cli::make_lint_command();
+  auto handler = markql::cli::make_lint_command();
   bool handled = handler(".lint maybe", ctx);
   expect_true(handled, ".lint invalid value should be handled");
   expect_true(config.lint_warnings, "invalid .lint value should not change state");
@@ -322,23 +322,23 @@ static void test_lint_command_rejects_invalid_value() {
 
 static void test_describe_last_command_outputs_map() {
   StreamCapture capture(std::cout);
-  xsql::cli::ReplConfig config;
+  markql::cli::ReplConfig config;
   config.output_mode = "duckbox";
   config.color = false;
   config.highlight = false;
-  xsql::cli::LineEditor editor(5, "markql> ", 8);
-  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
+  markql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, markql::cli::LoadedSource> sources;
   std::string active_alias = "doc";
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
-  std::vector<xsql::ColumnNameMapping> last_schema_map = {
+  std::vector<markql::ColumnNameMapping> last_schema_map = {
       {"data-id", "data_id"},
       {"data_id", "data_id__2"},
   };
-  xsql::cli::CommandRegistry registry;
-  xsql::cli::PluginManager plugin_manager(registry);
-  xsql::cli::CommandContext ctx{
+  markql::cli::CommandRegistry registry;
+  markql::cli::PluginManager plugin_manager(registry);
+  markql::cli::CommandContext ctx{
       config,
       editor,
       sources,
@@ -349,7 +349,7 @@ static void test_describe_last_command_outputs_map() {
       last_schema_map,
       plugin_manager,
   };
-  auto handler = xsql::cli::make_describe_last_command();
+  auto handler = markql::cli::make_describe_last_command();
   bool handled = handler("DESCRIBE LAST;", ctx);
   expect_true(handled, "describe last command handles statement");
   std::string output = capture.str();
@@ -360,22 +360,22 @@ static void test_describe_last_command_outputs_map() {
 
 static void test_describe_last_command_outputs_csv() {
   StreamCapture capture(std::cout);
-  xsql::cli::ReplConfig config;
+  markql::cli::ReplConfig config;
   config.output_mode = "csv";
   config.color = false;
   config.highlight = false;
-  xsql::cli::LineEditor editor(5, "markql> ", 8);
-  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
+  markql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, markql::cli::LoadedSource> sources;
   std::string active_alias = "doc";
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
-  std::vector<xsql::ColumnNameMapping> last_schema_map = {
+  std::vector<markql::ColumnNameMapping> last_schema_map = {
       {"data-id", "data_id"},
   };
-  xsql::cli::CommandRegistry registry;
-  xsql::cli::PluginManager plugin_manager(registry);
-  xsql::cli::CommandContext ctx{
+  markql::cli::CommandRegistry registry;
+  markql::cli::PluginManager plugin_manager(registry);
+  markql::cli::CommandContext ctx{
       config,
       editor,
       sources,
@@ -386,7 +386,7 @@ static void test_describe_last_command_outputs_csv() {
       last_schema_map,
       plugin_manager,
   };
-  auto handler = xsql::cli::make_describe_last_command();
+  auto handler = markql::cli::make_describe_last_command();
   bool handled = handler("DESCRIBE LAST;", ctx);
   expect_true(handled, "describe last command handles csv output");
   std::string output = capture.str();
@@ -397,25 +397,25 @@ static void test_describe_last_command_outputs_csv() {
 
 static void test_explore_command_uses_active_alias_by_default() {
   StreamCapture err_capture(std::cerr);
-  xsql::cli::ReplConfig config;
+  markql::cli::ReplConfig config;
   config.color = false;
-  xsql::cli::LineEditor editor(5, "markql> ", 8);
-  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
-  sources["doc"] = xsql::cli::LoadedSource{"docs/fixtures/basic.html", std::nullopt};
+  markql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, markql::cli::LoadedSource> sources;
+  sources["doc"] = markql::cli::LoadedSource{"docs/fixtures/basic.html", std::nullopt};
   std::string active_alias = "doc";
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
-  std::vector<xsql::ColumnNameMapping> last_schema_map;
-  xsql::cli::CommandRegistry registry;
-  xsql::cli::PluginManager plugin_manager(registry);
-  xsql::cli::CommandContext ctx{
+  std::vector<markql::ColumnNameMapping> last_schema_map;
+  markql::cli::CommandRegistry registry;
+  markql::cli::PluginManager plugin_manager(registry);
+  markql::cli::CommandContext ctx{
       config, editor, sources, active_alias, last_full_output,
       display_full, max_rows, last_schema_map, plugin_manager,
   };
 
   std::string explored;
-  auto handler = xsql::cli::make_explore_command_with_runner(
+  auto handler = markql::cli::make_explore_command_with_runner(
       [&](const std::string& input, std::ostream&) {
         explored = input;
         return 0;
@@ -428,26 +428,26 @@ static void test_explore_command_uses_active_alias_by_default() {
 }
 
 static void test_explore_command_accepts_direct_target_and_alias_target() {
-  xsql::cli::ReplConfig config;
+  markql::cli::ReplConfig config;
   config.color = false;
-  xsql::cli::LineEditor editor(5, "markql> ", 8);
-  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
-  sources["doc"] = xsql::cli::LoadedSource{"docs/fixtures/basic.html", std::nullopt};
-  sources["backup"] = xsql::cli::LoadedSource{"docs/fixtures/products.html", std::nullopt};
+  markql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, markql::cli::LoadedSource> sources;
+  sources["doc"] = markql::cli::LoadedSource{"docs/fixtures/basic.html", std::nullopt};
+  sources["backup"] = markql::cli::LoadedSource{"docs/fixtures/products.html", std::nullopt};
   std::string active_alias = "doc";
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
-  std::vector<xsql::ColumnNameMapping> last_schema_map;
-  xsql::cli::CommandRegistry registry;
-  xsql::cli::PluginManager plugin_manager(registry);
-  xsql::cli::CommandContext ctx{
+  std::vector<markql::ColumnNameMapping> last_schema_map;
+  markql::cli::CommandRegistry registry;
+  markql::cli::PluginManager plugin_manager(registry);
+  markql::cli::CommandContext ctx{
       config, editor, sources, active_alias, last_full_output,
       display_full, max_rows, last_schema_map, plugin_manager,
   };
 
   std::vector<std::string> explored_targets;
-  auto handler = xsql::cli::make_explore_command_with_runner(
+  auto handler = markql::cli::make_explore_command_with_runner(
       [&](const std::string& input, std::ostream&) {
         explored_targets.push_back(input);
         return 0;

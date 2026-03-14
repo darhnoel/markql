@@ -3,9 +3,9 @@
 #include <optional>
 #include <string>
 
-#include "xsql/column_names.h"
+#include "markql/column_names.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 /// Holds a source reference and optional cached HTML for REPL sessions.
 /// MUST keep source as the original path or URL for display and reloads.
@@ -24,7 +24,7 @@ struct ReplConfig {
   bool display_full = true;
   bool lint_warnings = false;
   std::string output_mode = "duckbox";
-  xsql::ColumnNameMode colname_mode = xsql::ColumnNameMode::Normalize;
+  markql::ColumnNameMode colname_mode = markql::ColumnNameMode::Normalize;
   int timeout_ms = 5000;
 };
 
@@ -33,4 +33,4 @@ struct ReplConfig {
 /// Inputs are config values; outputs are a process status with terminal IO side effects.
 int run_repl(ReplConfig& config);
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

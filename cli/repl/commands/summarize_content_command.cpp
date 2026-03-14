@@ -15,9 +15,9 @@
 #include "../../ui/color.h"
 #include "../plugin_manager.h"
 #include "dom/html_parser.h"
-#include "runtime/engine/xsql_internal.h"
+#include "runtime/engine/markql_internal.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 namespace {
 
 std::string trim_text(const std::string& value) {
@@ -306,11 +306,11 @@ CommandHandler make_summarize_content_command() {
                   return a.token < b.token;
                 });
       size_t limit = std::min<size_t>(scores.size(), max_tokens);
-      xsql::QueryResult result;
+      markql::QueryResult result;
       result.columns = {"token", "count", "score"};
       for (size_t i = 0; i < limit; ++i) {
         const auto& entry = scores[i];
-        xsql::QueryResultRow row;
+        markql::QueryResultRow row;
         row.node_id = static_cast<int64_t>(entry.count);
         row.attributes["token"] = entry.token;
         std::ostringstream oss;
@@ -321,13 +321,13 @@ CommandHandler make_summarize_content_command() {
         result.rows.push_back(std::move(row));
       }
       if (ctx.config.output_mode == "duckbox") {
-        xsql::render::DuckboxOptions options;
+        markql::render::DuckboxOptions options;
         options.max_width = 0;
         options.max_rows = ctx.max_rows;
         options.highlight = ctx.config.highlight;
         options.is_tty = ctx.config.color;
         options.colname_mode = ctx.config.colname_mode;
-        std::cout << xsql::render::render_duckbox(result, options) << std::endl;
+        std::cout << markql::render::render_duckbox(result, options) << std::endl;
       } else if (ctx.config.output_mode == "csv") {
         std::ostringstream csv_out;
         std::string error;
@@ -364,4 +364,4 @@ CommandHandler make_summarize_content_command() {
   };
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

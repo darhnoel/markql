@@ -3,7 +3,7 @@
 #include <cctype>
 #include <unordered_set>
 
-namespace xsql::cli {
+namespace markql::cli {
 
 const std::vector<std::string>& markql_reserved_keywords() {
   static const std::vector<std::string> keywords = {
@@ -47,4 +47,4 @@ bool is_sql_keyword_token(std::string_view word) {
   return keywords.find(lower) != keywords.end();
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

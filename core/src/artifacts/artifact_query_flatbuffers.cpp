@@ -12,9 +12,9 @@
 
 #include "prepared_query_payload_generated.h"
 
-namespace xsql::artifacts::detail {
+namespace markql::artifacts::detail {
 
-namespace qastfb = xsql::artifacts::qastfb;
+namespace qastfb = markql::artifacts::qastfb;
 
 namespace {
 
@@ -680,4 +680,4 @@ Query parse_prepared_query_payload_flatbuffers(const std::string& payload) {
   return parse_query_fb(root->query());
 }
 
-}  // namespace xsql::artifacts::detail
+}  // namespace markql::artifacts::detail

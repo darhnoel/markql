@@ -1,9 +1,9 @@
-#include "xsql_internal.h"
+#include "markql_internal.h"
 
 #include <algorithm>
 #include <stdexcept>
 
-namespace xsql::xsql_internal {
+namespace markql::markql_internal {
 
 /// Builds column names for the result set based on query semantics.
 /// MUST enforce EXCLUDE rules and MUST preserve deterministic ordering.
@@ -84,4 +84,4 @@ bool has_inner_html_auto_depth(const Query& query) {
   return false;
 }
 
-}  // namespace xsql::xsql_internal
+}  // namespace markql::markql_internal

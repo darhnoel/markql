@@ -5,7 +5,7 @@
 
 #include "ast.h"
 
-namespace xsql {
+namespace markql {
 
 /// Describes a parse failure with a message and byte position.
 /// MUST report positions relative to the original input string.
@@ -28,4 +28,4 @@ struct ParseResult {
 /// Inputs are query text; outputs are ParseResult with optional error.
 ParseResult parse_query(const std::string& input);
 
-}  // namespace xsql
+}  // namespace markql

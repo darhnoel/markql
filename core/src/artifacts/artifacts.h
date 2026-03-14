@@ -6,10 +6,10 @@
 
 #include "../dom/html_parser.h"
 #include "../lang/ast.h"
-#include "xsql/xsql.h"
-#include "xsql/version.h"
+#include "markql/markql.h"
+#include "markql/version.h"
 
-namespace xsql::artifacts {
+namespace markql::artifacts {
 
 enum class ArtifactKind {
   None,
@@ -75,4 +75,4 @@ QueryResult execute_prepared_query_on_document(const PreparedQueryArtifact& arti
 QueryResult execute_query_text_on_document(const std::string& query_text,
                                            const DocumentArtifact& document);
 
-}  // namespace xsql::artifacts
+}  // namespace markql::artifacts

@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace xsql {
+namespace markql {
 
 enum class ColumnNameMode { Normalize, Raw };
 
@@ -19,4 +19,4 @@ std::vector<ColumnNameMapping> build_column_name_map(
     ColumnNameMode mode = ColumnNameMode::Normalize,
     bool lowercase = true);
 
-}  // namespace xsql
+}  // namespace markql

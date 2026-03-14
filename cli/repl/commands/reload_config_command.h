@@ -2,8 +2,8 @@
 
 #include "repl/commands/registry.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 CommandHandler make_reload_config_command();
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

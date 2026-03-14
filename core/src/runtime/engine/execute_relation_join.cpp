@@ -1,4 +1,4 @@
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 
 #include <chrono>
 #include <cstdint>
@@ -14,7 +14,7 @@
 #include "engine_execution_internal.h"
 #include "relation_runtime_internal.h"
 
-namespace xsql {
+namespace markql {
 
 namespace {
 
@@ -575,4 +575,4 @@ Relation execute_relation_join_non_lateral(const Query::JoinItem& join,
   return next;
 }
 
-}  // namespace xsql
+}  // namespace markql

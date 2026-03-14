@@ -30,7 +30,7 @@ class TableResult:
 
 @dataclass(frozen=True)
 class QueryResult:
-    """Carries rows/tables plus metadata from executing an XSQL query."""
+    """Carries rows/tables plus metadata from executing an MARKQL query."""
 
     columns: List[str]
     warnings: List[str]

@@ -9,13 +9,13 @@
 #include <unordered_map>
 #include <vector>
 
-#ifdef XSQL_USE_ARROW
+#ifdef MARKQL_USE_ARROW
 #include <arrow/api.h>
 #include <arrow/io/api.h>
 #include <parquet/arrow/writer.h>
 #endif
 
-namespace xsql::cli {
+namespace markql::cli {
 
 namespace {
 
@@ -63,7 +63,7 @@ std::string term_scores_to_string(const std::unordered_map<std::string, double>&
   return oss.str();
 }
 
-CellValue field_value(const xsql::QueryResultRow& row, const std::string& field) {
+CellValue field_value(const markql::QueryResultRow& row, const std::string& field) {
   if (field == "node_id") return {std::to_string(row.node_id), false};
   if (field == "count") return {std::to_string(row.node_id), false};
   if (field == "tag") return {row.tag, false};
@@ -137,8 +137,8 @@ std::string json_escape(const std::string& value) {
 }
 
 void write_json_row(std::ostream& out,
-                    const xsql::QueryResultRow& row,
-                    const std::vector<xsql::ColumnNameMapping>& schema) {
+                    const markql::QueryResultRow& row,
+                    const std::vector<markql::ColumnNameMapping>& schema) {
   out << "{";
   for (size_t i = 0; i < schema.size(); ++i) {
     if (i > 0) out << ",";
@@ -153,7 +153,7 @@ void write_json_row(std::ostream& out,
   out << "}";
 }
 
-bool validate_rectangular(const xsql::QueryResult& result, std::string& error) {
+bool validate_rectangular(const markql::QueryResult& result, std::string& error) {
   if (result.to_table || !result.tables.empty()) {
     error = "TO CSV/PARQUET/JSON/NDJSON does not support TO TABLE() results";
     return false;
@@ -165,21 +165,21 @@ bool validate_rectangular(const xsql::QueryResult& result, std::string& error) {
   return true;
 }
 
-std::vector<xsql::ColumnNameMapping> result_schema(const xsql::QueryResult& result,
-                                                   xsql::ColumnNameMode colname_mode) {
-  return xsql::build_column_name_map(result.columns, colname_mode);
+std::vector<markql::ColumnNameMapping> result_schema(const markql::QueryResult& result,
+                                                   markql::ColumnNameMode colname_mode) {
+  return markql::build_column_name_map(result.columns, colname_mode);
 }
 
 }  // namespace
 
-static std::vector<std::string> table_columns(const xsql::QueryResult::TableResult& table);
+static std::vector<std::string> table_columns(const markql::QueryResult::TableResult& table);
 
 bool write_csv(std::ostream& out,
-               const xsql::QueryResult& result,
+               const markql::QueryResult& result,
                std::string& error,
-               xsql::ColumnNameMode colname_mode) {
+               markql::ColumnNameMode colname_mode) {
   if (!validate_rectangular(result, error)) return false;
-  std::vector<xsql::ColumnNameMapping> schema = result_schema(result, colname_mode);
+  std::vector<markql::ColumnNameMapping> schema = result_schema(result, colname_mode);
   for (size_t i = 0; i < schema.size(); ++i) {
     if (i > 0) out << ",";
     out << csv_escape(schema[i].output_name);
@@ -197,10 +197,10 @@ bool write_csv(std::ostream& out,
   return true;
 }
 
-bool write_csv(const xsql::QueryResult& result,
+bool write_csv(const markql::QueryResult& result,
                const std::string& path,
                std::string& error,
-               xsql::ColumnNameMode colname_mode) {
+               markql::ColumnNameMode colname_mode) {
   std::ofstream file;
   std::ostream* out = &std::cout;
   if (!path.empty()) {
@@ -214,12 +214,12 @@ bool write_csv(const xsql::QueryResult& result,
   return write_csv(*out, result, error, colname_mode);
 }
 
-bool write_json(const xsql::QueryResult& result,
+bool write_json(const markql::QueryResult& result,
                 const std::string& path,
                 std::string& error,
-                xsql::ColumnNameMode colname_mode) {
+                markql::ColumnNameMode colname_mode) {
   if (!validate_rectangular(result, error)) return false;
-  std::vector<xsql::ColumnNameMapping> schema = result_schema(result, colname_mode);
+  std::vector<markql::ColumnNameMapping> schema = result_schema(result, colname_mode);
   std::ofstream file;
   std::ostream* out = &std::cout;
   if (!path.empty()) {
@@ -242,12 +242,12 @@ bool write_json(const xsql::QueryResult& result,
   return true;
 }
 
-bool write_ndjson(const xsql::QueryResult& result,
+bool write_ndjson(const markql::QueryResult& result,
                   const std::string& path,
                   std::string& error,
-                  xsql::ColumnNameMode colname_mode) {
+                  markql::ColumnNameMode colname_mode) {
   if (!validate_rectangular(result, error)) return false;
-  std::vector<xsql::ColumnNameMapping> schema = result_schema(result, colname_mode);
+  std::vector<markql::ColumnNameMapping> schema = result_schema(result, colname_mode);
   std::ofstream file;
   std::ostream* out = &std::cout;
   if (!path.empty()) {
@@ -265,7 +265,7 @@ bool write_ndjson(const xsql::QueryResult& result,
   return true;
 }
 
-bool write_table_csv(const xsql::QueryResult::TableResult& table,
+bool write_table_csv(const markql::QueryResult::TableResult& table,
                      const std::string& path,
                      std::string& error,
                      bool table_has_header) {
@@ -294,7 +294,7 @@ bool write_table_csv(const xsql::QueryResult::TableResult& table,
   return true;
 }
 
-static std::vector<std::string> table_columns(const xsql::QueryResult::TableResult& table) {
+static std::vector<std::string> table_columns(const markql::QueryResult::TableResult& table) {
   size_t max_cols = 0;
   for (const auto& row : table.rows) {
     if (row.size() > max_cols) {
@@ -309,13 +309,13 @@ static std::vector<std::string> table_columns(const xsql::QueryResult::TableResu
   return cols;
 }
 
-bool write_parquet(const xsql::QueryResult& result,
+bool write_parquet(const markql::QueryResult& result,
                    const std::string& path,
                    std::string& error,
-                   xsql::ColumnNameMode colname_mode) {
+                   markql::ColumnNameMode colname_mode) {
   if (!validate_rectangular(result, error)) return false;
-  std::vector<xsql::ColumnNameMapping> col_schema = result_schema(result, colname_mode);
-#ifdef XSQL_USE_ARROW
+  std::vector<markql::ColumnNameMapping> col_schema = result_schema(result, colname_mode);
+#ifdef MARKQL_USE_ARROW
   std::vector<std::shared_ptr<arrow::ArrayBuilder>> builders;
   builders.reserve(col_schema.size());
   for (size_t i = 0; i < col_schema.size(); ++i) {
@@ -378,10 +378,10 @@ bool write_parquet(const xsql::QueryResult& result,
 #endif
 }
 
-bool write_table_parquet(const xsql::QueryResult::TableResult& table,
+bool write_table_parquet(const markql::QueryResult::TableResult& table,
                          const std::string& path,
                          std::string& error) {
-#ifdef XSQL_USE_ARROW
+#ifdef MARKQL_USE_ARROW
   std::vector<std::string> cols = table_columns(table);
   if (cols.empty()) {
     error = "Table export has no rows";
@@ -447,10 +447,10 @@ bool write_table_parquet(const xsql::QueryResult::TableResult& table,
 #endif
 }
 
-bool export_result(const xsql::QueryResult& result,
+bool export_result(const markql::QueryResult& result,
                    std::string& error,
-                   xsql::ColumnNameMode colname_mode) {
-  if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::None) {
+                   markql::ColumnNameMode colname_mode) {
+  if (result.export_sink.kind == markql::QueryResult::ExportSink::Kind::None) {
     return false;
   }
   if (!result.tables.empty()) {
@@ -458,16 +458,16 @@ bool export_result(const xsql::QueryResult& result,
       error = "Export requires a single table result; add a filter to select one table";
       return false;
     }
-    const bool sparse = result.table_options.format == xsql::QueryResult::TableOptions::Format::Sparse;
+    const bool sparse = result.table_options.format == markql::QueryResult::TableOptions::Format::Sparse;
     const bool sparse_long =
-        result.table_options.sparse_shape == xsql::QueryResult::TableOptions::SparseShape::Long;
+        result.table_options.sparse_shape == markql::QueryResult::TableOptions::SparseShape::Long;
     if (sparse && !sparse_long) {
       error = "TO TABLE(FORMAT=SPARSE, SPARSE_SHAPE=WIDE) does not support EXPORT";
       return false;
     }
-    if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Csv) {
+    if (result.export_sink.kind == markql::QueryResult::ExportSink::Kind::Csv) {
       if (sparse && sparse_long) {
-        xsql::QueryResult::TableResult table = result.tables[0];
+        markql::QueryResult::TableResult table = result.tables[0];
         std::vector<std::string> header_row = {"row_index", "col_index"};
         if (result.table_has_header) {
           header_row.push_back("header");
@@ -479,29 +479,29 @@ bool export_result(const xsql::QueryResult& result,
       return write_table_csv(result.tables[0], result.export_sink.path, error,
                              result.table_has_header);
     }
-    if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Parquet) {
+    if (result.export_sink.kind == markql::QueryResult::ExportSink::Kind::Parquet) {
       return write_table_parquet(result.tables[0], result.export_sink.path, error);
     }
-    if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Json ||
-        result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Ndjson) {
+    if (result.export_sink.kind == markql::QueryResult::ExportSink::Kind::Json ||
+        result.export_sink.kind == markql::QueryResult::ExportSink::Kind::Ndjson) {
       error = "TO JSON/NDJSON does not support TO TABLE() results";
       return false;
     }
   }
-  if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Csv) {
+  if (result.export_sink.kind == markql::QueryResult::ExportSink::Kind::Csv) {
     return write_csv(result, result.export_sink.path, error, colname_mode);
   }
-  if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Parquet) {
+  if (result.export_sink.kind == markql::QueryResult::ExportSink::Kind::Parquet) {
     return write_parquet(result, result.export_sink.path, error, colname_mode);
   }
-  if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Json) {
+  if (result.export_sink.kind == markql::QueryResult::ExportSink::Kind::Json) {
     return write_json(result, result.export_sink.path, error, colname_mode);
   }
-  if (result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Ndjson) {
+  if (result.export_sink.kind == markql::QueryResult::ExportSink::Kind::Ndjson) {
     return write_ndjson(result, result.export_sink.path, error, colname_mode);
   }
   error = "Unknown export sink";
   return false;
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

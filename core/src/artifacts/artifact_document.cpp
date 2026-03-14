@@ -10,9 +10,9 @@
 
 #include "document_generated.h"
 
-namespace xsql::artifacts::detail {
+namespace markql::artifacts::detail {
 
-namespace docnfb = xsql::artifacts::docnfb;
+namespace docnfb = markql::artifacts::docnfb;
 
 namespace {
 
@@ -169,8 +169,8 @@ bool document_uses_flatbuffers(const ArtifactHeader& header) {
 
 std::string build_document_meta_payload(const std::string& source_uri, size_t node_count) {
   BinaryWriter writer;
-  writer.write_string(xsql::get_version_info().version, "producer version");
-  writer.write_string(xsql::get_version_info().version, "language version");
+  writer.write_string(markql::get_version_info().version, "producer version");
+  writer.write_string(markql::get_version_info().version, "language version");
   writer.write_string(source_uri, "source uri");
   writer.write_u64(static_cast<uint64_t>(node_count));
   return writer.data();
@@ -229,4 +229,4 @@ void validate_document(const HtmlDocument& document) {
   }
 }
 
-}  // namespace xsql::artifacts::detail
+}  // namespace markql::artifacts::detail

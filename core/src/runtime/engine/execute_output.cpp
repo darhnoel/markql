@@ -1,4 +1,4 @@
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 
 #include <cctype>
 #include <string>
@@ -10,7 +10,7 @@
 #include "../../util/string_util.h"
 #include "engine_execution_internal.h"
 
-namespace xsql {
+namespace markql {
 
 namespace {
 
@@ -342,4 +342,4 @@ void materialize_table_result(const std::vector<std::vector<std::string>>& raw_r
   }
 }
 
-}  // namespace xsql
+}  // namespace markql

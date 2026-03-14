@@ -1,4 +1,4 @@
-namespace xsql.artifacts.docnfb;
+namespace markql.artifacts.docnfb;
 
 table Attribute {
   key:string;

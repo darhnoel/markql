@@ -1,4 +1,4 @@
-#include "xsql_internal.h"
+#include "markql_internal.h"
 
 #include <algorithm>
 #include <cctype>
@@ -7,7 +7,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace xsql::xsql_internal {
+namespace markql::markql_internal {
 namespace {
 
 const std::unordered_set<std::string>& english_stopwords() {
@@ -173,4 +173,4 @@ std::vector<QueryResultRow> build_tfidf_rows(const Query& query,
   return rows;
 }
 
-}  // namespace xsql::xsql_internal
+}  // namespace markql::markql_internal

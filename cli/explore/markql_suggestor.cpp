@@ -7,7 +7,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace xsql::cli {
+namespace markql::cli {
 
 namespace {
 
@@ -34,7 +34,7 @@ std::string escape_single_quotes(std::string_view text) {
 
 std::string sql_quote(std::string_view text) { return "'" + escape_single_quotes(text) + "'"; }
 
-std::string first_class_token(const xsql::HtmlNode& node) {
+std::string first_class_token(const markql::HtmlNode& node) {
   auto it = node.attributes.find("class");
   if (it == node.attributes.end()) return "";
   const std::string& cls = it->second;
@@ -81,7 +81,7 @@ bool contains_ci(std::string_view text, std::string_view needle) {
   return false;
 }
 
-std::vector<std::vector<int64_t>> build_children_index(const xsql::HtmlDocument& doc) {
+std::vector<std::vector<int64_t>> build_children_index(const markql::HtmlDocument& doc) {
   std::vector<std::vector<int64_t>> out(doc.nodes.size());
   for (const auto& node : doc.nodes) {
     if (!node.parent_id.has_value()) continue;
@@ -92,7 +92,7 @@ std::vector<std::vector<int64_t>> build_children_index(const xsql::HtmlDocument&
   return out;
 }
 
-std::vector<int64_t> ancestor_chain(const xsql::HtmlDocument& doc, int64_t node_id) {
+std::vector<int64_t> ancestor_chain(const markql::HtmlDocument& doc, int64_t node_id) {
   std::vector<int64_t> chain;
   if (node_id < 0 || static_cast<size_t>(node_id) >= doc.nodes.size()) return chain;
   int64_t cur = node_id;
@@ -109,7 +109,7 @@ std::vector<int64_t> ancestor_chain(const xsql::HtmlDocument& doc, int64_t node_
 
 }  // namespace
 
-MarkqlSuggestion suggest_markql_statement(const xsql::HtmlDocument& doc, int64_t selected_node_id) {
+MarkqlSuggestion suggest_markql_statement(const markql::HtmlDocument& doc, int64_t selected_node_id) {
   MarkqlSuggestion suggestion;
   if (doc.nodes.empty()) {
     suggestion.reason = "empty document";
@@ -206,7 +206,7 @@ MarkqlSuggestion suggest_markql_statement(const xsql::HtmlDocument& doc, int64_t
 
   std::optional<std::string> title_selector;
   std::optional<std::string> title_predicate;
-  auto classify_title_candidate = [&](const xsql::HtmlNode& node) {
+  auto classify_title_candidate = [&](const markql::HtmlNode& node) {
     std::string cls = first_class_token(node);
     // WHY: mix tag hints + class hints because many pages encode titles via either structure.
     bool is_title_like = contains_ci(node.tag, "h1") || contains_ci(node.tag, "h2") ||
@@ -333,4 +333,4 @@ MarkqlSuggestion suggest_markql_statement(const xsql::HtmlDocument& doc, int64_t
   return suggestion;
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

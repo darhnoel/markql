@@ -2,8 +2,8 @@
 
 #include "registry.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 CommandHandler make_display_mode_command();
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

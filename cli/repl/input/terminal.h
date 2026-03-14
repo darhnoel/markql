@@ -1,6 +1,6 @@
 #pragma once
 
-namespace xsql::cli {
+namespace markql::cli {
 
 /// Manages raw terminal mode and bracketed paste for interactive editing.
 /// MUST restore terminal settings on destruction to avoid leaving the shell broken.
@@ -30,4 +30,4 @@ class TermiosGuard {
 /// Inputs are terminal state; outputs are column count with no side effects.
 int terminal_width();
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

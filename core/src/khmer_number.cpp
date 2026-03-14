@@ -1,4 +1,4 @@
-#include "xsql/khmer_number.h"
+#include "markql/khmer_number.h"
 
 #include <algorithm>
 #include <array>
@@ -9,7 +9,7 @@
 
 #include <boost/multiprecision/cpp_int.hpp>
 
-namespace xsql::khmer_number {
+namespace markql::khmer_number {
 
 namespace {
 
@@ -658,4 +658,4 @@ Result<std::string> khmer_words_to_number(std::string_view text) {
   return Result<std::string>::success(out);
 }
 
-}  // namespace xsql::khmer_number
+}  // namespace markql::khmer_number

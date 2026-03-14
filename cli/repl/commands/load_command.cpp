@@ -9,7 +9,7 @@
 #include "../../cli_utils.h"
 #include "../../ui/color.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 namespace {
 
@@ -101,7 +101,7 @@ CommandHandler make_load_command() {
       return true;
     }
     if (is_url(path)) {
-#ifndef XSQL_USE_CURL
+#ifndef MARKQL_USE_CURL
       std::cerr << "Error: URL fetching is disabled (libcurl not available). Install libcurl and rebuild." << std::endl;
       return true;
 #endif
@@ -128,4 +128,4 @@ CommandHandler make_load_command() {
   };
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

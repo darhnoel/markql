@@ -1,6 +1,6 @@
 #pragma once
 
-namespace xsql::cli {
+namespace markql::cli {
 
 /// Defines ANSI color codes for CLI output styling and diagnostics.
 /// MUST remain valid ANSI sequences and MUST stay ASCII-only for terminal compatibility.
@@ -21,4 +21,4 @@ struct Color {
 /// Inputs/outputs are the global instance; side effects happen on usage in I/O.
 extern Color kColor;
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

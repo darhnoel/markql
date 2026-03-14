@@ -8,7 +8,7 @@
 #include <variant>
 #include <vector>
 
-namespace xsql {
+namespace markql {
 
 struct Span {
   size_t start = 0;
@@ -247,4 +247,4 @@ struct Query {
   Span span;
 };
 
-}  // namespace xsql
+}  // namespace markql

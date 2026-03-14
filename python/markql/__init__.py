@@ -1,4 +1,4 @@
-"""Python interface for XSQL query execution with safety-first defaults."""
+"""Python interface for MARKQL query execution with safety-first defaults."""
 
 from __future__ import annotations
 
@@ -29,18 +29,18 @@ doc: Optional[Document] = None
 
 def _require_core() -> None:
     if _core is None:
-        raise RuntimeError("xsql native module is unavailable") from _core_import_error
+        raise RuntimeError("markql native module is unavailable") from _core_import_error
 
 
 def _resolve_cli_binary() -> Optional[str]:
-    env_cli = os.environ.get("XSQL_CLI")
+    env_cli = os.environ.get("MARKQL_CLI")
     if env_cli:
         return env_cli
-    cli = shutil.which("markql") or shutil.which("xsql")
+    cli = shutil.which("markql") or shutil.which("markql")
     if cli:
         return cli
     repo_root = Path(__file__).resolve().parents[2]
-    for candidate in (repo_root / "build" / "markql", repo_root / "build" / "xsql"):
+    for candidate in (repo_root / "build" / "markql", repo_root / "build" / "markql"):
         if candidate.exists():
             return str(candidate)
     return None
@@ -50,7 +50,7 @@ def _run_cli(args: list[str]) -> str:
     cli = _resolve_cli_binary()
     if not cli:
         raise RuntimeError(
-            "xsql native module is missing required APIs and markql CLI was not found for fallback"
+            "markql native module is missing required APIs and markql CLI was not found for fallback"
         )
     result = subprocess.run([cli, *args], capture_output=True, text=True, check=False)
     if result.returncode not in (0, 1):
@@ -72,7 +72,7 @@ def load(
 ) -> Document:
     """Loads HTML into a module-level Document for reuse across queries.
 
-    This function MUST be treated as not thread-safe because it mutates xsql.doc.
+    This function MUST be treated as not thread-safe because it mutates markql.doc.
     It performs IO for file/URL sources and enforces size/network limits.
     """
 
@@ -110,7 +110,7 @@ def execute(
     max_bytes: int = 5_000_000,
     max_results: int = 10_000,
 ) -> QueryResult:
-    """Executes an XSQL query against a document or source with safety limits.
+    """Executes an MARKQL query against a document or source with safety limits.
 
     The query MUST be executed without eval/exec and respects max_results limits.
     It may read files or URLs when a source is provided and allow_network permits it.
@@ -118,7 +118,7 @@ def execute(
 
     _require_core()
     if params:
-        raise ValueError("params are not supported by XSQL execution")
+        raise ValueError("params are not supported by MARKQL execution")
     active = doc or globals().get("doc")
     if active is None:
         if source is None:

@@ -1,11 +1,11 @@
-#include "xsql/column_names.h"
+#include "markql/column_names.h"
 
 #include <cctype>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 
-namespace xsql {
+namespace markql {
 
 namespace {
 
@@ -120,4 +120,4 @@ std::vector<ColumnNameMapping> build_column_name_map(
   return out;
 }
 
-}  // namespace xsql
+}  // namespace markql

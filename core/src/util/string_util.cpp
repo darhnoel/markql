@@ -4,7 +4,7 @@
 #include <optional>
 #include <regex>
 
-namespace xsql::util {
+namespace markql::util {
 
 namespace {
 
@@ -262,4 +262,4 @@ std::string minify_html(std::string_view html) {
   return out;
 }
 
-}  // namespace xsql::util
+}  // namespace markql::util

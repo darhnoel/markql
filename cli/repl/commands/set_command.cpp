@@ -7,7 +7,7 @@
 
 #include "../../cli_utils.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 namespace {
 
@@ -38,12 +38,12 @@ CommandHandler make_set_command() {
     }
     std::string mode = to_lower(setting);
     if (mode == "raw") {
-      ctx.config.colname_mode = xsql::ColumnNameMode::Raw;
+      ctx.config.colname_mode = markql::ColumnNameMode::Raw;
       std::cout << "Column names: raw" << std::endl;
       return true;
     }
     if (mode == "normalize") {
-      ctx.config.colname_mode = xsql::ColumnNameMode::Normalize;
+      ctx.config.colname_mode = markql::ColumnNameMode::Normalize;
       std::cout << "Column names: normalize" << std::endl;
       return true;
     }
@@ -52,4 +52,4 @@ CommandHandler make_set_command() {
   };
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

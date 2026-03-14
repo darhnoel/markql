@@ -52,7 +52,7 @@ bool is_ascii_digits(const std::string& value) {
       [](unsigned char c) { return std::isdigit(c) != 0; });
 }
 
-std::string stable_table_json(const xsql::QueryResult& result) {
+std::string stable_table_json(const markql::QueryResult& result) {
   std::ostringstream out;
   if (result.tables.empty()) {
     out << "[]\n";
@@ -60,9 +60,9 @@ std::string stable_table_json(const xsql::QueryResult& result) {
   }
   const auto& table = result.tables[0];
   const bool sparse =
-      result.table_options.format == xsql::QueryResult::TableOptions::Format::Sparse;
+      result.table_options.format == markql::QueryResult::TableOptions::Format::Sparse;
   const bool sparse_long =
-      result.table_options.sparse_shape == xsql::QueryResult::TableOptions::SparseShape::Long;
+      result.table_options.sparse_shape == markql::QueryResult::TableOptions::SparseShape::Long;
 
   if (!sparse) {
     out << "[\n";
@@ -124,7 +124,7 @@ std::string stable_table_json(const xsql::QueryResult& result) {
 
 void assert_golden(const std::string& actual, const std::string& golden_relative) {
   const std::filesystem::path golden = resolve_path(golden_relative);
-  const char* regen = std::getenv("XSQL_REGEN_GOLDEN");
+  const char* regen = std::getenv("MARKQL_REGEN_GOLDEN");
   const bool should_regen = (regen != nullptr && std::string(regen) == "1");
   if (should_regen) {
     std::filesystem::create_directories(golden.parent_path());

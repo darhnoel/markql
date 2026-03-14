@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <string>
 
-namespace xsql::cli {
+namespace markql::cli {
 
 /// Moves forward by Vim word motions (`w`/`W`) from a byte cursor.
 /// MUST treat count=0 as one step and clamp at buffer end.
@@ -33,4 +33,4 @@ bool delete_vim_motion(std::string& buffer,
                        char motion,
                        size_t line_end);
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

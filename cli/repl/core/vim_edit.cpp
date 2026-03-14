@@ -5,7 +5,7 @@
 
 #include "repl/input/text_util.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 namespace {
 
@@ -161,4 +161,4 @@ bool delete_vim_motion(std::string& buffer,
   return true;
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

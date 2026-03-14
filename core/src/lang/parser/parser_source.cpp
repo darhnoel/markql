@@ -1,6 +1,6 @@
 #include "parser_internal.h"
 
-namespace xsql {
+namespace markql {
 
 /// Parses the FROM source, supporting document, path, or URL forms.
 /// MUST normalize source kinds and capture spans for errors.
@@ -177,4 +177,4 @@ bool Parser::parse_source_alias(Source& src, bool require_alias, const char* req
   return true;
 }
 
-}  // namespace xsql
+}  // namespace markql

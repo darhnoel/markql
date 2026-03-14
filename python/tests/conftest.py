@@ -1,13 +1,13 @@
 import pytest
 
-import xsql
+import markql
 
 
 @pytest.fixture(scope="session")
 def supports_project() -> bool:
-    doc = xsql.load("<table><tbody><tr><td>2025</td></tr></tbody></table>")
+    doc = markql.load("<table><tbody><tr><td>2025</td></tr></tbody></table>")
     try:
-        xsql.execute(
+        markql.execute(
             "SELECT PROJECT(tr) AS (period: TEXT(td WHERE sibling_pos = 1)) "
             "FROM document WHERE EXISTS(child WHERE tag = 'td')",
             doc=doc,
@@ -19,9 +19,9 @@ def supports_project() -> bool:
 
 @pytest.fixture(scope="session")
 def supports_describe_language() -> bool:
-    doc = xsql.load("<html><body></body></html>")
+    doc = markql.load("<html><body></body></html>")
     try:
-        xsql.execute("DESCRIBE language", doc=doc)
+        markql.execute("DESCRIBE language", doc=doc)
         return True
     except RuntimeError:
         return False
@@ -29,9 +29,9 @@ def supports_describe_language() -> bool:
 
 @pytest.fixture(scope="session")
 def supports_parse_source() -> bool:
-    doc = xsql.load("<html><body></body></html>")
+    doc = markql.load("<html><body></body></html>")
     try:
-        xsql.execute(
+        markql.execute(
             "SELECT li FROM PARSE('<ul><li>1</li></ul>') AS frag",
             doc=doc,
         )
@@ -42,9 +42,9 @@ def supports_parse_source() -> bool:
 
 @pytest.fixture(scope="session")
 def supports_fragments_warnings() -> bool:
-    doc = xsql.load("<html><body></body></html>")
+    doc = markql.load("<html><body></body></html>")
     try:
-        result = xsql.execute(
+        result = markql.execute(
             "SELECT li FROM FRAGMENTS(RAW('<ul><li>1</li></ul>')) AS frag",
             doc=doc,
         )

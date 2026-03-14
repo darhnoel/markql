@@ -1,6 +1,6 @@
 #include "parser_internal.h"
 
-namespace xsql {
+namespace markql {
 
 /// Parses the core query clauses without enforcing the terminal token.
 /// MUST parse SELECT/FROM and optional WHERE/ORDER/LIMIT/TO consistently.
@@ -553,4 +553,4 @@ bool Parser::parse_limit(size_t& limit) {
   return true;
 }
 
-}  // namespace xsql
+}  // namespace markql

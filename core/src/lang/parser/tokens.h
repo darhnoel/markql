@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <string>
 
-namespace xsql {
+namespace markql {
 
 /// Enumerates lexical tokens produced by the query lexer.
 /// MUST remain consistent with parser expectations and keyword mapping.
@@ -94,4 +94,4 @@ struct Token {
   size_t pos = 0;
 };
 
-}  // namespace xsql
+}  // namespace markql

@@ -61,25 +61,25 @@ void test_attr_shorthand_axis_paths() {
 }
 
 void test_parse_alias_field_with_implicit_doc() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "SELECT doc.node_id, TEXT(doc) FROM doc WHERE doc.tag = 'div'");
   expect_true(parsed.query.has_value(), "parse implicit doc alias field references");
 }
 
 void test_parse_alias_field_with_explicit_alias() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "SELECT n.node_id, TEXT(n) FROM doc AS n WHERE n.tag = 'div'");
   expect_true(parsed.query.has_value(), "parse explicit alias field references");
 }
 
 void test_parse_legacy_tag_binding_still_works() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "SELECT li.node_id, TEXT(li) FROM doc WHERE tag = 'li'");
   expect_true(parsed.query.has_value(), "parse legacy tag binding");
 }
 
 void test_duplicate_source_alias_rejected() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "SELECT n.node_id FROM doc AS n AS m WHERE n.tag = 'div'");
   expect_true(!parsed.query.has_value(), "duplicate alias should fail parse");
   expect_true(parsed.error.has_value(), "duplicate alias returns parse error");

@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace xsql::cli {
+namespace markql::cli {
 
 /// Provides keyword and command completion for the REPL editor.
 /// MUST preserve user casing conventions and MUST not mutate unrelated text.
@@ -50,4 +50,4 @@ class AutoCompleter {
   std::vector<std::string> commands_;
 };
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

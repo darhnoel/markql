@@ -8,13 +8,13 @@
 
 namespace {
 
-std::vector<xsql::TokenType> lex_types(const std::string& input) {
-  xsql::Lexer lexer(input);
-  std::vector<xsql::TokenType> out;
+std::vector<markql::TokenType> lex_types(const std::string& input) {
+  markql::Lexer lexer(input);
+  std::vector<markql::TokenType> out;
   while (true) {
-    xsql::Token token = lexer.next();
+    markql::Token token = lexer.next();
     out.push_back(token.type);
-    if (token.type == xsql::TokenType::End || token.type == xsql::TokenType::Invalid) {
+    if (token.type == markql::TokenType::End || token.type == markql::TokenType::Invalid) {
       break;
     }
   }
@@ -25,10 +25,10 @@ void test_line_comment_before_tokens() {
   auto types = lex_types("-- comment\nSELECT div FROM document");
   expect_true(types.size() >= 5, "line comment before tokens keeps query tokens");
   if (types.size() >= 4) {
-    expect_true(types[0] == xsql::TokenType::KeywordSelect, "first token is SELECT");
-    expect_true(types[1] == xsql::TokenType::Identifier, "second token is identifier");
-    expect_true(types[2] == xsql::TokenType::KeywordFrom, "third token is FROM");
-    expect_true(types[3] == xsql::TokenType::KeywordDocument, "fourth token is DOCUMENT");
+    expect_true(types[0] == markql::TokenType::KeywordSelect, "first token is SELECT");
+    expect_true(types[1] == markql::TokenType::Identifier, "second token is identifier");
+    expect_true(types[2] == markql::TokenType::KeywordFrom, "third token is FROM");
+    expect_true(types[3] == markql::TokenType::KeywordDocument, "fourth token is DOCUMENT");
   }
 }
 
@@ -36,10 +36,10 @@ void test_line_comment_between_tokens() {
   auto types = lex_types("SELECT -- keep\n div FROM document");
   expect_true(types.size() >= 5, "line comment between tokens keeps sequence");
   if (types.size() >= 4) {
-    expect_true(types[0] == xsql::TokenType::KeywordSelect, "token 1 is SELECT");
-    expect_true(types[1] == xsql::TokenType::Identifier, "token 2 is identifier");
-    expect_true(types[2] == xsql::TokenType::KeywordFrom, "token 3 is FROM");
-    expect_true(types[3] == xsql::TokenType::KeywordDocument, "token 4 is DOCUMENT");
+    expect_true(types[0] == markql::TokenType::KeywordSelect, "token 1 is SELECT");
+    expect_true(types[1] == markql::TokenType::Identifier, "token 2 is identifier");
+    expect_true(types[2] == markql::TokenType::KeywordFrom, "token 3 is FROM");
+    expect_true(types[3] == markql::TokenType::KeywordDocument, "token 4 is DOCUMENT");
   }
 }
 
@@ -47,31 +47,31 @@ void test_line_comment_at_eof() {
   auto types = lex_types("SELECT div -- trailing");
   expect_true(!types.empty(), "lexer emits tokens with eof line comment");
   if (types.size() >= 2) {
-    expect_true(types[0] == xsql::TokenType::KeywordSelect, "token 1 is SELECT");
-    expect_true(types[1] == xsql::TokenType::Identifier, "token 2 is identifier");
+    expect_true(types[0] == markql::TokenType::KeywordSelect, "token 1 is SELECT");
+    expect_true(types[1] == markql::TokenType::Identifier, "token 2 is identifier");
   }
-  expect_true(types.back() == xsql::TokenType::End, "line comment at EOF ends cleanly");
+  expect_true(types.back() == markql::TokenType::End, "line comment at EOF ends cleanly");
 }
 
 void test_block_comment_single_line() {
   auto types = lex_types("/* c */ SELECT div FROM document");
   expect_true(types.size() >= 5, "block comment before statement works");
   if (types.size() >= 4) {
-    expect_true(types[0] == xsql::TokenType::KeywordSelect, "token 1 is SELECT");
-    expect_true(types[1] == xsql::TokenType::Identifier, "token 2 is identifier");
-    expect_true(types[2] == xsql::TokenType::KeywordFrom, "token 3 is FROM");
-    expect_true(types[3] == xsql::TokenType::KeywordDocument, "token 4 is DOCUMENT");
+    expect_true(types[0] == markql::TokenType::KeywordSelect, "token 1 is SELECT");
+    expect_true(types[1] == markql::TokenType::Identifier, "token 2 is identifier");
+    expect_true(types[2] == markql::TokenType::KeywordFrom, "token 3 is FROM");
+    expect_true(types[3] == markql::TokenType::KeywordDocument, "token 4 is DOCUMENT");
   }
 }
 
 void test_block_comment_multi_line() {
-  auto parsed = xsql::parse_query("/* one\n two */ SELECT div FROM document");
+  auto parsed = markql::parse_query("/* one\n two */ SELECT div FROM document");
   expect_true(parsed.query.has_value(), "multi-line block comment is skipped");
 }
 
 void test_unterminated_block_comment_error() {
   std::string query = "SELECT div FROM document /* missing";
-  auto parsed = xsql::parse_query(query);
+  auto parsed = markql::parse_query(query);
   expect_true(!parsed.query.has_value(), "unterminated block comment fails parse");
   expect_true(parsed.error.has_value(), "unterminated block comment returns parse error");
   if (parsed.error.has_value()) {
@@ -84,11 +84,11 @@ void test_unterminated_block_comment_error() {
 }
 
 void test_comment_markers_inside_string_literals() {
-  auto parsed_dash = xsql::parse_query(
+  auto parsed_dash = markql::parse_query(
       "SELECT div FROM document WHERE text = 'a--b'");
   expect_true(parsed_dash.query.has_value(), "-- inside string literal is not comment");
 
-  auto parsed_block = xsql::parse_query(
+  auto parsed_block = markql::parse_query(
       "SELECT div FROM document WHERE text = '/*x*/'");
   expect_true(parsed_block.query.has_value(), "/* */ inside string literal is not comment");
 }

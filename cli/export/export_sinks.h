@@ -3,40 +3,40 @@
 #include <ostream>
 #include <string>
 
-#include "xsql/column_names.h"
-#include "xsql/xsql.h"
+#include "markql/column_names.h"
+#include "markql/markql.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
-bool export_result(const xsql::QueryResult& result,
+bool export_result(const markql::QueryResult& result,
                    std::string& error,
-                   xsql::ColumnNameMode colname_mode = xsql::ColumnNameMode::Normalize);
+                   markql::ColumnNameMode colname_mode = markql::ColumnNameMode::Normalize);
 bool write_csv(std::ostream& out,
-               const xsql::QueryResult& result,
+               const markql::QueryResult& result,
                std::string& error,
-               xsql::ColumnNameMode colname_mode = xsql::ColumnNameMode::Normalize);
-bool write_csv(const xsql::QueryResult& result,
+               markql::ColumnNameMode colname_mode = markql::ColumnNameMode::Normalize);
+bool write_csv(const markql::QueryResult& result,
                const std::string& path,
                std::string& error,
-               xsql::ColumnNameMode colname_mode = xsql::ColumnNameMode::Normalize);
-bool write_json(const xsql::QueryResult& result,
+               markql::ColumnNameMode colname_mode = markql::ColumnNameMode::Normalize);
+bool write_json(const markql::QueryResult& result,
                 const std::string& path,
                 std::string& error,
-                xsql::ColumnNameMode colname_mode = xsql::ColumnNameMode::Normalize);
-bool write_ndjson(const xsql::QueryResult& result,
+                markql::ColumnNameMode colname_mode = markql::ColumnNameMode::Normalize);
+bool write_ndjson(const markql::QueryResult& result,
                   const std::string& path,
                   std::string& error,
-                  xsql::ColumnNameMode colname_mode = xsql::ColumnNameMode::Normalize);
-bool write_parquet(const xsql::QueryResult& result,
+                  markql::ColumnNameMode colname_mode = markql::ColumnNameMode::Normalize);
+bool write_parquet(const markql::QueryResult& result,
                    const std::string& path,
                    std::string& error,
-                   xsql::ColumnNameMode colname_mode = xsql::ColumnNameMode::Normalize);
-bool write_table_csv(const xsql::QueryResult::TableResult& table,
+                   markql::ColumnNameMode colname_mode = markql::ColumnNameMode::Normalize);
+bool write_table_csv(const markql::QueryResult::TableResult& table,
                      const std::string& path,
                      std::string& error,
                      bool table_has_header);
-bool write_table_parquet(const xsql::QueryResult::TableResult& table,
+bool write_table_parquet(const markql::QueryResult::TableResult& table,
                          const std::string& path,
                          std::string& error);
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

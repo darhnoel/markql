@@ -8,7 +8,7 @@
 
 #include "dom/html_parser.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 enum class InnerHtmlSearchMode {
   Exact,
@@ -43,7 +43,7 @@ std::string make_inner_html_snippet(std::string_view inner_html,
 /// Searches node text scopes with fuzzy matching and returns ranked matches.
 /// Scopes: self attributes > self tag/text > descendant inner_html.
 /// MUST sort by ranked priority and node id ascending for deterministic output.
-std::vector<InnerHtmlSearchMatch> fuzzy_search_inner_html(const xsql::HtmlDocument& doc,
+std::vector<InnerHtmlSearchMatch> fuzzy_search_inner_html(const markql::HtmlDocument& doc,
                                                           const std::string& query,
                                                           size_t max_results,
                                                           bool include_snippet = true,
@@ -53,11 +53,11 @@ std::vector<InnerHtmlSearchMatch> fuzzy_search_inner_html(const xsql::HtmlDocume
 /// Searches node text scopes with exact contiguous case-insensitive matching.
 /// Scopes: self attributes > self tag/text > descendant inner_html.
 /// MUST sort by ranked priority and node id ascending for deterministic output.
-std::vector<InnerHtmlSearchMatch> exact_search_inner_html(const xsql::HtmlDocument& doc,
+std::vector<InnerHtmlSearchMatch> exact_search_inner_html(const markql::HtmlDocument& doc,
                                                           const std::string& query,
                                                           size_t max_results,
                                                           bool include_snippet = true,
                                                           bool sort_results = true,
                                                           const std::vector<int64_t>* candidate_node_ids = nullptr);
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

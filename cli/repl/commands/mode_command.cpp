@@ -5,7 +5,7 @@
 
 #include "../../cli_args.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 CommandHandler make_mode_command() {
   return [](const std::string& line, CommandContext& ctx) -> bool {
@@ -26,4 +26,4 @@ CommandHandler make_mode_command() {
   };
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

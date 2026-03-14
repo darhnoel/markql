@@ -1,4 +1,4 @@
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 
 #include <cctype>
 #include <string>
@@ -6,7 +6,7 @@
 
 #include "../../util/string_util.h"
 
-namespace xsql {
+namespace markql {
 
 std::optional<int64_t> parse_int64_value(const std::string& value) {
   try {
@@ -85,4 +85,4 @@ std::vector<std::string> split_ws(const std::string& s) {
   return out;
 }
 
-}  // namespace xsql
+}  // namespace markql

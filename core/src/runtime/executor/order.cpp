@@ -2,7 +2,7 @@
 
 #include <optional>
 
-namespace xsql::executor_internal {
+namespace markql::executor_internal {
 
 namespace {
 
@@ -55,4 +55,4 @@ int compare_nodes(const HtmlNode& left, const HtmlNode& right, const std::string
   return 0;
 }
 
-}  // namespace xsql::executor_internal
+}  // namespace markql::executor_internal

@@ -57,6 +57,7 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 - `FRAGMENTS(...)` remains supported for backward compatibility and now emits a deprecation warning.
 
 ### Changed
+- Official rename completed across the tracked repository: internal namespaces, headers, CMake targets, CLI/test target names, install paths, docs, and CI now use `markql` / `MarkQL` consistently, with `pyxsql` preserved as the only intentional legacy identifier.
 - Marked `.mqd` / `.mqp` artifact workflows as experimental in CLI help and documentation so WIP builds do not imply a fully settled interface.
 - `build.sh` now detects a default `vcpkg` triplet for Linux, macOS, and Windows environments instead of hardcoding `x64-linux`, and it falls back to portable CPU-count detection when `nproc` is unavailable.
 - Artifact persistence now uses explicit file magic, format versioning, producer-major compatibility checks, and additive sectioned payloads instead of private runtime layouts.
@@ -85,7 +86,7 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 - Updated tutorial/grammar/case-study examples to prefer `SELECT self` in node-returning `LATERAL` subqueries.
 - `--lint --format json` remains deterministic and ANSI-free regardless of color mode.
 - Optimized PROJECT/FLATTEN_EXTRACT evaluation by introducing per-row selector scope/tag caching, reducing repeated subtree scans while preserving query results and output formatting.
-- Bumped project/core, Python package metadata, and `vcpkg` manifest version references to `1.15.0`.
+- Bumped project/core, Python package metadata, and `vcpkg` manifest version references to `1.16.0`.
 
 ## [1.8.0] - 2026-02-13
 
@@ -183,8 +184,8 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 - Updated CLI and tutorial docs to document `EXISTS(...)` syntax, supported axes (`self|parent|child|ancestor|descendant`), and inner `WHERE` semantics.
 - Updated docs and language metadata (`SHOW FUNCTIONS` / `DESCRIBE language`) to include `FLATTEN_EXTRACT` usage.
 - Updated docs and language metadata to prefer `PROJECT(...)`; `FLATTEN_EXTRACT(...)` remains a compatibility alias.
-- Rebranded user-facing CLI/documentation name to MarkQL while keeping internal `xsql` namespace and APIs unchanged.
-- REPL prompt is now `markql> `, and the default CLI binary output is now `markql` (with `xsql` compatibility binary still generated).
+- Rebranded user-facing CLI/documentation name to MarkQL while keeping internal `markql` namespace and APIs unchanged.
+- REPL prompt is now `markql> `, and the default CLI binary output is now `markql` (with `markql` compatibility binary still generated).
 - REPL history recall now places the cursor at end-of-line by default when navigating with Up/Down.
 
 ### Deprecated
@@ -199,7 +200,7 @@ Includes major changes first landed between 2026-01-12 and 2026-02-07.
 - Added `FLATTEN_TEXT(...)` projection support with optional depth, then added `FLATTEN(...)` as an alias (first landed 2026-01-19).
 - Added `max_depth` and `doc_order` metadata fields in result rows (first landed 2026-01-19).
 - Added Khmer number conversion support as both CLI module and plugin (first landed 2026-01-18).
-- Added benchmark target `xsql_bench_inner_html` to compare minified vs raw inner HTML output.
+- Added benchmark target `markql_bench_inner_html` to compare minified vs raw inner HTML output.
 - Added tests for minifier behavior and proportional cursor mapping.
 
 ### Changed

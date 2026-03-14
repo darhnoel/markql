@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(xsql_number_to_khmer_plugin LANGUAGES CXX)
+project(markql_number_to_khmer_plugin LANGUAGES CXX)
 
-if (NOT DEFINED XSQL_ROOT)
-  message(FATAL_ERROR "XSQL_ROOT must be set to the XSQL source root.")
+if (NOT DEFINED MARKQL_ROOT)
+  message(FATAL_ERROR "MARKQL_ROOT must be set to the MARKQL source root.")
 endif()
 if (NOT DEFINED PLUGIN_SOURCE)
-  message(FATAL_ERROR "PLUGIN_SOURCE must point to the XSQL source root.")
+  message(FATAL_ERROR "PLUGIN_SOURCE must point to the MARKQL source root.")
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
@@ -16,7 +16,7 @@ get_filename_component(PLUGIN_SOURCE_ABS "${PLUGIN_SOURCE}" ABSOLUTE)
 
 set(KHMER_NUMBER_SOURCES
   "${PLUGIN_SOURCE_ABS}/core/src/khmer_number.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/xsql_number_to_khmer_plugin.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/markql_number_to_khmer_plugin.cpp"
 )
 
 foreach(source_file IN LISTS KHMER_NUMBER_SOURCES)
@@ -30,7 +30,7 @@ add_library(number_to_khmer_plugin SHARED
 )
 
 target_include_directories(number_to_khmer_plugin PRIVATE
-  "${XSQL_ROOT}/core/include"
+  "${MARKQL_ROOT}/core/include"
 )
 
 set_target_properties(number_to_khmer_plugin PROPERTIES

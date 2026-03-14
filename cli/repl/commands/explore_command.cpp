@@ -8,7 +8,7 @@
 #include "../../explore/dom_explorer.h"
 #include "../../ui/color.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 namespace {
 
@@ -111,4 +111,4 @@ CommandHandler make_explore_command_with_runner(ExploreRunner runner) {
   };
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

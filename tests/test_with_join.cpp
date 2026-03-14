@@ -30,12 +30,12 @@ std::string baseline_query() {
 }
 
 void test_parse_with_single_and_multiple_ctes() {
-  auto single = xsql::parse_query(
+  auto single = markql::parse_query(
       "WITH rows AS (SELECT n.node_id AS row_id FROM doc AS n) "
       "SELECT rows.row_id FROM rows");
   expect_true(single.query.has_value(), "WITH single CTE parses");
 
-  auto multi = xsql::parse_query(
+  auto multi = markql::parse_query(
       "WITH rows AS (SELECT n.node_id AS row_id FROM doc AS n), "
       "cells AS (SELECT rows.row_id FROM rows) "
       "SELECT cells.row_id FROM cells");
@@ -43,29 +43,29 @@ void test_parse_with_single_and_multiple_ctes() {
 }
 
 void test_parse_derived_table_and_joins() {
-  auto derived = xsql::parse_query(
+  auto derived = markql::parse_query(
       "SELECT t.row_id FROM (SELECT n.node_id AS row_id FROM doc AS n) AS t");
   expect_true(derived.query.has_value(), "derived table source parses");
 
-  auto joins = xsql::parse_query(
+  auto joins = markql::parse_query(
       "SELECT r.node_id, c.node_id "
       "FROM doc AS r "
       "JOIN doc AS c ON c.parent_id = r.node_id");
   expect_true(joins.query.has_value(), "inner JOIN parses");
 
-  auto left_join = xsql::parse_query(
+  auto left_join = markql::parse_query(
       "SELECT r.node_id, c.node_id "
       "FROM doc AS r "
       "LEFT JOIN doc AS c ON c.parent_id = r.node_id");
   expect_true(left_join.query.has_value(), "LEFT JOIN parses");
 
-  auto cross_join = xsql::parse_query(
+  auto cross_join = markql::parse_query(
       "SELECT r.node_id, c.node_id FROM doc AS r CROSS JOIN doc AS c");
   expect_true(cross_join.query.has_value(), "CROSS JOIN parses");
 }
 
 void test_parse_cross_join_lateral() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "WITH rows AS (SELECT n.node_id AS row_id FROM doc AS n) "
       "SELECT r.row_id "
       "FROM rows AS r "
@@ -78,7 +78,7 @@ void test_parse_cross_join_lateral() {
 }
 
 void test_parse_reject_duplicate_cte_name() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "WITH rows AS (SELECT n.node_id AS row_id FROM doc AS n), "
       "rows AS (SELECT n.node_id AS row_id FROM doc AS n) "
       "SELECT rows.row_id FROM rows");
@@ -91,7 +91,7 @@ void test_parse_reject_duplicate_cte_name() {
 }
 
 void test_parse_reject_derived_table_without_alias() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "SELECT row_id FROM (SELECT n.node_id AS row_id FROM doc AS n)");
   expect_true(!parsed.query.has_value(), "derived table without alias fails");
   expect_true(parsed.error.has_value(), "derived table without alias error is populated");
@@ -102,7 +102,7 @@ void test_parse_reject_derived_table_without_alias() {
 }
 
 void test_parse_reject_join_without_on() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "SELECT r.node_id FROM doc AS r JOIN doc AS c");
   expect_true(!parsed.query.has_value(), "JOIN without ON fails parse");
   expect_true(parsed.error.has_value(), "JOIN without ON parse error");
@@ -113,7 +113,7 @@ void test_parse_reject_join_without_on() {
 }
 
 void test_parse_reject_cross_join_with_on() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "SELECT r.node_id FROM doc AS r CROSS JOIN doc AS c ON c.parent_id = r.node_id");
   expect_true(!parsed.query.has_value(), "CROSS JOIN with ON fails parse");
   expect_true(parsed.error.has_value(), "CROSS JOIN with ON parse error");
@@ -124,7 +124,7 @@ void test_parse_reject_cross_join_with_on() {
 }
 
 void test_parse_reject_lateral_without_alias() {
-  auto parsed = xsql::parse_query(
+  auto parsed = markql::parse_query(
       "WITH rows AS (SELECT n.node_id AS row_id FROM doc AS n) "
       "SELECT r.row_id "
       "FROM rows AS r "
@@ -262,7 +262,7 @@ void test_with_join_to_csv_sets_export_sink() {
       html,
       "WITH rows AS (SELECT n.node_id AS row_id FROM doc AS n WHERE n.tag = 'tr') "
       "SELECT r.row_id FROM rows AS r TO CSV('out.csv')");
-  expect_true(result.export_sink.kind == xsql::QueryResult::ExportSink::Kind::Csv,
+  expect_true(result.export_sink.kind == markql::QueryResult::ExportSink::Kind::Csv,
               "WITH/JOIN runtime keeps TO CSV export sink");
   expect_true(result.export_sink.path == "out.csv",
               "WITH/JOIN runtime keeps export path");

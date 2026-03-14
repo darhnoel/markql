@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace xsql {
+namespace markql {
 
 /// Classifies diagnostic urgency for linting and execution error rendering.
 /// MUST remain stable for text/JSON outputs and tests.
@@ -91,4 +91,4 @@ std::vector<Diagnostic> lint_query(const std::string& query);
 std::vector<Diagnostic> diagnose_query_failure(const std::string& query,
                                                const std::string& error_message);
 
-}  // namespace xsql
+}  // namespace markql

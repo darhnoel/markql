@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 
-namespace xsql::cli {
+namespace markql::cli {
 namespace {
 
 struct TermiosState {
@@ -58,4 +58,4 @@ int terminal_width() {
   return 80;
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

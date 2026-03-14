@@ -2,7 +2,7 @@
 
 #include <cctype>
 
-namespace xsql {
+namespace markql {
 
 /// Consumes an identifier matching the expected string.
 /// MUST enforce exact match and report errors on mismatch.
@@ -102,4 +102,4 @@ std::string Parser::to_lower(const std::string& s) {
   return out;
 }
 
-}  // namespace xsql
+}  // namespace markql

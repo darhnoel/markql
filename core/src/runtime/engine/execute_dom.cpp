@@ -1,4 +1,4 @@
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 
 #include <algorithm>
 #include <cctype>
@@ -17,9 +17,9 @@
 #include "dom_descendants_internal.h"
 #include "dom_projection_internal.h"
 #include "engine_execution_internal.h"
-#include "xsql_internal.h"
+#include "markql_internal.h"
 
-namespace xsql {
+namespace markql {
 
 namespace {
 struct ScopedProjectBenchStats {
@@ -35,8 +35,8 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
   ProjectBenchStats* project_bench_stats =
       project_bench_stats_enabled() ? &scoped_project_bench_stats.stats : nullptr;
   QueryResult out;
-  out.columns = xsql_internal::build_columns(query);
-  out.columns_implicit = !xsql_internal::is_projection_query(query);
+  out.columns = markql_internal::build_columns(query);
+  out.columns_implicit = !markql_internal::is_projection_query(query);
   out.source_uri_excluded =
       std::find(query.exclude_fields.begin(), query.exclude_fields.end(), "source_uri") !=
       query.exclude_fields.end();
@@ -58,14 +58,14 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
     out.export_sink.path = sink.path;
   }
   if (query.export_sink.has_value() &&
-      (query.to_table || xsql_internal::is_table_select(query)) &&
+      (query.to_table || markql_internal::is_table_select(query)) &&
       exec.nodes.size() != 1) {
     throw std::runtime_error(
         "Export requires a single table result; add a filter to select one table");
   }
   if (!query.select_items.empty() &&
       query.select_items[0].aggregate == Query::SelectItem::Aggregate::Tfidf) {
-    out.rows = xsql_internal::build_tfidf_rows(query, exec.nodes);
+    out.rows = markql_internal::build_tfidf_rows(query, exec.nodes);
     return out;
   }
   if (!query.select_items.empty() &&
@@ -120,12 +120,12 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
   }
   // WHY: table extraction bypasses row projections to preserve table layout.
   if (query.to_table ||
-      (query.export_sink.has_value() && xsql_internal::is_table_select(query))) {
-    auto children = xsql_internal::build_children(doc);
+      (query.export_sink.has_value() && markql_internal::is_table_select(query))) {
+    auto children = markql_internal::build_children(doc);
     for (const auto& node : exec.nodes) {
       QueryResult::TableResult table;
       table.node_id = node.id;
-      xsql_internal::collect_rows(doc, children, node.id, table.rows);
+      markql_internal::collect_rows(doc, children, node.id, table.rows);
       if (!table_uses_default_output(query)) {
         materialize_table_result(
             table.rows, query.table_has_header, query.table_options, table);
@@ -145,7 +145,7 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
     }
   }
   if (flatten_extract_item != nullptr) {
-    auto children = xsql_internal::build_children(doc);
+    auto children = markql_internal::build_children(doc);
     std::vector<int64_t> sibling_positions(doc.nodes.size(), 1);
     for (size_t parent = 0; parent < children.size(); ++parent) {
       const auto& kids = children[parent];
@@ -221,7 +221,7 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
     return out;
   }
   if (flatten_item != nullptr) {
-    auto children = xsql_internal::build_children(doc);
+    auto children = markql_internal::build_children(doc);
     std::vector<int64_t> sibling_positions(doc.nodes.size(), 1);
     for (size_t parent = 0; parent < children.size(); ++parent) {
       const auto& kids = children[parent];
@@ -282,10 +282,10 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
           }
         }
         if (!matched) continue;
-        std::string direct = xsql_internal::extract_direct_text_strict(child.inner_html);
+        std::string direct = markql_internal::extract_direct_text_strict(child.inner_html);
         std::string normalized = normalize_flatten_text(direct);
         if (normalized.empty()) {
-          direct = xsql_internal::extract_direct_text(child.inner_html);
+          direct = markql_internal::extract_direct_text(child.inner_html);
           normalized = normalize_flatten_text(direct);
         }
         if (depth_is_default && normalized.empty()) {
@@ -332,8 +332,8 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
       return out;
     }
   }
-  auto inner_html_depth = xsql_internal::find_inner_html_depth(query);
-  bool inner_html_auto_depth = xsql_internal::has_inner_html_auto_depth(query);
+  auto inner_html_depth = markql_internal::find_inner_html_depth(query);
+  bool inner_html_auto_depth = markql_internal::has_inner_html_auto_depth(query);
   std::unordered_set<std::string> trim_fields;
   trim_fields.reserve(query.select_items.size());
   for (const auto& item : query.select_items) {
@@ -360,7 +360,7 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
       has_project_expr = true;
     }
   }
-  auto children = xsql_internal::build_children(doc);
+  auto children = markql_internal::build_children(doc);
   std::vector<int64_t> sibling_positions(doc.nodes.size(), 1);
   for (size_t parent = 0; parent < children.size(); ++parent) {
     const auto& kids = children[parent];
@@ -379,9 +379,9 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
                                        ? static_cast<size_t>(std::max<int64_t>(0, node.max_depth))
                                        : 1;
     }
-    row.text = use_text_function ? xsql_internal::extract_direct_text(node.inner_html) : node.text;
+    row.text = use_text_function ? markql_internal::extract_direct_text(node.inner_html) : node.text;
     row.inner_html = effective_inner_html_depth.has_value()
-                         ? xsql_internal::limit_inner_html(node.inner_html, *effective_inner_html_depth)
+                         ? markql_internal::limit_inner_html(node.inner_html, *effective_inner_html_depth)
                          : node.inner_html;
     if (use_inner_html_function && !use_raw_inner_html_function) {
       row.inner_html = util::minify_html(row.inner_html);
@@ -435,4 +435,4 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
   return out;
 }
 
-}  // namespace xsql
+}  // namespace markql

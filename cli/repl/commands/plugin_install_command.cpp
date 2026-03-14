@@ -10,7 +10,7 @@
 
 #include "plugin_registry.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 namespace {
 
 int run_command(const std::string& command,
@@ -93,7 +93,7 @@ CommandHandler make_plugin_install_command() {
     std::filesystem::create_directories(bin_root);
 
     std::filesystem::path log_dir =
-        std::filesystem::path("plugins") / ".xsql_logs" / match->name;
+        std::filesystem::path("plugins") / ".markql_logs" / match->name;
     std::filesystem::create_directories(log_dir);
     std::filesystem::path git_log = log_dir / "git.log";
     std::filesystem::path cmake_log = log_dir / "cmake.log";
@@ -141,11 +141,11 @@ CommandHandler make_plugin_install_command() {
     }
 
     std::cout << "Step 2/2: Building plugin..." << std::endl;
-    std::string xsql_root = std::filesystem::current_path().string();
+    std::string markql_root = std::filesystem::current_path().string();
     std::string plugin_source = std::filesystem::absolute(plugin_root).string();
     std::string cmake_config =
         "cmake -S \"" + cmake_root.string() + "\" -B \"" + build_dir.string() +
-        "\" -DXSQL_ROOT=\"" + xsql_root + "\" -DPLUGIN_SOURCE=\"" +
+        "\" -DMARKQL_ROOT=\"" + markql_root + "\" -DPLUGIN_SOURCE=\"" +
         plugin_source + "\"";
     if (run_command(cmake_config, verbose, cmake_log) != 0) {
       std::cerr << "Error: CMake configure failed for " << match->name << std::endl;
@@ -198,4 +198,4 @@ CommandHandler make_plugin_install_command() {
   };
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

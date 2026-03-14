@@ -1,6 +1,6 @@
 #pragma once
 
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 
 #include <cstdint>
 #include <optional>
@@ -11,7 +11,7 @@
 #include "../../dom/html_parser.h"
 #include "../../lang/markql_parser.h"
 
-namespace xsql {
+namespace markql {
 
 struct ProjectBenchStats {
   uint64_t selector_calls = 0;
@@ -58,4 +58,4 @@ std::optional<std::string> eval_flatten_extract_expr(
 
 std::optional<std::string> eval_parse_source_expr(const ScalarExpr& expr);
 
-}  // namespace xsql
+}  // namespace markql

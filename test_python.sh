@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VENV_DIR="${VENV_DIR:-xsql_venv}"
+VENV_DIR="${VENV_DIR:-markql_venv}"
 
 if [[ ! -d "${VENV_DIR}" ]]; then
   echo "Virtual environment not found: ${VENV_DIR}" >&2

@@ -4,7 +4,7 @@
 #include <string>
 #include <string_view>
 
-namespace xsql::util {
+namespace markql::util {
 
 /// Converts a string to lowercase for case-insensitive comparisons.
 /// MUST avoid locale-sensitive behavior to keep parsing deterministic.
@@ -28,4 +28,4 @@ std::optional<std::string> regex_replace_all(const std::string& input,
 /// Inputs are HTML strings; outputs are minified HTML strings with no side effects.
 std::string minify_html(std::string_view html);
 
-}  // namespace xsql::util
+}  // namespace markql::util

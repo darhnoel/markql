@@ -1,4 +1,4 @@
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 
 #include <stdexcept>
 #include <string>
@@ -7,9 +7,9 @@
 #include "../../dom/html_parser.h"
 #include "../../util/string_util.h"
 #include "engine_execution_internal.h"
-#include "xsql_internal.h"
+#include "markql_internal.h"
 
-namespace xsql {
+namespace markql {
 
 std::optional<std::string> field_value_string(const QueryResultRow& row, const std::string& field) {
   if (field == "node_id") return std::to_string(row.node_id);
@@ -84,14 +84,14 @@ FragmentSource collect_html_fragments(const QueryResult& result, const std::stri
       throw std::runtime_error(
           source_name + " expects HTML strings (use inner_html(...) or RAW('<...>'))");
     }
-    if (trimmed.size() > xsql_internal::kMaxFragmentHtmlBytes) {
+    if (trimmed.size() > markql_internal::kMaxFragmentHtmlBytes) {
       throw std::runtime_error(source_name + " HTML fragment exceeds maximum size");
     }
     total_bytes += trimmed.size();
-    if (out.fragments.size() >= xsql_internal::kMaxFragmentCount) {
+    if (out.fragments.size() >= markql_internal::kMaxFragmentCount) {
       throw std::runtime_error(source_name + " exceeds maximum fragment count");
     }
-    if (total_bytes > xsql_internal::kMaxFragmentBytes) {
+    if (total_bytes > markql_internal::kMaxFragmentBytes) {
       throw std::runtime_error(source_name + " exceeds maximum total HTML size");
     }
     out.fragments.push_back(std::move(trimmed));
@@ -102,4 +102,4 @@ FragmentSource collect_html_fragments(const QueryResult& result, const std::stri
   return out;
 }
 
-}  // namespace xsql
+}  // namespace markql

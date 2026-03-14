@@ -1,4 +1,4 @@
-#include "xsql_internal.h"
+#include "markql_internal.h"
 
 #include <algorithm>
 #include <functional>
@@ -6,7 +6,7 @@
 
 #include "../../util/string_util.h"
 
-namespace xsql::xsql_internal {
+namespace markql::markql_internal {
 
 namespace {
 
@@ -624,4 +624,4 @@ void validate_export_sink(const Query& query) {
   }
 }
 
-}  // namespace xsql::xsql_internal
+}  // namespace markql::markql_internal

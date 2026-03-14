@@ -1,3 +1,3 @@
 #include "ast.h"
 
-namespace xsql {}
+namespace markql {}

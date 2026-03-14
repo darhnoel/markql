@@ -1,4 +1,4 @@
-#include "xsql/plugin_api.h"
+#include "markql/plugin_api.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -24,16 +24,16 @@ const char* env_or_default(const char* env_name, const char* fallback) {
 }
 
 const char* default_dict_path() {
-#if defined(XSQL_KHMER_PLUGIN_SOURCE)
-  return XSQL_KHMER_PLUGIN_SOURCE "/port/common/khmer_dictionary_words.txt";
+#if defined(MARKQL_KHMER_PLUGIN_SOURCE)
+  return MARKQL_KHMER_PLUGIN_SOURCE "/port/common/khmer_dictionary_words.txt";
 #else
   return "plugins/khmer_segmenter/port/common/khmer_dictionary_words.txt";
 #endif
 }
 
 const char* default_freq_path() {
-#if defined(XSQL_KHMER_PLUGIN_SOURCE)
-  return XSQL_KHMER_PLUGIN_SOURCE "/port/common/khmer_word_frequencies.bin";
+#if defined(MARKQL_KHMER_PLUGIN_SOURCE)
+  return MARKQL_KHMER_PLUGIN_SOURCE "/port/common/khmer_word_frequencies.bin";
 #else
   return "plugins/khmer_segmenter/port/common/khmer_word_frequencies.bin";
 #endif
@@ -43,8 +43,8 @@ bool ensure_segmenter(KhmerPluginState& state, std::string& error) {
   if (state.segmenter) {
     return true;
   }
-  const char* dict_path = env_or_default("XSQL_KHMER_DICT", default_dict_path());
-  const char* freq_path = env_or_default("XSQL_KHMER_FREQ", default_freq_path());
+  const char* dict_path = env_or_default("MARKQL_KHMER_DICT", default_dict_path());
+  const char* freq_path = env_or_default("MARKQL_KHMER_FREQ", default_freq_path());
   state.segmenter = khmer_segmenter_init(dict_path, freq_path);
   if (!state.segmenter) {
     error = "Failed to initialize khmer_segmenter (check dictionary paths).";
@@ -103,10 +103,10 @@ bool tokenize_khmer(const char* text,
 
 }  // namespace
 
-extern "C" bool xsql_register_plugin(const XsqlPluginHost* host,
+extern "C" bool markql_register_plugin(const XsqlPluginHost* host,
                                       char* out_error,
                                       size_t out_error_size) {
-  if (!host || host->api_version != XSQL_PLUGIN_API_VERSION) {
+  if (!host || host->api_version != MARKQL_PLUGIN_API_VERSION) {
     if (out_error && out_error_size > 0) {
       std::snprintf(out_error, out_error_size, "Unsupported plugin API version.");
     }

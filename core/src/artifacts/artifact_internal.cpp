@@ -6,7 +6,7 @@
 #include <limits>
 #include <unordered_set>
 
-namespace xsql::artifacts::detail {
+namespace markql::artifacts::detail {
 
 namespace {
 
@@ -58,7 +58,7 @@ void ensure(bool condition, const std::string& message) {
 }
 
 uint32_t current_producer_major() {
-  const std::string version = xsql::get_version_info().version;
+  const std::string version = markql::get_version_info().version;
   size_t end = version.find('.');
   std::string major_text = end == std::string::npos ? version : version.substr(0, end);
   try {
@@ -278,4 +278,4 @@ std::string compatibility_error_for_header(const ArtifactHeader& header) {
   return "";
 }
 
-}  // namespace xsql::artifacts::detail
+}  // namespace markql::artifacts::detail

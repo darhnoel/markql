@@ -7,24 +7,24 @@
 namespace {
 
 void test_parse_show_describe() {
-  auto show_inputs = xsql::parse_query("SHOW INPUTS");
+  auto show_inputs = markql::parse_query("SHOW INPUTS");
   expect_true(show_inputs.query.has_value(), "SHOW INPUTS parses");
   if (show_inputs.query.has_value()) {
-    expect_true(show_inputs.query->kind == xsql::Query::Kind::ShowInputs,
+    expect_true(show_inputs.query->kind == markql::Query::Kind::ShowInputs,
                 "SHOW INPUTS kind");
   }
 
-  auto describe = xsql::parse_query("DESCRIBE doc");
+  auto describe = markql::parse_query("DESCRIBE doc");
   expect_true(describe.query.has_value(), "DESCRIBE doc parses");
   if (describe.query.has_value()) {
-    expect_true(describe.query->kind == xsql::Query::Kind::DescribeDoc,
+    expect_true(describe.query->kind == markql::Query::Kind::DescribeDoc,
                 "DESCRIBE doc kind");
   }
 
-  auto describe_language = xsql::parse_query("DESCRIBE language");
+  auto describe_language = markql::parse_query("DESCRIBE language");
   expect_true(describe_language.query.has_value(), "DESCRIBE language parses");
   if (describe_language.query.has_value()) {
-    expect_true(describe_language.query->kind == xsql::Query::Kind::DescribeLanguage,
+    expect_true(describe_language.query->kind == markql::Query::Kind::DescribeLanguage,
                 "DESCRIBE language kind");
   }
 }
@@ -76,25 +76,25 @@ void test_describe_language_output() {
 }
 
 void test_show_input_requires_source() {
-  xsql::QueryResult result;
+  markql::QueryResult result;
   std::string error;
-  bool ok = xsql::cli::build_show_input_result("", result, error);
+  bool ok = markql::cli::build_show_input_result("", result, error);
   expect_true(!ok, "SHOW INPUT requires an active source");
   expect_true(!error.empty(), "SHOW INPUT provides an error message");
 }
 
 void test_show_inputs_requires_source() {
-  xsql::QueryResult result;
+  markql::QueryResult result;
   std::string error;
-  bool ok = xsql::cli::build_show_inputs_result({}, "", result, error);
+  bool ok = markql::cli::build_show_inputs_result({}, "", result, error);
   expect_true(!ok, "SHOW INPUTS requires sources");
   expect_true(!error.empty(), "SHOW INPUTS provides an error message");
 }
 
 void test_show_inputs_fallback_source() {
-  xsql::QueryResult result;
+  markql::QueryResult result;
   std::string error;
-  bool ok = xsql::cli::build_show_inputs_result({}, "doc", result, error);
+  bool ok = markql::cli::build_show_inputs_result({}, "doc", result, error);
   expect_true(ok, "SHOW INPUTS falls back to the active source");
   expect_eq(result.rows.size(), 1, "SHOW INPUTS fallback row count");
   if (!result.rows.empty()) {
@@ -103,31 +103,31 @@ void test_show_inputs_fallback_source() {
 }
 
 void test_auto_include_source_uri() {
-  xsql::QueryResult result;
+  markql::QueryResult result;
   result.columns = {"node_id", "tag", "attributes", "parent_id"};
   result.columns_implicit = true;
   result.source_uri_excluded = false;
-  xsql::QueryResultRow row_a;
+  markql::QueryResultRow row_a;
   row_a.source_uri = "a.html";
   result.rows.push_back(row_a);
-  xsql::QueryResultRow row_b;
+  markql::QueryResultRow row_b;
   row_b.source_uri = "b.html";
   result.rows.push_back(row_b);
 
-  auto sources = xsql::cli::collect_source_uris(result);
-  xsql::cli::apply_source_uri_policy(result, sources);
+  auto sources = markql::cli::collect_source_uris(result);
+  markql::cli::apply_source_uri_policy(result, sources);
 
   expect_true(!result.columns.empty(), "auto include columns not empty");
   if (!result.columns.empty()) {
     expect_true(result.columns[0] == "source_uri", "auto include source_uri column");
   }
 
-  xsql::QueryResult explicit_result;
+  markql::QueryResult explicit_result;
   explicit_result.columns = {"node_id"};
   explicit_result.columns_implicit = false;
   explicit_result.rows = result.rows;
-  auto explicit_sources = xsql::cli::collect_source_uris(explicit_result);
-  xsql::cli::apply_source_uri_policy(explicit_result, explicit_sources);
+  auto explicit_sources = markql::cli::collect_source_uris(explicit_result);
+  markql::cli::apply_source_uri_policy(explicit_result, explicit_sources);
   expect_true(explicit_result.columns.size() == 1, "explicit columns stay unchanged");
 }
 

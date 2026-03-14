@@ -2,7 +2,7 @@
 
 #include "parser_internal.h"
 
-namespace xsql {
+namespace markql {
 
 /// Constructs a parser for a given query input.
 /// MUST immediately read the first token to initialize state.
@@ -36,4 +36,4 @@ ParseResult parse_query_impl(const std::string& input) {
   return parser.parse();
 }
 
-}  // namespace xsql
+}  // namespace markql

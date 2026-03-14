@@ -103,7 +103,7 @@ Check version + provenance:
 ```
 
 Compatibility note:
-- `./build/xsql` remains available as a legacy command name.
+- `./build/markql` remains available as a legacy command name.
 
 ## Artifact Workflow
 
@@ -219,15 +219,15 @@ CLI version output includes provenance:
 - semantic version
 - git commit hash
 - `-dirty` suffix when built from a dirty worktree
-- version source of truth: `python/xsql/_meta.py` (`__version__`)
+- version source of truth: `python/markql/_meta.py` (`__version__`)
 
 Python exposes the same core provenance:
 
 ```python
-import xsql
-print(xsql.__version__)
-print(xsql.core_version())
-print(xsql.core_version_info())
+import markql
+print(markql.__version__)
+print(markql.core_version())
+print(markql.core_version_info())
 ```
 
 Artifact files also record producer version metadata. `--artifact-info` shows:

@@ -5,7 +5,7 @@
 #include <string>
 #include <unistd.h>
 
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 #include "artifacts/artifacts.h"
 #include "dom/html_parser.h"
 #include "export/export_sinks.h"
@@ -15,10 +15,10 @@
 #include "explore/dom_explorer.h"
 #include "script_runner.h"
 #include "repl/core/repl.h"
-#include "runtime/engine/xsql_internal.h"
+#include "runtime/engine/markql_internal.h"
 #include "ui/color.h"
 
-using namespace xsql::cli;
+using namespace markql::cli;
 
 /// Entry point that parses CLI options and dispatches to batch or REPL modes.
 /// MUST preserve exit codes for script usage and MUST not hide fatal errors.
@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
     return 0;
   }
   if (options.show_version) {
-    std::cout << "markql " << xsql::version_string() << std::endl;
+    std::cout << "markql " << markql::version_string() << std::endl;
     return 0;
   }
 
@@ -65,9 +65,9 @@ int main(int argc, char** argv) {
   const bool stderr_is_tty = isatty(fileno(stderr));
   bool color = resolve_output_color_enabled(options, stdout_is_tty, no_color_env);
   const bool stderr_color = resolve_output_color_enabled(options, stderr_is_tty, no_color_env);
-  xsql::DiagnosticTextRenderOptions lint_render_options;
+  markql::DiagnosticTextRenderOptions lint_render_options;
   lint_render_options.use_color = resolve_diagnostics_color_enabled(options, stdout_is_tty, no_color_env);
-  xsql::DiagnosticTextRenderOptions error_render_options;
+  markql::DiagnosticTextRenderOptions error_render_options;
   error_render_options.use_color =
       resolve_diagnostics_color_enabled(options, stderr_is_tty, no_color_env);
   std::string output_mode = options.output_mode;
@@ -75,64 +75,64 @@ int main(int argc, char** argv) {
   bool highlight = options.highlight;
   bool display_full = options.display_mode_set ? options.display_full : false;
   int timeout_ms = options.timeout_ms;
-  const xsql::ColumnNameMode colname_mode = xsql::ColumnNameMode::Normalize;
+  const markql::ColumnNameMode colname_mode = markql::ColumnNameMode::Normalize;
 
   // WHY: reject unknown modes to avoid silently changing output contracts.
-  if (!xsql::cli::is_supported_output_mode(output_mode)) {
+  if (!markql::cli::is_supported_output_mode(output_mode)) {
     std::cerr << "Invalid --mode value (use duckbox|json|plain|csv)\n";
     return 2;
   }
 
   try {
     if (!options.artifact_info.empty()) {
-      auto query_kind_name = [](xsql::Query::Kind kind) {
+      auto query_kind_name = [](markql::Query::Kind kind) {
         switch (kind) {
-          case xsql::Query::Kind::Select:
+          case markql::Query::Kind::Select:
             return "select";
-          case xsql::Query::Kind::ShowInput:
+          case markql::Query::Kind::ShowInput:
             return "show_input";
-          case xsql::Query::Kind::ShowInputs:
+          case markql::Query::Kind::ShowInputs:
             return "show_inputs";
-          case xsql::Query::Kind::ShowFunctions:
+          case markql::Query::Kind::ShowFunctions:
             return "show_functions";
-          case xsql::Query::Kind::ShowAxes:
+          case markql::Query::Kind::ShowAxes:
             return "show_axes";
-          case xsql::Query::Kind::ShowOperators:
+          case markql::Query::Kind::ShowOperators:
             return "show_operators";
-          case xsql::Query::Kind::DescribeDoc:
+          case markql::Query::Kind::DescribeDoc:
             return "describe_doc";
-          case xsql::Query::Kind::DescribeLanguage:
+          case markql::Query::Kind::DescribeLanguage:
             return "describe_language";
         }
         return "unknown";
       };
-      auto source_kind_name = [](xsql::Source::Kind kind) {
+      auto source_kind_name = [](markql::Source::Kind kind) {
         switch (kind) {
-          case xsql::Source::Kind::Document:
+          case markql::Source::Kind::Document:
             return "document";
-          case xsql::Source::Kind::Path:
+          case markql::Source::Kind::Path:
             return "path";
-          case xsql::Source::Kind::Url:
+          case markql::Source::Kind::Url:
             return "url";
-          case xsql::Source::Kind::RawHtml:
+          case markql::Source::Kind::RawHtml:
             return "raw_html";
-          case xsql::Source::Kind::Fragments:
+          case markql::Source::Kind::Fragments:
             return "fragments";
-          case xsql::Source::Kind::Parse:
+          case markql::Source::Kind::Parse:
             return "parse";
-          case xsql::Source::Kind::CteRef:
+          case markql::Source::Kind::CteRef:
             return "cte_ref";
-          case xsql::Source::Kind::DerivedSubquery:
+          case markql::Source::Kind::DerivedSubquery:
             return "derived_subquery";
         }
         return "unknown";
       };
-      xsql::artifacts::ArtifactInfo info = xsql::artifacts::inspect_artifact_file(options.artifact_info);
+      markql::artifacts::ArtifactInfo info = markql::artifacts::inspect_artifact_file(options.artifact_info);
       const std::string compatibility_error =
-          xsql::artifacts::artifact_compatibility_error(info.header);
+          markql::artifacts::artifact_compatibility_error(info.header);
       const bool compatible = compatibility_error.empty();
       std::cout << "Type: "
-                << (info.header.kind == xsql::artifacts::ArtifactKind::DocumentSnapshot ? "mqd"
+                << (info.header.kind == markql::artifacts::ArtifactKind::DocumentSnapshot ? "mqd"
                                                                                          : "mqp")
                 << std::endl;
       std::cout << "Format: " << info.header.format_major << "." << info.header.format_minor
@@ -152,7 +152,7 @@ int main(int argc, char** argv) {
         std::cout << "Compatibility note: " << compatibility_error << std::endl;
       }
       if (info.metadata_available) {
-        if (info.header.kind == xsql::artifacts::ArtifactKind::DocumentSnapshot) {
+        if (info.header.kind == markql::artifacts::ArtifactKind::DocumentSnapshot) {
           std::cout << "Source URI: " << escape_control_for_terminal(info.source_uri) << std::endl;
           std::cout << "Nodes: " << info.node_count << std::endl;
         } else {
@@ -167,12 +167,12 @@ int main(int argc, char** argv) {
     }
 
     if (options.lint) {
-      std::vector<xsql::Diagnostic> diagnostics;
+      std::vector<markql::Diagnostic> diagnostics;
 
       auto collect_statement_diagnostics = [&](const std::string& statement,
                                                size_t statement_index,
                                                size_t total_statements) {
-        std::vector<xsql::Diagnostic> statement_diags = xsql::lint_query(statement);
+        std::vector<markql::Diagnostic> statement_diags = markql::lint_query(statement);
         if (total_statements > 1) {
           for (auto& diag : statement_diags) {
             diag.message = "statement " + std::to_string(statement_index) + "/" +
@@ -183,7 +183,7 @@ int main(int argc, char** argv) {
       };
 
       if (!query_file.empty()) {
-        if (xsql::artifacts::path_has_artifact_magic(query_file)) {
+        if (markql::artifacts::path_has_artifact_magic(query_file)) {
           std::cerr << "Error: --lint expects SQL text, not prepared query artifacts (.mqp)"
                     << std::endl;
           return 2;
@@ -201,7 +201,7 @@ int main(int argc, char** argv) {
         }
         ScriptSplitResult split = split_sql_script(script);
         if (split.error_message.has_value()) {
-          diagnostics.push_back(xsql::make_syntax_diagnostic(
+          diagnostics.push_back(markql::make_syntax_diagnostic(
               script, *split.error_message, split.error_position));
         } else {
           const size_t total = split.statements.size();
@@ -218,13 +218,13 @@ int main(int argc, char** argv) {
       }
 
       if (options.lint_format == "json") {
-        std::cout << xsql::render_diagnostics_json(diagnostics) << std::endl;
+        std::cout << markql::render_diagnostics_json(diagnostics) << std::endl;
       } else if (diagnostics.empty()) {
         std::cout << "No diagnostics." << std::endl;
       } else {
-        std::cout << xsql::render_diagnostics_text(diagnostics, lint_render_options) << std::endl;
+        std::cout << markql::render_diagnostics_text(diagnostics, lint_render_options) << std::endl;
       }
-      return xsql::has_error_diagnostics(diagnostics) ? 1 : 0;
+      return markql::has_error_diagnostics(diagnostics) ? 1 : 0;
     }
 
     auto load_default_html = [&]() -> std::pair<std::string, std::string> {
@@ -232,21 +232,21 @@ int main(int argc, char** argv) {
         return {read_stdin(), "document"};
       }
       if (is_url(input)) {
-        return {xsql::xsql_internal::fetch_url(input, timeout_ms), input};
+        return {markql::markql_internal::fetch_url(input, timeout_ms), input};
       }
-      return {xsql::xsql_internal::read_file(input), input};
+      return {markql::markql_internal::read_file(input), input};
     };
 
     if (!options.write_mqd.empty()) {
       auto [html, source_uri] = load_default_html();
-      xsql::HtmlDocument document = xsql::parse_html(html);
-      xsql::artifacts::write_document_artifact_file(document, source_uri, options.write_mqd);
+      markql::HtmlDocument document = markql::parse_html(html);
+      markql::artifacts::write_document_artifact_file(document, source_uri, options.write_mqd);
       std::cout << "Wrote MQD: " << options.write_mqd << std::endl;
       return 0;
     }
 
     if (!options.write_mqp.empty()) {
-      if (!query_file.empty() && xsql::artifacts::path_has_artifact_magic(query_file)) {
+      if (!query_file.empty() && markql::artifacts::path_has_artifact_magic(query_file)) {
         std::cerr << "Error: --write-mqp expects SQL text, not an existing artifact" << std::endl;
         return 2;
       }
@@ -270,9 +270,9 @@ int main(int argc, char** argv) {
         }
         artifact_query = split.statements.front().text;
       }
-      xsql::artifacts::PreparedQueryArtifact artifact =
-          xsql::artifacts::prepare_query_artifact(artifact_query);
-      xsql::artifacts::write_prepared_query_artifact_file(
+      markql::artifacts::PreparedQueryArtifact artifact =
+          markql::artifacts::prepare_query_artifact(artifact_query);
+      markql::artifacts::write_prepared_query_artifact_file(
           artifact.query, artifact.info.original_query, options.write_mqp);
       std::cout << "Wrote MQP: " << options.write_mqp << std::endl;
       return 0;
@@ -290,7 +290,7 @@ int main(int argc, char** argv) {
     }
 
     std::optional<std::string> stdin_cache;
-    auto render_result = [&](xsql::QueryResult& result,
+    auto render_result = [&](markql::QueryResult& result,
                              const std::chrono::steady_clock::time_point& started_at,
                              const std::optional<size_t>& rss_before_bytes) {
       bool runtime_summary_printed = false;
@@ -312,9 +312,9 @@ int main(int argc, char** argv) {
         if (stderr_color) std::cerr << kColor.reset;
       }
 
-      if (result.export_sink.kind != xsql::QueryResult::ExportSink::Kind::None) {
+      if (result.export_sink.kind != markql::QueryResult::ExportSink::Kind::None) {
         std::string export_error;
-        if (!xsql::cli::export_result(result, export_error, colname_mode)) {
+        if (!markql::cli::export_result(result, export_error, colname_mode)) {
           throw std::runtime_error(export_error);
         }
         if (!result.export_sink.path.empty()) {
@@ -331,7 +331,7 @@ int main(int argc, char** argv) {
             std::cout << "Rows: 0" << std::endl;
             emit_runtime_summary();
           } else if (result.table_options.format ==
-                     xsql::QueryResult::TableOptions::Format::Sparse) {
+                     markql::QueryResult::TableOptions::Format::Sparse) {
             std::string json_out = build_table_json(result);
             if (display_full) {
               std::cout << colorize_json(json_out, color) << std::endl;
@@ -342,7 +342,7 @@ int main(int argc, char** argv) {
             size_t sparse_rows = 0;
             for (const auto& table : result.tables) {
               if (result.table_options.sparse_shape ==
-                  xsql::QueryResult::TableOptions::SparseShape::Long) {
+                  markql::QueryResult::TableOptions::SparseShape::Long) {
                 sparse_rows += table.rows.size();
               } else {
                 sparse_rows += table.sparse_wide_rows.size();
@@ -365,13 +365,13 @@ int main(int argc, char** argv) {
             emit_runtime_summary();
           }
         } else if (!result.to_list) {
-          xsql::render::DuckboxOptions options;
+          markql::render::DuckboxOptions options;
           options.max_width = 0;
           options.max_rows = 40;
           options.highlight = highlight;
           options.is_tty = color;
           options.colname_mode = colname_mode;
-          std::cout << xsql::render::render_duckbox(result, options) << std::endl;
+          std::cout << markql::render::render_duckbox(result, options) << std::endl;
           std::cout << "Rows: " << count_result_rows(result) << std::endl;
           emit_runtime_summary();
         } else {
@@ -391,7 +391,7 @@ int main(int argc, char** argv) {
               "CSV output mode does not support TO TABLE() results; use TO TABLE(EXPORT='file.csv') instead");
         }
         std::string error;
-        if (!xsql::cli::write_csv(std::cout, result, error, colname_mode)) {
+        if (!markql::cli::write_csv(std::cout, result, error, colname_mode)) {
           throw std::runtime_error(error);
         }
       } else {
@@ -415,77 +415,77 @@ int main(int argc, char** argv) {
       const auto started_at = std::chrono::steady_clock::now();
       const auto rss_before_bytes = read_process_rss_bytes();
       std::string statement = rewrite_from_path_if_needed(raw_query);
-      xsql::QueryResult result;
+      markql::QueryResult result;
       auto source = parse_query_source(statement);
-      if (source.has_value() && source->statement_kind != xsql::Query::Kind::Select) {
+      if (source.has_value() && source->statement_kind != markql::Query::Kind::Select) {
         std::string meta_error;
-        if (source->statement_kind == xsql::Query::Kind::ShowInput) {
+        if (source->statement_kind == markql::Query::Kind::ShowInput) {
           if (!build_show_input_result(input, result, meta_error)) {
             throw std::runtime_error(meta_error);
           }
-        } else if (source->statement_kind == xsql::Query::Kind::ShowInputs) {
+        } else if (source->statement_kind == markql::Query::Kind::ShowInputs) {
           if (!build_show_inputs_result({}, input, result, meta_error)) {
             throw std::runtime_error(meta_error);
           }
         } else {
-          result = xsql::execute_query_from_document("", statement);
+          result = markql::execute_query_from_document("", statement);
         }
       } else {
-        if (source.has_value() && source->kind == xsql::Source::Kind::Url) {
-          result = xsql::execute_query_from_url(source->value, statement, timeout_ms);
-        } else if (source.has_value() && source->kind == xsql::Source::Kind::Path) {
-          result = xsql::execute_query_from_file(source->value, statement);
-        } else if (source.has_value() && source->kind == xsql::Source::Kind::RawHtml) {
-          result = xsql::execute_query_from_document("", statement);
+        if (source.has_value() && source->kind == markql::Source::Kind::Url) {
+          result = markql::execute_query_from_url(source->value, statement, timeout_ms);
+        } else if (source.has_value() && source->kind == markql::Source::Kind::Path) {
+          result = markql::execute_query_from_file(source->value, statement);
+        } else if (source.has_value() && source->kind == markql::Source::Kind::RawHtml) {
+          result = markql::execute_query_from_document("", statement);
         } else if (source.has_value() && !source->needs_input) {
-          result = xsql::execute_query_from_document("", statement);
+          result = markql::execute_query_from_document("", statement);
         } else if (input.empty() || input == "document") {
           if (!stdin_cache.has_value()) {
             stdin_cache = read_stdin();
           }
-          result = xsql::execute_query_from_document(*stdin_cache, statement);
+          result = markql::execute_query_from_document(*stdin_cache, statement);
         } else {
           if (is_url(input)) {
-            result = xsql::execute_query_from_url(input, statement, timeout_ms);
+            result = markql::execute_query_from_url(input, statement, timeout_ms);
           } else {
-            result = xsql::execute_query_from_file(input, statement);
+            result = markql::execute_query_from_file(input, statement);
           }
         }
       }
       render_result(result, started_at, rss_before_bytes);
     };
 
-    if (!query_file.empty() && xsql::artifacts::path_has_artifact_magic(query_file)) {
-      xsql::artifacts::PreparedQueryArtifact artifact =
-          xsql::artifacts::read_prepared_query_artifact_file(query_file);
+    if (!query_file.empty() && markql::artifacts::path_has_artifact_magic(query_file)) {
+      markql::artifacts::PreparedQueryArtifact artifact =
+          markql::artifacts::read_prepared_query_artifact_file(query_file);
       const auto started_at = std::chrono::steady_clock::now();
       const auto rss_before_bytes = read_process_rss_bytes();
-      xsql::QueryResult result;
-      if (artifact.query.kind != xsql::Query::Kind::Select) {
-        result = xsql::artifacts::execute_prepared_query_on_html(artifact, "", "document");
-      } else if (artifact.query.source.kind == xsql::Source::Kind::Url ||
-                 artifact.query.source.kind == xsql::Source::Kind::Path ||
-                 artifact.query.source.kind == xsql::Source::Kind::RawHtml ||
-                 artifact.query.source.kind == xsql::Source::Kind::Fragments ||
-                 artifact.query.source.kind == xsql::Source::Kind::Parse) {
-        result = xsql::artifacts::execute_prepared_query_on_html(artifact, "", "document");
+      markql::QueryResult result;
+      if (artifact.query.kind != markql::Query::Kind::Select) {
+        result = markql::artifacts::execute_prepared_query_on_html(artifact, "", "document");
+      } else if (artifact.query.source.kind == markql::Source::Kind::Url ||
+                 artifact.query.source.kind == markql::Source::Kind::Path ||
+                 artifact.query.source.kind == markql::Source::Kind::RawHtml ||
+                 artifact.query.source.kind == markql::Source::Kind::Fragments ||
+                 artifact.query.source.kind == markql::Source::Kind::Parse) {
+        result = markql::artifacts::execute_prepared_query_on_html(artifact, "", "document");
       } else if (input.empty() || input == "document") {
         if (!stdin_cache.has_value()) stdin_cache = read_stdin();
-        result = xsql::artifacts::execute_prepared_query_on_html(artifact, *stdin_cache, "document");
+        result = markql::artifacts::execute_prepared_query_on_html(artifact, *stdin_cache, "document");
       } else if (is_url(input)) {
-        std::string html = xsql::xsql_internal::fetch_url(input, timeout_ms);
-        result = xsql::artifacts::execute_prepared_query_on_html(artifact, html, input);
-      } else if (xsql::artifacts::path_has_artifact_magic(input)) {
-        xsql::artifacts::ArtifactInfo info = xsql::artifacts::inspect_artifact_file(input);
-        if (info.header.kind != xsql::artifacts::ArtifactKind::DocumentSnapshot) {
+        std::string html = markql::markql_internal::fetch_url(input, timeout_ms);
+        result = markql::artifacts::execute_prepared_query_on_html(artifact, html, input);
+      } else if (markql::artifacts::path_has_artifact_magic(input)) {
+        markql::artifacts::ArtifactInfo info = markql::artifacts::inspect_artifact_file(input);
+        if (info.header.kind != markql::artifacts::ArtifactKind::DocumentSnapshot) {
           throw std::runtime_error("Prepared query artifacts (.mqp) cannot be used as input documents");
         }
-        xsql::artifacts::DocumentArtifact document =
-            xsql::artifacts::read_document_artifact_file(input);
-        result = xsql::artifacts::execute_prepared_query_on_document(artifact, document);
+        markql::artifacts::DocumentArtifact document =
+            markql::artifacts::read_document_artifact_file(input);
+        result = markql::artifacts::execute_prepared_query_on_document(artifact, document);
       } else {
-        std::string html = xsql::xsql_internal::read_file(input);
-        result = xsql::artifacts::execute_prepared_query_on_html(artifact, html, input);
+        std::string html = markql::markql_internal::read_file(input);
+        result = markql::artifacts::execute_prepared_query_on_html(artifact, html, input);
       }
       render_result(result, started_at, rss_before_bytes);
       return 0;
@@ -521,9 +521,9 @@ int main(int argc, char** argv) {
       return 2;
     }
     if (!query.empty()) {
-      std::vector<xsql::Diagnostic> diagnostics = xsql::diagnose_query_failure(query, ex.what());
+      std::vector<markql::Diagnostic> diagnostics = markql::diagnose_query_failure(query, ex.what());
       if (!diagnostics.empty()) {
-        std::cerr << xsql::render_diagnostics_text(diagnostics, error_render_options) << std::endl;
+        std::cerr << markql::render_diagnostics_text(diagnostics, error_render_options) << std::endl;
         return 1;
       }
     }

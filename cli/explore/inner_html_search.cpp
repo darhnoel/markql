@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cctype>
 
-namespace xsql::cli {
+namespace markql::cli {
 
 namespace {
 
@@ -196,7 +196,7 @@ int compare_ranked_match(const InnerHtmlSearchMatch& left, const InnerHtmlSearch
   return 0;
 }
 
-std::vector<InnerHtmlSearchMatch> search_inner_html_impl(const xsql::HtmlDocument& doc,
+std::vector<InnerHtmlSearchMatch> search_inner_html_impl(const markql::HtmlDocument& doc,
                                                          const std::string& query,
                                                          size_t max_results,
                                                          bool include_snippet,
@@ -253,7 +253,7 @@ std::vector<InnerHtmlSearchMatch> search_inner_html_impl(const xsql::HtmlDocumen
   matches.reserve(std::min(max_results, estimated_count));
   size_t best_idx = 0;
 
-  auto consume_node = [&](const xsql::HtmlNode& node) {
+  auto consume_node = [&](const markql::HtmlNode& node) {
     ScopeCandidate best_scope{};
     bool has_scope_match = false;
 
@@ -362,7 +362,7 @@ std::string make_inner_html_snippet(std::string_view inner_html,
   return build_match_snippet(inner_html, match_position, query_len, max_chars);
 }
 
-std::vector<InnerHtmlSearchMatch> fuzzy_search_inner_html(const xsql::HtmlDocument& doc,
+std::vector<InnerHtmlSearchMatch> fuzzy_search_inner_html(const markql::HtmlDocument& doc,
                                                           const std::string& query,
                                                           size_t max_results,
                                                           bool include_snippet,
@@ -377,7 +377,7 @@ std::vector<InnerHtmlSearchMatch> fuzzy_search_inner_html(const xsql::HtmlDocume
                                 InnerHtmlSearchMode::Fuzzy);
 }
 
-std::vector<InnerHtmlSearchMatch> exact_search_inner_html(const xsql::HtmlDocument& doc,
+std::vector<InnerHtmlSearchMatch> exact_search_inner_html(const markql::HtmlDocument& doc,
                                                           const std::string& query,
                                                           size_t max_results,
                                                           bool include_snippet,
@@ -392,4 +392,4 @@ std::vector<InnerHtmlSearchMatch> exact_search_inner_html(const xsql::HtmlDocume
                                 InnerHtmlSearchMode::Exact);
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

@@ -2,7 +2,7 @@
 
 #include <cctype>
 
-namespace xsql {
+namespace markql {
 
 Lexer::Lexer(const std::string& input) : input_(input) {}
 
@@ -266,4 +266,4 @@ std::string Lexer::to_upper(const std::string& s) {
   return out;
 }
 
-}  // namespace xsql
+}  // namespace markql

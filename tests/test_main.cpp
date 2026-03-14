@@ -42,7 +42,7 @@ void register_explore_search_tests(std::vector<TestCase>& tests);
 void register_markql_suggestor_tests(std::vector<TestCase>& tests);
 void register_table_option_tests(std::vector<TestCase>& tests);
 void register_diagnostic_tests(std::vector<TestCase>& tests);
-#ifdef XSQL_ENABLE_KHMER_NUMBER
+#ifdef MARKQL_ENABLE_KHMER_NUMBER
 void register_khmer_number_tests(std::vector<TestCase>& tests);
 #endif
 
@@ -50,7 +50,7 @@ namespace {
 
 std::unordered_set<std::string> parse_skip_list_from_env() {
   std::unordered_set<std::string> out;
-  const char* raw = std::getenv("XSQL_TEST_SKIP");
+  const char* raw = std::getenv("MARKQL_TEST_SKIP");
   if (!raw || !*raw) return out;
   std::istringstream iss(raw);
   std::string token;
@@ -103,7 +103,7 @@ int main(int argc, char** argv) {
   register_markql_suggestor_tests(tests);
   register_table_option_tests(tests);
   register_diagnostic_tests(tests);
-#ifdef XSQL_ENABLE_KHMER_NUMBER
+#ifdef MARKQL_ENABLE_KHMER_NUMBER
   register_khmer_number_tests(tests);
 #endif
 

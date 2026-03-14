@@ -1,4 +1,4 @@
-#include "xsql_internal.h"
+#include "markql_internal.h"
 
 #include <cctype>
 #include <cstdio>
@@ -6,11 +6,11 @@
 #include <sstream>
 #include <stdexcept>
 
-#ifdef XSQL_USE_CURL
+#ifdef MARKQL_USE_CURL
 #include <curl/curl.h>
 #endif
 
-namespace xsql::xsql_internal {
+namespace markql::markql_internal {
 
 /// Loads file contents for core query execution.
 /// MUST throw on IO errors and MUST not perform network access.
@@ -25,7 +25,7 @@ std::string read_file(const std::string& path) {
   return buffer.str();
 }
 
-#ifdef XSQL_USE_CURL
+#ifdef MARKQL_USE_CURL
 namespace {
 
 void ensure_curl_global_init() {
@@ -157,7 +157,7 @@ void validate_content_type(CURL* curl) {
 /// MUST honor timeout_ms and MUST throw on curl failures.
 /// Inputs are URL/timeout; outputs are contents with network side effects.
 std::string fetch_url(const std::string& url, int timeout_ms) {
-#ifdef XSQL_USE_CURL
+#ifdef MARKQL_USE_CURL
   ensure_curl_global_init();
   CURL* curl = curl_easy_init();
   if (!curl) {
@@ -196,4 +196,4 @@ std::string fetch_url(const std::string& url, int timeout_ms) {
 #endif
 }
 
-}  // namespace xsql::xsql_internal
+}  // namespace markql::markql_internal

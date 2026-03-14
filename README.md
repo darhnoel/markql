@@ -31,7 +31,7 @@ MarkQL is a **SQL-style query engine for HTML** that lets you **select precisely
 Prerequisites:
 - CMake 3.16+
 - A C++20 compiler
-- Boost (multiprecision); set `-DXSQL_ENABLE_KHMER_NUMBER=OFF` to skip Boost
+- Boost (multiprecision); set `-DMARKQL_ENABLE_KHMER_NUMBER=OFF` to skip Boost
 - Optional dependencies: `libxml2`, `curl`, `nlohmann_json`, `arrow/parquet`
 
 Ubuntu/Debian/WSL (minimal packages):
@@ -85,14 +85,14 @@ Minimal build when optional dependencies are unavailable:
 
 ```bash
 cmake -S . -B build \
-  -DXSQL_WITH_LIBXML2=OFF \
-  -DXSQL_WITH_CURL=OFF \
-  -DXSQL_WITH_ARROW=OFF \
-  -DXSQL_WITH_NLOHMANN_JSON=OFF
+  -DMARKQL_WITH_LIBXML2=OFF \
+  -DMARKQL_WITH_CURL=OFF \
+  -DMARKQL_WITH_ARROW=OFF \
+  -DMARKQL_WITH_NLOHMANN_JSON=OFF
 cmake --build build
 ```
 
-To build without Boost, add `-DXSQL_ENABLE_KHMER_NUMBER=OFF`.
+To build without Boost, add `-DMARKQL_ENABLE_KHMER_NUMBER=OFF`.
 
 Run one query:
 
@@ -109,11 +109,11 @@ Run interactive REPL:
 ## CLI Notes
 
 - Primary CLI binary is `./build/markql`.
-- Legacy compatibility binary `./build/xsql` is still generated.
+- Legacy compatibility binary `./build/markql` is still generated.
 - `doc` and `document` are both valid sources in `FROM`.
 - If `--input` is omitted, the CLI reads HTML from `stdin`.
-- URL sources (`FROM 'https://...'`) require `XSQL_WITH_CURL=ON`.
-- `TO PARQUET(...)` requires `XSQL_WITH_ARROW=ON`.
+- URL sources (`FROM 'https://...'`) require `MARKQL_WITH_CURL=ON`.
+- `TO PARQUET(...)` requires `MARKQL_WITH_ARROW=ON`.
 - `INNER_HTML(...)` returns minified HTML by default. Use `RAW_INNER_HTML(...)` for unmodified raw output.
 - `TO TABLE(...)` supports explicit trimming/sparse options: `TRIM_EMPTY_ROWS`, `TRIM_EMPTY_COLS`, `EMPTY_IS`, `STOP_AFTER_EMPTY_ROWS`, `FORMAT`, `SPARSE_SHAPE`, and `HEADER_NORMALIZE`.
 
@@ -122,7 +122,7 @@ Run interactive REPL:
 C++ tests:
 
 ```bash
-cmake --build build --target xsql_tests
+cmake --build build --target markql_tests
 ctest --test-dir build --output-on-failure
 ```
 

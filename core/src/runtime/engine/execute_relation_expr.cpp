@@ -1,4 +1,4 @@
-#include "xsql/xsql.h"
+#include "markql/markql.h"
 
 #include <chrono>
 #include <cctype>
@@ -15,7 +15,7 @@
 #include "relation_runtime_internal.h"
 #include "engine_execution_internal.h"
 
-namespace xsql {
+namespace markql {
 
 namespace {
 
@@ -523,4 +523,4 @@ std::optional<std::string> relation_field_by_name(const RelationRow& row,
   return found;
 }
 
-}  // namespace xsql
+}  // namespace markql

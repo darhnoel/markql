@@ -11,13 +11,13 @@
 #include "plugin_command.h"
 #include "reload_config_command.h"
 #include "set_command.h"
-#ifdef XSQL_ENABLE_KHMER_NUMBER
+#ifdef MARKQL_ENABLE_KHMER_NUMBER
 #include "khmer_number_command.h"
 #endif
 #include "summarize_content_command.h"
 #include "summarize_command.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 void CommandRegistry::add(CommandHandler handler) {
   handlers_.push_back(std::move(handler));
@@ -43,7 +43,7 @@ void register_default_commands(CommandRegistry& registry) {
   registry.add(make_reload_config_command());
   registry.add(make_plugin_command());
   registry.add(make_explore_command());
-#ifdef XSQL_ENABLE_KHMER_NUMBER
+#ifdef MARKQL_ENABLE_KHMER_NUMBER
   registry.add(make_khmer_number_command());
 #endif
   registry.add(make_summarize_content_command());
@@ -51,4 +51,4 @@ void register_default_commands(CommandRegistry& registry) {
   registry.add(make_load_command());
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

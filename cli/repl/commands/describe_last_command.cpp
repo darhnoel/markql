@@ -10,7 +10,7 @@
 #include "../../render/duckbox_renderer.h"
 #include "../../ui/color.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 namespace {
 
@@ -29,22 +29,22 @@ CommandHandler make_describe_last_command() {
     if (lowered != "describe last") {
       return false;
     }
-    xsql::QueryResult result;
+    markql::QueryResult result;
     result.columns = {"raw_name", "output_name"};
     for (const auto& item : ctx.last_schema_map) {
-      xsql::QueryResultRow row;
+      markql::QueryResultRow row;
       row.attributes["raw_name"] = item.raw_name;
       row.attributes["output_name"] = item.output_name;
       result.rows.push_back(std::move(row));
     }
     if (ctx.config.output_mode == "duckbox") {
-      xsql::render::DuckboxOptions options;
+      markql::render::DuckboxOptions options;
       options.max_width = 0;
       options.max_rows = ctx.max_rows;
       options.highlight = ctx.config.highlight;
       options.is_tty = ctx.config.color;
       options.colname_mode = ctx.config.colname_mode;
-      std::cout << xsql::render::render_duckbox(result, options) << std::endl;
+      std::cout << markql::render::render_duckbox(result, options) << std::endl;
       std::cout << "Rows: " << count_result_rows(result) << std::endl;
     } else if (ctx.config.output_mode == "csv") {
       std::ostringstream csv_out;
@@ -75,4 +75,4 @@ CommandHandler make_describe_last_command() {
   };
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

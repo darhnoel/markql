@@ -5,7 +5,7 @@
 
 #include "sql_keywords.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 AutoCompleter::AutoCompleter() {
   keywords_ = markql_completion_keywords();
@@ -16,7 +16,7 @@ AutoCompleter::AutoCompleter() {
       ".plugin", ".quit", ".q",
       ":help", ":load", ":lint", ":explore", ":quit", ":exit"
   };
-#ifdef XSQL_ENABLE_KHMER_NUMBER
+#ifdef MARKQL_ENABLE_KHMER_NUMBER
   commands_.push_back(".number_to_khmer");
   commands_.push_back(".khmer_to_number");
 #endif
@@ -129,4 +129,4 @@ std::string AutoCompleter::apply_case(const std::string& pattern, const std::str
   return value;
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

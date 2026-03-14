@@ -5,10 +5,10 @@
 #include <vector>
 
 #include "lang/ast.h"
-#include "xsql/column_names.h"
-#include "xsql/xsql.h"
+#include "markql/column_names.h"
+#include "markql/markql.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 /// Holds truncated output and whether truncation occurred for user messaging.
 /// MUST keep output intact when truncated is false and MUST be consistent with truncation logic.
@@ -70,12 +70,12 @@ std::string sanitize_pasted_line(std::string line);
 /// MUST mirror parser semantics and MUST treat document as the default source.
 /// Inputs are parsed values; outputs are the kind/value pair with no side effects.
 struct QuerySource {
-  xsql::Source::Kind kind = xsql::Source::Kind::Document;
+  markql::Source::Kind kind = markql::Source::Kind::Document;
   std::string value;
   std::optional<std::string> alias;
   std::optional<std::string> source_token;
   bool needs_input = true;
-  xsql::Query::Kind statement_kind = xsql::Query::Kind::Select;
+  markql::Query::Kind statement_kind = markql::Query::Kind::Select;
 };
 
 /// Summarizes lexical inspection results for comment-only/error handling.
@@ -106,17 +106,17 @@ std::string escape_control_for_terminal(const std::string& text);
 /// Serializes full query rows into JSON objects for CLI output modes.
 /// MUST preserve column ordering semantics and MUST escape content correctly.
 /// Inputs are QueryResult rows; outputs are JSON text with no side effects.
-std::string build_json(const xsql::QueryResult& result,
-                       xsql::ColumnNameMode colname_mode = xsql::ColumnNameMode::Normalize);
+std::string build_json(const markql::QueryResult& result,
+                       markql::ColumnNameMode colname_mode = markql::ColumnNameMode::Normalize);
 /// Serializes a single-column result into a JSON list.
 /// MUST enforce single-column output and MUST represent NULLs explicitly.
 /// Inputs are QueryResult rows; outputs are JSON list text with no side effects.
-std::string build_json_list(const xsql::QueryResult& result,
-                            xsql::ColumnNameMode colname_mode = xsql::ColumnNameMode::Normalize);
+std::string build_json_list(const markql::QueryResult& result,
+                            markql::ColumnNameMode colname_mode = markql::ColumnNameMode::Normalize);
 /// Serializes table extraction output into JSON arrays.
 /// MUST preserve row ordering and MUST keep cells as string values.
 /// Inputs are table results; outputs are JSON text with no side effects.
-std::string build_table_json(const xsql::QueryResult& result);
+std::string build_table_json(const markql::QueryResult& result);
 /// Serializes tag-count summaries into JSON for non-duckbox output modes.
 /// MUST preserve deterministic ordering and MUST escape tag names.
 /// Inputs are summary pairs; outputs are JSON text with no side effects.
@@ -125,35 +125,35 @@ std::string build_summary_json(const std::vector<std::pair<std::string, size_t>>
 /// Collects distinct source URIs in the order first seen.
 /// MUST preserve encounter order and MUST ignore empty rows safely.
 /// Inputs are QueryResult rows; outputs are source lists with no side effects.
-std::vector<std::string> collect_source_uris(const xsql::QueryResult& result);
+std::vector<std::string> collect_source_uris(const markql::QueryResult& result);
 /// Applies the default source_uri visibility policy to result columns.
 /// MUST respect explicit projections and EXCLUDE source_uri requests.
 /// Inputs are results and source lists; outputs are mutated columns only.
-void apply_source_uri_policy(xsql::QueryResult& result, const std::vector<std::string>& sources);
+void apply_source_uri_policy(markql::QueryResult& result, const std::vector<std::string>& sources);
 /// Counts data rows in an extracted HTML table.
 /// MUST exclude header rows when has_header is true.
 /// Inputs are table rows and header flag; outputs are row counts.
-size_t count_table_rows(const xsql::QueryResult::TableResult& table, bool has_header);
+size_t count_table_rows(const markql::QueryResult::TableResult& table, bool has_header);
 /// Counts rows in a regular query result (non-table outputs).
 /// MUST reflect the full result set, not truncation.
 /// Inputs are QueryResult rows; outputs are row counts.
-size_t count_result_rows(const xsql::QueryResult& result);
+size_t count_result_rows(const markql::QueryResult& result);
 /// Builds a SHOW INPUT result or reports a missing-input error.
 /// MUST return false when no active source is available.
 bool build_show_input_result(const std::string& source_uri,
-                             xsql::QueryResult& out,
+                             markql::QueryResult& out,
                              std::string& error);
 /// Builds a SHOW INPUTS result from the last sources or active source.
 /// MUST return false when no sources are available.
 bool build_show_inputs_result(const std::vector<std::string>& sources,
                               const std::string& fallback_source,
-                              xsql::QueryResult& out,
+                              markql::QueryResult& out,
                               std::string& error);
 
 /// Renders an extracted HTML table into duckbox format for terminal display.
 /// MUST honor max_rows and MUST avoid color when not in a TTY.
 /// Inputs are table data and render options; outputs are formatted text.
-std::string render_table_duckbox(const xsql::QueryResult::TableResult& table,
+std::string render_table_duckbox(const markql::QueryResult::TableResult& table,
                                  bool has_header,
                                  bool highlight,
                                  bool is_tty,
@@ -162,6 +162,6 @@ std::string render_table_duckbox(const xsql::QueryResult::TableResult& table,
 /// Maps export sink kinds to user-facing labels for CLI messages.
 /// MUST remain stable for scripts that parse output and MUST handle None.
 /// Inputs are export kind values; outputs are labels with no side effects.
-std::string export_kind_label(xsql::QueryResult::ExportSink::Kind kind);
+std::string export_kind_label(markql::QueryResult::ExportSink::Kind kind);
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

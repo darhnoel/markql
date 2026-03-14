@@ -1,28 +1,28 @@
 cmake_minimum_required(VERSION 3.16)
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/python/xsql/_meta.py" XSQL_META_PY)
-string(REGEX MATCH "__version__ = \"([0-9]+\\.[0-9]+\\.[0-9]+)\"" XSQL_VERSION_MATCH "${XSQL_META_PY}")
-if (XSQL_VERSION_MATCH)
-  set(XSQL_PROJECT_VERSION "${CMAKE_MATCH_1}")
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/python/markql/_meta.py" MARKQL_META_PY)
+string(REGEX MATCH "__version__ = \"([0-9]+\\.[0-9]+\\.[0-9]+)\"" MARKQL_VERSION_MATCH "${MARKQL_META_PY}")
+if (MARKQL_VERSION_MATCH)
+  set(MARKQL_PROJECT_VERSION "${CMAKE_MATCH_1}")
 else()
-  set(XSQL_PROJECT_VERSION "0.0.0")
+  set(MARKQL_PROJECT_VERSION "0.0.0")
 endif()
-project(markql VERSION ${XSQL_PROJECT_VERSION} LANGUAGES CXX)
+project(markql VERSION ${MARKQL_PROJECT_VERSION} LANGUAGES CXX)
 
-option(XSQL_BUILD_CLI "Build the MarkQL CLI" ON)
-option(XSQL_BUILD_TESTS "Build tests" ON)
-option(XSQL_BUILD_PYTHON "Build the Python module" OFF)
-option(XSQL_WITH_LIBXML2 "Use libxml2 for HTML parsing" ON)
-option(XSQL_WITH_NLOHMANN_JSON "Use nlohmann/json for CLI output" ON)
-option(XSQL_WITH_CURL "Use libcurl for URL fetching" ON)
-option(XSQL_WITH_ARROW "Enable Apache Arrow for Parquet export" ON)
-option(XSQL_WITH_FLATBUFFERS "Use FlatBuffers for DOCN artifact payloads" ON)
-option(XSQL_ENABLE_KHMER_NUMBER "Enable built-in Khmer number module" ON)
+option(MARKQL_BUILD_CLI "Build the MarkQL CLI" ON)
+option(MARKQL_BUILD_TESTS "Build tests" ON)
+option(MARKQL_BUILD_PYTHON "Build the Python module" OFF)
+option(MARKQL_WITH_LIBXML2 "Use libxml2 for HTML parsing" ON)
+option(MARKQL_WITH_NLOHMANN_JSON "Use nlohmann/json for CLI output" ON)
+option(MARKQL_WITH_CURL "Use libcurl for URL fetching" ON)
+option(MARKQL_WITH_ARROW "Enable Apache Arrow for Parquet export" ON)
+option(MARKQL_WITH_FLATBUFFERS "Use FlatBuffers for DOCN artifact payloads" ON)
+option(MARKQL_ENABLE_KHMER_NUMBER "Enable built-in Khmer number module" ON)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_library(xsql_core
+add_library(markql_core
   core/src/version.cpp
   core/src/artifacts/artifacts.cpp
   core/src/artifacts/artifact_internal.cpp
@@ -69,136 +69,136 @@ add_library(xsql_core
   core/src/runtime/engine/tfidf.cpp
 )
 
-target_include_directories(xsql_core
+target_include_directories(markql_core
   PUBLIC
     core/include
   PRIVATE
     core/src
 )
 
-target_compile_features(xsql_core PUBLIC cxx_std_20)
+target_compile_features(markql_core PUBLIC cxx_std_20)
 execute_process(
   COMMAND git rev-parse --short=12 HEAD
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-  OUTPUT_VARIABLE XSQL_GIT_COMMIT
+  OUTPUT_VARIABLE MARKQL_GIT_COMMIT
   OUTPUT_STRIP_TRAILING_WHITESPACE
   ERROR_QUIET
 )
-if (NOT XSQL_GIT_COMMIT)
-  set(XSQL_GIT_COMMIT "unknown")
+if (NOT MARKQL_GIT_COMMIT)
+  set(MARKQL_GIT_COMMIT "unknown")
 endif()
 
 execute_process(
   COMMAND git diff --quiet --ignore-submodules HEAD --
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-  RESULT_VARIABLE XSQL_GIT_DIRTY_RESULT
+  RESULT_VARIABLE MARKQL_GIT_DIRTY_RESULT
   ERROR_QUIET
 )
-set(XSQL_GIT_DIRTY 0)
-if (NOT XSQL_GIT_DIRTY_RESULT EQUAL 0)
-  set(XSQL_GIT_DIRTY 1)
+set(MARKQL_GIT_DIRTY 0)
+if (NOT MARKQL_GIT_DIRTY_RESULT EQUAL 0)
+  set(MARKQL_GIT_DIRTY 1)
 endif()
 
-target_compile_definitions(xsql_core
+target_compile_definitions(markql_core
   PUBLIC
-    XSQL_VERSION="${PROJECT_VERSION}"
-    XSQL_GIT_COMMIT="${XSQL_GIT_COMMIT}"
-    XSQL_GIT_DIRTY=${XSQL_GIT_DIRTY}
+    MARKQL_VERSION="${PROJECT_VERSION}"
+    MARKQL_GIT_COMMIT="${MARKQL_GIT_COMMIT}"
+    MARKQL_GIT_DIRTY=${MARKQL_GIT_DIRTY}
 )
 
-if (XSQL_WITH_FLATBUFFERS)
+if (MARKQL_WITH_FLATBUFFERS)
   find_package(flatbuffers CONFIG QUIET)
   if (NOT flatbuffers_FOUND)
-    message(FATAL_ERROR "flatbuffers not found. Configure with the repo vcpkg manifest/build path or set XSQL_WITH_FLATBUFFERS=OFF.")
+    message(FATAL_ERROR "flatbuffers not found. Configure with the repo vcpkg manifest/build path or set MARKQL_WITH_FLATBUFFERS=OFF.")
   endif()
-  set(XSQL_DOCN_SCHEMA "${CMAKE_CURRENT_SOURCE_DIR}/core/src/artifacts/schema/document.fbs")
-  set(XSQL_QAST_SCHEMA "${CMAKE_CURRENT_SOURCE_DIR}/core/src/artifacts/schema/prepared_query_payload.fbs")
+  set(MARKQL_DOCN_SCHEMA "${CMAKE_CURRENT_SOURCE_DIR}/core/src/artifacts/schema/document.fbs")
+  set(MARKQL_QAST_SCHEMA "${CMAKE_CURRENT_SOURCE_DIR}/core/src/artifacts/schema/prepared_query_payload.fbs")
   flatbuffers_generate_headers(
-    TARGET xsql_artifact_docn_flatbuffers
-    SCHEMAS ${XSQL_DOCN_SCHEMA}
+    TARGET markql_artifact_docn_flatbuffers
+    SCHEMAS ${MARKQL_DOCN_SCHEMA}
     INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/core/src/artifacts/schema"
   )
   flatbuffers_generate_headers(
-    TARGET xsql_artifact_qast_flatbuffers
-    SCHEMAS ${XSQL_QAST_SCHEMA}
+    TARGET markql_artifact_qast_flatbuffers
+    SCHEMAS ${MARKQL_QAST_SCHEMA}
     INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/core/src/artifacts/schema"
   )
-  add_dependencies(xsql_core GENERATE_xsql_artifact_docn_flatbuffers)
-  add_dependencies(xsql_core GENERATE_xsql_artifact_qast_flatbuffers)
-  target_link_libraries(xsql_core PUBLIC flatbuffers::flatbuffers
-                                         xsql_artifact_docn_flatbuffers
-                                         xsql_artifact_qast_flatbuffers)
+  add_dependencies(markql_core GENERATE_markql_artifact_docn_flatbuffers)
+  add_dependencies(markql_core GENERATE_markql_artifact_qast_flatbuffers)
+  target_link_libraries(markql_core PUBLIC flatbuffers::flatbuffers
+                                         markql_artifact_docn_flatbuffers
+                                         markql_artifact_qast_flatbuffers)
 endif()
 
-if (XSQL_ENABLE_KHMER_NUMBER)
-  target_sources(xsql_core PRIVATE core/src/khmer_number.cpp)
-  target_compile_definitions(xsql_core PUBLIC XSQL_ENABLE_KHMER_NUMBER)
+if (MARKQL_ENABLE_KHMER_NUMBER)
+  target_sources(markql_core PRIVATE core/src/khmer_number.cpp)
+  target_compile_definitions(markql_core PUBLIC MARKQL_ENABLE_KHMER_NUMBER)
 endif()
 
-if (XSQL_WITH_LIBXML2)
+if (MARKQL_WITH_LIBXML2)
   find_package(LibXml2)
   if (LibXml2_FOUND)
-    target_include_directories(xsql_core PRIVATE ${LIBXML2_INCLUDE_DIR})
-    target_link_libraries(xsql_core PRIVATE ${LIBXML2_LIBRARIES})
-    target_compile_definitions(xsql_core PRIVATE XSQL_USE_LIBXML2)
+    target_include_directories(markql_core PRIVATE ${LIBXML2_INCLUDE_DIR})
+    target_link_libraries(markql_core PRIVATE ${LIBXML2_LIBRARIES})
+    target_compile_definitions(markql_core PRIVATE MARKQL_USE_LIBXML2)
   else()
     message(WARNING "LibXml2 not found; falling back to naive HTML parser.")
   endif()
 endif()
 
-if (XSQL_WITH_CURL)
+if (MARKQL_WITH_CURL)
   find_package(CURL CONFIG QUIET)
   if (TARGET CURL::libcurl)
-    target_link_libraries(xsql_core PRIVATE CURL::libcurl)
-    target_compile_definitions(xsql_core PUBLIC XSQL_USE_CURL)
+    target_link_libraries(markql_core PRIVATE CURL::libcurl)
+    target_compile_definitions(markql_core PUBLIC MARKQL_USE_CURL)
   else()
     find_package(CURL)
     if (CURL_FOUND)
-      target_include_directories(xsql_core PRIVATE ${CURL_INCLUDE_DIRS})
-      target_link_libraries(xsql_core PRIVATE ${CURL_LIBRARIES})
-      target_compile_definitions(xsql_core PUBLIC XSQL_USE_CURL)
+      target_include_directories(markql_core PRIVATE ${CURL_INCLUDE_DIRS})
+      target_link_libraries(markql_core PRIVATE ${CURL_LIBRARIES})
+      target_compile_definitions(markql_core PUBLIC MARKQL_USE_CURL)
     else()
       message(WARNING "libcurl not found; URL fetching disabled.")
     endif()
   endif()
 endif()
 
-if (XSQL_WITH_ARROW)
+if (MARKQL_WITH_ARROW)
   find_package(Arrow CONFIG QUIET)
   find_package(Parquet CONFIG QUIET)
   if (TARGET Arrow::arrow_shared)
-    set(XSQL_ARROW_TARGET Arrow::arrow_shared)
+    set(MARKQL_ARROW_TARGET Arrow::arrow_shared)
   elseif (TARGET Arrow::arrow_static)
-    set(XSQL_ARROW_TARGET Arrow::arrow_static)
+    set(MARKQL_ARROW_TARGET Arrow::arrow_static)
   elseif (TARGET Arrow::arrow)
-    set(XSQL_ARROW_TARGET Arrow::arrow)
+    set(MARKQL_ARROW_TARGET Arrow::arrow)
   elseif (TARGET arrow_shared)
-    set(XSQL_ARROW_TARGET arrow_shared)
+    set(MARKQL_ARROW_TARGET arrow_shared)
   elseif (TARGET arrow_static)
-    set(XSQL_ARROW_TARGET arrow_static)
+    set(MARKQL_ARROW_TARGET arrow_static)
   elseif (TARGET arrow)
-    set(XSQL_ARROW_TARGET arrow)
+    set(MARKQL_ARROW_TARGET arrow)
   endif()
   if (TARGET Parquet::parquet_shared)
-    set(XSQL_PARQUET_TARGET Parquet::parquet_shared)
+    set(MARKQL_PARQUET_TARGET Parquet::parquet_shared)
   elseif (TARGET Parquet::parquet_static)
-    set(XSQL_PARQUET_TARGET Parquet::parquet_static)
+    set(MARKQL_PARQUET_TARGET Parquet::parquet_static)
   elseif (TARGET Parquet::parquet)
-    set(XSQL_PARQUET_TARGET Parquet::parquet)
+    set(MARKQL_PARQUET_TARGET Parquet::parquet)
   elseif (TARGET parquet_shared)
-    set(XSQL_PARQUET_TARGET parquet_shared)
+    set(MARKQL_PARQUET_TARGET parquet_shared)
   elseif (TARGET parquet_static)
-    set(XSQL_PARQUET_TARGET parquet_static)
+    set(MARKQL_PARQUET_TARGET parquet_static)
   elseif (TARGET parquet)
-    set(XSQL_PARQUET_TARGET parquet)
+    set(MARKQL_PARQUET_TARGET parquet)
   endif()
-  if (NOT XSQL_ARROW_TARGET OR NOT XSQL_PARQUET_TARGET)
+  if (NOT MARKQL_ARROW_TARGET OR NOT MARKQL_PARQUET_TARGET)
     message(WARNING "Arrow/Parquet not found; TO PARQUET disabled.")
   endif()
 endif()
 
-if (XSQL_BUILD_CLI)
-  add_executable(xsql
+if (MARKQL_BUILD_CLI)
+  add_executable(markql
     cli/main.cpp
     cli/cli_args.cpp
     cli/cli_utils.cpp
@@ -238,41 +238,41 @@ if (XSQL_BUILD_CLI)
     cli/export/export_sinks.cpp
     cli/render/duckbox_renderer.cpp
   )
-  if (XSQL_ENABLE_KHMER_NUMBER)
-    target_sources(xsql PRIVATE cli/repl/commands/khmer_number_command.cpp)
+  if (MARKQL_ENABLE_KHMER_NUMBER)
+    target_sources(markql PRIVATE cli/repl/commands/khmer_number_command.cpp)
   endif()
-  target_link_libraries(xsql PRIVATE xsql_core)
-  target_include_directories(xsql PRIVATE core/src core/include cli)
+  target_link_libraries(markql PRIVATE markql_core)
+  target_include_directories(markql PRIVATE core/src core/include cli)
   if (UNIX AND NOT APPLE)
-    target_link_libraries(xsql PRIVATE dl)
+    target_link_libraries(markql PRIVATE dl)
   endif()
-  if (XSQL_WITH_NLOHMANN_JSON)
+  if (MARKQL_WITH_NLOHMANN_JSON)
     find_package(nlohmann_json CONFIG)
     if (nlohmann_json_FOUND)
-      target_link_libraries(xsql PRIVATE nlohmann_json::nlohmann_json)
-      target_compile_definitions(xsql PRIVATE XSQL_USE_NLOHMANN_JSON)
+      target_link_libraries(markql PRIVATE nlohmann_json::nlohmann_json)
+      target_compile_definitions(markql PRIVATE MARKQL_USE_NLOHMANN_JSON)
     else()
       message(WARNING "nlohmann_json not found; using built-in JSON output.")
     endif()
   endif()
-  if (XSQL_ARROW_TARGET AND XSQL_PARQUET_TARGET)
-    target_link_libraries(xsql PRIVATE ${XSQL_ARROW_TARGET} ${XSQL_PARQUET_TARGET})
-    target_compile_definitions(xsql PRIVATE XSQL_USE_ARROW)
+  if (MARKQL_ARROW_TARGET AND MARKQL_PARQUET_TARGET)
+    target_link_libraries(markql PRIVATE ${MARKQL_ARROW_TARGET} ${MARKQL_PARQUET_TARGET})
+    target_compile_definitions(markql PRIVATE MARKQL_USE_ARROW)
   endif()
-  set_target_properties(xsql PROPERTIES OUTPUT_NAME markql)
+  set_target_properties(markql PROPERTIES OUTPUT_NAME markql)
   add_custom_command(
-    TARGET xsql
+    TARGET markql
     POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "$<TARGET_FILE:xsql>"
-            "$<TARGET_FILE_DIR:xsql>/xsql${CMAKE_EXECUTABLE_SUFFIX}"
-    COMMENT "Creating compatibility binary: xsql -> markql"
+            "$<TARGET_FILE:markql>"
+            "$<TARGET_FILE_DIR:markql>/markql${CMAKE_EXECUTABLE_SUFFIX}"
+    COMMENT "Creating compatibility binary: markql -> markql"
   )
 endif()
 
-if (XSQL_BUILD_TESTS)
+if (MARKQL_BUILD_TESTS)
   enable_testing()
-  add_executable(xsql_tests
+  add_executable(markql_tests
     tests/test_main.cpp
     tests/test_harness.cpp
     tests/test_utils.cpp
@@ -347,55 +347,55 @@ if (XSQL_BUILD_TESTS)
     cli/export/export_sinks.cpp
     cli/render/duckbox_renderer.cpp
   )
-  if (XSQL_ENABLE_KHMER_NUMBER)
-    target_sources(xsql_tests PRIVATE
+  if (MARKQL_ENABLE_KHMER_NUMBER)
+    target_sources(markql_tests PRIVATE
       cli/repl/commands/khmer_number_command.cpp
       tests/test_khmer_number.cpp
     )
   endif()
-  target_link_libraries(xsql_tests PRIVATE xsql_core)
-  target_include_directories(xsql_tests PRIVATE cli core/src core/include tests)
-  if (XSQL_WITH_FLATBUFFERS)
-    target_link_libraries(xsql_tests PRIVATE xsql_artifact_docn_flatbuffers
-                                             xsql_artifact_qast_flatbuffers)
+  target_link_libraries(markql_tests PRIVATE markql_core)
+  target_include_directories(markql_tests PRIVATE cli core/src core/include tests)
+  if (MARKQL_WITH_FLATBUFFERS)
+    target_link_libraries(markql_tests PRIVATE markql_artifact_docn_flatbuffers
+                                             markql_artifact_qast_flatbuffers)
   endif()
-  if (XSQL_ARROW_TARGET AND XSQL_PARQUET_TARGET)
-    target_link_libraries(xsql_tests PRIVATE ${XSQL_ARROW_TARGET} ${XSQL_PARQUET_TARGET})
-    target_compile_definitions(xsql_tests PRIVATE XSQL_USE_ARROW)
+  if (MARKQL_ARROW_TARGET AND MARKQL_PARQUET_TARGET)
+    target_link_libraries(markql_tests PRIVATE ${MARKQL_ARROW_TARGET} ${MARKQL_PARQUET_TARGET})
+    target_compile_definitions(markql_tests PRIVATE MARKQL_USE_ARROW)
   endif()
-  add_executable(xsql_bench_inner_html tests/bench_inner_html.cpp)
-  target_link_libraries(xsql_bench_inner_html PRIVATE xsql_core)
-  target_include_directories(xsql_bench_inner_html PRIVATE core/include)
-  if (XSQL_ARROW_TARGET AND XSQL_PARQUET_TARGET)
-    target_link_libraries(xsql_bench_inner_html PRIVATE ${XSQL_ARROW_TARGET} ${XSQL_PARQUET_TARGET})
-    target_compile_definitions(xsql_bench_inner_html PRIVATE XSQL_USE_ARROW)
+  add_executable(markql_bench_inner_html tests/bench_inner_html.cpp)
+  target_link_libraries(markql_bench_inner_html PRIVATE markql_core)
+  target_include_directories(markql_bench_inner_html PRIVATE core/include)
+  if (MARKQL_ARROW_TARGET AND MARKQL_PARQUET_TARGET)
+    target_link_libraries(markql_bench_inner_html PRIVATE ${MARKQL_ARROW_TARGET} ${MARKQL_PARQUET_TARGET})
+    target_compile_definitions(markql_bench_inner_html PRIVATE MARKQL_USE_ARROW)
   endif()
-  set_target_properties(xsql_bench_inner_html PROPERTIES OUTPUT_NAME markql_bench_inner_html)
+  set_target_properties(markql_bench_inner_html PROPERTIES OUTPUT_NAME markql_bench_inner_html)
   add_custom_command(
-    TARGET xsql_bench_inner_html
+    TARGET markql_bench_inner_html
     POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "$<TARGET_FILE:xsql_bench_inner_html>"
-            "$<TARGET_FILE_DIR:xsql_bench_inner_html>/xsql_bench_inner_html${CMAKE_EXECUTABLE_SUFFIX}"
-    COMMENT "Creating compatibility binary: xsql_bench_inner_html -> markql_bench_inner_html"
+            "$<TARGET_FILE:markql_bench_inner_html>"
+            "$<TARGET_FILE_DIR:markql_bench_inner_html>/markql_bench_inner_html${CMAKE_EXECUTABLE_SUFFIX}"
+    COMMENT "Creating compatibility binary: markql_bench_inner_html -> markql_bench_inner_html"
   )
-  add_executable(xsql_bench_artifacts tests/bench_artifacts.cpp)
-  target_link_libraries(xsql_bench_artifacts PRIVATE xsql_core)
-  target_include_directories(xsql_bench_artifacts PRIVATE cli core/src core/include tests)
-  if (XSQL_WITH_FLATBUFFERS)
-    target_link_libraries(xsql_bench_artifacts PRIVATE xsql_artifact_docn_flatbuffers
-                                                      xsql_artifact_qast_flatbuffers)
+  add_executable(markql_bench_artifacts tests/bench_artifacts.cpp)
+  target_link_libraries(markql_bench_artifacts PRIVATE markql_core)
+  target_include_directories(markql_bench_artifacts PRIVATE cli core/src core/include tests)
+  if (MARKQL_WITH_FLATBUFFERS)
+    target_link_libraries(markql_bench_artifacts PRIVATE markql_artifact_docn_flatbuffers
+                                                      markql_artifact_qast_flatbuffers)
   endif()
-  set_target_properties(xsql_bench_artifacts PROPERTIES OUTPUT_NAME markql_bench_artifacts)
+  set_target_properties(markql_bench_artifacts PROPERTIES OUTPUT_NAME markql_bench_artifacts)
   add_custom_command(
-    TARGET xsql_bench_artifacts
+    TARGET markql_bench_artifacts
     POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "$<TARGET_FILE:xsql_bench_artifacts>"
-            "$<TARGET_FILE_DIR:xsql_bench_artifacts>/xsql_bench_artifacts${CMAKE_EXECUTABLE_SUFFIX}"
-    COMMENT "Creating compatibility binary: xsql_bench_artifacts -> markql_bench_artifacts"
+            "$<TARGET_FILE:markql_bench_artifacts>"
+            "$<TARGET_FILE_DIR:markql_bench_artifacts>/markql_bench_artifacts${CMAKE_EXECUTABLE_SUFFIX}"
+    COMMENT "Creating compatibility binary: markql_bench_artifacts -> markql_bench_artifacts"
   )
-  set(XSQL_TESTS
+  set(MARKQL_TESTS
     select_ul_by_id
     class_in_matches_token
     parent_attribute_filter
@@ -648,8 +648,8 @@ if (XSQL_BUILD_TESTS)
     golden_table_sparse_long
     golden_table_sparse_wide
   )
-  if (XSQL_ENABLE_KHMER_NUMBER)
-    list(APPEND XSQL_TESTS
+  if (MARKQL_ENABLE_KHMER_NUMBER)
+    list(APPEND MARKQL_TESTS
       khmer_number_digits
       khmer_number_scale_boundaries
       khmer_number_decimals_negatives
@@ -660,29 +660,29 @@ if (XSQL_BUILD_TESTS)
       khmer_number_command_compact
     )
   endif()
-  if (XSQL_ARROW_TARGET AND XSQL_PARQUET_TARGET)
-    list(APPEND XSQL_TESTS parquet_export_smoke)
+  if (MARKQL_ARROW_TARGET AND MARKQL_PARQUET_TARGET)
+    list(APPEND MARKQL_TESTS parquet_export_smoke)
   endif()
-  foreach(test_name IN LISTS XSQL_TESTS)
-    add_test(NAME xsql_${test_name} COMMAND xsql_tests ${test_name})
+  foreach(test_name IN LISTS MARKQL_TESTS)
+    add_test(NAME markql_${test_name} COMMAND markql_tests ${test_name})
   endforeach()
 endif()
 
-if (XSQL_BUILD_PYTHON)
+if (MARKQL_BUILD_PYTHON)
   find_package(Python COMPONENTS Development.Module REQUIRED)
   find_package(pybind11 CONFIG REQUIRED)
-  pybind11_add_module(_core python/xsql/_core.cpp)
-  target_link_libraries(_core PRIVATE xsql_core)
+  pybind11_add_module(_core python/markql/_core.cpp)
+  target_link_libraries(_core PRIVATE markql_core)
   target_include_directories(_core PRIVATE core/include)
   set_target_properties(_core PROPERTIES OUTPUT_NAME "_core")
   if (DEFINED SKBUILD_PLATLIB_DIR)
-    set_target_properties(_core PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${SKBUILD_PLATLIB_DIR}/xsql")
+    set_target_properties(_core PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${SKBUILD_PLATLIB_DIR}/markql")
   endif()
 endif()
 
 # Local packaging support (e.g., cpack -G DEB on Ubuntu).
-if (XSQL_BUILD_CLI)
-  install(TARGETS xsql RUNTIME DESTINATION bin)
+if (MARKQL_BUILD_CLI)
+  install(TARGETS markql RUNTIME DESTINATION bin)
   if (EXISTS "${CMAKE_SOURCE_DIR}/markqli.sh")
     install(PROGRAMS "${CMAKE_SOURCE_DIR}/markqli.sh" DESTINATION bin)
   endif()
@@ -702,7 +702,7 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/completions/markql.bash")
           RENAME markql)
   install(FILES "${CMAKE_SOURCE_DIR}/completions/markql.bash"
           DESTINATION share/bash-completion/completions
-          RENAME xsql)
+          RENAME markql)
 endif()
 
 set(CPACK_PACKAGE_NAME "markql")

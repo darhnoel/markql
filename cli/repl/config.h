@@ -5,7 +5,7 @@
 
 #include "repl/core/repl.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 class LineEditor;
 
@@ -30,4 +30,4 @@ bool apply_repl_settings(const ReplSettings& settings,
                          size_t& max_rows,
                          std::string& error);
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

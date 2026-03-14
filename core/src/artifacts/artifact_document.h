@@ -2,7 +2,7 @@
 
 #include "artifact_internal.h"
 
-namespace xsql::artifacts::detail {
+namespace markql::artifacts::detail {
 
 uint64_t document_required_features();
 bool document_uses_flatbuffers(const ArtifactHeader& header);
@@ -14,4 +14,4 @@ std::string build_document_nodes_payload(const HtmlDocument& document);
 HtmlDocument parse_document_nodes(const ArtifactHeader& header, const std::string& payload);
 void validate_document(const HtmlDocument& document);
 
-}  // namespace xsql::artifacts::detail
+}  // namespace markql::artifacts::detail

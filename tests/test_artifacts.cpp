@@ -13,11 +13,11 @@
 #include "cli_args.h"
 #include "cli_utils.h"
 #include "document_generated.h"
-#include "xsql/diagnostics.h"
+#include "markql/diagnostics.h"
 
 namespace {
 
-namespace docnfb = xsql::artifacts::docnfb;
+namespace docnfb = markql::artifacts::docnfb;
 
 std::filesystem::path temp_path(const std::string& name) {
   return std::filesystem::temp_directory_path() / name;
@@ -148,8 +148,8 @@ void write_binary(const std::filesystem::path& path, const std::string& data) {
   out.write(data.data(), static_cast<std::streamsize>(data.size()));
 }
 
-std::string canonical_rows_json(const xsql::QueryResult& result) {
-  return xsql::cli::build_json(result, xsql::ColumnNameMode::Normalize);
+std::string canonical_rows_json(const markql::QueryResult& result) {
+  return markql::cli::build_json(result, markql::ColumnNameMode::Normalize);
 }
 
 void test_artifact_cli_args() {
@@ -161,9 +161,9 @@ void test_artifact_cli_args() {
       "page.mqd",
   };
   int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
-  xsql::cli::CliOptions options;
+  markql::cli::CliOptions options;
   std::string error;
-  bool ok = xsql::cli::parse_cli_args(argc, const_cast<char**>(argv), options, error);
+  bool ok = markql::cli::parse_cli_args(argc, const_cast<char**>(argv), options, error);
   expect_true(ok, "artifact flags parse");
   expect_true(options.input == "page.html", "artifact input parsed");
   expect_true(options.write_mqd == "page.mqd", "write-mqd parsed");
@@ -173,13 +173,13 @@ void test_artifact_html_and_mqd_results_match() {
   const std::filesystem::path fixture = repo_path("docs/fixtures/basic.html");
   const std::string query =
       "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL ORDER BY doc_order";
-  const std::filesystem::path artifact_path = temp_path("xsql_test_basic.mqd");
+  const std::filesystem::path artifact_path = temp_path("markql_test_basic.mqd");
   const std::string html = read_file_to_string(fixture);
-  xsql::artifacts::write_document_artifact_file(
-      xsql::parse_html(html), fixture.string(), artifact_path.string());
+  markql::artifacts::write_document_artifact_file(
+      markql::parse_html(html), fixture.string(), artifact_path.string());
 
-  xsql::QueryResult direct = xsql::execute_query_from_file(fixture.string(), query);
-  xsql::QueryResult via_artifact = xsql::execute_query_from_file(artifact_path.string(), query);
+  markql::QueryResult direct = markql::execute_query_from_file(fixture.string(), query);
+  markql::QueryResult via_artifact = markql::execute_query_from_file(artifact_path.string(), query);
   expect_true(canonical_rows_json(direct) == canonical_rows_json(via_artifact),
               "html query matches mqd query");
   std::filesystem::remove(artifact_path);
@@ -190,15 +190,15 @@ void test_artifact_query_and_mqp_results_match() {
   const std::string html = read_file_to_string(fixture);
   const std::string query =
       "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL ORDER BY doc_order";
-  const std::filesystem::path artifact_path = temp_path("xsql_test_basic.mqp");
-  xsql::artifacts::PreparedQueryArtifact prepared = xsql::artifacts::prepare_query_artifact(query);
-  xsql::artifacts::write_prepared_query_artifact_file(prepared.query, query, artifact_path.string());
-  xsql::artifacts::PreparedQueryArtifact loaded =
-      xsql::artifacts::read_prepared_query_artifact_file(artifact_path.string());
+  const std::filesystem::path artifact_path = temp_path("markql_test_basic.mqp");
+  markql::artifacts::PreparedQueryArtifact prepared = markql::artifacts::prepare_query_artifact(query);
+  markql::artifacts::write_prepared_query_artifact_file(prepared.query, query, artifact_path.string());
+  markql::artifacts::PreparedQueryArtifact loaded =
+      markql::artifacts::read_prepared_query_artifact_file(artifact_path.string());
 
-  xsql::QueryResult direct = xsql::execute_query_from_file(fixture.string(), query);
-  xsql::QueryResult via_artifact =
-      xsql::artifacts::execute_prepared_query_on_html(loaded, html, fixture.string());
+  markql::QueryResult direct = markql::execute_query_from_file(fixture.string(), query);
+  markql::QueryResult via_artifact =
+      markql::artifacts::execute_prepared_query_on_html(loaded, html, fixture.string());
   expect_true(canonical_rows_json(direct) == canonical_rows_json(via_artifact),
               "query text matches mqp query");
   std::filesystem::remove(artifact_path);
@@ -209,20 +209,20 @@ void test_artifact_mqp_on_mqd_matches_direct() {
   const std::string html = read_file_to_string(fixture);
   const std::string query =
       "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL ORDER BY doc_order";
-  const std::filesystem::path mqd_path = temp_path("xsql_test_combo.mqd");
-  const std::filesystem::path mqp_path = temp_path("xsql_test_combo.mqp");
-  xsql::artifacts::write_document_artifact_file(
-      xsql::parse_html(html), fixture.string(), mqd_path.string());
-  xsql::artifacts::PreparedQueryArtifact prepared = xsql::artifacts::prepare_query_artifact(query);
-  xsql::artifacts::write_prepared_query_artifact_file(prepared.query, query, mqp_path.string());
+  const std::filesystem::path mqd_path = temp_path("markql_test_combo.mqd");
+  const std::filesystem::path mqp_path = temp_path("markql_test_combo.mqp");
+  markql::artifacts::write_document_artifact_file(
+      markql::parse_html(html), fixture.string(), mqd_path.string());
+  markql::artifacts::PreparedQueryArtifact prepared = markql::artifacts::prepare_query_artifact(query);
+  markql::artifacts::write_prepared_query_artifact_file(prepared.query, query, mqp_path.string());
 
-  xsql::QueryResult direct = xsql::execute_query_from_file(fixture.string(), query);
-  xsql::artifacts::PreparedQueryArtifact loaded_query =
-      xsql::artifacts::read_prepared_query_artifact_file(mqp_path.string());
-  xsql::artifacts::DocumentArtifact loaded_doc =
-      xsql::artifacts::read_document_artifact_file(mqd_path.string());
-  xsql::QueryResult via_both =
-      xsql::artifacts::execute_prepared_query_on_document(loaded_query, loaded_doc);
+  markql::QueryResult direct = markql::execute_query_from_file(fixture.string(), query);
+  markql::artifacts::PreparedQueryArtifact loaded_query =
+      markql::artifacts::read_prepared_query_artifact_file(mqp_path.string());
+  markql::artifacts::DocumentArtifact loaded_doc =
+      markql::artifacts::read_document_artifact_file(mqd_path.string());
+  markql::QueryResult via_both =
+      markql::artifacts::execute_prepared_query_on_document(loaded_query, loaded_doc);
   expect_true(canonical_rows_json(direct) == canonical_rows_json(via_both),
               "mqp on mqd matches direct execution");
 
@@ -239,18 +239,18 @@ void test_artifact_lint_behavior_unchanged() {
       "\"span\":{\"start_line\":1,\"start_col\":8,\"end_line\":1,\"end_col\":9,\"byte_start\":7,\"byte_end\":8},"
       "\"snippet\":\" --> line 1, col 8\\n  |\\n1 | SELECT FROM doc\\n  |        ^\","
       "\"related\":[]}]";
-  const std::string actual = xsql::render_diagnostics_json(xsql::lint_query(query));
+  const std::string actual = markql::render_diagnostics_json(markql::lint_query(query));
   expect_true(actual == expected, "lint json remains stable");
 }
 
 void test_artifact_document_round_trip_is_deterministic() {
   const std::filesystem::path fixture = repo_path("docs/fixtures/basic.html");
   const std::string html = read_file_to_string(fixture);
-  const std::filesystem::path path_a = temp_path("xsql_det_a.mqd");
-  const std::filesystem::path path_b = temp_path("xsql_det_b.mqd");
-  xsql::HtmlDocument document = xsql::parse_html(html);
-  xsql::artifacts::write_document_artifact_file(document, fixture.string(), path_a.string());
-  xsql::artifacts::write_document_artifact_file(document, fixture.string(), path_b.string());
+  const std::filesystem::path path_a = temp_path("markql_det_a.mqd");
+  const std::filesystem::path path_b = temp_path("markql_det_b.mqd");
+  markql::HtmlDocument document = markql::parse_html(html);
+  markql::artifacts::write_document_artifact_file(document, fixture.string(), path_a.string());
+  markql::artifacts::write_document_artifact_file(document, fixture.string(), path_b.string());
   expect_true(read_binary(path_a) == read_binary(path_b), "mqd bytes deterministic");
   std::filesystem::remove(path_a);
   std::filesystem::remove(path_b);
@@ -259,11 +259,11 @@ void test_artifact_document_round_trip_is_deterministic() {
 void test_artifact_query_round_trip_is_deterministic() {
   const std::string query =
       "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL ORDER BY doc_order";
-  const std::filesystem::path path_a = temp_path("xsql_det_a.mqp");
-  const std::filesystem::path path_b = temp_path("xsql_det_b.mqp");
-  xsql::artifacts::PreparedQueryArtifact prepared = xsql::artifacts::prepare_query_artifact(query);
-  xsql::artifacts::write_prepared_query_artifact_file(prepared.query, query, path_a.string());
-  xsql::artifacts::write_prepared_query_artifact_file(prepared.query, query, path_b.string());
+  const std::filesystem::path path_a = temp_path("markql_det_a.mqp");
+  const std::filesystem::path path_b = temp_path("markql_det_b.mqp");
+  markql::artifacts::PreparedQueryArtifact prepared = markql::artifacts::prepare_query_artifact(query);
+  markql::artifacts::write_prepared_query_artifact_file(prepared.query, query, path_a.string());
+  markql::artifacts::write_prepared_query_artifact_file(prepared.query, query, path_b.string());
   expect_true(read_binary(path_a) == read_binary(path_b), "mqp bytes deterministic");
   std::filesystem::remove(path_a);
   std::filesystem::remove(path_b);
@@ -272,16 +272,16 @@ void test_artifact_query_round_trip_is_deterministic() {
 void test_artifact_document_major_version_rejected() {
   const std::filesystem::path fixture = repo_path("docs/fixtures/basic.html");
   const std::string html = read_file_to_string(fixture);
-  const std::filesystem::path path = temp_path("xsql_bad_major.mqd");
-  xsql::artifacts::write_document_artifact_file(
-      xsql::parse_html(html), fixture.string(), path.string());
+  const std::filesystem::path path = temp_path("markql_bad_major.mqd");
+  markql::artifacts::write_document_artifact_file(
+      markql::parse_html(html), fixture.string(), path.string());
   std::string bytes = read_binary(path);
   bytes[4] = 3;
   bytes[5] = 0;
   write_binary(path, bytes);
   bool threw = false;
   try {
-    (void)xsql::artifacts::read_document_artifact_file(path.string());
+    (void)markql::artifacts::read_document_artifact_file(path.string());
   } catch (const std::exception& ex) {
     threw = true;
     expect_true(std::string(ex.what()).find("major version mismatch") != std::string::npos,
@@ -294,16 +294,16 @@ void test_artifact_document_major_version_rejected() {
 void test_artifact_query_major_version_rejected() {
   const std::string query =
       "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL ORDER BY doc_order";
-  const std::filesystem::path path = temp_path("xsql_bad_major.mqp");
-  xsql::artifacts::PreparedQueryArtifact prepared = xsql::artifacts::prepare_query_artifact(query);
-  xsql::artifacts::write_prepared_query_artifact_file(prepared.query, query, path.string());
+  const std::filesystem::path path = temp_path("markql_bad_major.mqp");
+  markql::artifacts::PreparedQueryArtifact prepared = markql::artifacts::prepare_query_artifact(query);
+  markql::artifacts::write_prepared_query_artifact_file(prepared.query, query, path.string());
   std::string bytes = read_binary(path);
   bytes[4] = 3;
   bytes[5] = 0;
   write_binary(path, bytes);
   bool threw = false;
   try {
-    (void)xsql::artifacts::read_prepared_query_artifact_file(path.string());
+    (void)markql::artifacts::read_prepared_query_artifact_file(path.string());
   } catch (const std::exception& ex) {
     threw = true;
     expect_true(std::string(ex.what()).find("major version mismatch") != std::string::npos,
@@ -316,15 +316,15 @@ void test_artifact_query_major_version_rejected() {
 void test_artifact_corrupted_files_fail_safely() {
   const std::filesystem::path fixture = repo_path("docs/fixtures/basic.html");
   const std::string html = read_file_to_string(fixture);
-  const std::filesystem::path path = temp_path("xsql_corrupt.mqd");
-  xsql::artifacts::write_document_artifact_file(
-      xsql::parse_html(html), fixture.string(), path.string());
+  const std::filesystem::path path = temp_path("markql_corrupt.mqd");
+  markql::artifacts::write_document_artifact_file(
+      markql::parse_html(html), fixture.string(), path.string());
   std::string bytes = read_binary(path);
   bytes.resize(12);
   write_binary(path, bytes);
   bool threw = false;
   try {
-    (void)xsql::artifacts::read_document_artifact_file(path.string());
+    (void)markql::artifacts::read_document_artifact_file(path.string());
   } catch (const std::exception& ex) {
     threw = true;
     expect_true(std::string(ex.what()).find("Corrupted artifact") != std::string::npos ||
@@ -340,15 +340,15 @@ void test_artifact_inspect_reports_metadata() {
   const std::string html = read_file_to_string(fixture);
   const std::string query =
       "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL ORDER BY doc_order";
-  const std::filesystem::path mqd_path = temp_path("xsql_info.mqd");
-  const std::filesystem::path mqp_path = temp_path("xsql_info.mqp");
-  xsql::artifacts::write_document_artifact_file(
-      xsql::parse_html(html), fixture.string(), mqd_path.string());
-  xsql::artifacts::PreparedQueryArtifact prepared = xsql::artifacts::prepare_query_artifact(query);
-  xsql::artifacts::write_prepared_query_artifact_file(prepared.query, query, mqp_path.string());
+  const std::filesystem::path mqd_path = temp_path("markql_info.mqd");
+  const std::filesystem::path mqp_path = temp_path("markql_info.mqp");
+  markql::artifacts::write_document_artifact_file(
+      markql::parse_html(html), fixture.string(), mqd_path.string());
+  markql::artifacts::PreparedQueryArtifact prepared = markql::artifacts::prepare_query_artifact(query);
+  markql::artifacts::write_prepared_query_artifact_file(prepared.query, query, mqp_path.string());
 
-  xsql::artifacts::ArtifactInfo doc_info = xsql::artifacts::inspect_artifact_file(mqd_path.string());
-  expect_true(doc_info.header.kind == xsql::artifacts::ArtifactKind::DocumentSnapshot,
+  markql::artifacts::ArtifactInfo doc_info = markql::artifacts::inspect_artifact_file(mqd_path.string());
+  expect_true(doc_info.header.kind == markql::artifacts::ArtifactKind::DocumentSnapshot,
               "inspect mqd kind");
   expect_true(doc_info.header.section_count == 2, "inspect mqd section count");
   expect_true(doc_info.header.format_minor == 1, "inspect mqd format minor");
@@ -358,9 +358,9 @@ void test_artifact_inspect_reports_metadata() {
               "inspect mqd language version");
   expect_true(doc_info.node_count > 0, "inspect mqd node count");
 
-  xsql::artifacts::ArtifactInfo query_info =
-      xsql::artifacts::inspect_artifact_file(mqp_path.string());
-  expect_true(query_info.header.kind == xsql::artifacts::ArtifactKind::PreparedQuery,
+  markql::artifacts::ArtifactInfo query_info =
+      markql::artifacts::inspect_artifact_file(mqp_path.string());
+  expect_true(query_info.header.kind == markql::artifacts::ArtifactKind::PreparedQuery,
               "inspect mqp kind");
   expect_true(query_info.header.required_features == 2, "inspect mqp required feature bit");
   expect_true(query_info.original_query == query, "inspect mqp original query");
@@ -371,14 +371,14 @@ void test_artifact_inspect_reports_metadata() {
 
 void test_artifact_bad_magic_rejected() {
   const std::filesystem::path fixture = repo_path("docs/fixtures/basic.html");
-  const std::filesystem::path path = temp_path("xsql_bad_magic.mqd");
-  xsql::artifacts::write_document_artifact_file(
-      xsql::parse_html(read_file_to_string(fixture)), fixture.string(), path.string());
+  const std::filesystem::path path = temp_path("markql_bad_magic.mqd");
+  markql::artifacts::write_document_artifact_file(
+      markql::parse_html(read_file_to_string(fixture)), fixture.string(), path.string());
   std::string bytes = read_binary(path);
   bytes[0] = 'B';
   write_binary(path, bytes);
   expect_artifact_error_contains(
-      [&]() { (void)xsql::artifacts::read_document_artifact_file(path.string()); },
+      [&]() { (void)markql::artifacts::read_document_artifact_file(path.string()); },
       "unknown magic header",
       "bad magic rejected clearly");
   std::filesystem::remove(path);
@@ -386,14 +386,14 @@ void test_artifact_bad_magic_rejected() {
 
 void test_artifact_unknown_required_flag_rejected() {
   const std::filesystem::path fixture = repo_path("docs/fixtures/basic.html");
-  const std::filesystem::path path = temp_path("xsql_required_flag.mqd");
-  xsql::artifacts::write_document_artifact_file(
-      xsql::parse_html(read_file_to_string(fixture)), fixture.string(), path.string());
+  const std::filesystem::path path = temp_path("markql_required_flag.mqd");
+  markql::artifacts::write_document_artifact_file(
+      markql::parse_html(read_file_to_string(fixture)), fixture.string(), path.string());
   std::string bytes = read_binary(path);
   write_u64_le(bytes, 16, 2);
   write_binary(path, bytes);
   expect_artifact_error_contains(
-      [&]() { (void)xsql::artifacts::read_document_artifact_file(path.string()); },
+      [&]() { (void)markql::artifacts::read_document_artifact_file(path.string()); },
       "unknown required feature flags",
       "unknown required flags rejected");
   std::filesystem::remove(path);
@@ -401,15 +401,15 @@ void test_artifact_unknown_required_flag_rejected() {
 
 void test_artifact_checksum_mismatch_rejected() {
   const std::filesystem::path fixture = repo_path("docs/fixtures/basic.html");
-  const std::filesystem::path path = temp_path("xsql_checksum.mqd");
-  xsql::artifacts::write_document_artifact_file(
-      xsql::parse_html(read_file_to_string(fixture)), fixture.string(), path.string());
+  const std::filesystem::path path = temp_path("markql_checksum.mqd");
+  markql::artifacts::write_document_artifact_file(
+      markql::parse_html(read_file_to_string(fixture)), fixture.string(), path.string());
   std::string bytes = read_binary(path);
   const size_t payload_offset = header_bytes(bytes);
   bytes[payload_offset + 20] ^= 0x01;
   write_binary(path, bytes);
   expect_artifact_error_contains(
-      [&]() { (void)xsql::artifacts::read_document_artifact_file(path.string()); },
+      [&]() { (void)markql::artifacts::read_document_artifact_file(path.string()); },
       "checksum mismatch",
       "checksum mismatch rejected");
   std::filesystem::remove(path);
@@ -417,16 +417,16 @@ void test_artifact_checksum_mismatch_rejected() {
 
 void test_artifact_section_length_rejected() {
   const std::filesystem::path fixture = repo_path("docs/fixtures/basic.html");
-  const std::filesystem::path path = temp_path("xsql_section_length.mqd");
-  xsql::artifacts::write_document_artifact_file(
-      xsql::parse_html(read_file_to_string(fixture)), fixture.string(), path.string());
+  const std::filesystem::path path = temp_path("markql_section_length.mqd");
+  markql::artifacts::write_document_artifact_file(
+      markql::parse_html(read_file_to_string(fixture)), fixture.string(), path.string());
   std::string bytes = read_binary(path);
   const size_t meta_size_offset = header_bytes(bytes) + 4;
   write_u64_le(bytes, meta_size_offset, read_u64_le(bytes, meta_size_offset) + 1024ull * 1024ull);
   rewrite_payload_checksum(bytes);
   write_binary(path, bytes);
   expect_artifact_error_contains(
-      [&]() { (void)xsql::artifacts::read_document_artifact_file(path.string()); },
+      [&]() { (void)markql::artifacts::read_document_artifact_file(path.string()); },
       "truncated section payload",
       "section length corruption rejected");
   std::filesystem::remove(path);
@@ -434,16 +434,16 @@ void test_artifact_section_length_rejected() {
 
 void test_artifact_huge_node_count_rejected() {
   const std::filesystem::path fixture = repo_path("docs/fixtures/basic.html");
-  const std::filesystem::path path = temp_path("xsql_node_count.mqd");
-  xsql::artifacts::write_document_artifact_file(
-      xsql::parse_html(read_file_to_string(fixture)), fixture.string(), path.string());
+  const std::filesystem::path path = temp_path("markql_node_count.mqd");
+  markql::artifacts::write_document_artifact_file(
+      markql::parse_html(read_file_to_string(fixture)), fixture.string(), path.string());
   std::string bytes = read_binary(path);
   const size_t node_count_offset = find_meta_node_count_offset(bytes);
   write_u64_le(bytes, node_count_offset, 1000001ull);
   rewrite_payload_checksum(bytes);
   write_binary(path, bytes);
   expect_artifact_error_contains(
-      [&]() { (void)xsql::artifacts::read_document_artifact_file(path.string()); },
+      [&]() { (void)markql::artifacts::read_document_artifact_file(path.string()); },
       "node count is too large",
       "huge node count rejected");
   std::filesystem::remove(path);
@@ -451,16 +451,16 @@ void test_artifact_huge_node_count_rejected() {
 
 void test_artifact_docn_flatbuffer_verifier_rejected() {
   const std::filesystem::path fixture = repo_path("docs/fixtures/basic.html");
-  const std::filesystem::path path = temp_path("xsql_docn_verifier.mqd");
-  xsql::artifacts::write_document_artifact_file(
-      xsql::parse_html(read_file_to_string(fixture)), fixture.string(), path.string());
+  const std::filesystem::path path = temp_path("markql_docn_verifier.mqd");
+  markql::artifacts::write_document_artifact_file(
+      markql::parse_html(read_file_to_string(fixture)), fixture.string(), path.string());
   std::string bytes = read_binary(path);
   const size_t docn_payload = find_section_payload_offset(bytes, "DOCN");
   write_u32_le(bytes, docn_payload, 0x7fffffffu);
   rewrite_payload_checksum(bytes);
   write_binary(path, bytes);
   expect_artifact_error_contains(
-      [&]() { (void)xsql::artifacts::read_document_artifact_file(path.string()); },
+      [&]() { (void)markql::artifacts::read_document_artifact_file(path.string()); },
       "FlatBuffer verification failed",
       "docn flatbuffer verifier rejects hostile payload");
   std::filesystem::remove(path);
@@ -468,16 +468,16 @@ void test_artifact_docn_flatbuffer_verifier_rejected() {
 
 void test_artifact_node_count_metadata_mismatch_rejected() {
   const std::filesystem::path fixture = repo_path("docs/fixtures/basic.html");
-  const std::filesystem::path path = temp_path("xsql_node_count_meta.mqd");
-  xsql::artifacts::write_document_artifact_file(
-      xsql::parse_html(read_file_to_string(fixture)), fixture.string(), path.string());
+  const std::filesystem::path path = temp_path("markql_node_count_meta.mqd");
+  markql::artifacts::write_document_artifact_file(
+      markql::parse_html(read_file_to_string(fixture)), fixture.string(), path.string());
   std::string bytes = read_binary(path);
   const size_t node_count_offset = find_meta_node_count_offset(bytes);
   write_u64_le(bytes, node_count_offset, 1);
   rewrite_payload_checksum(bytes);
   write_binary(path, bytes);
   expect_artifact_error_contains(
-      [&]() { (void)xsql::artifacts::read_document_artifact_file(path.string()); },
+      [&]() { (void)markql::artifacts::read_document_artifact_file(path.string()); },
       "node count metadata mismatch",
       "metadata node count mismatch rejected");
   std::filesystem::remove(path);
@@ -486,16 +486,16 @@ void test_artifact_node_count_metadata_mismatch_rejected() {
 void test_artifact_qast_flatbuffer_verifier_rejected() {
   const std::string query =
       "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL ORDER BY doc_order";
-  const std::filesystem::path path = temp_path("xsql_qast_verifier.mqp");
-  xsql::artifacts::PreparedQueryArtifact prepared = xsql::artifacts::prepare_query_artifact(query);
-  xsql::artifacts::write_prepared_query_artifact_file(prepared.query, query, path.string());
+  const std::filesystem::path path = temp_path("markql_qast_verifier.mqp");
+  markql::artifacts::PreparedQueryArtifact prepared = markql::artifacts::prepare_query_artifact(query);
+  markql::artifacts::write_prepared_query_artifact_file(prepared.query, query, path.string());
   std::string bytes = read_binary(path);
   const size_t qast_payload = find_section_payload_offset(bytes, "QAST");
   write_u32_le(bytes, qast_payload, 0x7fffffffu);
   rewrite_payload_checksum(bytes);
   write_binary(path, bytes);
   expect_artifact_error_contains(
-      [&]() { (void)xsql::artifacts::read_prepared_query_artifact_file(path.string()); },
+      [&]() { (void)markql::artifacts::read_prepared_query_artifact_file(path.string()); },
       "QAST FlatBuffer verification failed",
       "qast flatbuffer verifier rejects hostile payload");
   std::filesystem::remove(path);
@@ -504,16 +504,16 @@ void test_artifact_qast_flatbuffer_verifier_rejected() {
 void test_artifact_query_kind_metadata_mismatch_rejected() {
   const std::string query =
       "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL ORDER BY doc_order";
-  const std::filesystem::path path = temp_path("xsql_query_kind_meta.mqp");
-  xsql::artifacts::PreparedQueryArtifact prepared = xsql::artifacts::prepare_query_artifact(query);
-  xsql::artifacts::write_prepared_query_artifact_file(prepared.query, query, path.string());
+  const std::filesystem::path path = temp_path("markql_query_kind_meta.mqp");
+  markql::artifacts::PreparedQueryArtifact prepared = markql::artifacts::prepare_query_artifact(query);
+  markql::artifacts::write_prepared_query_artifact_file(prepared.query, query, path.string());
   std::string bytes = read_binary(path);
   bytes[find_prepared_meta_query_kind_offset(bytes)] =
-      static_cast<char>(xsql::Query::Kind::DescribeLanguage);
+      static_cast<char>(markql::Query::Kind::DescribeLanguage);
   rewrite_payload_checksum(bytes);
   write_binary(path, bytes);
   expect_artifact_error_contains(
-      [&]() { (void)xsql::artifacts::read_prepared_query_artifact_file(path.string()); },
+      [&]() { (void)markql::artifacts::read_prepared_query_artifact_file(path.string()); },
       "query metadata mismatch",
       "query kind metadata mismatch rejected");
   std::filesystem::remove(path);
@@ -522,16 +522,16 @@ void test_artifact_query_kind_metadata_mismatch_rejected() {
 void test_artifact_source_kind_metadata_mismatch_rejected() {
   const std::string query =
       "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL ORDER BY doc_order";
-  const std::filesystem::path path = temp_path("xsql_source_kind_meta.mqp");
-  xsql::artifacts::PreparedQueryArtifact prepared = xsql::artifacts::prepare_query_artifact(query);
-  xsql::artifacts::write_prepared_query_artifact_file(prepared.query, query, path.string());
+  const std::filesystem::path path = temp_path("markql_source_kind_meta.mqp");
+  markql::artifacts::PreparedQueryArtifact prepared = markql::artifacts::prepare_query_artifact(query);
+  markql::artifacts::write_prepared_query_artifact_file(prepared.query, query, path.string());
   std::string bytes = read_binary(path);
   bytes[find_prepared_meta_source_kind_offset(bytes)] =
-      static_cast<char>(xsql::Source::Kind::DerivedSubquery);
+      static_cast<char>(markql::Source::Kind::DerivedSubquery);
   rewrite_payload_checksum(bytes);
   write_binary(path, bytes);
   expect_artifact_error_contains(
-      [&]() { (void)xsql::artifacts::read_prepared_query_artifact_file(path.string()); },
+      [&]() { (void)markql::artifacts::read_prepared_query_artifact_file(path.string()); },
       "source metadata mismatch",
       "source kind metadata mismatch rejected");
   std::filesystem::remove(path);
@@ -539,9 +539,9 @@ void test_artifact_source_kind_metadata_mismatch_rejected() {
 
 void test_artifact_invalid_utf8_rejected() {
   const std::filesystem::path fixture = repo_path("docs/fixtures/basic.html");
-  const std::filesystem::path path = temp_path("xsql_utf8.mqd");
-  xsql::artifacts::write_document_artifact_file(
-      xsql::parse_html(read_file_to_string(fixture)), fixture.string(), path.string());
+  const std::filesystem::path path = temp_path("markql_utf8.mqd");
+  markql::artifacts::write_document_artifact_file(
+      markql::parse_html(read_file_to_string(fixture)), fixture.string(), path.string());
   std::string bytes = read_binary(path);
   const size_t meta_payload = find_section_payload_offset(bytes, "META");
   const uint64_t producer_len = read_u64_le(bytes, meta_payload);
@@ -553,7 +553,7 @@ void test_artifact_invalid_utf8_rejected() {
   rewrite_payload_checksum(bytes);
   write_binary(path, bytes);
   expect_artifact_error_contains(
-      [&]() { (void)xsql::artifacts::read_document_artifact_file(path.string()); },
+      [&]() { (void)markql::artifacts::read_document_artifact_file(path.string()); },
       "not valid UTF-8",
       "invalid utf8 rejected");
   std::filesystem::remove(path);
@@ -561,9 +561,9 @@ void test_artifact_invalid_utf8_rejected() {
 
 void test_artifact_terminal_escape_sanitization() {
   const std::filesystem::path fixture = repo_path("docs/fixtures/basic.html");
-  const std::filesystem::path path = temp_path("xsql_escape_info.mqd");
-  xsql::artifacts::write_document_artifact_file(
-      xsql::parse_html(read_file_to_string(fixture)), fixture.string(), path.string());
+  const std::filesystem::path path = temp_path("markql_escape_info.mqd");
+  markql::artifacts::write_document_artifact_file(
+      markql::parse_html(read_file_to_string(fixture)), fixture.string(), path.string());
   std::string bytes = read_binary(path);
   const size_t meta_payload = find_section_payload_offset(bytes, "META");
   const uint64_t producer_len = read_u64_le(bytes, meta_payload);
@@ -581,8 +581,8 @@ void test_artifact_terminal_escape_sanitization() {
   bytes[source_bytes + 5] = 'X';
   rewrite_payload_checksum(bytes);
   write_binary(path, bytes);
-  xsql::artifacts::ArtifactInfo info = xsql::artifacts::inspect_artifact_file(path.string());
-  std::string safe = xsql::cli::escape_control_for_terminal(info.source_uri);
+  markql::artifacts::ArtifactInfo info = markql::artifacts::inspect_artifact_file(path.string());
+  std::string safe = markql::cli::escape_control_for_terminal(info.source_uri);
   expect_true(safe.find('\x1B') == std::string::npos, "escaped text omits raw escape bytes");
   expect_true(safe.find("\\x1B") != std::string::npos, "escaped text renders escape visibly");
   std::filesystem::remove(path);

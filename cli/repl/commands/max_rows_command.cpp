@@ -3,7 +3,7 @@
 #include <iostream>
 #include <sstream>
 
-namespace xsql::cli {
+namespace markql::cli {
 
 CommandHandler make_max_rows_command() {
   return [](const std::string& line, CommandContext& ctx) -> bool {
@@ -36,4 +36,4 @@ CommandHandler make_max_rows_command() {
   };
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

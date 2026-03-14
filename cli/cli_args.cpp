@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <string>
 
-namespace xsql::cli {
+namespace markql::cli {
 
 /// Prints the startup help so users see baseline usage without flags.
 /// MUST keep examples aligned with current CLI and MUST not throw on stream errors.
@@ -27,7 +27,7 @@ void print_startup_help(std::ostream& os) {
   os << "  markql --version\n";
   os << "  markql --color=auto|always|never|disabled\n\n";
   os << "Notes:\n";
-  os << "  - Legacy `xsql` binary name is still available for compatibility.\n";
+  os << "  - Legacy `markql` binary name is still available for compatibility.\n";
   os << "  - If --input is omitted, HTML is read from stdin.\n";
   os << "  - URLs are supported when libcurl is available.\n";
   os << "  - --input accepts HTML or experimental .mqd document snapshots.\n";
@@ -63,7 +63,7 @@ void print_help(std::ostream& os) {
   os << "       markql --timeout-ms <n>\n";
   os << "       markql --version\n";
   os << "       markql --color=auto|always|never|disabled\n";
-  os << "Legacy `xsql` command name remains available.\n";
+  os << "Legacy `markql` command name remains available.\n";
   os << "If --input is omitted, HTML is read from stdin.\n";
   os << "Scripts and REPL input support SQL comments: -- ... and /* ... */.\n";
   os << "Use TO CSV('file.csv'), TO PARQUET('file.parquet'), TO JSON('file.json'), or\n"
@@ -311,4 +311,4 @@ bool no_color_env_present() {
   return value != nullptr && *value != '\0';
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

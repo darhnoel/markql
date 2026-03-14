@@ -12,7 +12,7 @@
 #include "../../ui/color.h"
 #include "dom/html_parser.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 CommandHandler make_summarize_command() {
   return [](const std::string& line, CommandContext& ctx) -> bool {
@@ -53,7 +53,7 @@ CommandHandler make_summarize_command() {
       } else {
         html = load_html_input(target, ctx.config.timeout_ms);
       }
-      xsql::HtmlDocument doc = xsql::parse_html(html);
+      markql::HtmlDocument doc = markql::parse_html(html);
       std::unordered_map<std::string, size_t> counts;
       for (const auto& node : doc.nodes) {
         ++counts[node.tag];
@@ -68,22 +68,22 @@ CommandHandler make_summarize_command() {
                   if (a.second != b.second) return a.second > b.second;
                   return a.first < b.first;
                 });
-      xsql::QueryResult result;
+      markql::QueryResult result;
       result.columns = {"tag", "count"};
       for (const auto& item : summary) {
-        xsql::QueryResultRow row;
+        markql::QueryResultRow row;
         row.tag = item.first;
         row.node_id = static_cast<int64_t>(item.second);
         result.rows.push_back(std::move(row));
       }
       if (ctx.config.output_mode == "duckbox") {
-        xsql::render::DuckboxOptions options;
+        markql::render::DuckboxOptions options;
         options.max_width = 0;
         options.max_rows = ctx.max_rows;
         options.highlight = ctx.config.highlight;
         options.is_tty = ctx.config.color;
         options.colname_mode = ctx.config.colname_mode;
-        std::cout << xsql::render::render_duckbox(result, options) << std::endl;
+        std::cout << markql::render::render_duckbox(result, options) << std::endl;
       } else if (ctx.config.output_mode == "csv") {
         std::ostringstream csv_out;
         std::string error;
@@ -112,4 +112,4 @@ CommandHandler make_summarize_command() {
   };
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

@@ -10,7 +10,7 @@
 
 #include "test_harness.h"
 
-#include "xsql/khmer_number.h"
+#include "markql/khmer_number.h"
 #include "repl/commands/khmer_number_command.h"
 #include "repl/commands/registry.h"
 #include "repl/core/line_editor.h"
@@ -36,18 +36,18 @@ struct StreamCapture {
   std::string str() const { return buffer.str(); }
 };
 
-void expect_ok(const xsql::khmer_number::Result<std::string>& result,
+void expect_ok(const markql::khmer_number::Result<std::string>& result,
                const std::string& message) {
   expect_true(result.ok, message + " (error: " + result.error + ")");
 }
 
 void expect_round_trip(const std::string& number, const std::string& label) {
-  auto words = xsql::khmer_number::number_to_khmer_words(number);
+  auto words = markql::khmer_number::number_to_khmer_words(number);
   expect_ok(words, label + " number_to_khmer_words");
   if (!words.ok) {
     return;
   }
-  auto back = xsql::khmer_number::khmer_words_to_number(words.value);
+  auto back = markql::khmer_number::khmer_words_to_number(words.value);
   expect_ok(back, label + " khmer_words_to_number");
   if (!back.ok) {
     return;
@@ -84,7 +84,7 @@ static void test_khmer_digits() {
       "ប្រាំ", "ប្រាំមួយ", "ប្រាំពីរ", "ប្រាំបី", "ប្រាំបួន",
   };
   for (size_t i = 0; i < expected.size(); ++i) {
-    auto result = xsql::khmer_number::number_to_khmer_words(std::to_string(i));
+    auto result = markql::khmer_number::number_to_khmer_words(std::to_string(i));
     expect_ok(result, "digits conversion");
     if (!result.ok) {
       continue;
@@ -136,13 +136,13 @@ static void test_khmer_decimals_and_negatives() {
 }
 
 static void test_khmer_numerals_output() {
-  auto result = xsql::khmer_number::number_to_khmer_numerals("12.30");
+  auto result = markql::khmer_number::number_to_khmer_numerals("12.30");
   expect_ok(result, "numerals 12.30");
   if (result.ok) {
     expect_true(result.value == "១២.៣០", "numerals 12.30 mismatch");
   }
 
-  auto result2 = xsql::khmer_number::number_to_khmer_numerals("-001,234");
+  auto result2 = markql::khmer_number::number_to_khmer_numerals("-001,234");
   expect_ok(result2, "numerals -001,234");
   if (result2.ok) {
     expect_true(result2.value == "-១២៣៤", "numerals -001,234 mismatch");
@@ -150,25 +150,25 @@ static void test_khmer_numerals_output() {
 }
 
 static void test_khmer_concatenated_input() {
-  auto result = xsql::khmer_number::khmer_words_to_number("មួយរយម្ភៃបី");
+  auto result = markql::khmer_number::khmer_words_to_number("មួយរយម្ភៃបី");
   expect_ok(result, "concat words 123");
   if (result.ok) {
     expect_true(result.value == "123", "concat words 123 mismatch");
   }
 
-  auto result2 = xsql::khmer_number::khmer_words_to_number("ដប់ពីរ");
+  auto result2 = markql::khmer_number::khmer_words_to_number("ដប់ពីរ");
   expect_ok(result2, "concat words 12");
   if (result2.ok) {
     expect_true(result2.value == "12", "concat words 12 mismatch");
   }
 
-  auto result3 = xsql::khmer_number::khmer_words_to_number("ដកមួយរយ");
+  auto result3 = markql::khmer_number::khmer_words_to_number("ដកមួយរយ");
   expect_ok(result3, "concat negative 100");
   if (result3.ok) {
     expect_true(result3.value == "-100", "concat negative mismatch");
   }
 
-  auto result4 = xsql::khmer_number::khmer_words_to_number("សូន្យក្បៀសប្រាំ");
+  auto result4 = markql::khmer_number::khmer_words_to_number("សូន្យក្បៀសប្រាំ");
   expect_ok(result4, "concat decimal 0.5");
   if (result4.ok) {
     expect_true(result4.value == "0.5", "concat decimal mismatch");
@@ -228,12 +228,12 @@ static void test_khmer_golden_vectors() {
     if (cols.size() != 3) {
       continue;
     }
-    auto words = xsql::khmer_number::number_to_khmer_words(cols[0]);
+    auto words = markql::khmer_number::number_to_khmer_words(cols[0]);
     expect_ok(words, "fixture number_to_khmer_words");
     if (words.ok) {
       expect_true(words.value == cols[1], "fixture words mismatch");
     }
-    auto back = xsql::khmer_number::khmer_words_to_number(cols[1]);
+    auto back = markql::khmer_number::khmer_words_to_number(cols[1]);
     expect_ok(back, "fixture khmer_words_to_number");
     if (back.ok) {
       expect_true(back.value == cols[2], "fixture parsed mismatch");
@@ -243,23 +243,23 @@ static void test_khmer_golden_vectors() {
 
 static void test_khmer_command_to_words() {
   StreamCapture capture(std::cout);
-  xsql::cli::ReplConfig config;
+  markql::cli::ReplConfig config;
   config.output_mode = "duckbox";
   config.color = false;
   config.highlight = false;
   config.input = "";
 
-  xsql::cli::LineEditor editor(5, "markql> ", 8);
-  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
+  markql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, markql::cli::LoadedSource> sources;
   std::string active_alias = "doc";
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
-  std::vector<xsql::ColumnNameMapping> last_schema_map;
+  std::vector<markql::ColumnNameMapping> last_schema_map;
 
-  xsql::cli::CommandRegistry registry;
-  xsql::cli::PluginManager plugin_manager(registry);
-  xsql::cli::CommandContext ctx{
+  markql::cli::CommandRegistry registry;
+  markql::cli::PluginManager plugin_manager(registry);
+  markql::cli::CommandContext ctx{
       config,
       editor,
       sources,
@@ -271,7 +271,7 @@ static void test_khmer_command_to_words() {
       plugin_manager,
   };
 
-  auto handler = xsql::cli::make_khmer_number_command();
+  auto handler = markql::cli::make_khmer_number_command();
   bool handled = handler(".number_to_khmer 12.30", ctx);
   expect_true(handled, "number_to_khmer should handle command");
   std::string output = capture.str();
@@ -281,23 +281,23 @@ static void test_khmer_command_to_words() {
 
 static void test_khmer_command_compact() {
   StreamCapture capture(std::cout);
-  xsql::cli::ReplConfig config;
+  markql::cli::ReplConfig config;
   config.output_mode = "duckbox";
   config.color = false;
   config.highlight = false;
   config.input = "";
 
-  xsql::cli::LineEditor editor(5, "markql> ", 8);
-  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
+  markql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, markql::cli::LoadedSource> sources;
   std::string active_alias = "doc";
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
-  std::vector<xsql::ColumnNameMapping> last_schema_map;
+  std::vector<markql::ColumnNameMapping> last_schema_map;
 
-  xsql::cli::CommandRegistry registry;
-  xsql::cli::PluginManager plugin_manager(registry);
-  xsql::cli::CommandContext ctx{
+  markql::cli::CommandRegistry registry;
+  markql::cli::PluginManager plugin_manager(registry);
+  markql::cli::CommandContext ctx{
       config,
       editor,
       sources,
@@ -309,7 +309,7 @@ static void test_khmer_command_compact() {
       plugin_manager,
   };
 
-  auto handler = xsql::cli::make_khmer_number_command();
+  auto handler = markql::cli::make_khmer_number_command();
   bool handled = handler(".number_to_khmer --compact 12.30", ctx);
   expect_true(handled, "number_to_khmer compact should handle command");
   std::string output = capture.str();
@@ -319,23 +319,23 @@ static void test_khmer_command_compact() {
 
 static void test_khmer_command_numerals() {
   StreamCapture capture(std::cout);
-  xsql::cli::ReplConfig config;
+  markql::cli::ReplConfig config;
   config.output_mode = "duckbox";
   config.color = false;
   config.highlight = false;
   config.input = "";
 
-  xsql::cli::LineEditor editor(5, "markql> ", 8);
-  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
+  markql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, markql::cli::LoadedSource> sources;
   std::string active_alias = "doc";
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
-  std::vector<xsql::ColumnNameMapping> last_schema_map;
+  std::vector<markql::ColumnNameMapping> last_schema_map;
 
-  xsql::cli::CommandRegistry registry;
-  xsql::cli::PluginManager plugin_manager(registry);
-  xsql::cli::CommandContext ctx{
+  markql::cli::CommandRegistry registry;
+  markql::cli::PluginManager plugin_manager(registry);
+  markql::cli::CommandContext ctx{
       config,
       editor,
       sources,
@@ -347,7 +347,7 @@ static void test_khmer_command_numerals() {
       plugin_manager,
   };
 
-  auto handler = xsql::cli::make_khmer_number_command();
+  auto handler = markql::cli::make_khmer_number_command();
   bool handled = handler(".number_to_khmer --khmer-digits 12.30", ctx);
   expect_true(handled, "number_to_khmer numerals should handle command");
   std::string output = capture.str();
@@ -357,23 +357,23 @@ static void test_khmer_command_numerals() {
 
 static void test_khmer_command_to_number_numerals() {
   StreamCapture capture(std::cout);
-  xsql::cli::ReplConfig config;
+  markql::cli::ReplConfig config;
   config.output_mode = "duckbox";
   config.color = false;
   config.highlight = false;
   config.input = "";
 
-  xsql::cli::LineEditor editor(5, "markql> ", 8);
-  std::unordered_map<std::string, xsql::cli::LoadedSource> sources;
+  markql::cli::LineEditor editor(5, "markql> ", 8);
+  std::unordered_map<std::string, markql::cli::LoadedSource> sources;
   std::string active_alias = "doc";
   std::string last_full_output;
   bool display_full = true;
   size_t max_rows = 40;
-  std::vector<xsql::ColumnNameMapping> last_schema_map;
+  std::vector<markql::ColumnNameMapping> last_schema_map;
 
-  xsql::cli::CommandRegistry registry;
-  xsql::cli::PluginManager plugin_manager(registry);
-  xsql::cli::CommandContext ctx{
+  markql::cli::CommandRegistry registry;
+  markql::cli::PluginManager plugin_manager(registry);
+  markql::cli::CommandContext ctx{
       config,
       editor,
       sources,
@@ -385,7 +385,7 @@ static void test_khmer_command_to_number_numerals() {
       plugin_manager,
   };
 
-  auto handler = xsql::cli::make_khmer_number_command();
+  auto handler = markql::cli::make_khmer_number_command();
   bool handled = handler(".khmer_to_number --khmer-digits ដប់-ពីរ", ctx);
   expect_true(handled, "khmer_to_number numerals should handle command");
   std::string output = capture.str();

@@ -6,9 +6,9 @@
 #include <vector>
 
 #include "../../util/string_util.h"
-#include "../engine/xsql_internal.h"
+#include "../engine/markql_internal.h"
 
-namespace xsql::executor_internal {
+namespace markql::executor_internal {
 
 struct EvalContext {
   const HtmlNode& current_row_node;
@@ -797,7 +797,7 @@ ScalarValue eval_scalar_expr_impl(const ScalarExpr& expr,
 
     if (fn == "TEXT") return make_string(target->text);
     if (fn == "DIRECT_TEXT") {
-      return make_string(xsql_internal::extract_direct_text_strict(target->inner_html));
+      return make_string(markql_internal::extract_direct_text_strict(target->inner_html));
     }
     if (fn == "ATTR") {
       ScalarValue attr_value = eval_scalar_expr_impl(expr.args[1], doc, children, context);
@@ -819,7 +819,7 @@ ScalarValue eval_scalar_expr_impl(const ScalarExpr& expr,
       has_depth = true;
     }
     size_t effective_depth = has_depth ? depth : 1;
-    std::string html = xsql_internal::limit_inner_html(target->inner_html, effective_depth);
+    std::string html = markql_internal::limit_inner_html(target->inner_html, effective_depth);
     if (fn == "RAW_INNER_HTML") return make_string(html);
     return make_string(util::minify_html(html));
   }
@@ -1072,7 +1072,7 @@ bool eval_expr_with_context(const Expr& expr,
 
     if (cmp.op == CompareExpr::Op::HasDirectText) {
       if (node.tag != cmp.lhs.attribute) return false;
-      std::string direct = xsql_internal::extract_direct_text(node.inner_html);
+      std::string direct = markql_internal::extract_direct_text(node.inner_html);
       return contains_ci(direct, values.front());
     }
     if (cmp.op == CompareExpr::Op::IsNull || cmp.op == CompareExpr::Op::IsNotNull) {
@@ -1183,4 +1183,4 @@ bool eval_expr_flatten_base(const Expr& expr,
   return left || right;
 }
 
-}  // namespace xsql::executor_internal
+}  // namespace markql::executor_internal

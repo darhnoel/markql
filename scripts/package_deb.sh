@@ -79,12 +79,12 @@ fi
 echo "[1/3] Configure project (${BUILD_TYPE})"
 cmake -S "${REPO_ROOT}" -B "${BUILD_DIR_ABS}" \
   -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-  -DXSQL_BUILD_CLI=ON \
-  -DXSQL_BUILD_TESTS="${WITH_TESTS}" \
-  -DXSQL_BUILD_PYTHON=OFF
+  -DMARKQL_BUILD_CLI=ON \
+  -DMARKQL_BUILD_TESTS="${WITH_TESTS}" \
+  -DMARKQL_BUILD_PYTHON=OFF
 
 echo "[2/3] Build CLI target"
-cmake --build "${BUILD_DIR_ABS}" --target xsql -j"${JOBS}"
+cmake --build "${BUILD_DIR_ABS}" --target markql -j"${JOBS}"
 
 if [[ ! -f "${BUILD_DIR_ABS}/CPackConfig.cmake" ]]; then
   echo "CPack config not found: ${BUILD_DIR_ABS}/CPackConfig.cmake" >&2

@@ -7,7 +7,7 @@
 
 #include "repl/state/history.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 class AutoCompleter;
 
@@ -100,4 +100,4 @@ class LineEditor {
   std::unique_ptr<AutoCompleter> completer_;
 };
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

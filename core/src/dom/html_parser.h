@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace xsql {
+namespace markql {
 
 struct HtmlNode {
   int64_t id = 0;
@@ -26,4 +26,4 @@ struct HtmlDocument {
 HtmlDocument parse_html(const std::string& html);
 int64_t count_html_nodes_fast(const std::string& html);
 
-}  // namespace xsql
+}  // namespace markql

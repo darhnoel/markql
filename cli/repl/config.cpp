@@ -10,7 +10,7 @@
 #include "../cli_args.h"
 #include "repl/core/line_editor.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 namespace {
 
@@ -85,31 +85,31 @@ std::string parse_string_value(const std::string& raw, bool& ok) {
 }  // namespace
 
 std::string resolve_repl_config_path() {
-  std::string override = get_env("XSQL_CONFIG");
+  std::string override = get_env("MARKQL_CONFIG");
   if (!override.empty()) {
     return override;
   }
   std::string xdg_config = get_env("XDG_CONFIG_HOME");
   if (!xdg_config.empty()) {
-    return (std::filesystem::path(xdg_config) / "xsql" / "config.toml").string();
+    return (std::filesystem::path(xdg_config) / "markql" / "config.toml").string();
   }
   std::string home = get_env("HOME");
   if (!home.empty()) {
-    return (std::filesystem::path(home) / ".config" / "xsql" / "config.toml").string();
+    return (std::filesystem::path(home) / ".config" / "markql" / "config.toml").string();
   }
-  return "xsql.config.toml";
+  return "markql.config.toml";
 }
 
 std::string resolve_default_history_path() {
   std::string xdg_state = get_env("XDG_STATE_HOME");
   if (!xdg_state.empty()) {
-    return (std::filesystem::path(xdg_state) / "xsql" / "history").string();
+    return (std::filesystem::path(xdg_state) / "markql" / "history").string();
   }
   std::string home = get_env("HOME");
   if (!home.empty()) {
-    return (std::filesystem::path(home) / ".local" / "state" / "xsql" / "history").string();
+    return (std::filesystem::path(home) / ".local" / "state" / "markql" / "history").string();
   }
-  return "xsql.history";
+  return "markql.history";
 }
 
 std::string expand_user_path(const std::string& raw) {
@@ -288,8 +288,8 @@ bool apply_repl_settings(const ReplSettings& settings,
   }
   if (settings.colname_mode.has_value()) {
     config.colname_mode = *settings.colname_mode == "raw"
-                              ? xsql::ColumnNameMode::Raw
-                              : xsql::ColumnNameMode::Normalize;
+                              ? markql::ColumnNameMode::Raw
+                              : markql::ColumnNameMode::Normalize;
   }
   if (settings.editor_mode.has_value()) {
     if (*settings.editor_mode == "vim") {
@@ -311,4 +311,4 @@ bool apply_repl_settings(const ReplSettings& settings,
   return true;
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

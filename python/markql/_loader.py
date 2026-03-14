@@ -77,7 +77,7 @@ def _fetch_url(url: str, policy: FetchPolicy) -> Tuple[str, str]:
     opener = urllib.request.build_opener(_NoRedirect)
     for _ in range(policy.max_redirects + 1):
         try:
-            request = urllib.request.Request(current, headers={"User-Agent": "xsql-python/1.0"})
+            request = urllib.request.Request(current, headers={"User-Agent": "markql-python/1.0"})
             with opener.open(request, timeout=policy.timeout) as response:
                 if 300 <= response.status < 400:
                     location = response.headers.get("Location")

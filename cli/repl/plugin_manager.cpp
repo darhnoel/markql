@@ -15,7 +15,7 @@
 #include <dlfcn.h>
 #endif
 
-namespace xsql::cli {
+namespace markql::cli {
 namespace {
 
 std::string shared_library_suffix() {
@@ -206,7 +206,7 @@ std::string PluginManager::resolve_plugin_path(const std::string& name_or_path) 
   }
   std::string suffix = shared_library_suffix();
   std::vector<std::string> search_paths;
-  auto env_paths = split_paths(std::getenv("XSQL_PLUGIN_PATH"));
+  auto env_paths = split_paths(std::getenv("MARKQL_PLUGIN_PATH"));
   search_paths.insert(search_paths.end(), env_paths.begin(), env_paths.end());
   search_paths.emplace_back("plugins");
   search_paths.emplace_back("plugins/bin");
@@ -241,9 +241,9 @@ bool PluginManager::load(const std::string& name_or_path, std::string& error) {
     return false;
   }
   auto register_fn =
-      reinterpret_cast<XsqlRegisterPluginFn>(GetProcAddress(handle, "xsql_register_plugin"));
+      reinterpret_cast<XsqlRegisterPluginFn>(GetProcAddress(handle, "markql_register_plugin"));
   if (!register_fn) {
-    error = "Plugin missing xsql_register_plugin: " + path;
+    error = "Plugin missing markql_register_plugin: " + path;
     FreeLibrary(handle);
     return false;
   }
@@ -254,15 +254,15 @@ bool PluginManager::load(const std::string& name_or_path, std::string& error) {
     return false;
   }
   auto register_fn =
-      reinterpret_cast<XsqlRegisterPluginFn>(dlsym(handle, "xsql_register_plugin"));
+      reinterpret_cast<XsqlRegisterPluginFn>(dlsym(handle, "markql_register_plugin"));
   if (!register_fn) {
-    error = std::string("Plugin missing xsql_register_plugin: ") + path;
+    error = std::string("Plugin missing markql_register_plugin: ") + path;
     dlclose(handle);
     return false;
   }
 #endif
   XsqlPluginHost host{};
-  host.api_version = XSQL_PLUGIN_API_VERSION;
+  host.api_version = MARKQL_PLUGIN_API_VERSION;
   host.host_context = &host_context_;
   host.register_command = &PluginManager::register_command;
   host.register_tokenizer = &PluginManager::register_tokenizer;
@@ -334,4 +334,4 @@ const std::vector<PluginCommandInfo>& PluginManager::commands() const {
   return command_info_;
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli

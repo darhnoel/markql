@@ -22,7 +22,7 @@
 #include "repl/core/line_editor.h"
 #include "repl/plugin_manager.h"
 
-namespace xsql::cli {
+namespace markql::cli {
 
 int run_repl(ReplConfig& config) {
   ReplSettings settings;
@@ -40,7 +40,7 @@ int run_repl(ReplConfig& config) {
   bool display_full = config.display_full;
   size_t max_rows = 40;
   std::vector<std::string> last_sources;
-  std::vector<xsql::ColumnNameMapping> last_schema_map;
+  std::vector<markql::ColumnNameMapping> last_schema_map;
   std::string line;
 
   if (!isatty(fileno(stdout))) {
@@ -107,50 +107,50 @@ int run_repl(ReplConfig& config) {
 
     std::string query_text = rewrite_from_path_if_needed(raw_query);
     if (config.lint_warnings) {
-      std::vector<xsql::Diagnostic> diagnostics = xsql::lint_query(query_text);
-      std::vector<xsql::Diagnostic> warnings;
+      std::vector<markql::Diagnostic> diagnostics = markql::lint_query(query_text);
+      std::vector<markql::Diagnostic> warnings;
       warnings.reserve(diagnostics.size());
       for (const auto& diagnostic : diagnostics) {
-        if (diagnostic.severity == xsql::DiagnosticSeverity::Warning) {
+        if (diagnostic.severity == markql::DiagnosticSeverity::Warning) {
           warnings.push_back(diagnostic);
         }
       }
       if (!warnings.empty()) {
         if (config.color) std::cerr << kColor.yellow;
-        std::cerr << xsql::render_diagnostics_text(warnings) << std::endl;
+        std::cerr << markql::render_diagnostics_text(warnings) << std::endl;
         if (config.color) std::cerr << kColor.reset;
       }
     }
 
-    xsql::QueryResult result;
+    markql::QueryResult result;
     auto source = parse_query_source(query_text);
-    if (source.has_value() && source->statement_kind != xsql::Query::Kind::Select) {
+    if (source.has_value() && source->statement_kind != markql::Query::Kind::Select) {
       std::string active_source;
       auto active_it = sources.find(active_alias);
       if (active_it != sources.end()) {
         active_source = active_it->second.source;
       }
       std::string meta_error;
-      if (source->statement_kind == xsql::Query::Kind::ShowInput) {
+      if (source->statement_kind == markql::Query::Kind::ShowInput) {
         if (!build_show_input_result(active_source, result, meta_error)) {
           throw std::runtime_error(meta_error);
         }
-      } else if (source->statement_kind == xsql::Query::Kind::ShowInputs) {
+      } else if (source->statement_kind == markql::Query::Kind::ShowInputs) {
         if (!build_show_inputs_result(last_sources, active_source, result, meta_error)) {
           throw std::runtime_error(meta_error);
         }
       } else {
-        result = xsql::execute_query_from_document("", query_text);
+        result = markql::execute_query_from_document("", query_text);
       }
     } else {
-      if (source.has_value() && source->kind == xsql::Source::Kind::Url) {
-        result = xsql::execute_query_from_url(source->value, query_text, config.timeout_ms);
-      } else if (source.has_value() && source->kind == xsql::Source::Kind::Path) {
-        result = xsql::execute_query_from_file(source->value, query_text);
-      } else if (source.has_value() && source->kind == xsql::Source::Kind::RawHtml) {
-        result = xsql::execute_query_from_document("", query_text);
+      if (source.has_value() && source->kind == markql::Source::Kind::Url) {
+        result = markql::execute_query_from_url(source->value, query_text, config.timeout_ms);
+      } else if (source.has_value() && source->kind == markql::Source::Kind::Path) {
+        result = markql::execute_query_from_file(source->value, query_text);
+      } else if (source.has_value() && source->kind == markql::Source::Kind::RawHtml) {
+        result = markql::execute_query_from_document("", query_text);
       } else if (source.has_value() && !source->needs_input) {
-        result = xsql::execute_query_from_document("", query_text);
+        result = markql::execute_query_from_document("", query_text);
       } else {
         std::string alias = active_alias;
         if (source.has_value() && source->alias.has_value()) {
@@ -159,7 +159,7 @@ int run_repl(ReplConfig& config) {
         auto it = sources.find(alias);
         if ((it == sources.end() || it->second.source.empty()) &&
             source.has_value() &&
-            source->kind == xsql::Source::Kind::Document &&
+            source->kind == markql::Source::Kind::Document &&
             source->source_token.has_value() &&
             (*source->source_token == "doc" || *source->source_token == "document")) {
           auto active_it = sources.find(active_alias);
@@ -182,9 +182,9 @@ int run_repl(ReplConfig& config) {
         if (!it->second.html.has_value()) {
           it->second.html = load_html_input(it->second.source, config.timeout_ms);
         }
-        result = xsql::execute_query_from_document(*it->second.html, query_text);
+        result = markql::execute_query_from_document(*it->second.html, query_text);
         if (!it->second.source.empty() &&
-            (!source.has_value() || source->kind == xsql::Source::Kind::Document)) {
+            (!source.has_value() || source->kind == markql::Source::Kind::Document)) {
           for (auto& row : result.rows) {
             row.source_uri = it->second.source;
           }
@@ -198,10 +198,10 @@ int run_repl(ReplConfig& config) {
       std::cerr << "Warning: " << warning << std::endl;
       if (config.color) std::cerr << kColor.reset;
     }
-    last_schema_map = xsql::build_column_name_map(result.columns, config.colname_mode);
-    if (result.export_sink.kind != xsql::QueryResult::ExportSink::Kind::None) {
+    last_schema_map = markql::build_column_name_map(result.columns, config.colname_mode);
+    if (result.export_sink.kind != markql::QueryResult::ExportSink::Kind::None) {
       std::string export_error;
-      if (!xsql::cli::export_result(result, export_error, config.colname_mode)) {
+      if (!markql::cli::export_result(result, export_error, config.colname_mode)) {
         throw std::runtime_error(export_error);
       }
       if (!result.export_sink.path.empty()) {
@@ -217,7 +217,7 @@ int run_repl(ReplConfig& config) {
           std::cout << "Rows: 0" << std::endl;
           emit_runtime_summary();
         } else if (result.table_options.format ==
-                   xsql::QueryResult::TableOptions::Format::Sparse) {
+                   markql::QueryResult::TableOptions::Format::Sparse) {
           std::string json_out = build_table_json(result);
           last_full_output = json_out;
           if (display_full) {
@@ -229,7 +229,7 @@ int run_repl(ReplConfig& config) {
           size_t sparse_rows = 0;
           for (const auto& table : result.tables) {
             if (result.table_options.sparse_shape ==
-                xsql::QueryResult::TableOptions::SparseShape::Long) {
+                markql::QueryResult::TableOptions::SparseShape::Long) {
               sparse_rows += table.rows.size();
             } else {
               sparse_rows += table.sparse_wide_rows.size();
@@ -252,13 +252,13 @@ int run_repl(ReplConfig& config) {
           emit_runtime_summary();
         }
       } else if (!result.to_list) {
-        xsql::render::DuckboxOptions options;
+        markql::render::DuckboxOptions options;
         options.max_width = 0;
         options.max_rows = max_rows;
         options.highlight = config.highlight;
         options.is_tty = config.color;
         options.colname_mode = config.colname_mode;
-        std::cout << xsql::render::render_duckbox(result, options) << std::endl;
+        std::cout << markql::render::render_duckbox(result, options) << std::endl;
         std::cout << "Rows: " << count_result_rows(result) << std::endl;
         emit_runtime_summary();
       } else {
@@ -280,7 +280,7 @@ int run_repl(ReplConfig& config) {
       }
       std::ostringstream csv_out;
       std::string error;
-      if (!xsql::cli::write_csv(csv_out, result, error, config.colname_mode)) {
+      if (!markql::cli::write_csv(csv_out, result, error, config.colname_mode)) {
         throw std::runtime_error(error);
       }
       last_full_output = csv_out.str();
@@ -317,7 +317,7 @@ int run_repl(ReplConfig& config) {
       }
       continue;
     }
-#ifndef XSQL_ENABLE_KHMER_NUMBER
+#ifndef MARKQL_ENABLE_KHMER_NUMBER
     if (line.rfind(".number_to_khmer", 0) == 0 || line.rfind(".khmer_to_number", 0) == 0) {
       std::cerr << "Khmer number module not enabled. "
                    "Run: .plugin install number_to_khmer (then .plugin load number_to_khmer)"
@@ -373,11 +373,11 @@ int run_repl(ReplConfig& config) {
       }
       editor.reset_render_state();
     } catch (const std::exception& ex) {
-      std::vector<xsql::Diagnostic> diagnostics =
-          xsql::diagnose_query_failure(query_text, ex.what());
+      std::vector<markql::Diagnostic> diagnostics =
+          markql::diagnose_query_failure(query_text, ex.what());
       if (!diagnostics.empty()) {
         if (config.color) std::cerr << kColor.red;
-        std::cerr << xsql::render_diagnostics_text(diagnostics) << std::endl;
+        std::cerr << markql::render_diagnostics_text(diagnostics) << std::endl;
         if (config.color) std::cerr << kColor.reset;
       } else {
         if (config.color) std::cerr << kColor.red;
@@ -390,4 +390,4 @@ int run_repl(ReplConfig& config) {
   return 0;
 }
 
-}  // namespace xsql::cli
+}  // namespace markql::cli
