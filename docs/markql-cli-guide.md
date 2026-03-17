@@ -183,9 +183,25 @@ Use lint mode to validate syntax + key semantic rules without loading/executing 
 ```
 
 Default lint output provides one diagnostic block per issue:
+- an upfront lint summary with parse status and validation coverage
 - severity and stable `code`
+- diagnostic `category`
 - caret-positioned snippet
+- `why:` MarkQL-specific explanation
 - `help:` fix guidance
+- `example:` short valid replacement syntax when available
+
+For parse failures, lint now prefers local repair guidance when it can prove the failing context.
+Examples:
+- typo-like operator/keyword/axis mistakes suggest the nearest supported token when the current grammar position is known
+- local enum/value mistakes such as `SHOW ...`, `DESCRIBE ...`, `TO ...`, and `TABLE(...)` option values stay in that construct instead of falling back to top-level clause-order help
+- function/CASE/POSITION/EXISTS parse failures show local examples instead of generic top-level query templates
+
+Clean lint output is intentionally cautious:
+- `Result: ... (no proven diagnostics)` means no implemented rule fired
+- `Validation coverage: full` means the full current lint path ran
+- `Validation coverage: reduced` means relation-style features (`WITH`, `JOIN`, CTE/derived sources) parsed successfully but only the reduced validation path ran
+- a clean reduced result should not be read as “query is definitely correct”
 
 Lint text color controls:
 - `--color=always`: always emit ANSI colors for human lint text
@@ -195,8 +211,29 @@ Lint text color controls:
 
 `--format json` is always uncolored for automation stability.
 
+`--format json` now emits a top-level lint result object:
+- `summary`
+- `diagnostics`
+
+`summary` includes:
+- `parse_succeeded`
+- `coverage`
+- `relation_style_query`
+- `used_reduced_validation`
+- `status`
+- counts for errors/warnings/notes
+
+Each `diagnostics[]` entry keeps the existing diagnostic fields and now includes richer editor-friendly fields:
+- `category`
+- `why`
+- `example`
+- `expected`
+- `encountered`
+
 `SELECT <from_alias>` now emits a warning (`MQL-LINT-0001`) because alias-as-value
 is ambiguous; use `SELECT self` for current-row node projection.
+
+Suspicious qualified member accesses can also emit warnings when MarkQL accepts them as dynamic attribute syntax but they look like likely mistakes, for example a near-miss built-in field such as `alias.tagy`.
 
 `doc_ref` remains available in JSON diagnostics output.
 

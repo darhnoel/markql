@@ -75,6 +75,20 @@ std::string severity_to_string(markql::DiagnosticSeverity severity) {
   return "ERROR";
 }
 
+std::string coverage_to_string(markql::LintCoverageLevel coverage) {
+  switch (coverage) {
+    case markql::LintCoverageLevel::ParseOnly:
+      return "parse_only";
+    case markql::LintCoverageLevel::Full:
+      return "full";
+    case markql::LintCoverageLevel::Reduced:
+      return "reduced";
+    case markql::LintCoverageLevel::Mixed:
+      return "mixed";
+  }
+  return "parse_only";
+}
+
 py::dict diagnostic_to_dict(const markql::Diagnostic& diagnostic) {
   py::dict out;
   out["severity"] = severity_to_string(diagnostic.severity);
@@ -92,6 +106,23 @@ py::dict diagnostic_to_dict(const markql::Diagnostic& diagnostic) {
     related.append(rel);
   }
   out["related"] = related;
+  out["category"] = diagnostic.category;
+  out["why"] = diagnostic.why;
+  out["example"] = diagnostic.example;
+  out["expected"] = diagnostic.expected;
+  out["encountered"] = diagnostic.encountered;
+  return out;
+}
+
+py::dict lint_summary_to_dict(const markql::LintSummary& summary) {
+  py::dict out;
+  out["parse_succeeded"] = summary.parse_succeeded;
+  out["coverage"] = coverage_to_string(summary.coverage);
+  out["relation_style_query"] = summary.relation_style_query;
+  out["used_reduced_validation"] = summary.used_reduced_validation;
+  out["error_count"] = summary.error_count;
+  out["warning_count"] = summary.warning_count;
+  out["note_count"] = summary.note_count;
   return out;
 }
 
@@ -148,6 +179,20 @@ PYBIND11_MODULE(_core, m) {
           for (const auto& diagnostic : diagnostics) {
             out.append(diagnostic_to_dict(diagnostic));
           }
+          return out;
+        },
+        py::arg("query"));
+
+  m.def("lint_query_detailed",
+        [](const std::string& query) {
+          markql::LintResult result = markql::lint_query_detailed(query);
+          py::dict out;
+          out["summary"] = lint_summary_to_dict(result.summary);
+          py::list diagnostics;
+          for (const auto& diagnostic : result.diagnostics) {
+            diagnostics.append(diagnostic_to_dict(diagnostic));
+          }
+          out["diagnostics"] = diagnostics;
           return out;
         },
         py::arg("query"));

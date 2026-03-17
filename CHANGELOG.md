@@ -58,6 +58,9 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 
 ### Changed
 - Official rename completed across the tracked repository: internal namespaces, headers, CMake targets, CLI/test target names, install paths, docs, and CI now use `markql` / `MarkQL` consistently, with `pyxsql` preserved as the only intentional legacy identifier.
+- Parse diagnostics now use a reusable expected-token-family repair layer before generic fallback, so operator/keyword/axis/value typos in local contexts such as `EXISTS(...)`, `SHOW`, `DESCRIBE`, `TO`, and `TABLE(...)` options produce local repair guidance and examples instead of unrelated top-level query help.
+- Lint now reports coverage-aware summaries (`parse_only` / `full` / `reduced`), emits cautious clean-result wording (`no proven diagnostics`), returns a top-level JSON lint result envelope for CLI/editor use, and adds non-breaking suspicion/binding warnings for likely mistakes in reduced-coverage relation-style queries.
+- Upgraded lint diagnostics to provide clearer mistake-specific messages, categories, `why` explanations, short valid examples, and additive JSON/Python fields (`category`, `why`, `example`, `expected`, `encountered`) while keeping the existing C++ lint engine authoritative.
 - Marked `.mqd` / `.mqp` artifact workflows as experimental in CLI help and documentation so WIP builds do not imply a fully settled interface.
 - `build.sh` now detects a default `vcpkg` triplet for Linux, macOS, and Windows environments instead of hardcoding `x64-linux`, and it falls back to portable CPU-count detection when `nproc` is unavailable.
 - Artifact persistence now uses explicit file magic, format versioning, producer-major compatibility checks, and additive sectioned payloads instead of private runtime layouts.
@@ -86,7 +89,7 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 - Updated tutorial/grammar/case-study examples to prefer `SELECT self` in node-returning `LATERAL` subqueries.
 - `--lint --format json` remains deterministic and ANSI-free regardless of color mode.
 - Optimized PROJECT/FLATTEN_EXTRACT evaluation by introducing per-row selector scope/tag caching, reducing repeated subtree scans while preserving query results and output formatting.
-- Bumped project/core, Python package metadata, and `vcpkg` manifest version references to `1.16.0`.
+- Bumped project/core, Python package metadata, and `vcpkg` manifest version references to `1.20.0`.
 
 ## [1.8.0] - 2026-02-13
 

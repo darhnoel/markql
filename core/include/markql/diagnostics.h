@@ -14,6 +14,15 @@ enum class DiagnosticSeverity {
   Note,
 };
 
+/// Describes how much of the lint engine ran for a query.
+/// MUST stay stable for CLI/JSON summaries and future editor tooling.
+enum class LintCoverageLevel {
+  ParseOnly,
+  Full,
+  Reduced,
+  Mixed,
+};
+
 /// Describes a source span in both byte offsets and line/column coordinates.
 /// MUST use 1-based line/column values; byte offsets are 0-based.
 struct DiagnosticSpan {
@@ -37,8 +46,13 @@ struct DiagnosticRelated {
 struct Diagnostic {
   DiagnosticSeverity severity = DiagnosticSeverity::Error;
   std::string code;
+  std::string category;
   std::string message;
+  std::string why;
   std::string help;
+  std::string example;
+  std::string expected;
+  std::string encountered;
   std::string doc_ref;
   DiagnosticSpan span;
   std::string snippet;
@@ -49,6 +63,25 @@ struct Diagnostic {
 /// MUST default to plain deterministic text unless explicitly enabled.
 struct DiagnosticTextRenderOptions {
   bool use_color = false;
+};
+
+/// Summary metadata for a lint run.
+/// MUST describe the confidence level of the current lint result without overstating certainty.
+struct LintSummary {
+  bool parse_succeeded = false;
+  LintCoverageLevel coverage = LintCoverageLevel::ParseOnly;
+  bool relation_style_query = false;
+  bool used_reduced_validation = false;
+  size_t error_count = 0;
+  size_t warning_count = 0;
+  size_t note_count = 0;
+};
+
+/// Authoritative lint result with diagnostics plus coverage metadata.
+/// MUST remain the single source of truth for CLI/Python lint reporting.
+struct LintResult {
+  std::vector<Diagnostic> diagnostics;
+  LintSummary summary;
 };
 
 /// Builds a syntax diagnostic anchored at a byte position.
@@ -80,12 +113,25 @@ std::string render_diagnostics_text(const std::vector<Diagnostic>& diagnostics,
 /// Renders diagnostics as a stable JSON array for machine consumption.
 /// MUST keep key ordering stable across runs.
 std::string render_diagnostics_json(const std::vector<Diagnostic>& diagnostics);
+/// Renders a coverage-aware lint result for human-readable CLI output.
+/// MUST distinguish parse success from full or reduced validation coverage.
+std::string render_lint_result_text(const LintResult& result);
+/// Renders a coverage-aware lint result for human-readable CLI output with styling options.
+/// MUST preserve plain-text layout when color is disabled.
+std::string render_lint_result_text(const LintResult& result,
+                                    const DiagnosticTextRenderOptions& options);
+/// Renders a coverage-aware lint result for machine-readable CLI/editor output.
+/// MUST keep key ordering stable and preserve the old diagnostics-array renderer separately.
+std::string render_lint_result_json(const LintResult& result);
 /// Returns true when at least one ERROR severity diagnostic exists.
 bool has_error_diagnostics(const std::vector<Diagnostic>& diagnostics);
 
 /// Parses and validates only (no execution) and returns diagnostics.
 /// MUST return empty list for valid queries.
 std::vector<Diagnostic> lint_query(const std::string& query);
+/// Parses and validates only (no execution) and returns diagnostics plus coverage metadata.
+/// MUST remain authoritative for CLI/Python lint reporting.
+LintResult lint_query_detailed(const std::string& query);
 /// Maps a caught execution error to structured diagnostics for consistent rendering.
 /// MUST avoid throwing and return at least one diagnostic for non-empty messages.
 std::vector<Diagnostic> diagnose_query_failure(const std::string& query,

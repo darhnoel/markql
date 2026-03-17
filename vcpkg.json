@@ -1,6 +1,6 @@
 {
   "name": "markql",
-  "version-string": "1.16.0",
+  "version-string": "1.20.0",
   "builtin-baseline": "af752f21c9d79ba3df9cb0250ce2233933f58486",
   "dependencies": [
     "flatbuffers",

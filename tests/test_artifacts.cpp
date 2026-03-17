@@ -233,12 +233,17 @@ void test_artifact_mqp_on_mqd_matches_direct() {
 void test_artifact_lint_behavior_unchanged() {
   const std::string query = "SELECT FROM doc";
   const std::string expected =
-      "[{\"severity\":\"ERROR\",\"code\":\"MQL-SYN-0001\",\"message\":\"Expected tag identifier\","
-      "\"help\":\"Check SQL clause order: WITH ... SELECT ... FROM ... WHERE ... ORDER BY ... LIMIT ... TO ...\","
+      "[{\"severity\":\"ERROR\",\"code\":\"MQL-SYN-0001\",\"message\":\"Missing projection after SELECT\","
+      "\"help\":\"Add a tag, self, *, or a projection expression after SELECT.\","
       "\"doc_ref\":\"docs/book/appendix-grammar.md\","
       "\"span\":{\"start_line\":1,\"start_col\":8,\"end_line\":1,\"end_col\":9,\"byte_start\":7,\"byte_end\":8},"
       "\"snippet\":\" --> line 1, col 8\\n  |\\n1 | SELECT FROM doc\\n  |        ^\","
-      "\"related\":[]}]";
+      "\"related\":[],"
+      "\"category\":\"parse\","
+      "\"why\":\"SELECT must contain at least one projection before FROM in MarkQL.\","
+      "\"example\":\"SELECT div FROM doc\","
+      "\"expected\":\"projection after SELECT\","
+      "\"encountered\":\"FROM\"}]";
   const std::string actual = markql::render_diagnostics_json(markql::lint_query(query));
   expect_true(actual == expected, "lint json remains stable");
 }

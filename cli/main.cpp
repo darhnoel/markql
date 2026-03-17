@@ -167,19 +167,46 @@ int main(int argc, char** argv) {
     }
 
     if (options.lint) {
-      std::vector<markql::Diagnostic> diagnostics;
+      markql::LintResult lint_result;
+      bool have_statement_results = false;
+
+      auto merge_coverage = [](markql::LintCoverageLevel lhs,
+                               markql::LintCoverageLevel rhs) -> markql::LintCoverageLevel {
+        if (lhs == rhs) return lhs;
+        return markql::LintCoverageLevel::Mixed;
+      };
 
       auto collect_statement_diagnostics = [&](const std::string& statement,
                                                size_t statement_index,
                                                size_t total_statements) {
-        std::vector<markql::Diagnostic> statement_diags = markql::lint_query(statement);
+        markql::LintResult statement_result = markql::lint_query_detailed(statement);
         if (total_statements > 1) {
-          for (auto& diag : statement_diags) {
+          for (auto& diag : statement_result.diagnostics) {
             diag.message = "statement " + std::to_string(statement_index) + "/" +
                            std::to_string(total_statements) + ": " + diag.message;
           }
         }
-        diagnostics.insert(diagnostics.end(), statement_diags.begin(), statement_diags.end());
+        lint_result.diagnostics.insert(lint_result.diagnostics.end(),
+                                       statement_result.diagnostics.begin(),
+                                       statement_result.diagnostics.end());
+        if (!have_statement_results) {
+          lint_result.summary = statement_result.summary;
+          have_statement_results = true;
+        } else {
+          lint_result.summary.parse_succeeded =
+              lint_result.summary.parse_succeeded && statement_result.summary.parse_succeeded;
+          lint_result.summary.coverage =
+              merge_coverage(lint_result.summary.coverage, statement_result.summary.coverage);
+          lint_result.summary.relation_style_query =
+              lint_result.summary.relation_style_query ||
+              statement_result.summary.relation_style_query;
+          lint_result.summary.used_reduced_validation =
+              lint_result.summary.used_reduced_validation ||
+              statement_result.summary.used_reduced_validation;
+          lint_result.summary.error_count += statement_result.summary.error_count;
+          lint_result.summary.warning_count += statement_result.summary.warning_count;
+          lint_result.summary.note_count += statement_result.summary.note_count;
+        }
       };
 
       if (!query_file.empty()) {
@@ -201,8 +228,12 @@ int main(int argc, char** argv) {
         }
         ScriptSplitResult split = split_sql_script(script);
         if (split.error_message.has_value()) {
-          diagnostics.push_back(markql::make_syntax_diagnostic(
+          lint_result.diagnostics.push_back(markql::make_syntax_diagnostic(
               script, *split.error_message, split.error_position));
+          lint_result.summary.parse_succeeded = false;
+          lint_result.summary.coverage = markql::LintCoverageLevel::ParseOnly;
+          lint_result.summary.error_count = 1;
+          have_statement_results = true;
         } else {
           const size_t total = split.statements.size();
           for (size_t i = 0; i < total; ++i) {
@@ -218,13 +249,14 @@ int main(int argc, char** argv) {
       }
 
       if (options.lint_format == "json") {
-        std::cout << markql::render_diagnostics_json(diagnostics) << std::endl;
-      } else if (diagnostics.empty()) {
-        std::cout << "No diagnostics." << std::endl;
       } else {
-        std::cout << markql::render_diagnostics_text(diagnostics, lint_render_options) << std::endl;
+        std::cout << markql::render_lint_result_text(lint_result, lint_render_options)
+                  << std::endl;
       }
-      return markql::has_error_diagnostics(diagnostics) ? 1 : 0;
+      if (options.lint_format == "json") {
+        std::cout << markql::render_lint_result_json(lint_result) << std::endl;
+      }
+      return lint_result.summary.error_count > 0 ? 1 : 0;
     }
 
     auto load_default_html = [&]() -> std::pair<std::string, std::string> {

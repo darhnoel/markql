@@ -6,4 +6,4 @@ Feature: CLI invalid query reports diagnostics
     Then the exit code is 1
     And stdout is empty
     And stderr contains "ERROR[MQL-SYN-0001]"
-    And stderr contains "Expected scalar expression"
+    And stderr contains "Missing scalar expression"

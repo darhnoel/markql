@@ -36,13 +36,13 @@ def _resolve_cli_binary() -> Optional[str]:
     env_cli = os.environ.get("MARKQL_CLI")
     if env_cli:
         return env_cli
-    cli = shutil.which("markql") or shutil.which("markql")
-    if cli:
-        return cli
     repo_root = Path(__file__).resolve().parents[2]
     for candidate in (repo_root / "build" / "markql", repo_root / "build" / "markql"):
         if candidate.exists():
             return str(candidate)
+    cli = shutil.which("markql") or shutil.which("markql")
+    if cli:
+        return cli
     return None
 
 
@@ -157,7 +157,6 @@ def execute(
 
 def lint(query: str) -> list[dict]:
     """Parses + validates a query and returns diagnostics without execution."""
-    _require_core()
     if hasattr(_core, "lint_query"):
         return list(_core.lint_query(query))
     raw = _run_cli(["--lint", query, "--format", "json"]).strip()
@@ -167,14 +166,62 @@ def lint(query: str) -> list[dict]:
         parsed = json.loads(raw)
     except json.JSONDecodeError as exc:
         raise RuntimeError("Failed to parse lint diagnostics JSON from markql CLI fallback") from exc
+    if isinstance(parsed, dict):
+        diagnostics = parsed.get("diagnostics", [])
+        if not isinstance(diagnostics, list):
+            raise RuntimeError("Unexpected lint diagnostics shape from markql CLI fallback")
+        return diagnostics
     if not isinstance(parsed, list):
         raise RuntimeError("Unexpected lint diagnostics shape from markql CLI fallback")
     return parsed
 
 
+def lint_detailed(query: str) -> dict:
+    """Parses + validates a query and returns diagnostics plus coverage metadata."""
+    if hasattr(_core, "lint_query_detailed"):
+        return dict(_core.lint_query_detailed(query))
+    raw = _run_cli(["--lint", query, "--format", "json"]).strip()
+    if not raw:
+        return {
+            "summary": {
+                "parse_succeeded": True,
+                "coverage": "parse_only",
+                "relation_style_query": False,
+                "used_reduced_validation": False,
+                "error_count": 0,
+                "warning_count": 0,
+                "note_count": 0,
+            },
+            "diagnostics": [],
+        }
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("Failed to parse detailed lint JSON from markql CLI fallback") from exc
+    if isinstance(parsed, list):
+        return {
+            "summary": {
+                "parse_succeeded": True,
+                "coverage": "parse_only",
+                "relation_style_query": False,
+                "used_reduced_validation": False,
+                "error_count": sum(1 for item in parsed if item.get("severity") == "ERROR"),
+                "warning_count": sum(1 for item in parsed if item.get("severity") == "WARNING"),
+                "note_count": sum(1 for item in parsed if item.get("severity") == "NOTE"),
+            },
+            "diagnostics": parsed,
+        }
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Unexpected detailed lint JSON shape from markql CLI fallback")
+    diagnostics = parsed.get("diagnostics", [])
+    summary = parsed.get("summary", {})
+    if not isinstance(diagnostics, list) or not isinstance(summary, dict):
+        raise RuntimeError("Unexpected detailed lint JSON structure from markql CLI fallback")
+    return {"summary": summary, "diagnostics": diagnostics}
+
+
 def core_version() -> str:
     """Returns core version + provenance string (version + commit, dirty if applicable)."""
-    _require_core()
     if hasattr(_core, "core_version"):
         return str(_core.core_version())
     return _run_cli(["--version"]).strip()
@@ -182,7 +229,6 @@ def core_version() -> str:
 
 def core_version_info() -> Dict[str, Any]:
     """Returns structured core version/provenance metadata."""
-    _require_core()
     if hasattr(_core, "core_version_info"):
         return dict(_core.core_version_info())
     rendered = core_version()
@@ -213,6 +259,7 @@ __all__ = [
     "summarize",
     "execute",
     "lint",
+    "lint_detailed",
     "core_version",
     "core_version_info",
 ]
