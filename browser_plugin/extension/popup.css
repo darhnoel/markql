@@ -52,6 +52,13 @@ h1 {
   color: var(--muted);
 }
 
+.field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .sql-editor {
   border: 1px solid var(--border);
   border-radius: 7px;
@@ -178,6 +185,21 @@ button.secondary {
   background: #fff;
   color: var(--text);
   border-color: var(--border);
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+
+.icon-button svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
 }
 
 button:disabled {

@@ -33,6 +33,8 @@ const ui = {
   editTokenBtn: document.getElementById("editTokenBtn"),
   tokenHelp: document.getElementById("tokenHelp"),
   queryInput: document.getElementById("queryInput"),
+  sqlEditor: document.querySelector(".sql-editor"),
+  copyQueryBtn: document.getElementById("copyQueryBtn"),
   maxRowsInput: document.getElementById("maxRowsInput"),
   timeoutInput: document.getElementById("timeoutInput"),
   captureBtn: document.getElementById("captureBtn"),
@@ -223,6 +225,12 @@ function insertAtCaret(text) {
   range.collapse(true);
   selection.removeAllRanges();
   selection.addRange(range);
+}
+
+function focusQueryInput(placeCaretAtEnd = false) {
+  ui.queryInput.focus();
+  if (!placeCaretAtEnd) return;
+  setCaretOffset(ui.queryInput, getQueryText().length);
 }
 
 function status(text) {
@@ -432,6 +440,15 @@ async function copyCsv() {
   status(`Copied CSV (${lastResult.rows.length} rows).`);
 }
 
+async function copyQuery() {
+  const query = getQueryText();
+  if (!query.trim()) {
+    throw new Error("No query to copy");
+  }
+  await navigator.clipboard.writeText(query);
+  status("Copied query.");
+}
+
 async function copyJson() {
   if (!lastResult || !Array.isArray(lastResult.columns) || !Array.isArray(lastResult.rows)) {
     throw new Error("No query result to export");
@@ -561,8 +578,15 @@ ui.cancelTokenBtn.addEventListener("click", () => {
 });
 ui.captureBtn.addEventListener("click", () => guarded(() => captureSnapshot(true)));
 ui.runBtn.addEventListener("click", () => guarded(runQuery));
+ui.copyQueryBtn.addEventListener("click", () => guarded(copyQuery));
 ui.copyCsvBtn.addEventListener("click", () => guarded(copyCsv));
 ui.copyJsonBtn.addEventListener("click", () => guarded(copyJson));
+ui.sqlEditor.addEventListener("mousedown", (event) => {
+  if (event.button !== 0) return;
+  if (event.target === ui.queryInput || ui.queryInput.contains(event.target)) return;
+  event.preventDefault();
+  focusQueryInput(true);
+});
 ui.queryInput.addEventListener("input", () => renderQueryHighlight(true));
 ui.queryInput.addEventListener("compositionstart", () => {
   isComposingQuery = true;
