@@ -322,6 +322,12 @@ button:disabled {
   border-bottom: 1px solid var(--border);
 }
 
+.output-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .output-tabs {
   display: flex;
   align-items: center;

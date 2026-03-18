@@ -59,6 +59,7 @@ const ui = {
   editTokenBtn: document.getElementById("editTokenBtn"),
   tokenHelp: document.getElementById("tokenHelp"),
   runBtn: document.getElementById("runBtn"),
+  runResultsBtn: document.getElementById("runResultsBtn"),
   captureBtn: document.getElementById("captureBtn"),
   examplesSelect: document.getElementById("examplesSelect"),
   formatBtn: document.getElementById("formatBtn"),
@@ -1021,6 +1022,7 @@ async function guarded(action) {
   const controls = [
     ui.captureBtn,
     ui.runBtn,
+    ui.runResultsBtn,
     ui.examplesSelect,
     ui.formatBtn,
     ui.lintBtn,
@@ -1058,6 +1060,7 @@ ui.cancelTokenBtn.addEventListener("click", () => {
 });
 ui.captureBtn.addEventListener("click", () => guarded(() => captureSnapshot(true)));
 ui.runBtn.addEventListener("click", () => guarded(runQuery));
+ui.runResultsBtn.addEventListener("click", () => guarded(runQuery));
 ui.examplesSelect.addEventListener("change", () => guarded(applySelectedExample));
 ui.formatBtn.addEventListener("click", () => guarded(formatCurrentQuery));
 ui.lintBtn.addEventListener("click", () => guarded(toggleLint));
