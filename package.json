@@ -1,0 +1,11 @@
+{
+  "name": "markql-browser-plugin-tests",
+  "private": true,
+  "scripts": {
+    "test:browser-plugin": "playwright test browser_plugin/tests",
+    "test:browser-plugin:headed": "playwright test browser_plugin/tests --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.2"
+  }
+}

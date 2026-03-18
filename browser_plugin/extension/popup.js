@@ -311,6 +311,15 @@ function formatQueryText(query) {
   let formatted = query.replace(/\r\n?/g, "\n").trim();
   if (!formatted) return "";
 
+  for (const keyword of SQL_KEYWORDS) {
+    const pattern = new RegExp(`\\b${keyword}\\b`, "gi");
+    formatted = formatted.replace(pattern, keyword);
+  }
+  for (const fn of SQL_FUNCTIONS) {
+    const pattern = new RegExp(`\\b${fn}\\b`, "gi");
+    formatted = formatted.replace(pattern, fn);
+  }
+
   formatted = formatted
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n[ \t]+/g, "\n")
