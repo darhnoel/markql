@@ -3,6 +3,7 @@ const STORAGE_KEY_TOKEN = "markqlAgentToken";
 const STORAGE_KEY_QUERY = "markqlLastQuery";
 const STORAGE_KEY_SNAPSHOT = "markqlSnapshotHtml";
 const STORAGE_KEY_SNAPSHOT_SCOPE = "markqlSnapshotScope";
+const STORAGE_KEY_LINT = "markqlLintEnabled";
 const LEGACY_STORAGE_KEY_TOKEN = "xsqlAgentToken";
 const LEGACY_STORAGE_KEY_QUERY = "xsqlLastQuery";
 const LEGACY_STORAGE_KEY_SNAPSHOT = "xsqlSnapshotHtml";
@@ -12,7 +13,11 @@ const FALLBACK_CAPTURE_SCOPE = "main";
 let snapshotHtml = "";
 let snapshotScope = "";
 let lastResult = null;
+let lastErrorText = "";
 let isComposingQuery = false;
+let lintEnabled = true;
+let activeOutputTab = "table";
+
 const SQL_KEYWORDS = new Set([
   "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "AS", "LIMIT",
   "ORDER", "BY", "ASC", "DESC", "EXISTS", "IS", "NULL", "CONTAINS",
@@ -32,18 +37,25 @@ const ui = {
   cancelTokenBtn: document.getElementById("cancelTokenBtn"),
   editTokenBtn: document.getElementById("editTokenBtn"),
   tokenHelp: document.getElementById("tokenHelp"),
+  runBtn: document.getElementById("runBtn"),
+  captureBtn: document.getElementById("captureBtn"),
+  examplesSelect: document.getElementById("examplesSelect"),
+  formatBtn: document.getElementById("formatBtn"),
+  lintBtn: document.getElementById("lintBtn"),
   queryInput: document.getElementById("queryInput"),
   sqlEditor: document.querySelector(".sql-editor"),
+  lineNumbers: document.getElementById("lineNumbers"),
   copyQueryBtn: document.getElementById("copyQueryBtn"),
   maxRowsInput: document.getElementById("maxRowsInput"),
   timeoutInput: document.getElementById("timeoutInput"),
-  captureBtn: document.getElementById("captureBtn"),
-  runBtn: document.getElementById("runBtn"),
-  copyCsvBtn: document.getElementById("copyCsvBtn"),
-  copyJsonBtn: document.getElementById("copyJsonBtn"),
+  copyExportBtn: document.getElementById("copyExportBtn"),
   statusLine: document.getElementById("statusLine"),
   resultsHead: document.querySelector("#resultsTable thead"),
-  resultsBody: document.querySelector("#resultsTable tbody")
+  resultsBody: document.querySelector("#resultsTable tbody"),
+  jsonOutput: document.getElementById("jsonOutput"),
+  errorsOutput: document.getElementById("errorsOutput"),
+  tabButtons: Array.from(document.querySelectorAll(".tab-button")),
+  tabPanes: Array.from(document.querySelectorAll(".tab-pane"))
 };
 
 function escapeHtml(text) {
@@ -151,8 +163,7 @@ function highlightSql(query) {
 }
 
 function getQueryText() {
-  if (!ui.queryInput) return "";
-  return ui.queryInput.textContent || "";
+  return ui.queryInput ? ui.queryInput.textContent || "" : "";
 }
 
 function setQueryText(text) {
@@ -178,6 +189,7 @@ function setCaretOffset(container, offset) {
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
   let remaining = Math.max(0, offset);
   let node = walker.nextNode();
+
   while (node) {
     const length = node.nodeValue.length;
     if (remaining <= length) {
@@ -197,18 +209,35 @@ function setCaretOffset(container, offset) {
   selection.addRange(range);
 }
 
-function renderQueryHighlight(preserveCaret = false) {
-  if (!ui.queryInput) return;
-  if (isComposingQuery) return;
+function renderLineNumbers() {
   const query = getQueryText();
+  const count = Math.max(1, query.split("\n").length);
+  const numbers = [];
+  for (let i = 1; i <= count; i += 1) {
+    numbers.push(String(i));
+  }
+  ui.lineNumbers.textContent = numbers.join("\n");
+}
+
+function syncEditorScroll() {
+  ui.lineNumbers.scrollTop = ui.queryInput.scrollTop;
+}
+
+function renderQueryHighlight(preserveCaret = false) {
+  if (!ui.queryInput || isComposingQuery) return;
+  const query = getQueryText();
+  const scrollTop = ui.queryInput.scrollTop;
   const caret = preserveCaret ? getCaretOffset(ui.queryInput) : 0;
   ui.queryInput.innerHTML = highlightSql(query);
   if (!query) {
     ui.queryInput.innerHTML = "";
   }
+  renderLineNumbers();
   if (preserveCaret) {
     setCaretOffset(ui.queryInput, caret);
   }
+  ui.queryInput.scrollTop = scrollTop;
+  syncEditorScroll();
 }
 
 function insertAtCaret(text) {
@@ -229,8 +258,9 @@ function insertAtCaret(text) {
 
 function focusQueryInput(placeCaretAtEnd = false) {
   ui.queryInput.focus();
-  if (!placeCaretAtEnd) return;
-  setCaretOffset(ui.queryInput, getQueryText().length);
+  if (placeCaretAtEnd) {
+    setCaretOffset(ui.queryInput, getQueryText().length);
+  }
 }
 
 function status(text) {
@@ -277,7 +307,198 @@ function buildJson(columns, rows) {
   return JSON.stringify(objects, null, 2);
 }
 
-function renderResults(result) {
+function formatQueryText(query) {
+  let formatted = query.replace(/\r\n?/g, "\n").trim();
+  if (!formatted) return "";
+
+  formatted = formatted
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/[ \t]{2,}/g, " ");
+
+  const breakKeywords = ["FROM", "WHERE", "LIMIT", "TO"];
+  for (const keyword of breakKeywords) {
+    const pattern = new RegExp(`\\s+${keyword}\\b`, "gi");
+    formatted = formatted.replace(pattern, `\n${keyword}`);
+  }
+  formatted = formatted.replace(/\s+ORDER\s+BY\b/gi, "\nORDER BY");
+  formatted = formatted.replace(/\s+(AND|OR)\b/gi, "\n  $1");
+  formatted = formatted.replace(/\n{3,}/g, "\n\n");
+
+  if (!/;\s*$/.test(formatted)) {
+    formatted += ";";
+  }
+  return formatted;
+}
+
+function unterminatedSingleQuote(query) {
+  let inCommentLine = false;
+  let inCommentBlock = false;
+
+  for (let i = 0; i < query.length; i += 1) {
+    const ch = query[i];
+    const next = query[i + 1];
+
+    if (inCommentLine) {
+      if (ch === "\n") inCommentLine = false;
+      continue;
+    }
+    if (inCommentBlock) {
+      if (ch === "*" && next === "/") {
+        inCommentBlock = false;
+        i += 1;
+      }
+      continue;
+    }
+    if (ch === "-" && next === "-") {
+      inCommentLine = true;
+      i += 1;
+      continue;
+    }
+    if (ch === "/" && next === "*") {
+      inCommentBlock = true;
+      i += 1;
+      continue;
+    }
+    if (ch === "'") {
+      i += 1;
+      while (i < query.length) {
+        if (query[i] === "'") {
+          if (query[i + 1] === "'") {
+            i += 2;
+            continue;
+          }
+          break;
+        }
+        i += 1;
+      }
+      if (i >= query.length) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function hasBalancedParens(query) {
+  let depth = 0;
+  let inString = false;
+  let inCommentLine = false;
+  let inCommentBlock = false;
+
+  for (let i = 0; i < query.length; i += 1) {
+    const ch = query[i];
+    const next = query[i + 1];
+
+    if (inCommentLine) {
+      if (ch === "\n") inCommentLine = false;
+      continue;
+    }
+    if (inCommentBlock) {
+      if (ch === "*" && next === "/") {
+        inCommentBlock = false;
+        i += 1;
+      }
+      continue;
+    }
+    if (inString) {
+      if (ch === "'") {
+        if (next === "'") {
+          i += 1;
+        } else {
+          inString = false;
+        }
+      }
+      continue;
+    }
+    if (ch === "-" && next === "-") {
+      inCommentLine = true;
+      i += 1;
+      continue;
+    }
+    if (ch === "/" && next === "*") {
+      inCommentBlock = true;
+      i += 1;
+      continue;
+    }
+    if (ch === "'") {
+      inString = true;
+      continue;
+    }
+    if (ch === "(") depth += 1;
+    if (ch === ")") depth -= 1;
+    if (depth < 0) return false;
+  }
+
+  return depth === 0;
+}
+
+function lintQuery(query) {
+  const messages = [];
+  const trimmed = query.trim();
+
+  if (!trimmed) {
+    messages.push({ level: "error", text: "Query is empty." });
+    return messages;
+  }
+  if (!/\bselect\b/i.test(trimmed)) {
+    messages.push({ level: "error", text: "Missing SELECT clause." });
+  }
+  if (!/\bfrom\b/i.test(trimmed)) {
+    messages.push({ level: "error", text: "Missing FROM clause." });
+  }
+  if (unterminatedSingleQuote(trimmed)) {
+    messages.push({ level: "error", text: "Unterminated single-quoted string." });
+  }
+  if (!hasBalancedParens(trimmed)) {
+    messages.push({ level: "error", text: "Unbalanced parentheses." });
+  }
+  if (!/;\s*$/.test(trimmed)) {
+    messages.push({ level: "warning", text: "Query does not end with a semicolon." });
+  }
+  return messages;
+}
+
+function renderErrorsPane() {
+  const query = getQueryText();
+  const lintMessages = lintEnabled ? lintQuery(query) : [];
+  const lines = [];
+
+  if (lintEnabled) {
+    if (lintMessages.length === 0) {
+      lines.push("Lint: no issues detected.");
+    } else {
+      for (const message of lintMessages) {
+        lines.push(`${message.level.toUpperCase()}: ${message.text}`);
+      }
+    }
+  } else {
+    lines.push("Lint is off.");
+  }
+
+  if (lastErrorText) {
+    lines.push("");
+    lines.push(`Runtime: ${lastErrorText}`);
+  }
+
+  const text = lines.join("\n").trim() || "No errors.";
+  ui.errorsOutput.textContent = text;
+  ui.errorsOutput.classList.toggle("empty", text === "No errors.");
+  ui.errorsOutput.classList.toggle("error", !!lastErrorText || lintMessages.some((m) => m.level === "error"));
+}
+
+function renderJsonPane() {
+  if (!lastResult || !Array.isArray(lastResult.columns) || !Array.isArray(lastResult.rows)) {
+    ui.jsonOutput.textContent = "No result yet.";
+    ui.jsonOutput.classList.add("empty");
+    return;
+  }
+  ui.jsonOutput.textContent = buildJson(lastResult.columns, lastResult.rows);
+  ui.jsonOutput.classList.remove("empty");
+}
+
+function renderResultsTable(result) {
   ui.resultsHead.innerHTML = "";
   ui.resultsBody.innerHTML = "";
 
@@ -300,6 +521,35 @@ function renderResults(result) {
   }
 }
 
+function setActiveTab(tabName) {
+  activeOutputTab = tabName;
+  for (const button of ui.tabButtons) {
+    const active = button.dataset.tab === tabName;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+  }
+  for (const pane of ui.tabPanes) {
+    pane.classList.toggle("active", pane.dataset.pane === tabName);
+  }
+}
+
+function updateCopyExportLabel() {
+  if (activeOutputTab === "table") {
+    ui.copyExportBtn.textContent = "Copy CSV";
+  } else if (activeOutputTab === "json") {
+    ui.copyExportBtn.textContent = "Copy JSON";
+  } else {
+    ui.copyExportBtn.textContent = "Copy Errors";
+  }
+}
+
+function refreshDerivedViews() {
+  renderLineNumbers();
+  renderJsonPane();
+  renderErrorsPane();
+  updateCopyExportLabel();
+}
+
 async function getActiveTab() {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tabs.length || typeof tabs[0].id !== "number") {
@@ -317,7 +567,6 @@ async function saveSnapshotToSession(html, scope) {
     });
     return true;
   } catch (err) {
-    // Large pages can exceed storage.session quota; keep in-memory snapshot usable.
     console.warn("Failed to cache snapshot in session storage:", err);
     return false;
   }
@@ -363,12 +612,11 @@ async function captureSnapshot(force = false) {
   }
 
   snapshotHtml = response.html;
-  const captureScope = response.scope || PRIMARY_CAPTURE_SCOPE;
-  snapshotScope = captureScope;
+  snapshotScope = response.scope || PRIMARY_CAPTURE_SCOPE;
   const cached = await saveSnapshotToSession(snapshotHtml, snapshotScope);
   const captureSource = response.source || "unknown";
   status(
-    `Captured ${response.size_bytes} bytes (${captureScope}/${captureSource})${cached ? "" : " | cache skipped"}.`
+    `Captured ${response.size_bytes} bytes (${snapshotScope}/${captureSource})${cached ? "" : " | cache skipped"}.`
   );
   return snapshotHtml;
 }
@@ -386,6 +634,14 @@ function getTokenOrExplain() {
 async function runQuery() {
   const token = getTokenOrExplain();
   const query = getQueryText().trim();
+  const lintMessages = lintEnabled ? lintQuery(query) : [];
+  if (lintMessages.some((message) => message.level === "error")) {
+    lastErrorText = "Query has lint errors. Fix them or turn lint off.";
+    renderErrorsPane();
+    setActiveTab("errors");
+    updateCopyExportLabel();
+    throw new Error(lastErrorText);
+  }
   if (!query) {
     throw new Error("Query is required");
   }
@@ -419,25 +675,24 @@ async function runQuery() {
 
   const payload = await response.json();
   if (!response.ok) {
-    const msg = payload && payload.error ? payload.error.message : `HTTP ${response.status}`;
-    throw new Error(msg);
+    lastErrorText = payload && payload.error ? payload.error.message : `HTTP ${response.status}`;
+    renderErrorsPane();
+    setActiveTab("errors");
+    updateCopyExportLabel();
+    throw new Error(lastErrorText);
   }
 
+  lastErrorText = "";
   lastResult = payload;
-  renderResults(payload);
+  renderResultsTable(payload);
+  renderJsonPane();
+  renderErrorsPane();
+  setActiveTab("table");
+  updateCopyExportLabel();
 
   const err = payload.error ? ` error=${payload.error.message}` : "";
   const trunc = payload.truncated ? " (truncated)" : "";
   status(`Snapshot ${snapshotHtml.length} bytes | elapsed ${payload.elapsed_ms} ms | rows ${payload.rows.length}${trunc}${err}`);
-}
-
-async function copyCsv() {
-  if (!lastResult || !Array.isArray(lastResult.columns) || !Array.isArray(lastResult.rows)) {
-    throw new Error("No query result to export");
-  }
-  const csv = buildCsv(lastResult.columns, lastResult.rows);
-  await navigator.clipboard.writeText(csv);
-  status(`Copied CSV (${lastResult.rows.length} rows).`);
 }
 
 async function copyQuery() {
@@ -449,13 +704,63 @@ async function copyQuery() {
   status("Copied query.");
 }
 
-async function copyJson() {
-  if (!lastResult || !Array.isArray(lastResult.columns) || !Array.isArray(lastResult.rows)) {
-    throw new Error("No query result to export");
+async function copyActiveExport() {
+  if (activeOutputTab === "table") {
+    if (!lastResult || !Array.isArray(lastResult.columns) || !Array.isArray(lastResult.rows)) {
+      throw new Error("No table result to export");
+    }
+    const csv = buildCsv(lastResult.columns, lastResult.rows);
+    await navigator.clipboard.writeText(csv);
+    status(`Copied CSV (${lastResult.rows.length} rows).`);
+    return;
   }
-  const json = buildJson(lastResult.columns, lastResult.rows);
-  await navigator.clipboard.writeText(json);
-  status(`Copied JSON (${lastResult.rows.length} rows).`);
+  if (activeOutputTab === "json") {
+    if (!lastResult || !Array.isArray(lastResult.columns) || !Array.isArray(lastResult.rows)) {
+      throw new Error("No JSON result to export");
+    }
+    await navigator.clipboard.writeText(buildJson(lastResult.columns, lastResult.rows));
+    status(`Copied JSON (${lastResult.rows.length} rows).`);
+    return;
+  }
+  const errorsText = ui.errorsOutput.textContent || "";
+  if (!errorsText.trim()) {
+    throw new Error("No errors to copy");
+  }
+  await navigator.clipboard.writeText(errorsText);
+  status("Copied errors.");
+}
+
+async function applySelectedExample() {
+  const value = ui.examplesSelect.value;
+  if (!value) return;
+  setQueryText(value);
+  renderQueryHighlight();
+  renderErrorsPane();
+  await chrome.storage.local.set({ [STORAGE_KEY_QUERY]: value });
+  status("Loaded example query.");
+  ui.examplesSelect.selectedIndex = 0;
+  focusQueryInput(true);
+}
+
+async function formatCurrentQuery() {
+  const formatted = formatQueryText(getQueryText());
+  if (!formatted) {
+    throw new Error("No query to format");
+  }
+  setQueryText(formatted);
+  renderQueryHighlight();
+  renderErrorsPane();
+  await chrome.storage.local.set({ [STORAGE_KEY_QUERY]: formatted });
+  status("Formatted query.");
+  focusQueryInput(true);
+}
+
+async function toggleLint() {
+  lintEnabled = !lintEnabled;
+  ui.lintBtn.setAttribute("aria-pressed", lintEnabled ? "true" : "false");
+  await chrome.storage.local.set({ [STORAGE_KEY_LINT]: lintEnabled });
+  renderErrorsPane();
+  status(lintEnabled ? "Lint enabled." : "Lint disabled.");
 }
 
 function setTokenEditorVisible(visible) {
@@ -498,6 +803,7 @@ async function restoreSettings() {
   const localData = await chrome.storage.local.get([
     STORAGE_KEY_TOKEN,
     STORAGE_KEY_QUERY,
+    STORAGE_KEY_LINT,
     LEGACY_STORAGE_KEY_TOKEN,
     LEGACY_STORAGE_KEY_QUERY
   ]);
@@ -516,6 +822,10 @@ async function restoreSettings() {
       await chrome.storage.local.set({ [STORAGE_KEY_QUERY]: query });
     }
   }
+  if (typeof localData[STORAGE_KEY_LINT] === "boolean") {
+    lintEnabled = localData[STORAGE_KEY_LINT];
+  }
+  ui.lintBtn.setAttribute("aria-pressed", lintEnabled ? "true" : "false");
 
   const restoredSnapshot = await restoreSnapshotFromSession();
   snapshotHtml = restoredSnapshot.html;
@@ -540,28 +850,35 @@ async function restoreSettings() {
   setTokenEditorVisible(!hasToken);
   updateTokenUi();
   renderQueryHighlight();
+  refreshDerivedViews();
+  setActiveTab("table");
 }
 
 async function guarded(action) {
+  const controls = [
+    ui.captureBtn,
+    ui.runBtn,
+    ui.examplesSelect,
+    ui.formatBtn,
+    ui.lintBtn,
+    ui.copyQueryBtn,
+    ui.copyExportBtn,
+    ui.saveTokenBtn,
+    ui.cancelTokenBtn,
+    ui.editTokenBtn
+  ];
+
   try {
-    ui.captureBtn.disabled = true;
-    ui.runBtn.disabled = true;
-    ui.copyCsvBtn.disabled = true;
-    ui.copyJsonBtn.disabled = true;
-    ui.saveTokenBtn.disabled = true;
-    ui.cancelTokenBtn.disabled = true;
-    ui.editTokenBtn.disabled = true;
+    for (const control of controls) {
+      control.disabled = true;
+    }
     await action();
   } catch (err) {
     status(`Error: ${err && err.message ? err.message : String(err)}`);
   } finally {
-    ui.captureBtn.disabled = false;
-    ui.runBtn.disabled = false;
-    ui.copyCsvBtn.disabled = false;
-    ui.copyJsonBtn.disabled = false;
-    ui.saveTokenBtn.disabled = false;
-    ui.cancelTokenBtn.disabled = false;
-    ui.editTokenBtn.disabled = false;
+    for (const control of controls) {
+      control.disabled = false;
+    }
   }
 }
 
@@ -578,35 +895,59 @@ ui.cancelTokenBtn.addEventListener("click", () => {
 });
 ui.captureBtn.addEventListener("click", () => guarded(() => captureSnapshot(true)));
 ui.runBtn.addEventListener("click", () => guarded(runQuery));
+ui.examplesSelect.addEventListener("change", () => guarded(applySelectedExample));
+ui.formatBtn.addEventListener("click", () => guarded(formatCurrentQuery));
+ui.lintBtn.addEventListener("click", () => guarded(toggleLint));
 ui.copyQueryBtn.addEventListener("click", () => guarded(copyQuery));
-ui.copyCsvBtn.addEventListener("click", () => guarded(copyCsv));
-ui.copyJsonBtn.addEventListener("click", () => guarded(copyJson));
+ui.copyExportBtn.addEventListener("click", () => guarded(copyActiveExport));
+
+for (const button of ui.tabButtons) {
+  button.addEventListener("click", () => {
+    setActiveTab(button.dataset.tab);
+    updateCopyExportLabel();
+  });
+}
+
 ui.sqlEditor.addEventListener("mousedown", (event) => {
   if (event.button !== 0) return;
   if (event.target === ui.queryInput || ui.queryInput.contains(event.target)) return;
   event.preventDefault();
   focusQueryInput(true);
 });
-ui.queryInput.addEventListener("input", () => renderQueryHighlight(true));
+
+ui.queryInput.addEventListener("scroll", syncEditorScroll);
+ui.queryInput.addEventListener("input", () => {
+  renderQueryHighlight(true);
+  renderErrorsPane();
+});
 ui.queryInput.addEventListener("compositionstart", () => {
   isComposingQuery = true;
 });
 ui.queryInput.addEventListener("compositionend", () => {
   isComposingQuery = false;
   renderQueryHighlight(true);
+  renderErrorsPane();
 });
 ui.queryInput.addEventListener("keydown", (event) => {
   if (event.isComposing || isComposingQuery) return;
+
+  if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+    event.preventDefault();
+    guarded(runQuery);
+    return;
+  }
   if (event.key === "Enter") {
     event.preventDefault();
     insertAtCaret("\n");
     renderQueryHighlight(true);
+    renderErrorsPane();
     return;
   }
   if (event.key === "Tab") {
     event.preventDefault();
     insertAtCaret("  ");
     renderQueryHighlight(true);
+    renderErrorsPane();
   }
 });
 ui.queryInput.addEventListener("paste", (event) => {
@@ -615,9 +956,13 @@ ui.queryInput.addEventListener("paste", (event) => {
   if (text) {
     insertAtCaret(text);
     renderQueryHighlight(true);
+    renderErrorsPane();
   }
 });
+
 renderQueryHighlight();
+refreshDerivedViews();
+setActiveTab("table");
 restoreSettings().catch((err) => {
   status(`Error: ${err && err.message ? err.message : String(err)}`);
 });
