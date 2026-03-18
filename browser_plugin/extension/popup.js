@@ -17,6 +17,9 @@ let lastErrorText = "";
 let isComposingQuery = false;
 let lintEnabled = true;
 let activeOutputTab = "table";
+let suppressHistoryPush = false;
+let historyIndex = -1;
+const queryHistory = [];
 
 const SQL_KEYWORDS = new Set([
   "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "AS", "LIMIT",
@@ -189,40 +192,73 @@ function setQueryText(text) {
 }
 
 function getCaretOffset(container) {
+  const offsets = getSelectionOffsets(container);
+  return offsets.end;
+}
+
+function getSelectionOffsets(container) {
   const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return 0;
+  if (!selection || selection.rangeCount === 0) return { start: 0, end: 0 };
   const range = selection.getRangeAt(0);
-  if (!container.contains(range.endContainer)) return getQueryText().length;
-  const before = range.cloneRange();
-  before.selectNodeContents(container);
-  before.setEnd(range.endContainer, range.endOffset);
-  return before.toString().length;
+  if (!container.contains(range.startContainer) || !container.contains(range.endContainer)) {
+    const length = getQueryText().length;
+    return { start: length, end: length };
+  }
+
+  const startRange = range.cloneRange();
+  startRange.selectNodeContents(container);
+  startRange.setEnd(range.startContainer, range.startOffset);
+
+  const endRange = range.cloneRange();
+  endRange.selectNodeContents(container);
+  endRange.setEnd(range.endContainer, range.endOffset);
+
+  const start = startRange.toString().length;
+  const end = endRange.toString().length;
+  return start <= end ? { start, end } : { start: end, end: start };
 }
 
 function setCaretOffset(container, offset) {
+  setSelectionOffsets(container, offset, offset);
+}
+
+function setSelectionOffsets(container, startOffset, endOffset) {
   const selection = window.getSelection();
   if (!selection) return;
 
   const range = document.createRange();
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-  let remaining = Math.max(0, offset);
+  const startTarget = Math.max(0, startOffset);
+  const endTarget = Math.max(0, endOffset);
+  let currentOffset = 0;
+  let startNode = null;
+  let endNode = null;
+  let startNodeOffset = 0;
+  let endNodeOffset = 0;
   let node = walker.nextNode();
 
   while (node) {
     const length = node.nodeValue.length;
-    if (remaining <= length) {
-      range.setStart(node, remaining);
-      range.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(range);
-      return;
+    if (!startNode && startTarget <= currentOffset + length) {
+      startNode = node;
+      startNodeOffset = startTarget - currentOffset;
     }
-    remaining -= length;
+    if (!endNode && endTarget <= currentOffset + length) {
+      endNode = node;
+      endNodeOffset = endTarget - currentOffset;
+      break;
+    }
+    currentOffset += length;
     node = walker.nextNode();
   }
 
-  range.selectNodeContents(container);
-  range.collapse(false);
+  if (!startNode || !endNode) {
+    range.selectNodeContents(container);
+    range.collapse(false);
+  } else {
+    range.setStart(startNode, startNodeOffset);
+    range.setEnd(endNode, endNodeOffset);
+  }
   selection.removeAllRanges();
   selection.addRange(range);
 }
@@ -245,14 +281,14 @@ function renderQueryHighlight(preserveCaret = false) {
   if (!ui.queryInput || isComposingQuery) return;
   const query = getQueryText();
   const scrollTop = ui.queryInput.scrollTop;
-  const caret = preserveCaret ? getCaretOffset(ui.queryInput) : 0;
+  const selection = preserveCaret ? getSelectionOffsets(ui.queryInput) : { start: 0, end: 0 };
   ui.queryInput.innerHTML = highlightSql(query);
   if (!query) {
     ui.queryInput.innerHTML = "";
   }
   renderLineNumbers();
   if (preserveCaret) {
-    setCaretOffset(ui.queryInput, caret);
+    setSelectionOffsets(ui.queryInput, selection.start, selection.end);
   }
   ui.queryInput.scrollTop = scrollTop;
   syncEditorScroll();
@@ -272,6 +308,103 @@ function insertAtCaret(text) {
   range.collapse(true);
   selection.removeAllRanges();
   selection.addRange(range);
+}
+
+function replaceQueryText(nextText, selectionStart = null, selectionEnd = null) {
+  setQueryText(nextText);
+  renderQueryHighlight();
+  const fallback = nextText.length;
+  const start = selectionStart === null ? fallback : selectionStart;
+  const end = selectionEnd === null ? start : selectionEnd;
+  setSelectionOffsets(ui.queryInput, start, end);
+}
+
+function recordHistoryState() {
+  if (suppressHistoryPush) return;
+  const query = getQueryText();
+  const selection = getSelectionOffsets(ui.queryInput);
+  const current = queryHistory[historyIndex];
+  if (current && current.text === query && current.start === selection.start && current.end === selection.end) {
+    return;
+  }
+  queryHistory.splice(historyIndex + 1);
+  queryHistory.push({ text: query, start: selection.start, end: selection.end });
+  historyIndex = queryHistory.length - 1;
+}
+
+function restoreHistoryState(state) {
+  suppressHistoryPush = true;
+  replaceQueryText(state.text, state.start, state.end);
+  renderErrorsPane();
+  suppressHistoryPush = false;
+}
+
+function undoQueryEdit() {
+  if (historyIndex <= 0) return;
+  historyIndex -= 1;
+  restoreHistoryState(queryHistory[historyIndex]);
+}
+
+function redoQueryEdit() {
+  if (historyIndex >= queryHistory.length - 1) return;
+  historyIndex += 1;
+  restoreHistoryState(queryHistory[historyIndex]);
+}
+
+function insertTextAtSelection(text) {
+  const query = getQueryText();
+  const selection = getSelectionOffsets(ui.queryInput);
+  const nextText = query.slice(0, selection.start) + text + query.slice(selection.end);
+  const nextOffset = selection.start + text.length;
+  replaceQueryText(nextText, nextOffset, nextOffset);
+  renderErrorsPane();
+  recordHistoryState();
+}
+
+function indentSelectedLines(unindent = false) {
+  const query = getQueryText();
+  const selection = getSelectionOffsets(ui.queryInput);
+  if (selection.start === selection.end && !unindent) {
+    insertTextAtSelection("  ");
+    return;
+  }
+  const lineStart = query.lastIndexOf("\n", Math.max(0, selection.start - 1)) + 1;
+  const lineEndBoundary = selection.end < query.length ? query.indexOf("\n", selection.end) : -1;
+  const lineEnd = lineEndBoundary === -1 ? query.length : lineEndBoundary;
+  const block = query.slice(lineStart, lineEnd);
+  const lines = block.split("\n");
+
+  let removedBeforeStart = 0;
+  let removedWithinSelection = 0;
+  const updatedLines = lines.map((line, index) => {
+    if (!unindent) return `  ${line}`;
+    let removeCount = 0;
+    if (line.startsWith("  ")) {
+      removeCount = 2;
+    } else if (line.startsWith("\t") || line.startsWith(" ")) {
+      removeCount = 1;
+    }
+    if (index === 0) removedBeforeStart = removeCount;
+    removedWithinSelection += removeCount;
+    return line.slice(removeCount);
+  });
+
+  const replacement = unindent ? updatedLines.join("\n") : updatedLines.join("\n");
+  const nextText = query.slice(0, lineStart) + replacement + query.slice(lineEnd);
+
+  let nextStart;
+  let nextEnd;
+  if (!unindent) {
+    nextStart = selection.start + 2;
+    nextEnd = selection.end + 2 * lines.length;
+  } else {
+    nextStart = Math.max(lineStart, selection.start - removedBeforeStart);
+    nextEnd = Math.max(nextStart, selection.end - removedWithinSelection);
+  }
+
+  replaceQueryText(nextText, nextStart, nextEnd);
+  renderErrorsPane();
+  recordHistoryState();
 }
 
 function focusQueryInput(placeCaretAtEnd = false) {
@@ -879,6 +1012,9 @@ async function restoreSettings() {
   renderQueryHighlight();
   refreshDerivedViews();
   setActiveTab("table");
+  queryHistory.length = 0;
+  historyIndex = -1;
+  recordHistoryState();
 }
 
 async function guarded(action) {
@@ -946,6 +1082,7 @@ ui.queryInput.addEventListener("scroll", syncEditorScroll);
 ui.queryInput.addEventListener("input", () => {
   renderQueryHighlight(true);
   renderErrorsPane();
+  recordHistoryState();
 });
 ui.queryInput.addEventListener("compositionstart", () => {
   isComposingQuery = true;
@@ -954,10 +1091,25 @@ ui.queryInput.addEventListener("compositionend", () => {
   isComposingQuery = false;
   renderQueryHighlight(true);
   renderErrorsPane();
+  recordHistoryState();
 });
 ui.queryInput.addEventListener("keydown", (event) => {
   if (event.isComposing || isComposingQuery) return;
 
+  if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "z") {
+    event.preventDefault();
+    if (event.shiftKey) {
+      redoQueryEdit();
+    } else {
+      undoQueryEdit();
+    }
+    return;
+  }
+  if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "y") {
+    event.preventDefault();
+    redoQueryEdit();
+    return;
+  }
   if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
     event.preventDefault();
     guarded(runQuery);
@@ -965,25 +1117,19 @@ ui.queryInput.addEventListener("keydown", (event) => {
   }
   if (event.key === "Enter") {
     event.preventDefault();
-    insertAtCaret("\n");
-    renderQueryHighlight(true);
-    renderErrorsPane();
+    insertTextAtSelection("\n");
     return;
   }
   if (event.key === "Tab") {
     event.preventDefault();
-    insertAtCaret("  ");
-    renderQueryHighlight(true);
-    renderErrorsPane();
+    indentSelectedLines(event.shiftKey);
   }
 });
 ui.queryInput.addEventListener("paste", (event) => {
   event.preventDefault();
   const text = event.clipboardData ? event.clipboardData.getData("text/plain") : "";
   if (text) {
-    insertAtCaret(text);
-    renderQueryHighlight(true);
-    renderErrorsPane();
+    insertTextAtSelection(text);
   }
 });
 
