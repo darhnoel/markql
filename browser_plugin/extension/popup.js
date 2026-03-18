@@ -573,6 +573,12 @@ ui.queryInput.addEventListener("compositionend", () => {
 });
 ui.queryInput.addEventListener("keydown", (event) => {
   if (event.isComposing || isComposingQuery) return;
+  if (event.key === "Enter") {
+    event.preventDefault();
+    insertAtCaret("\n");
+    renderQueryHighlight(true);
+    return;
+  }
   if (event.key === "Tab") {
     event.preventDefault();
     insertAtCaret("  ");
