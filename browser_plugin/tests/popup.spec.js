@@ -23,9 +23,9 @@ test.describe("browser plugin popup", () => {
     const { context, extensionId } = await launchExtensionContext();
 
     try {
-      let capturedRequest = null;
+      const capturedRequests = [];
       await context.route("http://127.0.0.1:7337/v1/query", async (route) => {
-        capturedRequest = JSON.parse(route.request().postData() || "{}");
+        capturedRequests.push(JSON.parse(route.request().postData() || "{}"));
         await route.fulfill({
           status: 200,
           contentType: "application/json",
@@ -50,6 +50,15 @@ test.describe("browser plugin popup", () => {
       await popupPage.locator("#captureBtn").click();
       await expect(popupPage.locator("#statusLine")).toContainText("Captured");
 
+      const copyButton = popupPage.locator("#copyExportBtn");
+      const runResultsButton = popupPage.locator("#runResultsBtn");
+      await expect(copyButton).toBeVisible();
+      await expect(runResultsButton).toBeVisible();
+      const buttons = await popupPage.locator(".output-actions > button").evaluateAll((nodes) =>
+        nodes.map((node) => node.id)
+      );
+      expect(buttons).toEqual(["copyExportBtn", "runResultsBtn"]);
+
       await popupPage.locator("#queryInput").fill(
         "SELECT ATTR(a, href)\nFROM doc\nWHERE href CONTAINS 'example.com';"
       );
@@ -59,10 +68,15 @@ test.describe("browser plugin popup", () => {
       await expect(popupPage.locator("#resultsTable tbody")).toContainText("https://example.com/alpha");
       await expect(popupPage.locator("#statusLine")).toContainText("rows 2");
 
-      expect(capturedRequest).toBeTruthy();
-      expect(capturedRequest.query).toContain("SELECT ATTR(a, href)");
-      expect(capturedRequest.html).toContain("Fixture Page");
-      expect(capturedRequest.html).toContain("https://example.com/alpha");
+      await runResultsButton.click();
+      await expect(popupPage.locator("#resultsTable tbody tr")).toHaveCount(2);
+      await expect(popupPage.locator("#statusLine")).toContainText("rows 2");
+
+      expect(capturedRequests).toHaveLength(2);
+      expect(capturedRequests[0].query).toContain("SELECT ATTR(a, href)");
+      expect(capturedRequests[0].html).toContain("Fixture Page");
+      expect(capturedRequests[0].html).toContain("https://example.com/alpha");
+      expect(capturedRequests[1].query).toContain("SELECT ATTR(a, href)");
     } finally {
       await context.close();
       await server.close();
