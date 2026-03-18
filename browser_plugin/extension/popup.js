@@ -12,6 +12,7 @@ const FALLBACK_CAPTURE_SCOPE = "main";
 let snapshotHtml = "";
 let snapshotScope = "";
 let lastResult = null;
+let isComposingQuery = false;
 const SQL_KEYWORDS = new Set([
   "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "AS", "LIMIT",
   "ORDER", "BY", "ASC", "DESC", "EXISTS", "IS", "NULL", "CONTAINS",
@@ -196,6 +197,7 @@ function setCaretOffset(container, offset) {
 
 function renderQueryHighlight(preserveCaret = false) {
   if (!ui.queryInput) return;
+  if (isComposingQuery) return;
   const query = getQueryText();
   const caret = preserveCaret ? getCaretOffset(ui.queryInput) : 0;
   ui.queryInput.innerHTML = highlightSql(query);
@@ -562,7 +564,15 @@ ui.runBtn.addEventListener("click", () => guarded(runQuery));
 ui.copyCsvBtn.addEventListener("click", () => guarded(copyCsv));
 ui.copyJsonBtn.addEventListener("click", () => guarded(copyJson));
 ui.queryInput.addEventListener("input", () => renderQueryHighlight(true));
+ui.queryInput.addEventListener("compositionstart", () => {
+  isComposingQuery = true;
+});
+ui.queryInput.addEventListener("compositionend", () => {
+  isComposingQuery = false;
+  renderQueryHighlight(true);
+});
 ui.queryInput.addEventListener("keydown", (event) => {
+  if (event.isComposing || isComposingQuery) return;
   if (event.key === "Tab") {
     event.preventDefault();
     insertAtCaret("  ");
