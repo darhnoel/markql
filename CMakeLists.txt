@@ -125,9 +125,9 @@ if (MARKQL_WITH_FLATBUFFERS)
   )
   add_dependencies(markql_core GENERATE_markql_artifact_docn_flatbuffers)
   add_dependencies(markql_core GENERATE_markql_artifact_qast_flatbuffers)
-  target_link_libraries(markql_core PUBLIC flatbuffers::flatbuffers
-                                         markql_artifact_docn_flatbuffers
-                                         markql_artifact_qast_flatbuffers)
+  target_link_libraries(markql_core PRIVATE flatbuffers::flatbuffers
+                                          markql_artifact_docn_flatbuffers
+                                          markql_artifact_qast_flatbuffers)
 endif()
 
 if (MARKQL_ENABLE_KHMER_NUMBER)
