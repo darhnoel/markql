@@ -22,7 +22,7 @@ namespace {
 
 using json = nlohmann::json;
 
-constexpr const char* kAgentVersion = "0.1.0";
+constexpr const char* kAgentVersion = "0.2.0";
 constexpr const char* kBindHost = "127.0.0.1";
 constexpr int kBindPort = 7337;
 constexpr size_t kDefaultMaxRows = 2000;

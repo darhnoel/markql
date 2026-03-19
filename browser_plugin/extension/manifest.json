@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MarkQL Browser Plugin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Capture rendered DOM HTML and run MarkQL queries via local MarkQL agent.",
   "permissions": [
     "activeTab",
