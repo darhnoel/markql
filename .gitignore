@@ -52,6 +52,10 @@ plugins/src/
 plugins/.markql_logs/
 plugins/cmake/*/build/
 plugins/playwright_fetch/node_modules/
+node_modules/
+playwright-report/
+test-results/
+browser_plugin/tests/.playwright-user-data/
 # Python cache
 __pycache__/
 *.pyc

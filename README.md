@@ -88,7 +88,9 @@ cmake -S . -B build \
   -DMARKQL_WITH_LIBXML2=OFF \
   -DMARKQL_WITH_CURL=OFF \
   -DMARKQL_WITH_ARROW=OFF \
-  -DMARKQL_WITH_NLOHMANN_JSON=OFF
+  -DMARKQL_WITH_NLOHMANN_JSON=OFF \
+  -DMARKQL_BUILD_AGENT=ON \
+  -DMARKQL_AGENT_FETCH_DEPS=ON
 cmake --build build
 ```
 
@@ -105,6 +107,33 @@ Run interactive REPL:
 ```bash
 ./build/markql --interactive --input ./data/index.html
 ```
+
+## Browser Plugin MVP
+
+Build and run `xsql-agent` (localhost `127.0.0.1:7337`):
+
+```bash
+./build.sh
+./start-agent.sh
+```
+
+Notes:
+- `XSQL_AGENT_TOKEN` is required by the agent.
+- `start-agent.sh` sets a default token if not provided.
+- You can set your own token:
+
+```bash
+XSQL_AGENT_TOKEN=your-secret-token ./start-agent.sh
+```
+
+Load the Chrome extension:
+1. Open `chrome://extensions`
+2. Enable `Developer mode`
+3. Click `Load unpacked`
+4. Select `browser_plugin/extension`
+
+Extension host permission:
+- `http://127.0.0.1:7337/*`
 
 ## CLI Notes
 
@@ -131,6 +160,14 @@ Python package/tests (optional):
 ```bash
 ./install_python.sh
 ./test_python.sh
+```
+
+Browser plugin UI tests (optional):
+
+```bash
+npm install
+npx playwright install chromium
+npm run test:browser-plugin
 ```
 
 ## Documentation

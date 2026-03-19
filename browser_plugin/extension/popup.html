@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MarkQL Browser Plugin</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="panel">
+        <div id="tokenCompact" class="token-compact hidden">
+          <span class="label">Agent Token</span>
+          <span class="token-state">Saved</span>
+          <button id="editTokenBtn" class="secondary">Update Token</button>
+        </div>
+        <div id="tokenEditor" class="token-editor">
+          <label class="field compact-field">
+            <span>Agent Token</span>
+            <input id="tokenInput" type="password" placeholder="Paste token from MarkQL agent terminal" />
+          </label>
+          <div class="token-actions">
+            <button id="saveTokenBtn" class="secondary">Save Token</button>
+            <button id="cancelTokenBtn" class="secondary hidden">Cancel</button>
+          </div>
+        </div>
+        <p id="tokenHelp" class="hint"></p>
+      </section>
+
+      <section class="workspace panel">
+        <div class="workspace-head">
+          <div class="workspace-title">Query</div>
+          <button id="runBtn" class="run-button" type="button">Run <span aria-hidden="true">▶</span></button>
+        </div>
+
+        <div class="toolbar">
+          <button id="captureBtn" class="secondary" type="button">Capture</button>
+          <select id="examplesSelect" class="toolbar-select" aria-label="Examples">
+            <option value="">Examples</option>
+            <option value="SELECT ATTR(a, href)&#10;FROM doc&#10;WHERE href CONTAINS 'http';">Links</option>
+            <option value="SELECT TEXT(title)&#10;FROM doc;">Page Title</option>
+            <option value="SELECT TEXT(h1)&#10;FROM doc;">Headings</option>
+            <option value="SELECT ATTR(img, src)&#10;FROM doc;">Images</option>
+          </select>
+          <button id="formatBtn" class="secondary" type="button">Format</button>
+          <button id="lintBtn" class="secondary" type="button" aria-pressed="true">Lint</button>
+          <label class="toolbar-field">
+            <span>Rows</span>
+            <input id="maxRowsInput" type="number" min="1" max="10000" value="2000" />
+          </label>
+          <label class="toolbar-field">
+            <span>Timeout</span>
+            <input id="timeoutInput" type="number" min="100" max="120000" value="5000" />
+            <span class="toolbar-suffix">ms</span>
+          </label>
+        </div>
+
+        <div class="editor-shell">
+          <div id="lineNumbers" class="line-numbers" aria-hidden="true">1</div>
+          <div class="editor-main">
+            <div class="editor-actions">
+              <button id="copyQueryBtn" class="icon-button secondary" type="button" aria-label="Copy query" title="Copy query">
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d="M5 2.5A1.5 1.5 0 0 1 6.5 1h6A1.5 1.5 0 0 1 14 2.5v8a1.5 1.5 0 0 1-1.5 1.5h-6A1.5 1.5 0 0 1 5 10.5zM6.5 2a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5v-8a.5.5 0 0 0-.5-.5z"></path>
+                  <path d="M2 5.5A1.5 1.5 0 0 1 3.5 4H4v1h-.5a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5V13h1v.5A1.5 1.5 0 0 1 9.5 15h-6A1.5 1.5 0 0 1 2 13.5z"></path>
+                </svg>
+              </button>
+            </div>
+            <div class="sql-editor">
+              <div
+                id="queryInput"
+                class="query-editor"
+                contenteditable="true"
+                spellcheck="false"
+                role="textbox"
+                aria-multiline="true"
+                data-placeholder="SELECT a.href FROM document WHERE href CONTAINS 'http'"
+              ></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="output-head">
+          <div class="output-tabs" role="tablist" aria-label="Output tabs">
+            <button id="tabTableBtn" class="tab-button active" type="button" role="tab" aria-selected="true" data-tab="table">Table</button>
+            <button id="tabJsonBtn" class="tab-button" type="button" role="tab" aria-selected="false" data-tab="json">JSON</button>
+            <button id="tabErrorsBtn" class="tab-button" type="button" role="tab" aria-selected="false" data-tab="errors">Errors</button>
+          </div>
+          <div class="output-actions">
+            <button id="copyExportBtn" class="secondary" type="button">Copy Export</button>
+            <button id="runResultsBtn" type="button">Run <span aria-hidden="true">▶</span></button>
+          </div>
+        </div>
+
+        <div id="statusLine" class="status">Ready.</div>
+
+        <div class="output-panel">
+          <div id="tablePane" class="tab-pane active" data-pane="table">
+            <div class="table-wrap">
+              <table id="resultsTable">
+                <thead></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div id="jsonPane" class="tab-pane" data-pane="json">
+            <pre id="jsonOutput" class="text-output empty">No result yet.</pre>
+          </div>
+          <div id="errorsPane" class="tab-pane" data-pane="errors">
+            <pre id="errorsOutput" class="text-output empty">No errors.</pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

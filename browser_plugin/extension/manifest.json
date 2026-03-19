@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "MarkQL Browser Plugin",
+  "version": "0.2.0",
+  "description": "Capture rendered DOM HTML and run MarkQL queries via local MarkQL agent.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "sidePanel"
+  ],
+  "host_permissions": [
+    "<all_urls>",
+    "http://127.0.0.1:7337/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "popup.html"
+  },
+  "action": {
+    "default_title": "MarkQL Browser Plugin"
+  }
+}

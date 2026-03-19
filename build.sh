@@ -1,6 +1,16 @@
 #!/bin/bash
 
 set -euo pipefail
+
+if [[ -n "${XSQL_BUILD_AGENT:-}" && -z "${MARKQL_BUILD_AGENT:-}" ]]; then
+  MARKQL_BUILD_AGENT="${XSQL_BUILD_AGENT}"
+fi
+if [[ -n "${XSQL_AGENT_FETCH_DEPS:-}" && -z "${MARKQL_AGENT_FETCH_DEPS:-}" ]]; then
+  MARKQL_AGENT_FETCH_DEPS="${XSQL_AGENT_FETCH_DEPS}"
+fi
+
+: "${MARKQL_BUILD_AGENT:=ON}"
+: "${MARKQL_AGENT_FETCH_DEPS:=ON}"
 VCPKG_ROOT="${VCPKG_ROOT:-$HOME/vcpkg}"
 VCPKG_LOCAL_INSTALLED_DIR="${PWD}/vcpkg_installed"
 VCPKG_LOCAL_BUILDTREES_DIR="${PWD}/.vcpkg/buildtrees"
@@ -50,6 +60,26 @@ detect_parallel_jobs() {
   echo 1
 }
 
+reset_stale_cmake_cache_for_vcpkg_manifest() {
+  local cache_file manifest_dir_line manifest_mode_line manifest_install_line
+  cache_file="${PWD}/build/CMakeCache.txt"
+
+  if [[ ! -f "${cache_file}" ]]; then
+    return
+  fi
+
+  manifest_dir_line="$(grep '^VCPKG_MANIFEST_DIR:PATH=' "${cache_file}" || true)"
+  manifest_mode_line="$(grep '^VCPKG_MANIFEST_MODE:BOOL=' "${cache_file}" || true)"
+  manifest_install_line="$(grep '^VCPKG_MANIFEST_INSTALL:BOOL=' "${cache_file}" || true)"
+
+  if [[ "${manifest_mode_line}" != 'VCPKG_MANIFEST_MODE:BOOL=ON' ]] || \
+     [[ "${manifest_install_line}" != 'VCPKG_MANIFEST_INSTALL:BOOL=ON' ]] || \
+     [[ "${manifest_dir_line}" != "VCPKG_MANIFEST_DIR:PATH=${PWD}" ]]; then
+    echo "Resetting stale CMake cache to reconfigure with the repo vcpkg manifest..."
+    rm -rf "${PWD}/build/CMakeCache.txt" "${PWD}/build/CMakeFiles"
+  fi
+}
+
 VCPKG_TARGET_TRIPLET="${VCPKG_TARGET_TRIPLET:-$(detect_vcpkg_triplet)}"
 VCPKG_HOST_TRIPLET="${VCPKG_HOST_TRIPLET:-$VCPKG_TARGET_TRIPLET}"
 VCPKG_TARGET_INSTALLED_DIR="${VCPKG_LOCAL_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}"
@@ -62,6 +92,8 @@ cmake_args=(
   -DMARKQL_WITH_LIBXML2=ON
   -DMARKQL_WITH_CURL=ON
   -DMARKQL_WITH_ARROW=ON
+  "-DMARKQL_BUILD_AGENT=${MARKQL_BUILD_AGENT}"
+  "-DMARKQL_AGENT_FETCH_DEPS=${MARKQL_AGENT_FETCH_DEPS}"
 )
 
 if [[ -n "${VCPKG_ROOT:-}" ]]; then
@@ -69,6 +101,7 @@ if [[ -n "${VCPKG_ROOT:-}" ]]; then
   cmake_args+=("-DVCPKG_TARGET_TRIPLET=${VCPKG_TARGET_TRIPLET}")
   cmake_args+=("-DVCPKG_HOST_TRIPLET=${VCPKG_HOST_TRIPLET}")
   cmake_args+=("-DVCPKG_MANIFEST_MODE=ON")
+  cmake_args+=("-DVCPKG_MANIFEST_DIR=${PWD}")
   cmake_args+=("-DVCPKG_INSTALLED_DIR=${VCPKG_LOCAL_INSTALLED_DIR}")
   cmake_args+=("-DCMAKE_PREFIX_PATH=${VCPKG_TARGET_INSTALLED_DIR};${VCPKG_FALLBACK_INSTALLED_DIR}")
   if [[ -d "${VCPKG_FALLBACK_INSTALLED_DIR}/share/curl" ]]; then
@@ -96,6 +129,7 @@ if [[ -n "${VCPKG_ROOT:-}" && -f vcpkg.json ]]; then
     --downloads-root="${VCPKG_DOWNLOADS_DIR}" \
     --binarysource=clear \
     --no-print-usage
+  reset_stale_cmake_cache_for_vcpkg_manifest
 fi
 
 cmake "${cmake_args[@]}"
