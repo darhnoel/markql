@@ -28,10 +28,40 @@ option(MARKQL_WITH_ARROW "Enable Apache Arrow for Parquet export" ON)
 option(MARKQL_WITH_FLATBUFFERS "Use FlatBuffers for DOCN artifact payloads" ON)
 option(MARKQL_ENABLE_KHMER_NUMBER "Enable built-in Khmer number module" ON)
 option(MARKQL_AGENT_FETCH_DEPS "Fetch xsql-agent deps with FetchContent when missing" ${_markql_agent_fetch_deps_default})
+option(MARKQL_OPTIMIZE_FOR_SIZE "Enable size-focused compile/link flags" OFF)
+option(MARKQL_STRIP_BINARIES "Strip release-like binaries after build" OFF)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+if (MARKQL_OPTIMIZE_FOR_SIZE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  add_compile_options(-ffunction-sections -fdata-sections)
+  add_link_options(-Wl,--gc-sections)
+endif()
+
+if (MARKQL_OPTIMIZE_FOR_SIZE)
+  include(CheckIPOSupported)
+  check_ipo_supported(RESULT MARKQL_IPO_SUPPORTED OUTPUT MARKQL_IPO_OUTPUT)
+  if (MARKQL_IPO_SUPPORTED)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+  else()
+    message(STATUS "IPO/LTO not enabled: ${MARKQL_IPO_OUTPUT}")
+  endif()
+endif()
+
+function(markql_maybe_strip_target target_name)
+  if (MARKQL_STRIP_BINARIES AND CMAKE_STRIP AND UNIX)
+    add_custom_command(
+      TARGET ${target_name}
+      POST_BUILD
+      COMMAND ${CMAKE_STRIP} "$<TARGET_FILE:${target_name}>"
+      COMMENT "Stripping ${target_name}"
+      VERBATIM
+    )
+  endif()
+endfunction()
 
 add_library(markql_core
   core/src/version.cpp
@@ -283,6 +313,7 @@ if (MARKQL_BUILD_CLI)
             "$<TARGET_FILE_DIR:markql>/markql${CMAKE_EXECUTABLE_SUFFIX}"
     COMMENT "Creating compatibility binary: markql -> markql"
   )
+  markql_maybe_strip_target(markql)
 endif()
 
 if (MARKQL_BUILD_TESTS)
@@ -379,6 +410,7 @@ if (MARKQL_BUILD_TESTS)
     target_link_libraries(markql_tests PRIVATE ${MARKQL_ARROW_TARGET} ${MARKQL_PARQUET_TARGET})
     target_compile_definitions(markql_tests PRIVATE MARKQL_USE_ARROW)
   endif()
+  markql_maybe_strip_target(markql_tests)
   add_executable(markql_bench_inner_html tests/bench_inner_html.cpp)
   target_link_libraries(markql_bench_inner_html PRIVATE markql_core)
   target_include_directories(markql_bench_inner_html PRIVATE core/include)
@@ -395,6 +427,7 @@ if (MARKQL_BUILD_TESTS)
             "$<TARGET_FILE_DIR:markql_bench_inner_html>/markql_bench_inner_html${CMAKE_EXECUTABLE_SUFFIX}"
     COMMENT "Creating compatibility binary: markql_bench_inner_html -> markql_bench_inner_html"
   )
+  markql_maybe_strip_target(markql_bench_inner_html)
   add_executable(markql_bench_artifacts tests/bench_artifacts.cpp)
   target_link_libraries(markql_bench_artifacts PRIVATE markql_core)
   target_include_directories(markql_bench_artifacts PRIVATE cli core/src core/include tests)
@@ -412,6 +445,7 @@ if (MARKQL_BUILD_TESTS)
             "$<TARGET_FILE_DIR:markql_bench_artifacts>/markql_bench_artifacts${CMAKE_EXECUTABLE_SUFFIX}"
     COMMENT "Creating compatibility binary: markql_bench_artifacts -> markql_bench_artifacts"
   )
+  markql_maybe_strip_target(markql_bench_artifacts)
   set(MARKQL_TESTS
     select_ul_by_id
     class_in_matches_token
@@ -692,6 +726,7 @@ if (MARKQL_BUILD_PYTHON)
   target_link_libraries(_core PRIVATE markql_core)
   target_include_directories(_core PRIVATE core/include)
   set_target_properties(_core PROPERTIES OUTPUT_NAME "_core")
+  markql_maybe_strip_target(_core)
   if (DEFINED SKBUILD_PLATLIB_DIR)
     set_target_properties(_core PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${SKBUILD_PLATLIB_DIR}/markql")
   endif()

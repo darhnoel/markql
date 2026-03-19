@@ -5,7 +5,7 @@ WITH r_cells AS (
     node_cell.data-date AS data_date,
     node_cell.data-level AS data_level,
     LTRIM(RTRIM(node_cell.parent.text)) AS raw_day
-  FROM doc AS nod_cell
+  FROM doc AS node_cell
   WHERE node_cell.tag = 'td'
     AND node_cell.id CONTAINS 'contribution-day-component'
 )
