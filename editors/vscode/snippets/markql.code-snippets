@@ -1,0 +1,91 @@
+{
+  "First Query Loop Starter": {
+    "prefix": "markql-first-loop",
+    "body": [
+      "SELECT *",
+      "FROM doc",
+      "LIMIT ${1:8};"
+    ],
+    "description": "Checkpoint A from the first-query loop: inspect rows before filtering."
+  },
+  "Select From Doc": {
+    "prefix": "markql-select-doc",
+    "body": [
+      "SELECT ${1:self}",
+      "FROM doc",
+      "WHERE ${2:tag = '${3:div}'}",
+      "ORDER BY ${4:node_id};"
+    ],
+    "description": "Basic MarkQL select query over doc."
+  },
+  "Exists Descendant": {
+    "prefix": "markql-exists",
+    "body": [
+      "EXISTS(descendant WHERE ${1:tag = '${2:span}'})"
+    ],
+    "description": "Structural row gating with EXISTS over a documented axis."
+  },
+  "Project": {
+    "prefix": "markql-project",
+    "body": [
+      "PROJECT(${1:section}) AS (",
+      "  ${2:title}: TEXT(${3:h3}),",
+      "  ${4:href}: ATTR(${5:a}, ${6:href})",
+      ")"
+    ],
+    "description": "PROJECT(...) field extraction pattern from the MarkQL book."
+  },
+  "Flatten": {
+    "prefix": "markql-flatten",
+    "body": [
+      "FLATTEN(${1:td}${2:, ${3:1}}) AS (${4:col_1}, ${5:col_2})"
+    ],
+    "description": "FLATTEN(...) schema construction pattern."
+  },
+  "Raw Source": {
+    "prefix": "markql-raw",
+    "body": [
+      "SELECT ${1:self}",
+      "FROM RAW('${2:<div>hello</div>}') AS ${3:node_raw}",
+      "WHERE ${4:tag = 'div'};"
+    ],
+    "description": "Query inline HTML with RAW(...)."
+  },
+  "Parse Source": {
+    "prefix": "markql-parse",
+    "body": [
+      "SELECT ${1:li}",
+      "FROM PARSE('${2:<ul><li>1</li></ul>}') AS ${3:node_fragment}",
+      "WHERE ${4:tag = 'li'};"
+    ],
+    "description": "Query HTML fragments with PARSE(...)."
+  },
+  "To JSON": {
+    "prefix": "markql-to-json",
+    "body": [
+      "TO JSON('${1:output.json}')"
+    ],
+    "description": "Export query results to JSON."
+  },
+  "To NDJSON": {
+    "prefix": "markql-to-ndjson",
+    "body": [
+      "TO NDJSON('${1:output.ndjson}')"
+    ],
+    "description": "Export query results to NDJSON."
+  },
+  "To CSV": {
+    "prefix": "markql-to-csv",
+    "body": [
+      "TO CSV('${1:output.csv}')"
+    ],
+    "description": "Export query results to CSV."
+  },
+  "To Parquet": {
+    "prefix": "markql-to-parquet",
+    "body": [
+      "TO PARQUET('${1:output.parquet}')"
+    ],
+    "description": "Export query results to Parquet when supported by the build."
+  }
+}

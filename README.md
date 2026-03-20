@@ -175,6 +175,9 @@ npm run test:browser-plugin
 - Book (chapter path + verified examples): [docs/book/SUMMARY.md](docs/book/SUMMARY.md)
 - Canonical tutorial: [docs/markql-tutorial.md](docs/markql-tutorial.md)
 - CLI guide: [docs/markql-cli-guide.md](docs/markql-cli-guide.md)
+- Editor support plan: [docs/editor-support-plan.md](docs/editor-support-plan.md)
+- VS Code extension: [docs/vscode-extension.md](docs/vscode-extension.md)
+- Vim plugin: [docs/vim-plugin.md](docs/vim-plugin.md)
 - Docs index: [docs/README.md](docs/README.md)
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 

@@ -1,0 +1,133 @@
+{
+  "name": "markql-vscode",
+  "displayName": "MarkQL",
+  "description": "Syntax highlighting, snippets, and CLI-backed linting for MarkQL queries.",
+  "version": "1.20.0",
+  "publisher": "borannchanrathnak",
+  "license": "SEE LICENSE IN LICENSE",
+  "homepage": "https://github.com/darhnoel/markql/tree/main/editors/vscode",
+  "bugs": {
+    "url": "https://github.com/darhnoel/markql/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/darhnoel/markql"
+  },
+  "icon": "images/markql-icon.png",
+  "galleryBanner": {
+    "color": "#143642",
+    "theme": "dark"
+  },
+  "pricing": "Free",
+  "markdown": "github",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Snippets"
+  ],
+  "keywords": [
+    "markql",
+    "html",
+    "query",
+    "scraping",
+    "sql",
+    "textmate",
+    "lint"
+  ],
+  "activationEvents": [
+    "onLanguage:markql",
+    "onCommand:markql.lintCurrentFile",
+    "onCommand:markql.runCurrentFile",
+    "onCommand:markql.showVersion"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Syntax highlighting and snippets work everywhere. CLI-backed lint and run commands require an accessible MarkQL CLI."
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "MarkQL CLI execution requires file-system access."
+    }
+  },
+  "main": "out/extension.js",
+  "scripts": {
+    "build": "tsc -p .",
+    "clean": "rm -rf out",
+    "test": "npm run build && node --test tests/*.test.js",
+    "vscode:prepublish": "npm run build",
+    "prepackage": "npm run build && npm test",
+    "package": "npx @vscode/vsce package --no-dependencies",
+    "publish:marketplace": "npx @vscode/vsce publish --no-dependencies"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^2.31.1",
+    "typescript": "^5.6.3"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "markql",
+        "aliases": [
+          "MarkQL",
+          "markql"
+        ],
+        "extensions": [
+          ".mql",
+          ".msql",
+          ".markql",
+          ".markql.sql"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "markql",
+        "scopeName": "source.markql",
+        "path": "./syntaxes/markql.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "markql",
+        "path": "./snippets/markql.code-snippets"
+      }
+    ],
+    "commands": [
+      {
+        "command": "markql.lintCurrentFile",
+        "title": "MarkQL: Lint Current File"
+      },
+      {
+        "command": "markql.runCurrentFile",
+        "title": "MarkQL: Run Current File"
+      },
+      {
+        "command": "markql.showVersion",
+        "title": "MarkQL: Show Version"
+      }
+    ],
+    "configuration": {
+      "title": "MarkQL",
+      "properties": {
+        "markql.cliPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the MarkQL CLI binary. When empty, the extension tries workspace-local build/markql, build/xsql, then PATH candidates."
+        },
+        "markql.enableLintOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run MarkQL lint on save for MarkQL documents."
+        }
+      }
+    }
+  }
+}

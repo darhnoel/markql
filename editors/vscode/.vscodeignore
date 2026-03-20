@@ -1,0 +1,6 @@
+src/**
+tests/**
+node_modules/**
+tsconfig.json
+package-lock.json
+markql-vscode-*.vsix
