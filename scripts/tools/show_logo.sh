@@ -10,7 +10,7 @@ Usage: ${script_name} [--logo FILE] [--width N]
 Render the MarkQL SVG logo in your terminal.
 
 Options:
-  --logo FILE   Path to an SVG logo file (default: scripts/markql_logo.svg)
+  --logo FILE   Path to an SVG logo file (default: docs/assets/logo/markql_logo_light.svg)
   --width N     Output width in terminal columns (default: auto small, clamped to 18..32)
   -h, --help    Show this help message
 
@@ -22,7 +22,7 @@ EOF
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-DEFAULT_LOGO="${REPO_ROOT}/scripts/markql_logo.svg"
+DEFAULT_LOGO="${REPO_ROOT}/docs/assets/logo/markql_logo_light.svg"
 LOGO_FILE="${DEFAULT_LOGO}"
 
 TERM_COLS="${COLUMNS:-80}"
