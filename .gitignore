@@ -76,3 +76,5 @@ bench/results/*
 
 # cucumber rustt
 tests/integration/rust/target
+
+python/xsql.egg-info/*
