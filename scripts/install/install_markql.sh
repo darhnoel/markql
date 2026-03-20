@@ -2,8 +2,10 @@
 set -euo pipefail
 
 usage() {
-  cat <<'EOF'
-Usage: ./install_markql.sh [PATH_TO_DEB]
+  local script_name
+  script_name="$(basename "$0")"
+  cat <<EOF
+Usage: ${script_name} [PATH_TO_DEB]
 
 Installs a local MarkQL .deb package using apt.
 
@@ -20,6 +22,7 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 resolve_deb_path() {
   local input="${1:-}"
@@ -33,17 +36,17 @@ resolve_deb_path() {
   fi
 
   local candidates
-  candidates="$(find "${SCRIPT_DIR}" \
+  candidates="$(find "${REPO_ROOT}" \
     -maxdepth 4 \
     -type f \
-    \( -path "${SCRIPT_DIR}/markql_*.deb" \
-       -o -path "${SCRIPT_DIR}/dist/deb/markql_*.deb" \
-       -o -path "${SCRIPT_DIR}/_CPack_Packages/Linux/DEB/markql_*.deb" \) \
+    \( -path "${REPO_ROOT}/markql_*.deb" \
+       -o -path "${REPO_ROOT}/dist/deb/markql_*.deb" \
+       -o -path "${REPO_ROOT}/_CPack_Packages/Linux/DEB/markql_*.deb" \) \
     -printf '%T@ %p\n' | sort -nr || true)"
 
   if [[ -z "${candidates}" ]]; then
     echo "No local markql .deb found." >&2
-    echo "Build one first (for example: ./scripts/package_deb.sh)." >&2
+    echo "Build one first (for example: ./scripts/package/package_deb.sh)." >&2
     exit 1
   fi
 

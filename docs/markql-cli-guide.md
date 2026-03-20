@@ -48,13 +48,13 @@ Deep explanation:
 
 Build:
 ```bash
-./build.sh
+./scripts/build/build.sh
 ```
 
 Build note:
-- `build.sh` now uses the repo `vcpkg.json` manifest to install FlatBuffers into `./vcpkg_installed` and to provide `flatc` during the build.
+- `scripts/build/build.sh` now uses the repo `vcpkg.json` manifest to install FlatBuffers into `./vcpkg_installed` and to provide `flatc` during the build.
 - This keeps the FlatBuffers dependency path local to the repo. System-wide `apt` packages are not required for the `DOCN` migration.
-- `build.sh` now auto-detects a default `vcpkg` triplet for Linux, macOS, and Windows shell environments. Override with `VCPKG_TARGET_TRIPLET` / `VCPKG_HOST_TRIPLET` when cross-compiling to a non-default target.
+- `scripts/build/build.sh` now auto-detects a default `vcpkg` triplet for Linux, macOS, and Windows shell environments. Override with `VCPKG_TARGET_TRIPLET` / `VCPKG_HOST_TRIPLET` when cross-compiling to a non-default target.
 
 Create a parsed document snapshot once:
 ```bash

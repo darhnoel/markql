@@ -78,7 +78,7 @@ brew install apache-arrow
 Build (project default):
 
 ```bash
-./build.sh
+./scripts/build/build.sh
 ```
 
 Minimal build when optional dependencies are unavailable:
@@ -113,17 +113,17 @@ Run interactive REPL:
 Build and run `xsql-agent` (localhost `127.0.0.1:7337`):
 
 ```bash
-./build.sh
-./start-agent.sh
+./scripts/build/build.sh
+./scripts/agent/start-agent.sh
 ```
 
 Notes:
 - `XSQL_AGENT_TOKEN` is required by the agent.
-- `start-agent.sh` sets a default token if not provided.
+- `scripts/agent/start-agent.sh` sets a default token if not provided.
 - You can set your own token:
 
 ```bash
-XSQL_AGENT_TOKEN=your-secret-token ./start-agent.sh
+XSQL_AGENT_TOKEN=your-secret-token ./scripts/agent/start-agent.sh
 ```
 
 Load the Chrome extension:
@@ -158,8 +158,8 @@ ctest --test-dir build --output-on-failure
 Python package/tests (optional):
 
 ```bash
-./install_python.sh
-./test_python.sh
+./scripts/python/install.sh
+./scripts/python/test.sh
 ```
 
 Browser plugin UI tests (optional):
@@ -179,6 +179,7 @@ npm run test:browser-plugin
 - VS Code extension: [docs/vscode-extension.md](docs/vscode-extension.md)
 - Vim plugin: [docs/vim-plugin.md](docs/vim-plugin.md)
 - Docs index: [docs/README.md](docs/README.md)
+- Script layout: [scripts/README.md](scripts/README.md)
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 
 ## License

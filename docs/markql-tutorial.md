@@ -54,7 +54,7 @@ For each kept row:
 Build:
 
 ```bash
-./build.sh
+./scripts/build/build.sh
 ```
 
 **Listing 1: Verify the CLI and inspect rows**

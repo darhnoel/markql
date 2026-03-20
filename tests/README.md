@@ -21,7 +21,7 @@ This directory groups test assets by intent while keeping existing test flows st
 ## Run Commands
 
 - Existing C++ tests (current flow):
-  - `./test.sh`
+  - `./scripts/test/ctest.sh`
   - or `ctest --test-dir build --output-on-failure`
 - Docs verification (existing flow, unchanged):
   - `./docs/verify_examples.sh`

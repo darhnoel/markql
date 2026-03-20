@@ -219,9 +219,9 @@ Prepared-query semantic boundary:
 Build note:
 
 - The repo now carries a `vcpkg.json` manifest entry for FlatBuffers.
-- `build.sh` installs FlatBuffers into `./vcpkg_installed` and uses the repo-local `flatc` during CMake generation.
+- `scripts/build/build.sh` installs FlatBuffers into `./vcpkg_installed` and uses the repo-local `flatc` during CMake generation.
 - The build does not require system-wide FlatBuffers packages.
-- `build.sh` auto-selects a default `vcpkg` triplet for Linux, macOS, and Windows shell environments, and you can override `VCPKG_TARGET_TRIPLET` / `VCPKG_HOST_TRIPLET` explicitly for cross-target builds.
+- `scripts/build/build.sh` auto-selects a default `vcpkg` triplet for Linux, macOS, and Windows shell environments, and you can override `VCPKG_TARGET_TRIPLET` / `VCPKG_HOST_TRIPLET` explicitly for cross-target builds.
 
 Benchmark methodology and current result:
 

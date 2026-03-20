@@ -215,7 +215,7 @@ has now flourished to v1.0.0 as an offline-first C++20 tool.
 
 Build:
 ```
-./build.sh
+./scripts/build/build.sh
 ```
 
 Run on a file:
@@ -253,13 +253,13 @@ Linux (Ubuntu/Debian):
 ```
 sudo apt-get update
 sudo apt-get install -y build-essential cmake ninja-build pkg-config bison flex
-./build.sh
+./scripts/build/build.sh
 ```
 
 macOS (Homebrew):
 ```
 brew install cmake ninja pkg-config bison flex
-./build.sh
+./scripts/build/build.sh
 ```
 
 Windows (PowerShell, MSVC):
