@@ -1,0 +1,170 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "MarkQL",
+  "scopeName": "source.markql",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#clauses"
+    },
+    {
+      "include": "#functions"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#axes"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#identifiers"
+    },
+    {
+      "include": "#punctuation"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-dash.markql",
+          "match": "--.*$"
+        },
+        {
+          "name": "comment.block.markql",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.single.markql",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.markql",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.double.markql",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.markql",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.markql",
+          "match": "\\b\\d+\\b"
+        }
+      ]
+    },
+    "clauses": {
+      "patterns": [
+        {
+          "name": "keyword.control.clause.markql",
+          "match": "(?i)\\b(WITH|SELECT|EXCLUDE|FROM|JOIN|LEFT|INNER|CROSS|LATERAL|ON|WHERE|ORDER|BY|LIMIT|TO|AS|SHOW|DESCRIBE|DOCUMENT|DOC|LANGUAGE|INPUT|INPUTS|FUNCTIONS|AXES|OPERATORS)\\b"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "support.function.markql",
+          "match": "(?i)\\b(PROJECT|FLATTEN_EXTRACT|FLATTEN_TEXT|FLATTEN|TEXT|DIRECT_TEXT|FIRST_TEXT|LAST_TEXT|ATTR|FIRST_ATTR|LAST_ATTR|INNER_HTML|RAW_INNER_HTML|RAW|PARSE|FRAGMENTS|COUNT|SUMMARIZE|TFIDF|COALESCE|CASE|WHEN|THEN|ELSE|END|POSITION|LOCATE|CONCAT|SUBSTRING|SUBSTR|LENGTH|CHAR_LENGTH|REPLACE|LOWER|UPPER|TRIM|LTRIM|RTRIM)\\b(?=\\s*\\()"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.word.markql",
+          "match": "(?i)\\b(IS\\s+NOT\\s+NULL|IS\\s+NULL|CONTAINS\\s+ALL|CONTAINS\\s+ANY|AND|OR|IN|LIKE|CONTAINS|EXISTS|NOT|NULL|HAS_DIRECT_TEXT)\\b"
+        },
+        {
+          "name": "keyword.operator.regex.markql",
+          "match": "~"
+        },
+        {
+          "name": "keyword.operator.comparison.markql",
+          "match": "<>|!=|<=|>=|=|<|>"
+        }
+      ]
+    },
+    "axes": {
+      "patterns": [
+        {
+          "name": "variable.language.axis.markql",
+          "match": "(?i)\\b(self|parent|child|ancestor|descendant)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.markql",
+          "match": "(?i)\\b(MAX_DEPTH|FIRST|LAST|ALL|ANY|HEADER|NOHEADER|NO_HEADER|EXPORT|TRIM_EMPTY_ROWS|TRIM_EMPTY_COLS|EMPTY_IS|STOP_AFTER_EMPTY_ROWS|FORMAT|SPARSE_SHAPE|HEADER_NORMALIZE|TRAILING|BLANK_OR_NULL|NULL_ONLY|BLANK_ONLY|RECT|SPARSE|LONG|WIDE|TOP_TERMS|MIN_DF|MAX_DF|STOPWORDS|NONE|OFF|ON|ENGLISH|DEFAULT|ASC|DESC|LIST|TABLE|CSV|PARQUET|JSON|NDJSON)\\b"
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "name": "variable.other.member.markql",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)+\\b"
+        },
+        {
+          "name": "entity.name.type.alias.markql",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_-]*\\b"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.separator.comma.markql",
+          "match": ","
+        },
+        {
+          "name": "punctuation.separator.colon.markql",
+          "match": ":"
+        },
+        {
+          "name": "punctuation.terminator.statement.markql",
+          "match": ";"
+        },
+        {
+          "name": "punctuation.definition.group.markql",
+          "match": "[()]"
+        },
+        {
+          "name": "keyword.operator.star.markql",
+          "match": "\\*"
+        }
+      ]
+    }
+  }
+}
