@@ -12,6 +12,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     env:
+      CIBW_ARCHS: auto64
       CIBW_TEST_COMMAND: >-
         python -c "import markql; import markql.rendering; print(markql.__version__)"
     steps:
