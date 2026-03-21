@@ -286,6 +286,42 @@ test.describe("browser plugin popup", () => {
     }
   });
 
+  test("moves the token panel below the workspace after a token is saved", async () => {
+    const { context, extensionId } = await launchExtensionContext();
+
+    try {
+      const popupPage = await openPopupPage(context, extensionId);
+      const positionsBefore = await popupPage.evaluate(() => {
+        const tokenPanel = document.getElementById("tokenPanel");
+        const workspace = document.querySelector(".workspace");
+        return {
+          tokenTop: tokenPanel.getBoundingClientRect().top,
+          workspaceTop: workspace.getBoundingClientRect().top
+        };
+      });
+
+      expect(positionsBefore.tokenTop).toBeLessThan(positionsBefore.workspaceTop);
+
+      await popupPage.locator("#tokenInput").fill("saved-token");
+      await popupPage.locator("#saveTokenBtn").click();
+
+      await expect(popupPage.locator("#tokenCompact")).toBeVisible();
+
+      const positionsAfter = await popupPage.evaluate(() => {
+        const tokenPanel = document.getElementById("tokenPanel");
+        const workspace = document.querySelector(".workspace");
+        return {
+          tokenTop: tokenPanel.getBoundingClientRect().top,
+          workspaceTop: workspace.getBoundingClientRect().top
+        };
+      });
+
+      expect(positionsAfter.tokenTop).toBeGreaterThan(positionsAfter.workspaceTop);
+    } finally {
+      await context.close();
+    }
+  });
+
   test("shows a new line after one Enter at end of the query", async () => {
     const { context, extensionId } = await launchExtensionContext();
 

@@ -1,5 +1,7 @@
 export function getPopupUi() {
   return {
+    app: document.querySelector(".app"),
+    tokenPanel: document.getElementById("tokenPanel"),
     tokenCompact: document.getElementById("tokenCompact"),
     tokenEditor: document.getElementById("tokenEditor"),
     tokenInput: document.getElementById("tokenInput"),

@@ -341,6 +341,7 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
 
     ui.tokenCompact.classList.toggle("hidden", !hasToken || editorVisible);
     ui.cancelTokenBtn.classList.toggle("hidden", !hasToken);
+    ui.app.classList.toggle("has-token", hasToken);
 
     if (!hasToken) {
       ui.tokenHelp.textContent = "Start MarkQL agent and copy token from terminal output.";

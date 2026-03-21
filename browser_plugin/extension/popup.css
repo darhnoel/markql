@@ -33,6 +33,18 @@ body {
   gap: 10px;
 }
 
+.token-panel {
+  order: 0;
+}
+
+.workspace {
+  order: 1;
+}
+
+.app.has-token .token-panel {
+  order: 2;
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);
