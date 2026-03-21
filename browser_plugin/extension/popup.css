@@ -59,6 +59,14 @@ body {
   color: var(--muted);
 }
 
+.hint {
+  margin: 0;
+}
+
+.hint:empty {
+  display: none;
+}
+
 .hidden {
   display: none !important;
 }
