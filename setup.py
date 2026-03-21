@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 import re
+import sys
 from pathlib import Path
 
 from pybind11.setup_helpers import Pybind11Extension, build_ext
@@ -82,6 +83,12 @@ def core_sources() -> list[str]:
     return sources
 
 
+def platform_compile_args() -> list[str]:
+    if sys.platform == "win32":
+        return ["/bigobj", "/utf-8"]
+    return []
+
+
 ext_modules = [
     Pybind11Extension(
         "markql._core",
@@ -99,6 +106,7 @@ ext_modules = [
             ("MARKQL_GIT_COMMIT", f'"{git_commit_short()}"'),
             ("MARKQL_GIT_DIRTY", git_dirty_flag()),
         ],
+        extra_compile_args=platform_compile_args(),
         cxx_std=20,
     )
 ]
