@@ -5,6 +5,10 @@ export function createQueryEditor({ ui, state, onQueryChanged, onRunShortcut }) 
   let historyIndex = -1;
   const queryHistory = [];
 
+  function isTrailingSentinel(node) {
+    return !!(node && node.nodeName === "BR" && node.dataset && node.dataset.trailingSentinel === "true");
+  }
+
   function escapeHtml(text) {
     return text
       .replace(/&/g, "&amp;")
@@ -55,6 +59,12 @@ export function createQueryEditor({ ui, state, onQueryChanged, onRunShortcut }) 
         }
         pushToken("sql-str", query.slice(i, j));
         i = j;
+        continue;
+      }
+
+      if (ch === "\n") {
+        out.push("<br>");
+        i += 1;
         continue;
       }
 
@@ -109,8 +119,73 @@ export function createQueryEditor({ ui, state, onQueryChanged, onRunShortcut }) 
     return out.join("");
   }
 
+  function readEditorText(node) {
+    if (!node) return "";
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.nodeValue || "";
+    }
+    if (node.nodeName === "BR") {
+      if (isTrailingSentinel(node)) {
+        return "";
+      }
+      return "\n";
+    }
+    let out = "";
+    for (const child of node.childNodes) {
+      out += readEditorText(child);
+    }
+    return out;
+  }
+
+  function buildSelectionMap(container) {
+    const positions = [];
+    let currentOffset = 0;
+
+    function record(node, offset) {
+      positions[currentOffset] = { node, offset };
+    }
+
+    function walk(node) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.nodeValue || "";
+        for (let i = 0; i <= text.length; i += 1) {
+          positions[currentOffset + i] = { node, offset: i };
+        }
+        currentOffset += text.length;
+        return;
+      }
+
+      if (node.nodeName === "BR") {
+        const parent = node.parentNode;
+        const index = Array.prototype.indexOf.call(parent.childNodes, node);
+        if (isTrailingSentinel(node)) {
+          positions[currentOffset] = { node: parent, offset: index };
+          return;
+        }
+        positions[currentOffset] = { node: parent, offset: index };
+        currentOffset += 1;
+        positions[currentOffset] = { node: parent, offset: index + 1 };
+        return;
+      }
+
+      if (!node.childNodes.length) {
+        record(node, 0);
+        return;
+      }
+
+      record(node, 0);
+      for (let i = 0; i < node.childNodes.length; i += 1) {
+        walk(node.childNodes[i]);
+        positions[currentOffset] = { node, offset: i + 1 };
+      }
+    }
+
+    walk(container);
+    return positions;
+  }
+
   function getQueryText() {
-    return ui.queryInput ? ui.queryInput.textContent || "" : "";
+    return ui.queryInput ? readEditorText(ui.queryInput) : "";
   }
 
   function setQueryText(text) {
@@ -125,18 +200,40 @@ export function createQueryEditor({ ui, state, onQueryChanged, onRunShortcut }) 
       const length = getQueryText().length;
       return { start: length, end: length };
     }
-
-    const startRange = range.cloneRange();
-    startRange.selectNodeContents(container);
-    startRange.setEnd(range.startContainer, range.startOffset);
-
-    const endRange = range.cloneRange();
-    endRange.selectNodeContents(container);
-    endRange.setEnd(range.endContainer, range.endOffset);
-
-    const start = startRange.toString().length;
-    const end = endRange.toString().length;
-    return start <= end ? { start, end } : { start: end, end: start };
+    const positions = buildSelectionMap(container);
+    const fallback = getQueryText().length;
+    const start = positions.findIndex(
+      (position) => position && position.node === range.startContainer && position.offset === range.startOffset
+    );
+    const end = positions.findIndex(
+      (position) => position && position.node === range.endContainer && position.offset === range.endOffset
+    );
+    const resolvedStart = start === -1 ? fallback : start;
+    const resolvedEnd = end === -1 ? fallback : end;
+    const trailingSentinel = container.lastChild && isTrailingSentinel(container.lastChild) ? container.lastChild : null;
+    if (range.collapsed && trailingSentinel) {
+      const parent = trailingSentinel.parentNode;
+      const index = Array.prototype.indexOf.call(parent.childNodes, trailingSentinel);
+      if (range.startContainer === parent && range.startOffset === index) {
+        return { start: fallback, end: fallback };
+      }
+    }
+    let normalizedStart = resolvedStart;
+    let normalizedEnd = resolvedEnd;
+    const queryLength = getQueryText().length;
+    if (
+      range.collapsed &&
+      container.lastChild &&
+      container.lastChild.nodeName === "BR" &&
+      normalizedStart === queryLength - 1 &&
+      normalizedEnd === queryLength - 1
+    ) {
+      normalizedStart = queryLength;
+      normalizedEnd = queryLength;
+    }
+    return normalizedStart <= normalizedEnd
+      ? { start: normalizedStart, end: normalizedEnd }
+      : { start: normalizedEnd, end: normalizedStart };
   }
 
   function setSelectionOffsets(container, startOffset, endOffset) {
@@ -144,37 +241,30 @@ export function createQueryEditor({ ui, state, onQueryChanged, onRunShortcut }) 
     if (!selection) return;
 
     const range = document.createRange();
-    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-    const startTarget = Math.max(0, startOffset);
-    const endTarget = Math.max(0, endOffset);
-    let currentOffset = 0;
-    let startNode = null;
-    let endNode = null;
-    let startNodeOffset = 0;
-    let endNodeOffset = 0;
-    let node = walker.nextNode();
-
-    while (node) {
-      const length = node.nodeValue.length;
-      if (!startNode && startTarget <= currentOffset + length) {
-        startNode = node;
-        startNodeOffset = startTarget - currentOffset;
-      }
-      if (!endNode && endTarget <= currentOffset + length) {
-        endNode = node;
-        endNodeOffset = endTarget - currentOffset;
-        break;
-      }
-      currentOffset += length;
-      node = walker.nextNode();
+    const trailingSentinel = container.lastChild && isTrailingSentinel(container.lastChild) ? container.lastChild : null;
+    const queryLength = getQueryText().length;
+    if (trailingSentinel && startOffset === queryLength && endOffset === queryLength) {
+      const parent = trailingSentinel.parentNode;
+      const index = Array.prototype.indexOf.call(parent.childNodes, trailingSentinel);
+      range.setStart(parent, index);
+      range.setEnd(parent, index);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      return;
     }
+    const positions = buildSelectionMap(container);
+    const maxOffset = Math.max(0, positions.length - 1);
+    const startTarget = Math.min(maxOffset, Math.max(0, startOffset));
+    const endTarget = Math.min(maxOffset, Math.max(0, endOffset));
+    const startPosition = positions[startTarget];
+    const endPosition = positions[endTarget];
 
-    if (!startNode || !endNode) {
+    if (!startPosition || !endPosition) {
       range.selectNodeContents(container);
       range.collapse(false);
     } else {
-      range.setStart(startNode, startNodeOffset);
-      range.setEnd(endNode, endNodeOffset);
+      range.setStart(startPosition.node, startPosition.offset);
+      range.setEnd(endPosition.node, endPosition.offset);
     }
     selection.removeAllRanges();
     selection.addRange(range);
@@ -198,34 +288,38 @@ export function createQueryEditor({ ui, state, onQueryChanged, onRunShortcut }) 
     ui.lineNumbers.scrollTop = ui.queryInput.scrollTop;
   }
 
-  function renderQueryHighlight(preserveCaret = false) {
+  function renderQueryHighlight({ preserveSelection = false, selection = null } = {}) {
     if (!ui.queryInput || state.isComposingQuery) return;
     const query = getQueryText();
     const scrollTop = ui.queryInput.scrollTop;
-    const selection = preserveCaret ? getSelectionOffsets(ui.queryInput) : { start: 0, end: 0 };
-    let rendered = highlightSql(query);
-    if (query.endsWith("\n")) {
-      rendered += "<br>";
-    }
-    ui.queryInput.innerHTML = rendered;
+    const nextSelection =
+      selection ||
+      (preserveSelection
+        ? getSelectionOffsets(ui.queryInput)
+        : null);
+    const rendered = highlightSql(query);
+    ui.queryInput.innerHTML = query.endsWith("\n") ? `${rendered}<br data-trailing-sentinel="true">` : rendered;
     if (!query) {
       ui.queryInput.innerHTML = "";
     }
     renderLineNumbers();
-    if (preserveCaret) {
-      setSelectionOffsets(ui.queryInput, selection.start, selection.end);
+    if (nextSelection) {
+      setSelectionOffsets(ui.queryInput, nextSelection.start, nextSelection.end);
     }
     ui.queryInput.scrollTop = scrollTop;
     syncEditorScroll();
   }
 
+  // Every editor-driven mutation must pass through this path so syntax highlighting
+  // cannot discard the current caret or selection during a re-render.
   function replaceQueryText(nextText, selectionStart = null, selectionEnd = null) {
     setQueryText(nextText);
-    renderQueryHighlight();
     const fallback = nextText.length;
     const start = selectionStart === null ? fallback : selectionStart;
     const end = selectionEnd === null ? start : selectionEnd;
-    setSelectionOffsets(ui.queryInput, start, end);
+    renderQueryHighlight({
+      selection: { start, end }
+    });
   }
 
   function recordHistoryState() {
@@ -244,7 +338,7 @@ export function createQueryEditor({ ui, state, onQueryChanged, onRunShortcut }) 
   function restoreHistoryState(stateSnapshot) {
     suppressHistoryPush = true;
     replaceQueryText(stateSnapshot.text, stateSnapshot.start, stateSnapshot.end);
-    onQueryChanged({ preserveCaret: true, recordHistory: false });
+    onQueryChanged({ recordHistory: false });
     suppressHistoryPush = false;
   }
 
@@ -266,7 +360,7 @@ export function createQueryEditor({ ui, state, onQueryChanged, onRunShortcut }) 
     const nextText = query.slice(0, selection.start) + text + query.slice(selection.end);
     const nextOffset = selection.start + text.length;
     replaceQueryText(nextText, nextOffset, nextOffset);
-    onQueryChanged({ preserveCaret: true, recordHistory: true });
+    onQueryChanged({ recordHistory: true });
   }
 
   function indentSelectedLines(unindent = false) {
@@ -311,7 +405,7 @@ export function createQueryEditor({ ui, state, onQueryChanged, onRunShortcut }) 
     }
 
     replaceQueryText(nextText, nextStart, nextEnd);
-    onQueryChanged({ preserveCaret: true, recordHistory: true });
+    onQueryChanged({ recordHistory: true });
   }
 
   function focusQueryInput(placeCaretAtEnd = false) {
@@ -493,14 +587,16 @@ export function createQueryEditor({ ui, state, onQueryChanged, onRunShortcut }) 
 
     ui.queryInput.addEventListener("scroll", syncEditorScroll);
     ui.queryInput.addEventListener("input", () => {
-      onQueryChanged({ preserveCaret: true, recordHistory: true });
+      renderQueryHighlight({ preserveSelection: true });
+      onQueryChanged({ recordHistory: true });
     });
     ui.queryInput.addEventListener("compositionstart", () => {
       state.isComposingQuery = true;
     });
     ui.queryInput.addEventListener("compositionend", () => {
       state.isComposingQuery = false;
-      onQueryChanged({ preserveCaret: true, recordHistory: true });
+      renderQueryHighlight({ preserveSelection: true });
+      onQueryChanged({ recordHistory: true });
     });
     ui.queryInput.addEventListener("keydown", (event) => {
       if (event.isComposing || state.isComposingQuery) return;
@@ -556,10 +652,10 @@ export function createQueryEditor({ ui, state, onQueryChanged, onRunShortcut }) 
     getQueryText,
     lintQuery,
     recordHistoryState,
+    replaceQueryText,
     renderLineNumbers,
     renderQueryHighlight,
     resetHistory,
-    setQueryText,
     syncEditorScroll
   };
 }

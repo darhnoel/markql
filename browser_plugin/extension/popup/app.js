@@ -12,9 +12,8 @@ export function bootPopup() {
   const editor = createQueryEditor({
     ui,
     state,
-    onQueryChanged: ({ preserveCaret, recordHistory }) => {
+    onQueryChanged: ({ recordHistory }) => {
       runtime.clearRunError();
-      editor.renderQueryHighlight(!!preserveCaret);
       panes.renderErrorsPane();
       if (recordHistory) {
         editor.recordHistoryState();

@@ -17,6 +17,52 @@ async function bindPopupToFixtureTab(popupPage, fixtureBaseUrl) {
   }, fixtureBaseUrl);
 }
 
+async function setEditorText(popupPage, text) {
+  await popupPage.locator("#queryInput").evaluate((node, value) => {
+    node.textContent = value;
+    node.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
+  }, text);
+}
+
+async function readEditorState(popupPage) {
+  return popupPage.locator("#queryInput").evaluate((node) => ({
+    text: (() => {
+      function readNodeText(currentNode) {
+        if (currentNode.nodeType === Node.TEXT_NODE) {
+          return currentNode.nodeValue || "";
+        }
+        if (currentNode.nodeName === "BR") {
+          return "\n";
+        }
+        let out = "";
+        for (const child of currentNode.childNodes) {
+          out += readNodeText(child);
+        }
+        return out;
+      }
+
+      return readNodeText(node);
+    })(),
+    html: node.innerHTML,
+    active: document.activeElement === node,
+    selection: (() => {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return { start: -1, end: -1 };
+      const range = selection.getRangeAt(0);
+      if (!node.contains(range.startContainer) || !node.contains(range.endContainer)) {
+        return { start: -1, end: -1 };
+      }
+      const startRange = range.cloneRange();
+      startRange.selectNodeContents(node);
+      startRange.setEnd(range.startContainer, range.startOffset);
+      const endRange = range.cloneRange();
+      endRange.selectNodeContents(node);
+      endRange.setEnd(range.endContainer, range.endOffset);
+      return { start: startRange.toString().length, end: endRange.toString().length };
+    })()
+  }));
+}
+
 test.describe("browser plugin popup", () => {
   test("captures the active page and runs a query through the agent", async () => {
     const server = await startFixtureServer();
@@ -247,38 +293,68 @@ test.describe("browser plugin popup", () => {
       const popupPage = await openPopupPage(context, extensionId);
       const queryInput = popupPage.locator("#queryInput");
 
-      await queryInput.fill("SELECT 1");
+      await setEditorText(popupPage, "SELECT 1");
       await queryInput.click();
       await popupPage.keyboard.press("End");
       await popupPage.keyboard.press("Enter");
+      await popupPage.keyboard.press("A");
 
       await expect(queryInput).toContainText("SELECT 1");
       await expect(popupPage.locator("#lineNumbers")).toHaveText("1\n2");
 
-      const editorState = await popupPage.locator("#queryInput").evaluate((node) => ({
-        text: node.textContent,
-        html: node.innerHTML,
-        active: document.activeElement === node,
-        selection: (() => {
-          const selection = window.getSelection();
-          if (!selection || selection.rangeCount === 0) return { start: -1, end: -1 };
-          const range = selection.getRangeAt(0);
-          if (!node.contains(range.startContainer) || !node.contains(range.endContainer)) {
-            return { start: -1, end: -1 };
-          }
-          const startRange = range.cloneRange();
-          startRange.selectNodeContents(node);
-          startRange.setEnd(range.startContainer, range.startOffset);
-          const endRange = range.cloneRange();
-          endRange.selectNodeContents(node);
-          endRange.setEnd(range.endContainer, range.endOffset);
-          return { start: startRange.toString().length, end: endRange.toString().length };
-        })()
-      }));
-      expect(editorState.text).toBe("SELECT 1\n");
+      const editorState = await readEditorState(popupPage);
+      expect(editorState.text).toBe("SELECT 1\nA");
       expect(editorState.html).toContain("<br>");
       expect(editorState.active).toBe(true);
-      expect(editorState.selection).toEqual({ start: 9, end: 9 });
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("preserves multi-line text through indent and unindent", async () => {
+    const { context, extensionId } = await launchExtensionContext();
+
+    try {
+      const popupPage = await openPopupPage(context, extensionId);
+      const queryInput = popupPage.locator("#queryInput");
+
+      await setEditorText(popupPage, "SELECT 1\nFROM doc");
+      await queryInput.click();
+      await popupPage.keyboard.press("Control+a");
+      await popupPage.keyboard.press("Tab");
+
+      let editorState = await readEditorState(popupPage);
+      expect(editorState.text).toBe("  SELECT 1\n  FROM doc");
+
+      await popupPage.keyboard.press("Shift+Tab");
+
+      editorState = await readEditorState(popupPage);
+      expect(editorState.text).toBe("SELECT 1\nFROM doc");
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("restores caret position through undo and redo after Enter", async () => {
+    const { context, extensionId } = await launchExtensionContext();
+
+    try {
+      const popupPage = await openPopupPage(context, extensionId);
+      const queryInput = popupPage.locator("#queryInput");
+
+      await setEditorText(popupPage, "SELECT 1");
+      await queryInput.click();
+      await popupPage.keyboard.press("End");
+      await popupPage.keyboard.press("Enter");
+
+      await popupPage.keyboard.press("Control+z");
+      let editorState = await readEditorState(popupPage);
+      expect(editorState.text).toBe("SELECT 1");
+
+      await popupPage.keyboard.press("Control+y");
+      await popupPage.keyboard.press("A");
+      editorState = await readEditorState(popupPage);
+      expect(editorState.text).toBe("SELECT 1\nA");
     } finally {
       await context.close();
     }

@@ -292,8 +292,7 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
     const value = ui.examplesSelect.value;
     if (!value) return;
     clearRunError();
-    editor.setQueryText(value);
-    editor.renderQueryHighlight();
+    editor.replaceQueryText(value);
     panes.renderErrorsPane();
     await chrome.storage.local.set({ [STORAGE_KEY_QUERY]: value });
     panes.status("Loaded example query.");
@@ -307,8 +306,7 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
       throw new Error("No query to format");
     }
     clearRunError();
-    editor.setQueryText(formatted);
-    editor.renderQueryHighlight();
+    editor.replaceQueryText(formatted);
     panes.renderErrorsPane();
     await chrome.storage.local.set({ [STORAGE_KEY_QUERY]: formatted });
     panes.status("Formatted query.");
@@ -385,7 +383,7 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
       }
     }
     if (typeof query === "string") {
-      editor.setQueryText(query);
+      editor.replaceQueryText(query);
       if (localData[STORAGE_KEY_QUERY] !== query) {
         await chrome.storage.local.set({ [STORAGE_KEY_QUERY]: query });
       }
