@@ -111,6 +111,89 @@ test.describe("browser plugin popup", () => {
     }
   });
 
+  test("auto-selects the errors tab and clears stale results for agent query errors", async () => {
+    const server = await startFixtureServer();
+    const { context, extensionId } = await launchExtensionContext();
+
+    try {
+      await context.route("http://127.0.0.1:7337/v1/query", async (route) => {
+        const body = JSON.parse(route.request().postData() || "{}");
+        if (typeof body.query === "string" && body.query.includes("EXISTS(d WHERE")) {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              elapsed_ms: 1,
+              columns: [],
+              rows: [],
+              truncated: false,
+              error: {
+                code: "QUERY_ERROR",
+                message: "Query parse error: Expected axis name (self, parent, child, ancestor, descendant)"
+              }
+            })
+          });
+          return;
+        }
+
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            columns: [{ name: "href" }],
+            rows: [["https://example.com/alpha"]],
+            elapsed_ms: 9,
+            truncated: false,
+            error: null
+          })
+        });
+      });
+
+      const fixturePage = await context.newPage();
+      await fixturePage.goto(`${server.baseUrl}/basic-page`);
+
+      const popupPage = await openPopupPage(context, extensionId);
+      await bindPopupToFixtureTab(popupPage, server.baseUrl);
+
+      await popupPage.locator("#tokenInput").fill("test-token");
+      await popupPage.locator("#saveTokenBtn").click();
+      await popupPage.locator("#captureBtn").click();
+
+      await popupPage.locator("#queryInput").fill("SELECT ATTR(a, href)\nFROM doc\nWHERE href CONTAINS 'example.com';");
+      await popupPage.locator("#runBtn").click();
+      await expect(popupPage.locator("#resultsTable tbody tr")).toHaveCount(1);
+
+      await popupPage.locator("#queryInput").fill(
+        "SELECT PROJECT(div) AS (\n" +
+        "  day_num: TEXT(span)\n" +
+        ")\n" +
+        "FROM doc\n" +
+        "WHERE tag = 'div'\n" +
+        "  AND EXISTS(d WHERE class = 'mui-1y0ir9k');"
+      );
+      await popupPage.locator("#runBtn").click();
+
+      await expect(popupPage.locator("#tabErrorsBtn")).toHaveAttribute("aria-selected", "true");
+      await expect(popupPage.locator("#copyExportBtn")).toHaveText("Copy Errors");
+      await expect(popupPage.locator("#resultsTable tbody tr")).toHaveCount(0);
+      await expect(popupPage.locator("#jsonOutput")).toContainText("No result yet.");
+      await expect(popupPage.locator("#statusLine")).toContainText("Parse error");
+      await expect(popupPage.locator("#statusLine")).toContainText("See Errors");
+      await expect(popupPage.locator("#statusLine")).toHaveClass(/error/);
+      await expect(popupPage.locator("#errorsOutput")).toContainText("Expected axis name");
+      await expect(popupPage.locator("#errorsOutput")).toContainText(
+        "Use EXISTS(self|parent|child|ancestor|descendant WHERE ...)"
+      );
+      await expect(popupPage.locator("#errorsOutput")).not.toContainText("Run Error");
+      await expect(popupPage.locator("#errorsOutput")).not.toContainText("QUERY_ERROR");
+      await expect(popupPage.locator("#errorsOutput")).not.toContainText("No lint issues detected.");
+      await expect(popupPage.locator("#errorsOutput")).not.toContainText("Current Query");
+    } finally {
+      await context.close();
+      await server.close();
+    }
+  });
+
   test("shows a new line after one Enter at end of the query", async () => {
     const { context, extensionId } = await launchExtensionContext();
 

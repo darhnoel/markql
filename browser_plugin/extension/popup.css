@@ -359,6 +359,11 @@ button:disabled {
   color: var(--muted);
 }
 
+.status.error {
+  color: var(--danger-text);
+  font-weight: 600;
+}
+
 .output-panel {
   padding: 10px 12px 12px;
 }
@@ -426,6 +431,136 @@ th {
   background: var(--danger-soft);
   color: var(--danger-text);
   border-color: #f1caca;
+}
+
+.errors-output {
+  min-height: 0;
+  max-height: 220px;
+  padding: 10px;
+  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+  white-space: normal;
+}
+
+.errors-output.empty {
+  white-space: pre-wrap;
+  font-family: "JetBrains Mono", "Fira Code", "SFMono-Regular", Consolas, monospace;
+}
+
+.errors-section + .errors-section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e6ebf0;
+}
+
+.errors-card {
+  border: 1px solid #f1caca;
+  border-radius: 12px;
+  background: #fff6f6;
+  padding: 12px;
+}
+
+.errors-card-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #a33a3a;
+}
+
+.errors-card-message {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #7a2f2f;
+}
+
+.errors-card-hint {
+  margin: 10px 0 0;
+  padding: 9px 10px;
+  border-radius: 9px;
+  background: #fff;
+  border: 1px solid #f2dbdb;
+  color: #6f3d3d;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.errors-output.error {
+  min-height: 0;
+  background: #fff;
+  border-color: var(--border);
+}
+
+.errors-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.errors-item {
+  border: 1px solid #e3e8ee;
+  border-radius: 9px;
+  background: #f8fafc;
+  padding: 10px 11px;
+}
+
+.errors-item.error {
+  border-color: #f0caca;
+  background: #fff7f7;
+}
+
+.errors-item.warning {
+  border-color: #f0dfb9;
+  background: #fffaf0;
+}
+
+.errors-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.errors-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: #dbeafe;
+  color: #25528b;
+}
+
+.errors-item.error .errors-badge {
+  background: #fde5e5;
+  color: #a33a3a;
+}
+
+.errors-item.warning .errors-badge {
+  background: #f7ead0;
+  color: #916b11;
+}
+
+.errors-item-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #34404c;
+}
+
+.errors-item-message {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #4c5865;
+}
+
+.errors-note {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6a7784;
 }
 
 @media (max-width: 760px) {

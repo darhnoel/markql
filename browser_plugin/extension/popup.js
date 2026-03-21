@@ -13,7 +13,7 @@ const FALLBACK_CAPTURE_SCOPE = "main";
 let snapshotHtml = "";
 let snapshotScope = "";
 let lastResult = null;
-let lastErrorText = "";
+let lastRunError = null;
 let isComposingQuery = false;
 let lintEnabled = true;
 let activeOutputTab = "table";
@@ -420,8 +420,9 @@ function focusQueryInput(placeCaretAtEnd = false) {
   }
 }
 
-function status(text) {
+function status(text, tone = "info") {
   ui.statusLine.textContent = text;
+  ui.statusLine.classList.toggle("error", tone === "error");
 }
 
 function normalizeNumber(value, fallback, min, max) {
@@ -626,32 +627,169 @@ function lintQuery(query) {
   return messages;
 }
 
+function clearResultsTable() {
+  ui.resultsHead.innerHTML = "";
+  ui.resultsBody.innerHTML = "";
+}
+
+function buildErrorHint(message) {
+  if (!message) return "";
+  if (message.includes("Expected axis name")) {
+    return "Use EXISTS(self|parent|child|ancestor|descendant WHERE ...) when adding a structural predicate.";
+  }
+  if (message.includes("Unterminated single-quoted string")) {
+    return "Close the quoted string or escape inner single quotes by doubling them.";
+  }
+  if (message.includes("Unbalanced parentheses")) {
+    return "Match every opening parenthesis with a closing parenthesis before running the query.";
+  }
+  if (message.includes("Query timed out")) {
+    return "Tighten the row filter, lower max rows, or increase the timeout if the query is expected to scan a large snapshot.";
+  }
+  return "";
+}
+
+function normalizeRunError(error) {
+  const message = error && error.message ? error.message : "Unknown error";
+
+  if (message.startsWith("Query parse error: ")) {
+    return {
+      summary: "Parse error",
+      detail: message.slice("Query parse error: ".length).trim() || message
+    };
+  }
+  if (error && error.code === "TIMEOUT") {
+    return { summary: "Timed out", detail: message };
+  }
+  if (error && error.title === "Request Error") {
+    return { summary: "Request error", detail: message };
+  }
+  if (error && error.code === "LINT") {
+    return { summary: "Lint error", detail: message };
+  }
+
+  return { summary: "Query error", detail: message };
+}
+
+function describeRunError(error) {
+  if (!error) return "";
+  return `${error.summary}. See Errors.`;
+}
+
+function setRunError(error) {
+  const normalized = normalizeRunError(error);
+  lastRunError = {
+    title: error.title || "Query Error",
+    code: error.code || "",
+    message: error.message || "Unknown error",
+    summary: normalized.summary,
+    detail: normalized.detail,
+    hint: error.hint || buildErrorHint(error.message || "")
+  };
+  lastResult = null;
+  clearResultsTable();
+  renderJsonPane();
+  renderErrorsPane();
+  setActiveTab("errors");
+  updateCopyExportLabel();
+  status(describeRunError(lastRunError), "error");
+}
+
+function clearRunError() {
+  lastRunError = null;
+}
+
 function renderErrorsPane() {
   const query = getQueryText();
   const lintMessages = lintEnabled ? lintQuery(query) : [];
-  const lines = [];
+  ui.errorsOutput.innerHTML = "";
 
-  if (lintEnabled) {
-    if (lintMessages.length === 0) {
-      lines.push("Lint: no issues detected.");
-    } else {
-      for (const message of lintMessages) {
-        lines.push(`${message.level.toUpperCase()}: ${message.text}`);
-      }
+  const hasErrorState = !!lastRunError || lintMessages.some((m) => m.level === "error");
+  const shouldShowLintSection = !lastRunError || !lintEnabled || lintMessages.length > 0;
+
+  if (lastRunError) {
+    const section = document.createElement("section");
+    section.className = "errors-section";
+
+    const card = document.createElement("div");
+    card.className = "errors-card";
+
+    const heading = document.createElement("p");
+    heading.className = "errors-card-title";
+    heading.textContent = lastRunError.summary;
+    card.appendChild(heading);
+
+    const message = document.createElement("p");
+    message.className = "errors-card-message";
+    message.textContent = lastRunError.detail;
+    card.appendChild(message);
+
+    if (lastRunError.hint) {
+      const hint = document.createElement("p");
+      hint.className = "errors-card-hint";
+      hint.textContent = `Hint: ${lastRunError.hint}`;
+      card.appendChild(hint);
     }
-  } else {
-    lines.push("Lint is off.");
+
+    section.appendChild(card);
+    ui.errorsOutput.appendChild(section);
   }
 
-  if (lastErrorText) {
-    lines.push("");
-    lines.push(`Runtime: ${lastErrorText}`);
+  if (shouldShowLintSection) {
+    const lintSection = document.createElement("section");
+    lintSection.className = "errors-section";
+
+    const lintTitle = document.createElement("h3");
+    lintTitle.className = "errors-title";
+    lintTitle.textContent = "Lint";
+    lintSection.appendChild(lintTitle);
+
+    if (!lintEnabled) {
+      const note = document.createElement("p");
+      note.className = "errors-note";
+      note.textContent = "Lint is off.";
+      lintSection.appendChild(note);
+    } else if (lintMessages.length === 0) {
+      const note = document.createElement("p");
+      note.className = "errors-note";
+      note.textContent = "No lint issues detected.";
+      lintSection.appendChild(note);
+    } else {
+      const list = document.createElement("ul");
+      list.className = "errors-list";
+      for (const lintMessage of lintMessages) {
+        const item = document.createElement("li");
+        item.className = `errors-item ${lintMessage.level}`;
+
+        const header = document.createElement("div");
+        header.className = "errors-item-header";
+
+        const badge = document.createElement("span");
+        badge.className = "errors-badge";
+        badge.textContent = lintMessage.level;
+        header.appendChild(badge);
+
+        const itemTitle = document.createElement("span");
+        itemTitle.className = "errors-item-title";
+        itemTitle.textContent = lintMessage.level === "error" ? "Fix before running" : "Review before running";
+        header.appendChild(itemTitle);
+        item.appendChild(header);
+
+        const body = document.createElement("div");
+        body.className = "errors-item-message";
+        body.textContent = lintMessage.text;
+        item.appendChild(body);
+
+        list.appendChild(item);
+      }
+      lintSection.appendChild(list);
+    }
+
+    ui.errorsOutput.appendChild(lintSection);
   }
 
-  const text = lines.join("\n").trim() || "No errors.";
-  ui.errorsOutput.textContent = text;
-  ui.errorsOutput.classList.toggle("empty", text === "No errors.");
-  ui.errorsOutput.classList.toggle("error", !!lastErrorText || lintMessages.some((m) => m.level === "error"));
+  ui.errorsOutput.classList.remove("empty");
+  ui.errorsOutput.classList.toggle("error", hasErrorState);
 }
 
 function renderJsonPane() {
@@ -665,8 +803,7 @@ function renderJsonPane() {
 }
 
 function renderResultsTable(result) {
-  ui.resultsHead.innerHTML = "";
-  ui.resultsBody.innerHTML = "";
+  clearResultsTable();
 
   const headTr = document.createElement("tr");
   for (const col of result.columns) {
@@ -802,11 +939,13 @@ async function runQuery() {
   const query = getQueryText().trim();
   const lintMessages = lintEnabled ? lintQuery(query) : [];
   if (lintMessages.some((message) => message.level === "error")) {
-    lastErrorText = "Query has lint errors. Fix them or turn lint off.";
-    renderErrorsPane();
-    setActiveTab("errors");
-    updateCopyExportLabel();
-    throw new Error(lastErrorText);
+    setRunError({
+      title: "Lint Error",
+      code: "LINT",
+      message: "Query has lint errors. Fix them or turn lint off.",
+      query
+    });
+    throw new Error(describeRunError(lastRunError));
   }
   if (!query) {
     throw new Error("Query is required");
@@ -840,15 +979,18 @@ async function runQuery() {
   });
 
   const payload = await response.json();
-  if (!response.ok) {
-    lastErrorText = payload && payload.error ? payload.error.message : `HTTP ${response.status}`;
-    renderErrorsPane();
-    setActiveTab("errors");
-    updateCopyExportLabel();
-    throw new Error(lastErrorText);
+  if (!response.ok || (payload && payload.error)) {
+    const errorPayload = payload && payload.error ? payload.error : null;
+    setRunError({
+      title: response.ok ? "Query Error" : "Request Error",
+      code: errorPayload && errorPayload.code ? errorPayload.code : "",
+      message: errorPayload && errorPayload.message ? errorPayload.message : `HTTP ${response.status}`,
+      query
+    });
+    throw new Error(describeRunError(lastRunError));
   }
 
-  lastErrorText = "";
+  clearRunError();
   lastResult = payload;
   renderResultsTable(payload);
   renderJsonPane();
@@ -856,9 +998,8 @@ async function runQuery() {
   setActiveTab("table");
   updateCopyExportLabel();
 
-  const err = payload.error ? ` error=${payload.error.message}` : "";
   const trunc = payload.truncated ? " (truncated)" : "";
-  status(`Snapshot ${snapshotHtml.length} bytes | elapsed ${payload.elapsed_ms} ms | rows ${payload.rows.length}${trunc}${err}`);
+  status(`Snapshot ${snapshotHtml.length} bytes | elapsed ${payload.elapsed_ms} ms | rows ${payload.rows.length}${trunc}`);
 }
 
 async function copyQuery() {
@@ -899,6 +1040,7 @@ async function copyActiveExport() {
 async function applySelectedExample() {
   const value = ui.examplesSelect.value;
   if (!value) return;
+  clearRunError();
   setQueryText(value);
   renderQueryHighlight();
   renderErrorsPane();
@@ -913,6 +1055,7 @@ async function formatCurrentQuery() {
   if (!formatted) {
     throw new Error("No query to format");
   }
+  clearRunError();
   setQueryText(formatted);
   renderQueryHighlight();
   renderErrorsPane();
@@ -1044,7 +1187,10 @@ async function guarded(action) {
     }
     await action();
   } catch (err) {
-    status(`Error: ${err && err.message ? err.message : String(err)}`);
+    const message = err && err.message ? err.message : String(err);
+    if (!lastRunError || message !== describeRunError(lastRunError)) {
+      status(`Error: ${message}`, "error");
+    }
   } finally {
     for (const control of controls) {
       control.disabled = false;
@@ -1088,6 +1234,7 @@ ui.sqlEditor.addEventListener("mousedown", (event) => {
 
 ui.queryInput.addEventListener("scroll", syncEditorScroll);
 ui.queryInput.addEventListener("input", () => {
+  clearRunError();
   renderQueryHighlight(true);
   renderErrorsPane();
   recordHistoryState();
@@ -1097,6 +1244,7 @@ ui.queryInput.addEventListener("compositionstart", () => {
 });
 ui.queryInput.addEventListener("compositionend", () => {
   isComposingQuery = false;
+  clearRunError();
   renderQueryHighlight(true);
   renderErrorsPane();
   recordHistoryState();
@@ -1145,5 +1293,5 @@ renderQueryHighlight();
 refreshDerivedViews();
 setActiveTab("table");
 restoreSettings().catch((err) => {
-  status(`Error: ${err && err.message ? err.message : String(err)}`);
+  status(`Error: ${err && err.message ? err.message : String(err)}`, "error");
 });
