@@ -395,4 +395,29 @@ test.describe("browser plugin popup", () => {
       await context.close();
     }
   });
+
+  test("keeps the caret in place when backspacing inside TO TABLE options", async () => {
+    const { context, extensionId } = await launchExtensionContext();
+
+    try {
+      const popupPage = await openPopupPage(context, extensionId);
+      const queryInput = popupPage.locator("#queryInput");
+
+      await setEditorText(
+        popupPage,
+        "SELECT table\nFROM doc\nTO TABLE(header=ON);"
+      );
+      await queryInput.click();
+      await popupPage.keyboard.press("End");
+      await popupPage.keyboard.press("ArrowLeft");
+      await popupPage.keyboard.press("ArrowLeft");
+      await popupPage.keyboard.press("Backspace");
+      await popupPage.keyboard.press("F");
+
+      const editorState = await readEditorState(popupPage);
+      expect(editorState.text).toBe("SELECT table\nFROM doc\nTO TABLE(header=OF);");
+    } finally {
+      await context.close();
+    }
+  });
 });

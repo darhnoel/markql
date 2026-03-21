@@ -184,6 +184,63 @@ export function createQueryEditor({ ui, state, onQueryChanged, onRunShortcut }) 
     return positions;
   }
 
+  function getLogicalNodeLength(node) {
+    if (!node) return 0;
+    if (node.nodeType === Node.TEXT_NODE) {
+      return (node.nodeValue || "").length;
+    }
+    if (node.nodeName === "BR") {
+      return isTrailingSentinel(node) ? 0 : 1;
+    }
+    let total = 0;
+    for (const child of node.childNodes) {
+      total += getLogicalNodeLength(child);
+    }
+    return total;
+  }
+
+  function resolveOffsetFromDomPosition(container, targetNode, targetOffset) {
+    let offset = 0;
+    let found = false;
+
+    function walk(node) {
+      if (found || !node) return;
+
+      if (node === targetNode) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          offset += Math.min(targetOffset, (node.nodeValue || "").length);
+        } else if (node.nodeName === "BR") {
+          offset += isTrailingSentinel(node) ? 0 : Math.min(targetOffset, 1);
+        } else {
+          const limit = Math.min(targetOffset, node.childNodes.length);
+          for (let i = 0; i < limit; i += 1) {
+            offset += getLogicalNodeLength(node.childNodes[i]);
+          }
+        }
+        found = true;
+        return;
+      }
+
+      if (node.nodeType === Node.TEXT_NODE) {
+        offset += (node.nodeValue || "").length;
+        return;
+      }
+
+      if (node.nodeName === "BR") {
+        offset += isTrailingSentinel(node) ? 0 : 1;
+        return;
+      }
+
+      for (const child of node.childNodes) {
+        walk(child);
+        if (found) return;
+      }
+    }
+
+    walk(container);
+    return found ? offset : getQueryText().length;
+  }
+
   function getQueryText() {
     return ui.queryInput ? readEditorText(ui.queryInput) : "";
   }
@@ -200,37 +257,8 @@ export function createQueryEditor({ ui, state, onQueryChanged, onRunShortcut }) 
       const length = getQueryText().length;
       return { start: length, end: length };
     }
-    const positions = buildSelectionMap(container);
-    const fallback = getQueryText().length;
-    const start = positions.findIndex(
-      (position) => position && position.node === range.startContainer && position.offset === range.startOffset
-    );
-    const end = positions.findIndex(
-      (position) => position && position.node === range.endContainer && position.offset === range.endOffset
-    );
-    const resolvedStart = start === -1 ? fallback : start;
-    const resolvedEnd = end === -1 ? fallback : end;
-    const trailingSentinel = container.lastChild && isTrailingSentinel(container.lastChild) ? container.lastChild : null;
-    if (range.collapsed && trailingSentinel) {
-      const parent = trailingSentinel.parentNode;
-      const index = Array.prototype.indexOf.call(parent.childNodes, trailingSentinel);
-      if (range.startContainer === parent && range.startOffset === index) {
-        return { start: fallback, end: fallback };
-      }
-    }
-    let normalizedStart = resolvedStart;
-    let normalizedEnd = resolvedEnd;
-    const queryLength = getQueryText().length;
-    if (
-      range.collapsed &&
-      container.lastChild &&
-      container.lastChild.nodeName === "BR" &&
-      normalizedStart === queryLength - 1 &&
-      normalizedEnd === queryLength - 1
-    ) {
-      normalizedStart = queryLength;
-      normalizedEnd = queryLength;
-    }
+    const normalizedStart = resolveOffsetFromDomPosition(container, range.startContainer, range.startOffset);
+    const normalizedEnd = resolveOffsetFromDomPosition(container, range.endContainer, range.endOffset);
     return normalizedStart <= normalizedEnd
       ? { start: normalizedStart, end: normalizedEnd }
       : { start: normalizedEnd, end: normalizedStart };
