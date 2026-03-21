@@ -1,0 +1,11 @@
+SELECT PROJECT({{ row_alias }}) AS (
+{%- for alias, value in fields %}
+  {{ alias }}: TEXT(td WHERE data-testid-cell='{{ value }}'){% if not loop.last %},{% endif %}
+{%- endfor %}
+)
+FROM {{ source }}
+WHERE ancestor.tag = '{{ ancestor_tag }}'
+  AND child.tag <> '{{ excluded_child_tag }}'
+{%- if limit is defined %}
+LIMIT {{ limit }}
+{%- endif %};

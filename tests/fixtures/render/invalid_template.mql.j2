@@ -1,0 +1,6 @@
+SELECT PROJECT({{ row_alias }}) AS (
+{% for alias, value in fields %}
+  {{ alias }}: TEXT(td WHERE data-testid-cell='{{ value }}')
+{% endfor
+)
+FROM {{ source }};

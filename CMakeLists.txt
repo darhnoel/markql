@@ -247,6 +247,7 @@ if (MARKQL_BUILD_CLI)
     cli/main.cpp
     cli/cli_args.cpp
     cli/cli_utils.cpp
+    cli/render/query_template_renderer.cpp
     cli/explore/dom_explorer.cpp
     cli/explore/inner_html_search.cpp
     cli/explore/markql_suggestor.cpp
@@ -288,6 +289,7 @@ if (MARKQL_BUILD_CLI)
   endif()
   target_link_libraries(markql PRIVATE markql_core)
   target_include_directories(markql PRIVATE core/src core/include cli)
+  target_compile_definitions(markql PRIVATE MARKQL_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
   if (UNIX AND NOT APPLE)
     target_link_libraries(markql PRIVATE dl)
   endif()
@@ -348,6 +350,7 @@ if (MARKQL_BUILD_TESTS)
     tests/test_string_sql.cpp
     tests/test_column_names.cpp
     tests/test_self_ref.cpp
+    tests/test_query_template_renderer.cpp
     tests/test_vim_edit.cpp
     tests/test_vim_normal.cpp
     tests/test_render.cpp
@@ -388,6 +391,7 @@ if (MARKQL_BUILD_TESTS)
     cli/repl/commands/summarize_content_command.cpp
     cli/cli_args.cpp
     cli/cli_utils.cpp
+    cli/render/query_template_renderer.cpp
     cli/script_runner.cpp
     cli/ui/color.cpp
     cli/export/export_sinks.cpp
@@ -401,6 +405,7 @@ if (MARKQL_BUILD_TESTS)
   endif()
   target_link_libraries(markql_tests PRIVATE markql_core)
   target_include_directories(markql_tests PRIVATE cli core/src core/include tests)
+  target_compile_definitions(markql_tests PRIVATE MARKQL_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
   if (MARKQL_WITH_FLATBUFFERS)
     target_link_libraries(markql_tests PRIVATE flatbuffers::flatbuffers
                                              markql_artifact_docn_flatbuffers
@@ -650,6 +655,11 @@ if (MARKQL_BUILD_TESTS)
     parse_cli_args_accepts_lint_json_format
     parse_cli_args_rejects_format_without_lint
     parse_cli_args_accepts_version_flag
+    parse_cli_args_accepts_render_flags
+    parse_cli_args_rejects_vars_without_render
+    parse_cli_args_rejects_render_without_query_file
+    parse_cli_args_rejects_unknown_render_mode
+    parse_cli_args_rejects_render_stdout_with_lint
     parse_cli_args_accepts_color_modes
     parse_cli_args_rejects_invalid_color_mode
     diagnostics_color_policy_modes_and_no_color_precedence
@@ -666,6 +676,11 @@ if (MARKQL_BUILD_TESTS)
     diagnostic_json_renderer_never_contains_ansi_sequences
     diagnose_query_failure_maps_parse_error
     version_string_contains_provenance
+    query_template_renderer_matches_golden_output
+    query_template_renderer_writes_exact_output_file
+    query_template_renderer_requires_defined_variables
+    query_template_renderer_rejects_invalid_toml
+    query_template_renderer_rejects_invalid_template_syntax
     parse_self_projection_and_where
     parse_select_self_node_projection
     parse_self_function_predicate

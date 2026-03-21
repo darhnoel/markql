@@ -1,0 +1,11 @@
+row_alias = "tr"
+source = "doc"
+ancestor_tag = "table"
+excluded_child_tag = "th"
+limit = 10
+
+fields = [
+  ["ticker", "ticker"],
+  ["short_name", "companyshortname.raw"],
+  ["intra_day_price", "intradayprice"]
+]

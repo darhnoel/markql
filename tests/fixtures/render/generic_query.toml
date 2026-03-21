@@ -1,0 +1,11 @@
+row_alias = "tr"
+source = "doc"
+ancestor_tag = "table"
+excluded_child_tag = "th"
+limit = 10
+
+fields = [
+  ["record_code", "code"],
+  ["display_name", "label"],
+  ["metric_value", "amount"]
+]

@@ -1,6 +1,6 @@
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -62,12 +62,6 @@ impl CliWorld {
         }
 
         Ok(primary)
-    }
-
-    fn require_fixture(&self) -> Result<&Path> {
-        self.fixture_path
-            .as_deref()
-            .ok_or_else(|| anyhow!("fixture path was not configured"))
     }
 
     fn require_query(&self) -> Result<&str> {
@@ -147,9 +141,11 @@ fn when_run_markql(world: &mut CliWorld) -> Result<()> {
         );
     }
 
-    let fixture = world.require_fixture()?;
     if world.query.is_some() && world.query_file.is_some() {
         bail!("scenario configured both inline query and query file; choose one");
+    }
+    if world.query.is_none() && world.query_file.is_none() {
+        bail!("scenario configured neither inline query nor query file");
     }
 
     let mut cmd = Command::new(&markql_bin);
@@ -162,8 +158,10 @@ fn when_run_markql(world: &mut CliWorld) -> Result<()> {
         cmd.arg("--query");
         cmd.arg(query);
     }
-    cmd.arg("--input");
-    cmd.arg(fixture);
+    if let Some(fixture) = &world.fixture_path {
+        cmd.arg("--input");
+        cmd.arg(fixture);
+    }
     cmd.arg("--color=disabled");
 
     let output = cmd
@@ -209,6 +207,18 @@ fn then_stderr_contains(world: &mut CliWorld, expected: String) -> Result<()> {
     Ok(())
 }
 
+#[then(expr = "stderr does not contain {string}")]
+fn then_stderr_not_contains(world: &mut CliWorld, unexpected: String) -> Result<()> {
+    if world.last_stderr.contains(&unexpected) {
+        bail!(
+            "stderr contained unexpected substring.\nunexpected: {}\nactual stderr:\n{}",
+            unexpected,
+            world.last_stderr
+        );
+    }
+    Ok(())
+}
+
 #[then("stdout is empty")]
 fn then_stdout_empty(world: &mut CliWorld) -> Result<()> {
     if !world.last_stdout.trim().is_empty() {
@@ -238,6 +248,28 @@ fn then_stdout_matches_golden(world: &mut CliWorld, path: String) -> Result<()> 
             golden_path.display(),
             expected,
             world.last_stdout
+        );
+    }
+    Ok(())
+}
+
+#[then(expr = "the file {string} matches golden file {string}")]
+fn then_file_matches_golden(_world: &mut CliWorld, actual_path: String, golden_path: String) -> Result<()> {
+    let actual = CliWorld::resolve_repo_relative(&actual_path)?;
+    let golden = CliWorld::resolve_repo_relative(&golden_path)?;
+    let actual_text = fs::read_to_string(&actual)
+        .with_context(|| format!("failed to read actual file: {}", actual.display()))?;
+    let golden_text = fs::read_to_string(&golden)
+        .with_context(|| format!("failed to read golden file: {}", golden.display()))?;
+
+    let actual_normalized = CliWorld::normalize_text(actual_text);
+    let expected_normalized = CliWorld::normalize_text(golden_text);
+    if actual_normalized != expected_normalized {
+        bail!(
+            "file mismatch with golden file {}\n--- expected ---\n{}\n--- actual ---\n{}",
+            golden.display(),
+            expected_normalized,
+            actual_normalized
         );
     }
     Ok(())

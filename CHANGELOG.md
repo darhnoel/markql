@@ -8,6 +8,11 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 ## [Unreleased]
 
 ### Added
+- Added opt-in Jinja2 query-file rendering in the CLI:
+  - `--render j2`
+  - `--vars <file.toml>`
+  - `--rendered-out <file.mql>|-`
+- Added Python rendering helpers for TOML vars loading and strict-undefined Jinja2 rendering.
 - Added versioned artifact snapshots:
   - `.mqd` for serialized parsed-document snapshots
   - `.mqp` for serialized prepared queries after parse + validate.
@@ -89,7 +94,7 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 - Updated tutorial/grammar/case-study examples to prefer `SELECT self` in node-returning `LATERAL` subqueries.
 - `--lint --format json` remains deterministic and ANSI-free regardless of color mode.
 - Optimized PROJECT/FLATTEN_EXTRACT evaluation by introducing per-row selector scope/tag caching, reducing repeated subtree scans while preserving query results and output formatting.
-- Bumped project/core, Python package metadata, and `vcpkg` manifest version references to `1.20.0`.
+- Bumped project/core, Python package metadata, and `vcpkg` manifest version references to `1.21.0`.
 
 ## [1.8.0] - 2026-02-13
 

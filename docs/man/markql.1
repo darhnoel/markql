@@ -5,6 +5,9 @@ markql \- query HTML documents using SQL-like syntax
 .B markql
 [\fB\-\-query\fR \fIQUERY\fR]
 [\fB\-\-query\-file\fR \fIFILE\fR]
+[\fB\-\-render\fR \fIj2\fR]
+[\fB\-\-vars\fR \fIFILE.toml\fR]
+[\fB\-\-rendered\-out\fR \fIFILE.mql|-\fR]
 [\fB\-\-input\fR \fIPATH_OR_URL\fR]
 [\fB\-\-write\-mqd\fR \fIFILE.mqd\fR]
 [\fB\-\-write\-mqp\fR \fIFILE.mqp\fR]
@@ -34,6 +37,7 @@ markql \- query HTML documents using SQL-like syntax
 or standard input and outputs rows in table, JSON, plain, or CSV formats.
 It also supports versioned `.mqd` document snapshots and `.mqp` prepared queries.
 These artifact workflows are currently experimental.
+Templated `.mql.j2` query files can be rendered with \fB\-\-render j2\fR and TOML vars.
 .SH OPTIONS
 .TP
 \fB\-\-query\fR \fIQUERY\fR
@@ -41,6 +45,15 @@ Execute a single inline query.
 .TP
 \fB\-\-query\-file\fR \fIFILE\fR
 Execute queries from a SQL script file.
+.TP
+\fB\-\-render\fR \fIj2\fR
+Render a templated query file before lint or execution. Rendering is opt-in only.
+.TP
+\fB\-\-vars\fR \fIFILE.toml\fR
+Load TOML template variables for \fB\-\-render j2\fR.
+.TP
+\fB\-\-rendered\-out\fR \fIFILE.mql|-\fR
+Write rendered MarkQL to a file, or print it to stdout when set to \fB-\fR.
 .TP
 \fB\-\-input\fR \fIPATH_OR_URL\fR
 HTML input source. If omitted, input is read from standard input. `.mqd` document snapshots are also accepted.
@@ -137,6 +150,12 @@ Lint a query without execution:
 .TP
 Lint and output JSON diagnostics:
 \fBmarkql \-\-lint "SELECT FROM doc" \-\-format json\fR
+.TP
+Render and lint a templated query file:
+\fBmarkql \-\-query\-file ./queries/stocks.mql.j2 \-\-render j2 \-\-vars ./queries/stocks.toml \-\-lint\fR
+.TP
+Preview rendered MarkQL on stdout:
+\fBmarkql \-\-query\-file ./queries/stocks.mql.j2 \-\-render j2 \-\-vars ./queries/stocks.toml \-\-rendered\-out -\fR
 .TP
 Run in REPL mode:
 \fBmarkql \-\-interactive \-\-input ./data/index.html\fR

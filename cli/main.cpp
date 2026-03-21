@@ -10,6 +10,7 @@
 #include "dom/html_parser.h"
 #include "export/export_sinks.h"
 #include "render/duckbox_renderer.h"
+#include "render/query_template_renderer.h"
 #include "cli_args.h"
 #include "cli_utils.h"
 #include "explore/dom_explorer.h"
@@ -84,6 +85,27 @@ int main(int argc, char** argv) {
   }
 
   try {
+    std::optional<QueryRenderResult> prepared_query_file;
+    auto load_prepared_query_file = [&]() -> const QueryRenderResult& {
+      if (prepared_query_file.has_value()) {
+        return *prepared_query_file;
+      }
+      if (query_file.empty()) {
+        throw QueryRenderError("Missing query file for rendering");
+      }
+      if (!options.render_mode.empty() && markql::artifacts::path_has_artifact_magic(query_file)) {
+        throw QueryRenderError(
+            "--render expects SQL text template files, not prepared query artifacts (.mqp)");
+      }
+      prepared_query_file =
+          load_query_file_text(query_file, options.render_mode, options.render_vars_file);
+      if (prepared_query_file->rendered && !options.rendered_out.empty() &&
+          !render_to_stdout_only(options.rendered_out)) {
+        write_rendered_query_output(options.rendered_out, prepared_query_file->text);
+      }
+      return *prepared_query_file;
+    };
+
     if (!options.artifact_info.empty()) {
       auto query_kind_name = [](markql::Query::Kind kind) {
         switch (kind) {
@@ -215,17 +237,7 @@ int main(int argc, char** argv) {
                     << std::endl;
           return 2;
         }
-        std::string script;
-        try {
-          script = read_file(query_file);
-        } catch (const std::exception& ex) {
-          std::cerr << "Error: " << ex.what() << std::endl;
-          return 2;
-        }
-        if (!is_valid_utf8(script)) {
-          std::cerr << "Error: query file is not valid UTF-8: " << query_file << std::endl;
-          return 2;
-        }
+        std::string script = load_prepared_query_file().text;
         ScriptSplitResult split = split_sql_script(script);
         if (split.error_message.has_value()) {
           lint_result.diagnostics.push_back(markql::make_syntax_diagnostic(
@@ -284,11 +296,7 @@ int main(int argc, char** argv) {
       }
       std::string artifact_query = query;
       if (!query_file.empty()) {
-        std::string script = read_file(query_file);
-        if (!is_valid_utf8(script)) {
-          std::cerr << "Error: query file is not valid UTF-8: " << query_file << std::endl;
-          return 2;
-        }
+        std::string script = load_prepared_query_file().text;
         ScriptSplitResult split = split_sql_script(script);
         if (split.error_message.has_value()) {
           auto [line, col] = line_col_from_offset(script, split.error_position);
@@ -319,6 +327,12 @@ int main(int argc, char** argv) {
       repl_config.output_mode = output_mode;
       repl_config.timeout_ms = timeout_ms;
       return run_repl(repl_config);
+    }
+
+    if (!query_file.empty() && !options.render_mode.empty() &&
+        render_to_stdout_only(options.rendered_out)) {
+      std::cout << load_prepared_query_file().text;
+      return 0;
     }
 
     std::optional<std::string> stdin_cache;
@@ -524,17 +538,7 @@ int main(int argc, char** argv) {
     }
 
     if (!query_file.empty()) {
-      std::string script;
-      try {
-        script = read_file(query_file);
-      } catch (const std::exception& ex) {
-        std::cerr << "Error: " << ex.what() << std::endl;
-        return 2;
-      }
-      if (!is_valid_utf8(script)) {
-        std::cerr << "Error: query file is not valid UTF-8: " << query_file << std::endl;
-        return 2;
-      }
+      std::string script = load_prepared_query_file().text;
       ScriptRunOptions script_options;
       script_options.continue_on_error = options.continue_on_error;
       script_options.quiet = options.quiet;
@@ -547,6 +551,9 @@ int main(int argc, char** argv) {
     }
     execute_and_render(query);
     return 0;
+  } catch (const QueryRenderError& ex) {
+    std::cerr << "Error: " << ex.what() << std::endl;
+    return 2;
   } catch (const std::exception& ex) {
     if (options.lint) {
       std::cerr << "Error: " << ex.what() << std::endl;

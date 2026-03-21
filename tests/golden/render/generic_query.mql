@@ -1,0 +1,9 @@
+SELECT PROJECT(tr) AS (
+  record_code: TEXT(td WHERE data-col='code'),
+  display_name: TEXT(td WHERE data-col='label'),
+  metric_value: TEXT(td WHERE data-col='amount')
+)
+FROM doc
+WHERE ancestor.tag = 'table'
+  AND child.tag <> 'th'
+LIMIT 10;

@@ -97,6 +97,34 @@ Lint as JSON:
 ./build/markql --lint "SELECT FROM doc" --format json
 ```
 
+Render a `.mql.j2` query file into plain MarkQL and lint the rendered text:
+```bash
+./build/markql \
+  --query-file tests/fixtures/render/generic_query.mql.j2 \
+  --render j2 \
+  --vars tests/fixtures/render/generic_query.toml \
+  --lint
+```
+
+Write rendered MarkQL to a file before continuing through lint/execute:
+```bash
+./build/markql \
+  --query-file tests/fixtures/render/generic_query.mql.j2 \
+  --render j2 \
+  --vars tests/fixtures/render/generic_query.toml \
+  --rendered-out /tmp/generic_query.mql \
+  --lint
+```
+
+Preview rendered MarkQL on stdout:
+```bash
+./build/markql \
+  --query-file tests/fixtures/render/generic_query.mql.j2 \
+  --render j2 \
+  --vars tests/fixtures/render/generic_query.toml \
+  --rendered-out -
+```
+
 Check version + provenance:
 ```bash
 ./build/markql --version
@@ -104,6 +132,24 @@ Check version + provenance:
 
 Compatibility note:
 - `./build/markql` remains available as a legacy command name.
+
+## Template Query Files
+
+MarkQL supports an opt-in pre-parse render step for templated query files.
+
+MVP contract:
+- Existing `.mql` / `.sql` query-file behavior is unchanged when `--render` is omitted.
+- `.mql.j2` rendering is never auto-detected; you must pass `--render j2`.
+- `--vars <file.toml>` is the supported variable format in this MVP.
+- Rendered output is plain MarkQL text; existing parser, lint, and execution paths run on that rendered text.
+- Jinja variables use strict undefined behavior, so missing values fail before MarkQL parsing.
+- `--rendered-out <file.mql>` writes the rendered MarkQL without changing the lint/execute flow.
+- `--rendered-out -` is a stdout preview mode for the rendered MarkQL text.
+
+Recommended naming:
+- template: `query.mql.j2`
+- vars: `query.toml`
+- rendered output: `query.mql`
 
 ## Artifact Workflow
 
@@ -210,6 +256,10 @@ Lint text color controls:
 - `NO_COLOR` overrides color and forces plain text
 
 `--format json` is always uncolored for automation stability.
+
+When linting a templated query file:
+- `--lint --query-file query.mql.j2 --render j2 --vars query.toml` lints the rendered MarkQL text.
+- TOML/Jinja failures are reported as render/tooling failures, not as MarkQL parse diagnostics.
 
 `--format json` now emits a top-level lint result object:
 - `summary`

@@ -21,6 +21,7 @@ This may feel unfamiliar if you normally tie scraping logic to browser state dir
 - Use stdin when piping dynamic HTML from another command.
 - Use `.mqd` when you want a stable parsed-document snapshot for repeated CLI runs.
 - Use `.mqp` when you want a stable prepared query for repeated CLI runs.
+- Use `.mql.j2` only with explicit `--render j2` when you want template-driven query files.
 
 ## Scope
 
@@ -40,6 +41,10 @@ Artifact path
   --query-file file.mqp
       -> load prepared query
       -> execute against html/stdin/url/mqd input
+
+  --query-file file.mql.j2 --render j2 --vars file.toml
+      -> render plain MarkQL text first
+      -> then lint/execute that rendered query
 ```
 
 ```text
@@ -154,6 +159,30 @@ Compatibility note:
 - `FRAGMENTS(...)` is still supported but deprecated.
 - Migration: `FRAGMENTS(x)` -> `PARSE(x)`.
 
+## Template query files via `--query-file`
+
+`--query-file` can also load a templated query file when you opt in explicitly:
+
+```bash
+./build/markql \
+  --query-file tests/fixtures/render/generic_query.mql.j2 \
+  --render j2 \
+  --vars tests/fixtures/render/generic_query.toml \
+  --rendered-out /tmp/generic_query.mql \
+  --lint
+```
+
+This keeps the boundary explicit:
+- MarkQL does not change its grammar or semantics for templates.
+- Jinja2 rendering happens first.
+- The rendered output is plain MarkQL text.
+- `--lint` then validates that rendered text exactly as if it came from a normal `.mql` file.
+
+Recommended file naming:
+- `query.mql.j2` for the template
+- `query.toml` for vars
+- `query.mql` for rendered output
+
 ## Versioned Artifacts
 
 Experimental status:
@@ -193,6 +222,7 @@ MVP limits:
 
 - artifact loading is only exposed through CLI `--input` / `--query-file`
 - `--lint` still works on SQL text only
+- `--lint --query-file query.mql.j2 --render j2 --vars query.toml` lints rendered SQL text
 - `.mqp` is single-statement only
 - compression is not used in the MVP artifact format
 

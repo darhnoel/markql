@@ -15,6 +15,7 @@ from ._meta import __version__
 from ._security import FetchPolicy
 from ._summary import summarize_document
 from ._types import Document, ExportSink, QueryResult, TableResult
+from .rendering import RenderError, RenderedQuery, load_toml_vars, render_j2_query_file
 
 try:
     from . import _core
@@ -253,6 +254,8 @@ __all__ = [
     "QueryResult",
     "TableResult",
     "ExportSink",
+    "RenderError",
+    "RenderedQuery",
     "__version__",
     "doc",
     "load",
@@ -262,4 +265,6 @@ __all__ = [
     "lint_detailed",
     "core_version",
     "core_version_info",
+    "load_toml_vars",
+    "render_j2_query_file",
 ]

@@ -1,0 +1,5 @@
+SELECT section
+FROM doc
+WHERE tag = 'section'
+ORDER BY node_id
+LIMIT 2;

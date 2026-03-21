@@ -18,6 +18,9 @@ enum class ColorMode {
 struct CliOptions {
   std::string query;
   std::string query_file;
+  std::string render_mode;
+  std::string render_vars_file;
+  std::string rendered_out;
   std::string input;
   std::string write_mqd;
   std::string write_mqp;

@@ -13,6 +13,8 @@ void print_startup_help(std::ostream& os) {
   os << "Usage:\n";
   os << "  markql --query <query> [--input <path>]\n";
   os << "  markql --query-file <file> [--input <path>]\n";
+  os << "  markql --query-file <file.mql.j2> --render j2 [--vars <file.toml>]\n";
+  os << "         [--rendered-out <file.mql>|-] [--input <path>]\n";
   os << "         [--continue-on-error] [--quiet]\n";
   os << "  markql --input <path> --write-mqd <file.mqd>        (experimental)\n";
   os << "  markql (--query <query> | --query-file <file.sql>) --write-mqp <file.mqp>  (experimental)\n";
@@ -32,6 +34,8 @@ void print_startup_help(std::ostream& os) {
   os << "  - URLs are supported when libcurl is available.\n";
   os << "  - --input accepts HTML or experimental .mqd document snapshots.\n";
   os << "  - --query-file accepts SQL text files or experimental .mqp prepared-query artifacts.\n";
+  os << "  - Template rendering is opt-in: use --render j2 with --query-file and optional --vars TOML.\n";
+  os << "  - --rendered-out writes rendered MarkQL to a file; use - for stdout preview only.\n";
   os << "  - Artifact workflows are experimental and may change across upcoming releases.\n";
   os << "  - TO LIST() outputs a JSON list for a single projected column.\n";
   os << "  - TO TABLE() extracts HTML tables into rows.\n";
@@ -40,6 +44,7 @@ void print_startup_help(std::ostream& os) {
   os << "Examples:\n";
   os << "  markql --query \"SELECT table FROM doc\" --input ./data/index.html\n";
   os << "  markql --lint \"SELECT div FROM doc WHERE\"\n";
+  os << "  markql --query-file ./queries/stocks.mql.j2 --render j2 --vars ./queries/stocks.toml --lint\n";
   os << "  markql --query \"SELECT link.href FROM doc WHERE attributes.rel = 'preload' TO LIST()\" --input ./data/index.html\n";
   os << "  markql --interactive --input ./data/index.html\n";
 }
@@ -50,6 +55,8 @@ void print_startup_help(std::ostream& os) {
 void print_help(std::ostream& os) {
   os << "Usage: markql --query <query> [--input <path>]\n";
   os << "       markql --query-file <file> [--input <path>]\n";
+  os << "       markql --query-file <file.mql.j2> --render j2 [--vars <file.toml>]\n";
+  os << "              [--rendered-out <file.mql>|-] [--input <path>]\n";
   os << "              [--continue-on-error] [--quiet]\n";
   os << "       markql --input <path> --write-mqd <file.mqd>        (experimental)\n";
   os << "       markql (--query <query> | --query-file <file.sql>) --write-mqp <file.mqp>  (experimental)\n";
@@ -69,6 +76,9 @@ void print_help(std::ostream& os) {
   os << "Use TO CSV('file.csv'), TO PARQUET('file.parquet'), TO JSON('file.json'), or\n"
         "TO NDJSON('file.ndjson') in queries to export.\n";
   os << "Use --write-mqd/--write-mqp to cache parsed documents or prepared queries.\n";
+  os << "Use --render j2 to render .mql.j2 query files into plain MarkQL before lint/execute.\n";
+  os << "--vars loads TOML template variables. Missing variables fail with strict undefined behavior.\n";
+  os << "--rendered-out writes rendered MarkQL to a file, or to stdout when set to -.\n";
   os << "Artifact workflows are experimental and may change across upcoming releases.\n";
   os << "--artifact-info prints artifact metadata and compatibility details.\n";
   os << "--lint validates syntax + semantic rules without executing the query.\n";
@@ -97,6 +107,24 @@ bool parse_cli_args(int argc, char** argv, CliOptions& options, std::string& err
         return false;
       }
       options.query_file = argv[++i];
+    } else if (arg == "--render") {
+      if (i + 1 >= argc) {
+        error = "Missing value for --render";
+        return false;
+      }
+      options.render_mode = argv[++i];
+    } else if (arg == "--vars") {
+      if (i + 1 >= argc) {
+        error = "Missing value for --vars";
+        return false;
+      }
+      options.render_vars_file = argv[++i];
+    } else if (arg == "--rendered-out") {
+      if (i + 1 >= argc) {
+        error = "Missing value for --rendered-out";
+        return false;
+      }
+      options.rendered_out = argv[++i];
     } else if (arg == "--input") {
       if (i + 1 >= argc) {
         error = "Missing value for --input";
@@ -214,6 +242,22 @@ bool parse_cli_args(int argc, char** argv, CliOptions& options, std::string& err
     error = "Error: --query and --query-file are mutually exclusive";
     return false;
   }
+  if (!options.render_mode.empty() && options.render_mode != "j2") {
+    error = "Invalid --render value (use j2)";
+    return false;
+  }
+  if (!options.render_mode.empty() && options.query_file.empty()) {
+    error = "--render requires --query-file";
+    return false;
+  }
+  if (options.render_mode.empty() && !options.render_vars_file.empty()) {
+    error = "--vars requires --render";
+    return false;
+  }
+  if (options.render_mode.empty() && !options.rendered_out.empty()) {
+    error = "--rendered-out requires --render";
+    return false;
+  }
   const bool artifact_mode =
       !options.write_mqd.empty() || !options.write_mqp.empty() || !options.artifact_info.empty();
   const int artifact_mode_count = (!options.write_mqd.empty() ? 1 : 0) +
@@ -241,6 +285,14 @@ bool parse_cli_args(int argc, char** argv, CliOptions& options, std::string& err
   }
   if (artifact_mode && options.interactive) {
     error = "Artifact commands are not supported with --interactive";
+    return false;
+  }
+  if (options.rendered_out == "-" && options.lint) {
+    error = "--rendered-out - is not supported with --lint";
+    return false;
+  }
+  if (options.rendered_out == "-" && !options.write_mqp.empty()) {
+    error = "--rendered-out - is not supported with --write-mqp";
     return false;
   }
   if (!options.write_mqd.empty()) {

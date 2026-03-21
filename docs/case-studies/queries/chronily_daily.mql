@@ -1,0 +1,19 @@
+SELECT PROJECT(div) AS (
+  day_num: TEXT(
+    span
+    WHERE class CONTAINS 'MuiTypography-caption'
+      AND TRIM(DIRECT_TEXT(span)) = REGEX_REPLACE(TRIM(DIRECT_TEXT(span)), '[^0-9]', '')
+  ),
+  label: COALESCE(attributes.aria-label, ''),
+  hours: TEXT(span WHERE class CONTAINS 'MuiTypography-body2')
+)
+FROM doc
+WHERE tag = 'div'
+  AND class = 'MuiBox-root'
+  AND EXISTS(paredt WHERE class = 'mui-1y0ir9k')
+  AND EXISTS(
+    child
+    WHERE tag = 'span'
+      AND class CONTAINS 'MuiTypography-caption'
+      AND TRIM(DIRECT_TEXT(self)) = REGEX_REPLACE(TRIM(DIRECT_TEXT(self)), '[^0-9]', '')
+  );

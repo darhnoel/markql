@@ -128,6 +128,99 @@ void test_parse_cli_args_accepts_version_flag() {
   expect_true(options.show_version, "version mode parsed");
 }
 
+void test_parse_cli_args_accepts_render_flags() {
+  const char* argv[] = {
+      "markql",
+      "--query-file",
+      "query.mql.j2",
+      "--render",
+      "j2",
+      "--vars",
+      "query.toml",
+      "--rendered-out",
+      "rendered.mql",
+  };
+  int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
+  markql::cli::CliOptions options;
+  std::string error;
+  bool ok = markql::cli::parse_cli_args(argc, const_cast<char**>(argv), options, error);
+  expect_true(ok, "render flags are accepted");
+  expect_true(options.render_mode == "j2", "render mode parsed");
+  expect_true(options.render_vars_file == "query.toml", "vars file parsed");
+  expect_true(options.rendered_out == "rendered.mql", "rendered output parsed");
+}
+
+void test_parse_cli_args_rejects_vars_without_render() {
+  const char* argv[] = {
+      "markql",
+      "--query-file",
+      "query.mql.j2",
+      "--vars",
+      "query.toml",
+  };
+  int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
+  markql::cli::CliOptions options;
+  std::string error;
+  bool ok = markql::cli::parse_cli_args(argc, const_cast<char**>(argv), options, error);
+  expect_true(!ok, "vars without render is rejected");
+  expect_true(error.find("--vars requires --render") != std::string::npos,
+              "vars without render has clear error");
+}
+
+void test_parse_cli_args_rejects_render_without_query_file() {
+  const char* argv[] = {
+      "markql",
+      "--query",
+      "SELECT 1",
+      "--render",
+      "j2",
+  };
+  int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
+  markql::cli::CliOptions options;
+  std::string error;
+  bool ok = markql::cli::parse_cli_args(argc, const_cast<char**>(argv), options, error);
+  expect_true(!ok, "render without query-file is rejected");
+  expect_true(error.find("--render requires --query-file") != std::string::npos,
+              "render without query-file has clear error");
+}
+
+void test_parse_cli_args_rejects_unknown_render_mode() {
+  const char* argv[] = {
+      "markql",
+      "--query-file",
+      "query.mql.j2",
+      "--render",
+      "liquid",
+  };
+  int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
+  markql::cli::CliOptions options;
+  std::string error;
+  bool ok = markql::cli::parse_cli_args(argc, const_cast<char**>(argv), options, error);
+  expect_true(!ok, "unknown render mode is rejected");
+  expect_true(error.find("Invalid --render value") != std::string::npos,
+              "unknown render mode has clear error");
+}
+
+void test_parse_cli_args_rejects_render_stdout_with_lint() {
+  const char* argv[] = {
+      "markql",
+      "--query-file",
+      "query.mql.j2",
+      "--render",
+      "j2",
+      "--rendered-out",
+      "-",
+      "--lint",
+  };
+  int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
+  markql::cli::CliOptions options;
+  std::string error;
+  bool ok = markql::cli::parse_cli_args(argc, const_cast<char**>(argv), options, error);
+  expect_true(!ok, "render stdout preview with lint is rejected");
+  expect_true(error.find("--rendered-out - is not supported with --lint") != std::string::npos,
+              "render stdout preview conflict has clear error");
+}
+
 void test_parse_cli_args_accepts_color_modes() {
   {
     const char* argv[] = {"markql", "--color=always"};
@@ -231,6 +324,16 @@ void register_cli_args_tests(std::vector<TestCase>& tests) {
                    test_parse_cli_args_rejects_format_without_lint});
   tests.push_back({"parse_cli_args_accepts_version_flag",
                    test_parse_cli_args_accepts_version_flag});
+  tests.push_back({"parse_cli_args_accepts_render_flags",
+                   test_parse_cli_args_accepts_render_flags});
+  tests.push_back({"parse_cli_args_rejects_vars_without_render",
+                   test_parse_cli_args_rejects_vars_without_render});
+  tests.push_back({"parse_cli_args_rejects_render_without_query_file",
+                   test_parse_cli_args_rejects_render_without_query_file});
+  tests.push_back({"parse_cli_args_rejects_unknown_render_mode",
+                   test_parse_cli_args_rejects_unknown_render_mode});
+  tests.push_back({"parse_cli_args_rejects_render_stdout_with_lint",
+                   test_parse_cli_args_rejects_render_stdout_with_lint});
   tests.push_back({"parse_cli_args_accepts_color_modes",
                    test_parse_cli_args_accepts_color_modes});
   tests.push_back({"parse_cli_args_rejects_invalid_color_mode",

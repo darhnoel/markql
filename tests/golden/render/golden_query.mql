@@ -1,0 +1,9 @@
+SELECT PROJECT(tr) AS (
+  ticker: TEXT(td WHERE data-testid-cell='ticker'),
+  short_name: TEXT(td WHERE data-testid-cell='companyshortname.raw'),
+  intra_day_price: TEXT(td WHERE data-testid-cell='intradayprice')
+)
+FROM doc
+WHERE ancestor.tag = 'table'
+  AND child.tag <> 'th'
+LIMIT 10;
