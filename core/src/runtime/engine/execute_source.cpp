@@ -3,7 +3,13 @@
 #include <stdexcept>
 #include <string>
 
+#ifndef MARKQL_WITH_ARTIFACTS
+#define MARKQL_WITH_ARTIFACTS 1
+#endif
+
+#if MARKQL_WITH_ARTIFACTS
 #include "../../artifacts/artifacts.h"
+#endif
 #include "../../dom/html_parser.h"
 #include "../../lang/markql_parser.h"
 #include "../../util/string_util.h"
@@ -160,6 +166,7 @@ QueryResult execute_query_from_document(const std::string& html, const std::stri
 /// MUST read from disk and MUST propagate IO failures as exceptions.
 /// Inputs are path/query; outputs are QueryResult with file IO side effects.
 QueryResult execute_query_from_file(const std::string& path, const std::string& query) {
+#if MARKQL_WITH_ARTIFACTS
   if (artifacts::path_has_artifact_magic(path)) {
     artifacts::ArtifactInfo info = artifacts::inspect_artifact_file(path);
     if (info.header.kind == artifacts::ArtifactKind::DocumentSnapshot) {
@@ -168,6 +175,7 @@ QueryResult execute_query_from_file(const std::string& path, const std::string& 
     }
     throw std::runtime_error("Prepared query artifacts (.mqp) cannot be used as input documents");
   }
+#endif
   std::string html = markql_internal::read_file(path);
   return execute_query_from_html(html, path, query);
 }
