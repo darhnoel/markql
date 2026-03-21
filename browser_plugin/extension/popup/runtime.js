@@ -14,6 +14,11 @@ import {
 } from "./config.js";
 
 export function createPopupRuntime({ ui, state, editor, panes }) {
+  function pickPrimaryDiagnostic(diagnostics) {
+    if (!Array.isArray(diagnostics) || diagnostics.length === 0) return null;
+    return diagnostics.find((diagnostic) => diagnostic && diagnostic.severity === "ERROR") || diagnostics[0];
+  }
+
   function normalizeNumber(value, fallback, min, max) {
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return fallback;
@@ -38,25 +43,35 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
   }
 
   function normalizeRunError(error) {
+    const diagnostic = pickPrimaryDiagnostic(error && error.diagnostics);
+    if (diagnostic) {
+      return {
+        summary: diagnostic.message || "Query error",
+        detail: diagnostic.why || diagnostic.snippet || error.message || "Unknown error",
+        hint: diagnostic.help || buildErrorHint(error && error.message ? error.message : "")
+      };
+    }
+
     const message = error && error.message ? error.message : "Unknown error";
 
     if (message.startsWith("Query parse error: ")) {
       return {
         summary: "Parse error",
-        detail: message.slice("Query parse error: ".length).trim() || message
+        detail: message.slice("Query parse error: ".length).trim() || message,
+        hint: buildErrorHint(message)
       };
     }
     if (error && error.code === "TIMEOUT") {
-      return { summary: "Timed out", detail: message };
+      return { summary: "Timed out", detail: message, hint: buildErrorHint(message) };
     }
     if (error && error.title === "Request Error") {
-      return { summary: "Request error", detail: message };
+      return { summary: "Request error", detail: message, hint: buildErrorHint(message) };
     }
     if (error && error.code === "LINT") {
-      return { summary: "Lint error", detail: message };
+      return { summary: "Lint error", detail: message, hint: buildErrorHint(message) };
     }
 
-    return { summary: "Query error", detail: message };
+    return { summary: "Query error", detail: message, hint: buildErrorHint(message) };
   }
 
   function describeRunError(error) {
@@ -70,9 +85,10 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
       title: error.title || "Query Error",
       code: error.code || "",
       message: error.message || "Unknown error",
+      diagnostics: Array.isArray(error.diagnostics) ? error.diagnostics : [],
       summary: normalized.summary,
       detail: normalized.detail,
-      hint: error.hint || buildErrorHint(error.message || "")
+      hint: error.hint || normalized.hint || buildErrorHint(error.message || "")
     };
     state.lastResult = null;
     panes.clearResultsTable();
@@ -217,7 +233,8 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
       setRunError({
         title: response.ok ? "Query Error" : "Request Error",
         code: errorPayload && errorPayload.code ? errorPayload.code : "",
-        message: errorPayload && errorPayload.message ? errorPayload.message : `HTTP ${response.status}`
+        message: errorPayload && errorPayload.message ? errorPayload.message : `HTTP ${response.status}`,
+        diagnostics: errorPayload && Array.isArray(errorPayload.diagnostics) ? errorPayload.diagnostics : []
       });
       throw new Error(describeRunError(state.lastRunError));
     }

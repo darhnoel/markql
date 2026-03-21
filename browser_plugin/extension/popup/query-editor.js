@@ -244,7 +244,7 @@ export function createQueryEditor({ ui, state, onQueryChanged, onRunShortcut }) 
   function restoreHistoryState(stateSnapshot) {
     suppressHistoryPush = true;
     replaceQueryText(stateSnapshot.text, stateSnapshot.start, stateSnapshot.end);
-    onQueryChanged({ preserveCaret: false, recordHistory: false });
+    onQueryChanged({ preserveCaret: true, recordHistory: false });
     suppressHistoryPush = false;
   }
 
@@ -266,7 +266,7 @@ export function createQueryEditor({ ui, state, onQueryChanged, onRunShortcut }) 
     const nextText = query.slice(0, selection.start) + text + query.slice(selection.end);
     const nextOffset = selection.start + text.length;
     replaceQueryText(nextText, nextOffset, nextOffset);
-    onQueryChanged({ preserveCaret: false, recordHistory: true });
+    onQueryChanged({ preserveCaret: true, recordHistory: true });
   }
 
   function indentSelectedLines(unindent = false) {
@@ -311,7 +311,7 @@ export function createQueryEditor({ ui, state, onQueryChanged, onRunShortcut }) 
     }
 
     replaceQueryText(nextText, nextStart, nextEnd);
-    onQueryChanged({ preserveCaret: false, recordHistory: true });
+    onQueryChanged({ preserveCaret: true, recordHistory: true });
   }
 
   function focusQueryInput(placeCaretAtEnd = false) {

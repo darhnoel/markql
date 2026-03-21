@@ -215,6 +215,28 @@ void test_diagnose_query_failure_maps_parse_error() {
               "mapped parse message is upgraded");
 }
 
+void test_diagnose_query_failure_maps_exists_axis_typo_for_json_consumers() {
+  std::vector<markql::Diagnostic> diagnostics = markql::diagnose_query_failure(
+      "SELECT div FROM doc WHERE EXISTS(paredt WHERE tag = 'a')",
+      "Query parse error: Expected axis name (self, parent, child, ancestor, descendant)");
+  expect_true(!diagnostics.empty(), "exists axis typo diagnostics available for agent payload");
+  if (diagnostics.empty()) return;
+  const auto& first = diagnostics.front();
+  expect_true(first.code == "MQL-SYN-0001", "exists axis typo code is stable");
+  expect_true(first.message == "Malformed EXISTS(...) predicate",
+              "exists axis typo message is upgraded");
+  expect_true(first.why.find("supported axes") != std::string::npos,
+              "exists axis typo why explains valid axes");
+  expect_true(first.help == "Replace 'paredt' with 'parent'.",
+              "exists axis typo help is typo-aware and stable");
+
+  const std::string json = markql::render_diagnostics_json(diagnostics);
+  expect_true(json.find("\"message\":\"Malformed EXISTS(...) predicate\"") != std::string::npos,
+              "json payload keeps upgraded exists message");
+  expect_true(json.find("\"help\":\"Replace 'paredt' with 'parent'.\"") != std::string::npos,
+              "json payload keeps typo-aware exists help");
+}
+
 void test_lint_invalid_clause_order_has_specific_diagnostic() {
   std::vector<markql::Diagnostic> diagnostics =
       markql::lint_query("SELECT div WHERE tag = 'div' FROM doc");
@@ -416,6 +438,8 @@ void register_diagnostic_tests(std::vector<TestCase>& tests) {
                    test_diagnostic_json_renderer_never_contains_ansi_sequences});
   tests.push_back({"diagnose_query_failure_maps_parse_error",
                    test_diagnose_query_failure_maps_parse_error});
+  tests.push_back({"diagnose_query_failure_maps_exists_axis_typo_for_json_consumers",
+                   test_diagnose_query_failure_maps_exists_axis_typo_for_json_consumers});
   tests.push_back({"lint_invalid_clause_order_has_specific_diagnostic",
                    test_lint_invalid_clause_order_has_specific_diagnostic});
   tests.push_back({"lint_operator_typo_prefers_local_repair_over_clause_order_help",

@@ -118,7 +118,7 @@ test.describe("browser plugin popup", () => {
     try {
       await context.route("http://127.0.0.1:7337/v1/query", async (route) => {
         const body = JSON.parse(route.request().postData() || "{}");
-        if (typeof body.query === "string" && body.query.includes("EXISTS(d WHERE")) {
+        if (typeof body.query === "string" && body.query.includes("EXISTS(paredt WHERE")) {
           await route.fulfill({
             status: 200,
             contentType: "application/json",
@@ -129,7 +129,16 @@ test.describe("browser plugin popup", () => {
               truncated: false,
               error: {
                 code: "QUERY_ERROR",
-                message: "Query parse error: Expected axis name (self, parent, child, ancestor, descendant)"
+                message: "Query parse error: Expected axis name (self, parent, child, ancestor, descendant)",
+                diagnostics: [
+                  {
+                    severity: "ERROR",
+                    code: "MQL-SYN-0001",
+                    message: "Malformed EXISTS(...) predicate",
+                    why: "EXISTS(axis [WHERE ...]) requires one of MarkQL's supported axes: self, parent, child, ancestor, or descendant.",
+                    help: "Replace 'paredt' with 'parent'."
+                  }
+                ]
               }
             })
           });
@@ -169,7 +178,7 @@ test.describe("browser plugin popup", () => {
         ")\n" +
         "FROM doc\n" +
         "WHERE tag = 'div'\n" +
-        "  AND EXISTS(d WHERE class = 'mui-1y0ir9k');"
+        "  AND EXISTS(paredt WHERE class = 'mui-1y0ir9k');"
       );
       await popupPage.locator("#runBtn").click();
 
@@ -177,13 +186,15 @@ test.describe("browser plugin popup", () => {
       await expect(popupPage.locator("#copyExportBtn")).toHaveText("Copy Errors");
       await expect(popupPage.locator("#resultsTable tbody tr")).toHaveCount(0);
       await expect(popupPage.locator("#jsonOutput")).toContainText("No result yet.");
-      await expect(popupPage.locator("#statusLine")).toContainText("Parse error");
+      await expect(popupPage.locator("#statusLine")).toContainText("Malformed EXISTS(...) predicate");
       await expect(popupPage.locator("#statusLine")).toContainText("See Errors");
       await expect(popupPage.locator("#statusLine")).toHaveClass(/error/);
-      await expect(popupPage.locator("#errorsOutput")).toContainText("Expected axis name");
+      await expect(popupPage.locator("#errorsOutput")).toContainText("Malformed EXISTS(...) predicate");
       await expect(popupPage.locator("#errorsOutput")).toContainText(
-        "Use EXISTS(self|parent|child|ancestor|descendant WHERE ...)"
+        "EXISTS(axis [WHERE ...]) requires one of MarkQL's supported axes"
       );
+      await expect(popupPage.locator("#errorsOutput")).toContainText("Replace 'paredt' with 'parent'.");
+      await expect(popupPage.locator("#errorsOutput")).not.toContainText("Expected axis name");
       await expect(popupPage.locator("#errorsOutput")).not.toContainText("Run Error");
       await expect(popupPage.locator("#errorsOutput")).not.toContainText("QUERY_ERROR");
       await expect(popupPage.locator("#errorsOutput")).not.toContainText("No lint issues detected.");
@@ -246,10 +257,28 @@ test.describe("browser plugin popup", () => {
 
       const editorState = await popupPage.locator("#queryInput").evaluate((node) => ({
         text: node.textContent,
-        html: node.innerHTML
+        html: node.innerHTML,
+        active: document.activeElement === node,
+        selection: (() => {
+          const selection = window.getSelection();
+          if (!selection || selection.rangeCount === 0) return { start: -1, end: -1 };
+          const range = selection.getRangeAt(0);
+          if (!node.contains(range.startContainer) || !node.contains(range.endContainer)) {
+            return { start: -1, end: -1 };
+          }
+          const startRange = range.cloneRange();
+          startRange.selectNodeContents(node);
+          startRange.setEnd(range.startContainer, range.startOffset);
+          const endRange = range.cloneRange();
+          endRange.selectNodeContents(node);
+          endRange.setEnd(range.endContainer, range.endOffset);
+          return { start: startRange.toString().length, end: endRange.toString().length };
+        })()
       }));
       expect(editorState.text).toBe("SELECT 1\n");
       expect(editorState.html).toContain("<br>");
+      expect(editorState.active).toBe(true);
+      expect(editorState.selection).toEqual({ start: 9, end: 9 });
     } finally {
       await context.close();
     }

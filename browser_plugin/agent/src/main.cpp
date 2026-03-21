@@ -199,13 +199,28 @@ void write_json(httplib::Response& res, int status, const json& payload) {
   res.set_content(payload.dump(), "application/json");
 }
 
-json build_error(int elapsed, const std::string& code, const std::string& message) {
+json diagnostics_to_json(const std::vector<markql::Diagnostic>& diagnostics) {
+  if (diagnostics.empty()) {
+    return json::array();
+  }
+  const std::string rendered = markql::render_diagnostics_json(diagnostics);
+  json parsed = json::parse(rendered, nullptr, false);
+  if (parsed.is_discarded() || !parsed.is_array()) {
+    return json::array();
+  }
+  return parsed;
+}
+
+json build_error(int elapsed,
+                 const std::string& code,
+                 const std::string& message,
+                 const json& diagnostics = json::array()) {
   return json{
       {"elapsed_ms", elapsed},
       {"columns", json::array()},
       {"rows", json::array()},
       {"truncated", false},
-      {"error", {{"code", code}, {"message", message}}},
+      {"error", {{"code", code}, {"message", message}, {"diagnostics", diagnostics}}},
   };
 }
 
@@ -478,7 +493,9 @@ int main() {
     const ExecutionOutcome execution = executor.execute(snapshot.prepared, query, options.timeout_ms);
     if (!execution.ok) {
       const std::string code = execution.timed_out ? "TIMEOUT" : "QUERY_ERROR";
-      const json error = build_error(elapsed_ms(started_at), code, execution.error_message);
+      const json diagnostics = diagnostics_to_json(
+          markql::diagnose_query_failure(query, execution.error_message));
+      const json error = build_error(elapsed_ms(started_at), code, execution.error_message, diagnostics);
       write_json(res, execution.timed_out ? 408 : 200, error);
       return;
     }
