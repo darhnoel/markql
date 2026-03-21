@@ -194,6 +194,41 @@ test.describe("browser plugin popup", () => {
     }
   });
 
+  test("toggles query visibility and restores the collapsed state", async () => {
+    const { context, extensionId } = await launchExtensionContext();
+
+    try {
+      const popupPage = await openPopupPage(context, extensionId);
+      const toggleButton = popupPage.locator("#toggleQueryBtn");
+      const editorShell = popupPage.locator(".editor-shell");
+
+      await expect(toggleButton).toHaveText("Hide");
+      await expect(toggleButton).toHaveAttribute("aria-expanded", "true");
+      await expect(editorShell).toBeVisible();
+
+      await toggleButton.click();
+
+      await expect(toggleButton).toHaveText("Show");
+      await expect(toggleButton).toHaveAttribute("aria-expanded", "false");
+      await expect(editorShell).toBeHidden();
+      await expect(popupPage.locator("#statusLine")).toContainText("Query hidden.");
+
+      await popupPage.reload();
+
+      await expect(toggleButton).toHaveText("Show");
+      await expect(toggleButton).toHaveAttribute("aria-expanded", "false");
+      await expect(editorShell).toBeHidden();
+
+      await toggleButton.click();
+
+      await expect(toggleButton).toHaveText("Hide");
+      await expect(toggleButton).toHaveAttribute("aria-expanded", "true");
+      await expect(editorShell).toBeVisible();
+    } finally {
+      await context.close();
+    }
+  });
+
   test("shows a new line after one Enter at end of the query", async () => {
     const { context, extensionId } = await launchExtensionContext();
 

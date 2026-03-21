@@ -1,6 +1,7 @@
 const AGENT_URL = "http://127.0.0.1:7337/v1/query";
 const STORAGE_KEY_TOKEN = "markqlAgentToken";
 const STORAGE_KEY_QUERY = "markqlLastQuery";
+const STORAGE_KEY_QUERY_COLLAPSED = "markqlQueryCollapsed";
 const STORAGE_KEY_SNAPSHOT = "markqlSnapshotHtml";
 const STORAGE_KEY_SNAPSHOT_SCOPE = "markqlSnapshotScope";
 const STORAGE_KEY_LINT = "markqlLintEnabled";
@@ -16,6 +17,7 @@ let lastResult = null;
 let lastRunError = null;
 let isComposingQuery = false;
 let lintEnabled = true;
+let queryCollapsed = false;
 let activeOutputTab = "table";
 let suppressHistoryPush = false;
 let historyIndex = -1;
@@ -58,7 +60,9 @@ const ui = {
   cancelTokenBtn: document.getElementById("cancelTokenBtn"),
   editTokenBtn: document.getElementById("editTokenBtn"),
   tokenHelp: document.getElementById("tokenHelp"),
+  workspace: document.querySelector(".workspace"),
   runBtn: document.getElementById("runBtn"),
+  toggleQueryBtn: document.getElementById("toggleQueryBtn"),
   runResultsBtn: document.getElementById("runResultsBtn"),
   captureBtn: document.getElementById("captureBtn"),
   examplesSelect: document.getElementById("examplesSelect"),
@@ -423,6 +427,12 @@ function focusQueryInput(placeCaretAtEnd = false) {
 function status(text, tone = "info") {
   ui.statusLine.textContent = text;
   ui.statusLine.classList.toggle("error", tone === "error");
+}
+
+function applyQueryCollapsedUi() {
+  ui.workspace.classList.toggle("query-collapsed", queryCollapsed);
+  ui.toggleQueryBtn.textContent = queryCollapsed ? "Show" : "Hide";
+  ui.toggleQueryBtn.setAttribute("aria-expanded", queryCollapsed ? "false" : "true");
 }
 
 function normalizeNumber(value, fallback, min, max) {
@@ -1072,6 +1082,13 @@ async function toggleLint() {
   status(lintEnabled ? "Lint enabled." : "Lint disabled.");
 }
 
+async function toggleQueryVisibility() {
+  queryCollapsed = !queryCollapsed;
+  applyQueryCollapsedUi();
+  await chrome.storage.local.set({ [STORAGE_KEY_QUERY_COLLAPSED]: queryCollapsed });
+  status(queryCollapsed ? "Query hidden." : "Query shown.");
+}
+
 function setTokenEditorVisible(visible) {
   ui.tokenEditor.classList.toggle("hidden", !visible);
   if (visible) {
@@ -1112,6 +1129,7 @@ async function restoreSettings() {
   const localData = await chrome.storage.local.get([
     STORAGE_KEY_TOKEN,
     STORAGE_KEY_QUERY,
+    STORAGE_KEY_QUERY_COLLAPSED,
     STORAGE_KEY_LINT,
     LEGACY_STORAGE_KEY_TOKEN,
     LEGACY_STORAGE_KEY_QUERY
@@ -1134,7 +1152,11 @@ async function restoreSettings() {
   if (typeof localData[STORAGE_KEY_LINT] === "boolean") {
     lintEnabled = localData[STORAGE_KEY_LINT];
   }
+  if (typeof localData[STORAGE_KEY_QUERY_COLLAPSED] === "boolean") {
+    queryCollapsed = localData[STORAGE_KEY_QUERY_COLLAPSED];
+  }
   ui.lintBtn.setAttribute("aria-pressed", lintEnabled ? "true" : "false");
+  applyQueryCollapsedUi();
 
   const restoredSnapshot = await restoreSnapshotFromSession();
   snapshotHtml = restoredSnapshot.html;
@@ -1170,6 +1192,7 @@ async function guarded(action) {
   const controls = [
     ui.captureBtn,
     ui.runBtn,
+    ui.toggleQueryBtn,
     ui.runResultsBtn,
     ui.examplesSelect,
     ui.formatBtn,
@@ -1211,6 +1234,7 @@ ui.cancelTokenBtn.addEventListener("click", () => {
 });
 ui.captureBtn.addEventListener("click", () => guarded(() => captureSnapshot(true)));
 ui.runBtn.addEventListener("click", () => guarded(runQuery));
+ui.toggleQueryBtn.addEventListener("click", () => guarded(toggleQueryVisibility));
 ui.runResultsBtn.addEventListener("click", () => guarded(runQuery));
 ui.examplesSelect.addEventListener("change", () => guarded(applySelectedExample));
 ui.formatBtn.addEventListener("click", () => guarded(formatCurrentQuery));
