@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional, Union
 
 import jinja2
 
@@ -22,10 +22,10 @@ class RenderError(ValueError):
 class RenderedQuery:
     text: str
     template_path: str
-    vars_path: str | None = None
+    vars_path: Optional[str] = None
 
 
-def load_toml_vars(path: str | Path) -> dict[str, Any]:
+def load_toml_vars(path: Union[str, Path]) -> dict[str, Any]:
     file_path = Path(path)
     try:
         raw = file_path.read_bytes()
@@ -71,9 +71,9 @@ def render_j2_template_text(
 
 
 def render_j2_query_file(
-    template_path: str | Path,
+    template_path: Union[str, Path],
     *,
-    vars_path: str | Path | None = None,
+    vars_path: Optional[Union[str, Path]] = None,
 ) -> RenderedQuery:
     template_file = Path(template_path)
     try:

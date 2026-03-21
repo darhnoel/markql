@@ -8,7 +8,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 from ._loader import load_html_source
 from ._meta import __version__
@@ -251,16 +251,16 @@ def core_version_info() -> Dict[str, Any]:
     }
 
 
-def load_toml_vars(path: str | Path) -> dict[str, Any]:
+def load_toml_vars(path: Union[str, Path]) -> dict[str, Any]:
     from .rendering import load_toml_vars as _load_toml_vars
 
     return _load_toml_vars(path)
 
 
 def render_j2_query_file(
-    template_path: str | Path,
+    template_path: Union[str, Path],
     *,
-    vars_path: str | Path | None = None,
+    vars_path: Optional[Union[str, Path]] = None,
 ):
     from .rendering import render_j2_query_file as _render_j2_query_file
 
