@@ -283,7 +283,12 @@ function renderQueryHighlight(preserveCaret = false) {
   const query = getQueryText();
   const scrollTop = ui.queryInput.scrollTop;
   const selection = preserveCaret ? getSelectionOffsets(ui.queryInput) : { start: 0, end: 0 };
-  ui.queryInput.innerHTML = highlightSql(query);
+  let rendered = highlightSql(query);
+  if (query.endsWith("\n")) {
+    // Keep a trailing empty line visible after syntax highlighting.
+    rendered += "<br>";
+  }
+  ui.queryInput.innerHTML = rendered;
   if (!query) {
     ui.queryInput.innerHTML = "";
   }

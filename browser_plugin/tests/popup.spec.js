@@ -110,4 +110,30 @@ test.describe("browser plugin popup", () => {
       await context.close();
     }
   });
+
+  test("shows a new line after one Enter at end of the query", async () => {
+    const { context, extensionId } = await launchExtensionContext();
+
+    try {
+      const popupPage = await openPopupPage(context, extensionId);
+      const queryInput = popupPage.locator("#queryInput");
+
+      await queryInput.fill("SELECT 1");
+      await queryInput.click();
+      await popupPage.keyboard.press("End");
+      await popupPage.keyboard.press("Enter");
+
+      await expect(queryInput).toContainText("SELECT 1");
+      await expect(popupPage.locator("#lineNumbers")).toHaveText("1\n2");
+
+      const editorState = await popupPage.locator("#queryInput").evaluate((node) => ({
+        text: node.textContent,
+        html: node.innerHTML
+      }));
+      expect(editorState.text).toBe("SELECT 1\n");
+      expect(editorState.html).toContain("<br>");
+    } finally {
+      await context.close();
+    }
+  });
 });
