@@ -1,0 +1,33 @@
+export function getPopupUi() {
+  return {
+    tokenCompact: document.getElementById("tokenCompact"),
+    tokenEditor: document.getElementById("tokenEditor"),
+    tokenInput: document.getElementById("tokenInput"),
+    saveTokenBtn: document.getElementById("saveTokenBtn"),
+    cancelTokenBtn: document.getElementById("cancelTokenBtn"),
+    editTokenBtn: document.getElementById("editTokenBtn"),
+    tokenHelp: document.getElementById("tokenHelp"),
+    workspace: document.querySelector(".workspace"),
+    runBtn: document.getElementById("runBtn"),
+    toggleQueryBtn: document.getElementById("toggleQueryBtn"),
+    runResultsBtn: document.getElementById("runResultsBtn"),
+    captureBtn: document.getElementById("captureBtn"),
+    examplesSelect: document.getElementById("examplesSelect"),
+    formatBtn: document.getElementById("formatBtn"),
+    lintBtn: document.getElementById("lintBtn"),
+    queryInput: document.getElementById("queryInput"),
+    sqlEditor: document.querySelector(".sql-editor"),
+    lineNumbers: document.getElementById("lineNumbers"),
+    copyQueryBtn: document.getElementById("copyQueryBtn"),
+    maxRowsInput: document.getElementById("maxRowsInput"),
+    timeoutInput: document.getElementById("timeoutInput"),
+    copyExportBtn: document.getElementById("copyExportBtn"),
+    statusLine: document.getElementById("statusLine"),
+    resultsHead: document.querySelector("#resultsTable thead"),
+    resultsBody: document.querySelector("#resultsTable tbody"),
+    jsonOutput: document.getElementById("jsonOutput"),
+    errorsOutput: document.getElementById("errorsOutput"),
+    tabButtons: Array.from(document.querySelectorAll(".tab-button")),
+    tabPanes: Array.from(document.querySelectorAll(".tab-pane"))
+  };
+}
