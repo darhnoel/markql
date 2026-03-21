@@ -8,14 +8,16 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from ._loader import load_html_source
 from ._meta import __version__
 from ._security import FetchPolicy
 from ._summary import summarize_document
 from ._types import Document, ExportSink, QueryResult, TableResult
-from .rendering import RenderError, RenderedQuery, load_toml_vars, render_j2_query_file
+
+if TYPE_CHECKING:
+    from .rendering import RenderError, RenderedQuery
 
 try:
     from . import _core
@@ -247,6 +249,30 @@ def core_version_info() -> Dict[str, Any]:
         "git_dirty": git_dirty,
         "provenance": rendered,
     }
+
+
+def load_toml_vars(path: str | Path) -> dict[str, Any]:
+    from .rendering import load_toml_vars as _load_toml_vars
+
+    return _load_toml_vars(path)
+
+
+def render_j2_query_file(
+    template_path: str | Path,
+    *,
+    vars_path: str | Path | None = None,
+):
+    from .rendering import render_j2_query_file as _render_j2_query_file
+
+    return _render_j2_query_file(template_path, vars_path=vars_path)
+
+
+def __getattr__(name: str):
+    if name in {"RenderError", "RenderedQuery"}:
+        from . import rendering as _rendering
+
+        return getattr(_rendering, name)
+    raise AttributeError(f"module 'markql' has no attribute {name!r}")
 
 
 __all__ = [
