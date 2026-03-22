@@ -5,6 +5,10 @@ export function createQueryEditor({ ui, state, onQueryChanged, onRunShortcut }) 
   let historyIndex = -1;
   const queryHistory = [];
 
+  function normalizeLineEndings(text) {
+    return typeof text === "string" ? text.replace(/\r\n?/g, "\n") : "";
+  }
+
   function isTrailingSentinel(node) {
     return !!(node && node.nodeName === "BR" && node.dataset && node.dataset.trailingSentinel === "true");
   }
@@ -246,7 +250,7 @@ export function createQueryEditor({ ui, state, onQueryChanged, onRunShortcut }) 
   }
 
   function setQueryText(text) {
-    ui.queryInput.textContent = text || "";
+    ui.queryInput.textContent = normalizeLineEndings(text || "");
   }
 
   function getSelectionOffsets(container) {
@@ -383,10 +387,11 @@ export function createQueryEditor({ ui, state, onQueryChanged, onRunShortcut }) 
   }
 
   function insertTextAtSelection(text) {
+    const normalizedText = normalizeLineEndings(text);
     const query = getQueryText();
     const selection = getSelectionOffsets(ui.queryInput);
-    const nextText = query.slice(0, selection.start) + text + query.slice(selection.end);
-    const nextOffset = selection.start + text.length;
+    const nextText = query.slice(0, selection.start) + normalizedText + query.slice(selection.end);
+    const nextOffset = selection.start + normalizedText.length;
     replaceQueryText(nextText, nextOffset, nextOffset);
     onQueryChanged({ recordHistory: true });
   }

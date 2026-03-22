@@ -157,6 +157,29 @@ test.describe("browser plugin popup", () => {
     }
   });
 
+  test("normalizes CRLF pasted text so the editor does not add extra blank lines", async () => {
+    const { context, extensionId } = await launchExtensionContext();
+
+    try {
+      const popupPage = await openPopupPage(context, extensionId);
+      await popupPage.locator("#queryInput").click();
+
+      await popupPage.locator("#queryInput").evaluate((node) => {
+        const data = new DataTransfer();
+        data.setData("text/plain", "SELECT TEXT(title)\r\nFROM doc\r\nWHERE title IS NOT NULL;");
+        node.dispatchEvent(new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: data }));
+      });
+
+      const state = await readEditorState(popupPage);
+      expect(state.text).toBe("SELECT TEXT(title)\nFROM doc\nWHERE title IS NOT NULL;");
+      expect(state.html).toContain("<br>");
+      expect(state.html).not.toContain("\r");
+      await expect(popupPage.locator("#lineNumbers")).toHaveText("1\n2\n3");
+    } finally {
+      await context.close();
+    }
+  });
+
   test("auto-selects the errors tab and clears stale results for agent query errors", async () => {
     const server = await startFixtureServer();
     const { context, extensionId } = await launchExtensionContext();
