@@ -20,10 +20,10 @@
 
 MarkQL is a **SQL-style query engine for HTML** that lets you **select precisely what you need**, **filter to the relevant parts of a page**, and **extract structured fields** using the familiar `SELECT ... FROM ... WHERE ...` flow, rather than relying on brittle, ad-hoc scraping logic.
 
-## Demo Video
+## Demo
 
 <p align="center">
-  <img src="docs/assets/demo/markql-demo.gif" alt="MarkQL demo GIF" width="640">
+  <img src="docs/assets/demo/quick_tutorial.gif" alt="MarkQL quick tutorial GIF" width="640">
 </p>
 
 ## Quick Start
