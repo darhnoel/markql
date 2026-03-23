@@ -1,6 +1,10 @@
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -12,6 +16,8 @@
 #include "repl/commands/explore_command.h"
 #include "repl/commands/lint_command.h"
 #include "repl/commands/mode_command.h"
+#include "repl/commands/plugin_command.h"
+#include "repl/commands/plugin_registry.h"
 #include "repl/commands/set_command.h"
 #include "repl/commands/summarize_content_command.h"
 #include "repl/core/line_editor.h"
@@ -36,6 +42,69 @@ struct StreamCapture {
   }
 
   std::string str() const { return buffer.str(); }
+};
+
+std::filesystem::path make_temp_dir(const std::string& prefix) {
+  static size_t counter = 0;
+  const auto base = std::filesystem::temp_directory_path();
+  while (true) {
+    auto candidate = base / (prefix + "_" + std::to_string(counter++));
+    std::error_code ec;
+    if (std::filesystem::create_directories(candidate, ec)) {
+      return candidate;
+    }
+    if (ec) {
+      throw std::runtime_error("Failed to create temp directory: " + candidate.string());
+    }
+  }
+}
+
+struct ScopedCurrentPath {
+  std::filesystem::path original;
+
+  explicit ScopedCurrentPath(const std::filesystem::path& next)
+      : original(std::filesystem::current_path()) {
+    std::filesystem::current_path(next);
+  }
+
+  ~ScopedCurrentPath() {
+    std::error_code ec;
+    std::filesystem::current_path(original, ec);
+  }
+};
+
+struct ScopedEnvVar {
+  std::string name;
+  bool had_value = false;
+  std::string original_value;
+
+  ScopedEnvVar(const std::string& key, const std::string& value) : name(key) {
+    if (const char* existing = std::getenv(name.c_str())) {
+      had_value = true;
+      original_value = existing;
+    }
+#if defined(_WIN32)
+    _putenv_s(name.c_str(), value.c_str());
+#else
+    setenv(name.c_str(), value.c_str(), 1);
+#endif
+  }
+
+  ~ScopedEnvVar() {
+    if (had_value) {
+#if defined(_WIN32)
+      _putenv_s(name.c_str(), original_value.c_str());
+#else
+      setenv(name.c_str(), original_value.c_str(), 1);
+#endif
+    } else {
+#if defined(_WIN32)
+      _putenv_s(name.c_str(), "");
+#else
+      unsetenv(name.c_str());
+#endif
+    }
+  }
 };
 
 }  // namespace
@@ -464,6 +533,104 @@ static void test_explore_command_accepts_direct_target_and_alias_target() {
               ".explore direct should forward input");
 }
 
+static void test_plugin_registry_rejects_unsafe_plugin_name() {
+  const auto temp_dir = make_temp_dir("markql_plugin_registry_name");
+  const auto registry_path = temp_dir / "registry.json";
+  {
+    std::ofstream out(registry_path);
+    out << R"([
+  {
+    "name": "../escape",
+    "repo": "https://example.com/plugin.git",
+    "cmake_subdir": ".",
+    "artifact": "libescape{ext}"
+  }
+])";
+  }
+
+  ScopedEnvVar registry_env("MARKQL_PLUGIN_REGISTRY", registry_path.string());
+  std::vector<markql::cli::PluginRegistryEntry> entries;
+  std::string error;
+  bool ok = markql::cli::load_plugin_registry(entries, error);
+
+  expect_true(!ok, "registry rejects unsafe plugin names");
+  expect_true(error.find("invalid plugin name") != std::string::npos,
+              "registry error reports invalid plugin name");
+
+  std::filesystem::remove_all(temp_dir);
+}
+
+static void test_plugin_registry_rejects_path_traversal() {
+  const auto temp_dir = make_temp_dir("markql_plugin_registry_path");
+  const auto registry_path = temp_dir / "registry.json";
+  {
+    std::ofstream out(registry_path);
+    out << R"([
+  {
+    "name": "safe_plugin",
+    "repo": "https://example.com/plugin.git",
+    "cmake_subdir": "../escape",
+    "artifact": "libsafe_plugin{ext}"
+  }
+])";
+  }
+
+  ScopedEnvVar registry_env("MARKQL_PLUGIN_REGISTRY", registry_path.string());
+  std::vector<markql::cli::PluginRegistryEntry> entries;
+  std::string error;
+  bool ok = markql::cli::load_plugin_registry(entries, error);
+
+  expect_true(!ok, "registry rejects path traversal in plugin paths");
+  expect_true(error.find("invalid plugin path") != std::string::npos,
+              "registry error reports invalid plugin path");
+
+  std::filesystem::remove_all(temp_dir);
+}
+
+static void test_plugin_remove_rejects_unsafe_name() {
+  const auto temp_dir = make_temp_dir("markql_plugin_remove");
+  std::filesystem::create_directories(temp_dir / "plugins" / "src");
+  std::filesystem::create_directories(temp_dir / "outside-target");
+
+  {
+    ScopedCurrentPath current_path(temp_dir);
+    StreamCapture capture(std::cerr);
+    markql::cli::ReplConfig config;
+    config.color = false;
+    markql::cli::LineEditor editor(5, "markql> ", 8);
+    std::unordered_map<std::string, markql::cli::LoadedSource> sources;
+    std::string active_alias = "doc";
+    std::string last_full_output;
+    bool display_full = true;
+    size_t max_rows = 40;
+    std::vector<markql::ColumnNameMapping> last_schema_map;
+    markql::cli::CommandRegistry registry;
+    markql::cli::PluginManager plugin_manager(registry);
+    markql::cli::CommandContext ctx{
+        config,
+        editor,
+        sources,
+        active_alias,
+        last_full_output,
+        display_full,
+        max_rows,
+        last_schema_map,
+        plugin_manager,
+    };
+
+    auto handler = markql::cli::make_plugin_command();
+    bool handled = handler(".plugin remove ../../outside-target", ctx);
+
+    expect_true(handled, ".plugin remove with unsafe name should be handled");
+    expect_true(capture.str().find("invalid plugin name") != std::string::npos,
+                ".plugin remove should reject unsafe names");
+    expect_true(std::filesystem::exists(temp_dir / "outside-target"),
+                "unsafe plugin remove should not delete traversed targets");
+  }
+
+  std::filesystem::remove_all(temp_dir);
+}
+
 void register_repl_tests(std::vector<TestCase>& tests) {
   tests.push_back({"summarize_content_basic", test_summarize_content_basic});
   tests.push_back({"summarize_content_khmer_requires_plugin",
@@ -482,4 +649,10 @@ void register_repl_tests(std::vector<TestCase>& tests) {
                    test_explore_command_uses_active_alias_by_default});
   tests.push_back({"explore_command_accepts_direct_target_and_alias_target",
                    test_explore_command_accepts_direct_target_and_alias_target});
+  tests.push_back({"plugin_registry_rejects_unsafe_plugin_name",
+                   test_plugin_registry_rejects_unsafe_plugin_name});
+  tests.push_back({"plugin_registry_rejects_path_traversal",
+                   test_plugin_registry_rejects_path_traversal});
+  tests.push_back({"plugin_remove_rejects_unsafe_name",
+                   test_plugin_remove_rejects_unsafe_name});
 }

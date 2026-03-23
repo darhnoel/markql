@@ -2,6 +2,7 @@
 
 #include <cctype>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 
@@ -15,6 +16,31 @@ std::string trim(const std::string& value) {
   }
   size_t end = value.find_last_not_of(" \t\r\n");
   return value.substr(start, end - start + 1);
+}
+
+bool has_control_chars(const std::string& value) {
+  for (unsigned char ch : value) {
+    if (std::iscntrl(ch)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool is_safe_relative_path(const std::string& value) {
+  if (value.empty() || has_control_chars(value)) {
+    return false;
+  }
+  std::filesystem::path path(value);
+  if (path.is_absolute()) {
+    return false;
+  }
+  for (const auto& part : path) {
+    if (part == "..") {
+      return false;
+    }
+  }
+  return true;
 }
 
 struct JsonCursor {
@@ -173,6 +199,38 @@ bool parse_registry_json(const std::string& json,
 
 }  // namespace
 
+bool is_safe_plugin_identifier(const std::string& value) {
+  if (value.empty()) {
+    return false;
+  }
+  for (unsigned char ch : value) {
+    if (!(std::isalnum(ch) || ch == '_' || ch == '-')) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool validate_plugin_registry_entry(const PluginRegistryEntry& entry, std::string& error) {
+  if (!is_safe_plugin_identifier(entry.name)) {
+    error = "Registry entry has invalid plugin name: " + entry.name;
+    return false;
+  }
+  if (entry.repo.empty() || has_control_chars(entry.repo)) {
+    error = "Registry entry has invalid repo for plugin: " + entry.name;
+    return false;
+  }
+  if (!is_safe_relative_path(entry.path)) {
+    error = "Registry entry has invalid plugin path for plugin: " + entry.name;
+    return false;
+  }
+  if (!entry.artifact.empty() && !is_safe_relative_path(entry.artifact)) {
+    error = "Registry entry has invalid artifact path for plugin: " + entry.name;
+    return false;
+  }
+  return true;
+}
+
 std::string plugin_registry_path() {
   std::string path = "plugins/registry.json";
   if (const char* env = std::getenv("MARKQL_PLUGIN_REGISTRY")) {
@@ -194,7 +252,15 @@ bool load_plugin_registry(std::vector<PluginRegistryEntry>& entries, std::string
   std::stringstream buffer;
   buffer << in.rdbuf();
   std::string json = buffer.str();
-  return parse_registry_json(json, entries, error);
+  if (!parse_registry_json(json, entries, error)) {
+    return false;
+  }
+  for (const auto& entry : entries) {
+    if (!validate_plugin_registry_entry(entry, error)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 const PluginRegistryEntry* find_plugin_entry(const std::vector<PluginRegistryEntry>& entries,

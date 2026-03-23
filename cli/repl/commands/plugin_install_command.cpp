@@ -13,6 +13,25 @@
 namespace markql::cli {
 namespace {
 
+std::string shell_quote_arg(const std::string& value) {
+#if defined(_WIN32)
+  return "\"" + value + "\"";
+#else
+  std::string quoted;
+  quoted.reserve(value.size() + 2);
+  quoted.push_back('\'');
+  for (char c : value) {
+    if (c == '\'') {
+      quoted += "'\\''";
+    } else {
+      quoted.push_back(c);
+    }
+  }
+  quoted.push_back('\'');
+  return quoted;
+#endif
+}
+
 int run_command(const std::string& command,
                 bool verbose,
                 const std::filesystem::path& log_path) {
@@ -22,8 +41,7 @@ int run_command(const std::string& command,
 #if defined(_WIN32)
   return std::system(command.c_str());
 #else
-  std::string quiet =
-      command + " > \"" + log_path.string() + "\" 2>&1";
+  std::string quiet = command + " > " + shell_quote_arg(log_path.string()) + " 2>&1";
   return std::system(quiet.c_str());
 #endif
 }
@@ -76,6 +94,11 @@ CommandHandler make_plugin_install_command() {
       std::cerr << "Error: plugin not found in registry: " << arg << std::endl;
       return true;
     }
+    std::string validation_error;
+    if (!validate_plugin_registry_entry(*match, validation_error)) {
+      std::cerr << "Error: " << validation_error << std::endl;
+      return true;
+    }
 
     bool use_local_source = match->repo == "local";
     std::filesystem::path plugin_root =
@@ -109,7 +132,8 @@ CommandHandler make_plugin_install_command() {
 
       if (std::filesystem::exists(plugin_root / ".git")) {
         std::cout << "Step 1/2: Updating source..." << std::endl;
-        std::string pull_cmd = "git -C \"" + plugin_root.string() + "\" pull --ff-only";
+        std::string pull_cmd =
+            "git -C " + shell_quote_arg(plugin_root.string()) + " pull --ff-only";
         if (run_command(pull_cmd, verbose, git_log) != 0) {
           std::cerr << "Error: git pull failed for " << match->name << std::endl;
           if (!verbose && std::filesystem::exists(git_log)) {
@@ -122,7 +146,8 @@ CommandHandler make_plugin_install_command() {
         std::cout << "Step 1/2: Cloning source..." << std::endl;
         std::filesystem::create_directories(plugin_root.parent_path());
         std::string clone_cmd =
-            "git clone \"" + match->repo + "\" \"" + plugin_root.string() + "\"";
+            "git clone " + shell_quote_arg(match->repo) + " " +
+            shell_quote_arg(plugin_root.string());
         if (run_command(clone_cmd, verbose, git_log) != 0) {
           std::cerr << "Error: git clone failed for " << match->name << std::endl;
           if (!verbose && std::filesystem::exists(git_log)) {
@@ -144,9 +169,10 @@ CommandHandler make_plugin_install_command() {
     std::string markql_root = std::filesystem::current_path().string();
     std::string plugin_source = std::filesystem::absolute(plugin_root).string();
     std::string cmake_config =
-        "cmake -S \"" + cmake_root.string() + "\" -B \"" + build_dir.string() +
-        "\" -DMARKQL_ROOT=\"" + markql_root + "\" -DPLUGIN_SOURCE=\"" +
-        plugin_source + "\"";
+        "cmake -S " + shell_quote_arg(cmake_root.string()) + " -B " +
+        shell_quote_arg(build_dir.string()) + " " +
+        shell_quote_arg("-DMARKQL_ROOT=" + markql_root) + " " +
+        shell_quote_arg("-DPLUGIN_SOURCE=" + plugin_source);
     if (run_command(cmake_config, verbose, cmake_log) != 0) {
       std::cerr << "Error: CMake configure failed for " << match->name << std::endl;
       if (!verbose && std::filesystem::exists(cmake_log)) {
@@ -155,8 +181,7 @@ CommandHandler make_plugin_install_command() {
       }
       return true;
     }
-    std::string cmake_build =
-        "cmake --build \"" + build_dir.string() + "\"";
+    std::string cmake_build = "cmake --build " + shell_quote_arg(build_dir.string());
     if (run_command(cmake_build, verbose, cmake_log) != 0) {
       std::cerr << "Error: CMake build failed for " << match->name << std::endl;
       if (!verbose && std::filesystem::exists(cmake_log)) {

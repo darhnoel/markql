@@ -130,6 +130,10 @@ CommandHandler make_plugin_command() {
         std::cerr << "Usage: .plugin remove <name>" << std::endl;
         return true;
       }
+      if (!is_safe_plugin_identifier(name)) {
+        std::cerr << "Error: invalid plugin name: " << name << std::endl;
+        return true;
+      }
       std::string error;
       ctx.plugin_manager.unload(name, error);
 
