@@ -55,21 +55,18 @@ std::string artifact_compatibility_error(const ArtifactHeader& header);
 bool path_has_artifact_magic(const std::string& path);
 ArtifactInfo inspect_artifact_file(const std::string& path);
 
-void write_document_artifact_file(const HtmlDocument& document,
-                                  const std::string& source_uri,
+void write_document_artifact_file(const HtmlDocument& document, const std::string& source_uri,
                                   const std::string& path);
 DocumentArtifact read_document_artifact_file(const std::string& path);
 
-void write_prepared_query_artifact_file(const Query& query,
-                                        const std::string& original_query,
+void write_prepared_query_artifact_file(const Query& query, const std::string& original_query,
                                         const std::string& path);
 PreparedQueryArtifact read_prepared_query_artifact_file(const std::string& path);
 
 PreparedQueryArtifact prepare_query_artifact(const std::string& query_text);
 
 QueryResult execute_prepared_query_on_html(const PreparedQueryArtifact& artifact,
-                                           const std::string& html,
-                                           const std::string& source_uri);
+                                           const std::string& html, const std::string& source_uri);
 QueryResult execute_prepared_query_on_document(const PreparedQueryArtifact& artifact,
                                                const DocumentArtifact& document);
 QueryResult execute_query_text_on_document(const std::string& query_text,

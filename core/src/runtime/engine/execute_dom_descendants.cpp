@@ -12,9 +12,7 @@
 namespace markql {
 
 void collect_descendants_at_depth(const std::vector<std::vector<int64_t>>& children,
-                                  int64_t node_id,
-                                  size_t depth,
-                                  std::vector<int64_t>& out) {
+                                  int64_t node_id, size_t depth, std::vector<int64_t>& out) {
   if (depth == 0) {
     out.push_back(node_id);
     return;
@@ -25,8 +23,7 @@ void collect_descendants_at_depth(const std::vector<std::vector<int64_t>>& child
 }
 
 void collect_descendants_any_depth(const std::vector<std::vector<int64_t>>& children,
-                                   int64_t node_id,
-                                   std::vector<int64_t>& out) {
+                                   int64_t node_id, std::vector<int64_t>& out) {
   for (int64_t child : children.at(static_cast<size_t>(node_id))) {
     out.push_back(child);
     collect_descendants_any_depth(children, child, out);

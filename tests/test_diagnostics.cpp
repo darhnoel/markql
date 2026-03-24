@@ -41,8 +41,8 @@ void test_lint_semantic_diagnostic_has_stable_code() {
 }
 
 void test_lint_warns_select_from_alias_as_ambiguous_node_value() {
-  std::vector<markql::Diagnostic> diagnostics = markql::lint_query(
-      "SELECT node_row FROM doc AS node_row WHERE node_row.tag = 'div'");
+  std::vector<markql::Diagnostic> diagnostics =
+      markql::lint_query("SELECT node_row FROM doc AS node_row WHERE node_row.tag = 'div'");
   expect_true(!diagnostics.empty(), "ambiguous alias-select warning produced");
   if (diagnostics.empty()) return;
   const auto& first = diagnostics.front();
@@ -51,16 +51,15 @@ void test_lint_warns_select_from_alias_as_ambiguous_node_value() {
   expect_true(first.category == "style_warning", "warning category is stable");
   expect_true(first.message == "Selecting the FROM alias as a value is ambiguous",
               "warning message is stable");
-  expect_true(first.help == "Use SELECT self to return the current node",
-              "warning help is stable");
+  expect_true(first.help == "Use SELECT self to return the current node", "warning help is stable");
   expect_true(first.doc_ref.find("appendix-grammar.md#select-self-for-current-row-nodes") !=
                   std::string::npos,
               "warning doc_ref points to canonical self docs");
 }
 
 void test_lint_select_self_has_no_alias_ambiguity_warning() {
-  std::vector<markql::Diagnostic> diagnostics = markql::lint_query(
-      "SELECT self FROM doc AS node_row WHERE node_row.tag = 'div'");
+  std::vector<markql::Diagnostic> diagnostics =
+      markql::lint_query("SELECT self FROM doc AS node_row WHERE node_row.tag = 'div'");
   expect_true(diagnostics.empty(), "canonical select self has no ambiguity warning");
 }
 
@@ -150,10 +149,12 @@ void test_diagnostic_json_renderer_matches_snapshot() {
   if (diagnostics.empty()) return;
   std::string json = markql::render_diagnostics_json(diagnostics);
   const std::string expected =
-      "[{\"severity\":\"ERROR\",\"code\":\"MQL-SYN-0001\",\"message\":\"Missing projection after SELECT\","
+      "[{\"severity\":\"ERROR\",\"code\":\"MQL-SYN-0001\",\"message\":\"Missing projection after "
+      "SELECT\","
       "\"help\":\"Add a tag, self, *, or a projection expression after SELECT.\","
       "\"doc_ref\":\"docs/book/appendix-grammar.md\","
-      "\"span\":{\"start_line\":1,\"start_col\":8,\"end_line\":1,\"end_col\":9,\"byte_start\":7,\"byte_end\":8},"
+      "\"span\":{\"start_line\":1,\"start_col\":8,\"end_line\":1,\"end_col\":9,\"byte_start\":7,"
+      "\"byte_end\":8},"
       "\"snippet\":\" --> line 1, col 8\\n  |\\n1 | SELECT FROM doc\\n  |        ^\","
       "\"related\":[],"
       "\"category\":\"parse\","
@@ -206,8 +207,8 @@ void test_diagnostic_json_renderer_never_contains_ansi_sequences() {
 }
 
 void test_diagnose_query_failure_maps_parse_error() {
-  std::vector<markql::Diagnostic> diagnostics =
-      markql::diagnose_query_failure("SELECT FROM doc", "Query parse error: Expected tag identifier");
+  std::vector<markql::Diagnostic> diagnostics = markql::diagnose_query_failure(
+      "SELECT FROM doc", "Query parse error: Expected tag identifier");
   expect_true(!diagnostics.empty(), "mapped parse failure diagnostics");
   if (diagnostics.empty()) return;
   expect_true(diagnostics.front().code == "MQL-SYN-0001", "mapped parse code");
@@ -256,8 +257,7 @@ void test_lint_operator_typo_prefers_local_repair_over_clause_order_help() {
   expect_true(!diagnostics.empty(), "operator typo diagnostics produced");
   if (diagnostics.empty()) return;
   const auto& first = diagnostics.front();
-  expect_true(first.message == "Expected a comparison operator",
-              "operator typo message is local");
+  expect_true(first.message == "Expected a comparison operator", "operator typo message is local");
   expect_true(first.expected == "comparison operator", "operator typo expected text is local");
   expect_true(first.encountered == "LKE", "operator typo encountered token is preserved");
   expect_true(first.help.find("LIKE") != std::string::npos, "operator typo suggests LIKE");
@@ -288,8 +288,7 @@ void test_lint_case_keyword_typo_prefers_local_repair() {
   expect_true(!diagnostics.empty(), "case typo diagnostics produced");
   if (diagnostics.empty()) return;
   const auto& first = diagnostics.front();
-  expect_true(first.message == "CASE expression is missing THEN",
-              "case typo message is local");
+  expect_true(first.message == "CASE expression is missing THEN", "case typo message is local");
   expect_true(first.expected == "THEN", "case typo expected token is local");
   expect_true(first.encountered == "THN", "case typo encountered token is preserved");
   expect_true(first.help.find("THEN") != std::string::npos, "case typo suggests THEN");
@@ -305,7 +304,8 @@ void test_lint_exists_axis_typo_prefers_local_repair() {
   const auto& first = diagnostics.front();
   expect_true(first.message == "Malformed EXISTS(...) predicate",
               "exists axis typo message is local");
-  expect_true(first.expected == "axis name inside EXISTS(...)", "exists axis expected text is local");
+  expect_true(first.expected == "axis name inside EXISTS(...)",
+              "exists axis expected text is local");
   expect_true(first.encountered == "DSCENDANT", "exists axis encountered token is preserved");
   expect_true(first.help.find("descendant") != std::string::npos,
               "exists axis typo suggests descendant");
@@ -314,13 +314,11 @@ void test_lint_exists_axis_typo_prefers_local_repair() {
 }
 
 void test_lint_to_target_typo_prefers_local_repair() {
-  std::vector<markql::Diagnostic> diagnostics =
-      markql::lint_query("SELECT div FROM doc TO JSNO()");
+  std::vector<markql::Diagnostic> diagnostics = markql::lint_query("SELECT div FROM doc TO JSNO()");
   expect_true(!diagnostics.empty(), "to-target typo diagnostics produced");
   if (diagnostics.empty()) return;
   const auto& first = diagnostics.front();
-  expect_true(first.message == "TO requires an output target",
-              "to-target message is local");
+  expect_true(first.message == "TO requires an output target", "to-target message is local");
   expect_true(first.help.find("JSON") != std::string::npos, "to-target typo suggests JSON");
   expect_true(first.example.find("TO LIST()") != std::string::npos,
               "to-target example stays local to TO syntax");
@@ -333,8 +331,7 @@ void test_lint_show_keyword_typo_prefers_local_repair() {
   const auto& first = diagnostics.front();
   expect_true(first.message == "SHOW requires a supported metadata category",
               "show typo message is local");
-  expect_true(first.help.find("FUNCTIONS") != std::string::npos,
-              "show typo suggests FUNCTIONS");
+  expect_true(first.help.find("FUNCTIONS") != std::string::npos, "show typo suggests FUNCTIONS");
   expect_true(first.example == "SHOW FUNCTIONS", "show typo example is local");
 }
 
@@ -357,22 +354,19 @@ void test_lint_exists_shape_has_specific_guidance() {
   expect_true(!diagnostics.empty(), "exists diagnostics produced");
   if (diagnostics.empty()) return;
   const auto& first = diagnostics.front();
-  expect_true(first.message == "Malformed EXISTS(...) predicate",
-              "exists message is specific");
+  expect_true(first.message == "Malformed EXISTS(...) predicate", "exists message is specific");
   expect_true(first.expected == "axis name inside EXISTS(...)", "exists expected text");
   expect_true(first.help.find("EXISTS(child)") != std::string::npos, "exists help example");
 }
 
 void test_lint_project_shape_has_specific_guidance() {
-  std::vector<markql::Diagnostic> diagnostics =
-      markql::lint_query("SELECT PROJECT(li) FROM doc");
+  std::vector<markql::Diagnostic> diagnostics = markql::lint_query("SELECT PROJECT(li) FROM doc");
   expect_true(!diagnostics.empty(), "project diagnostics produced");
   if (diagnostics.empty()) return;
   const auto& first = diagnostics.front();
   expect_true(first.message == "Invalid PROJECT()/FLATTEN_EXTRACT() usage",
               "project message is specific");
-  expect_true(first.help == "Use PROJECT(li) AS (title: TEXT(h2))",
-              "project help is specific");
+  expect_true(first.help == "Use PROJECT(li) AS (title: TEXT(h2))", "project help is specific");
 }
 
 void test_lint_node_function_rejects_scalar_argument_with_specific_guidance() {
@@ -410,8 +404,8 @@ void test_version_string_contains_provenance() {
 void register_diagnostic_tests(std::vector<TestCase>& tests) {
   tests.push_back({"lint_syntax_diagnostic_has_stable_code_and_span",
                    test_lint_syntax_diagnostic_has_stable_code_and_span});
-  tests.push_back({"lint_semantic_diagnostic_has_stable_code",
-                   test_lint_semantic_diagnostic_has_stable_code});
+  tests.push_back(
+      {"lint_semantic_diagnostic_has_stable_code", test_lint_semantic_diagnostic_has_stable_code});
   tests.push_back({"lint_warns_select_from_alias_as_ambiguous_node_value",
                    test_lint_warns_select_from_alias_as_ambiguous_node_value});
   tests.push_back({"lint_select_self_has_no_alias_ambiguity_warning",
@@ -436,8 +430,8 @@ void register_diagnostic_tests(std::vector<TestCase>& tests) {
                    test_diagnostic_text_renderer_color_includes_ansi_tokens});
   tests.push_back({"diagnostic_json_renderer_never_contains_ansi_sequences",
                    test_diagnostic_json_renderer_never_contains_ansi_sequences});
-  tests.push_back({"diagnose_query_failure_maps_parse_error",
-                   test_diagnose_query_failure_maps_parse_error});
+  tests.push_back(
+      {"diagnose_query_failure_maps_parse_error", test_diagnose_query_failure_maps_parse_error});
   tests.push_back({"diagnose_query_failure_maps_exists_axis_typo_for_json_consumers",
                    test_diagnose_query_failure_maps_exists_axis_typo_for_json_consumers});
   tests.push_back({"lint_invalid_clause_order_has_specific_diagnostic",
@@ -450,20 +444,19 @@ void register_diagnostic_tests(std::vector<TestCase>& tests) {
                    test_lint_case_keyword_typo_prefers_local_repair});
   tests.push_back({"lint_exists_axis_typo_prefers_local_repair",
                    test_lint_exists_axis_typo_prefers_local_repair});
-  tests.push_back({"lint_to_target_typo_prefers_local_repair",
-                   test_lint_to_target_typo_prefers_local_repair});
+  tests.push_back(
+      {"lint_to_target_typo_prefers_local_repair", test_lint_to_target_typo_prefers_local_repair});
   tests.push_back({"lint_show_keyword_typo_prefers_local_repair",
                    test_lint_show_keyword_typo_prefers_local_repair});
   tests.push_back({"lint_table_option_value_typo_prefers_local_repair",
                    test_lint_table_option_value_typo_prefers_local_repair});
-  tests.push_back({"lint_exists_shape_has_specific_guidance",
-                   test_lint_exists_shape_has_specific_guidance});
-  tests.push_back({"lint_project_shape_has_specific_guidance",
-                   test_lint_project_shape_has_specific_guidance});
+  tests.push_back(
+      {"lint_exists_shape_has_specific_guidance", test_lint_exists_shape_has_specific_guidance});
+  tests.push_back(
+      {"lint_project_shape_has_specific_guidance", test_lint_project_shape_has_specific_guidance});
   tests.push_back({"lint_node_function_rejects_scalar_argument_with_specific_guidance",
                    test_lint_node_function_rejects_scalar_argument_with_specific_guidance});
   tests.push_back({"lint_malformed_with_clause_has_specific_guidance",
                    test_lint_malformed_with_clause_has_specific_guidance});
-  tests.push_back({"version_string_contains_provenance",
-                   test_version_string_contains_provenance});
+  tests.push_back({"version_string_contains_provenance", test_version_string_contains_provenance});
 }

@@ -28,5 +28,6 @@ void test_shorthand_qualified_attribute_filter() {
 
 void register_shorthand_tests(std::vector<TestCase>& tests) {
   tests.push_back({"shorthand_attribute_filter", test_shorthand_attribute_filter});
-  tests.push_back({"shorthand_qualified_attribute_filter", test_shorthand_qualified_attribute_filter});
+  tests.push_back(
+      {"shorthand_qualified_attribute_filter", test_shorthand_qualified_attribute_filter});
 }

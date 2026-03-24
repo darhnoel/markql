@@ -237,7 +237,9 @@ char Lexer::advance_char() {
   return c;
 }
 
-bool Lexer::has_error() const { return has_error_; }
+bool Lexer::has_error() const {
+  return has_error_;
+}
 
 Token Lexer::make_token(TokenType type, const std::string& text, size_t start_pos) const {
   return Token{type, text, start_pos};

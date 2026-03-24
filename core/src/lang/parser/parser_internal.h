@@ -19,7 +19,8 @@ class Parser {
  private:
   bool parse_select_list(std::vector<Query::SelectItem>& items);
   bool parse_exclude_list(std::vector<std::string>& fields);
-  bool parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_field, bool& saw_tag_only);
+  bool parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_field,
+                         bool& saw_tag_only);
   bool parse_flatten_extract_expr(Query::SelectItem::FlattenExtractExpr& expr);
   bool parse_flatten_extract_alias_expr_pairs(Query::SelectItem& item);
 
@@ -30,7 +31,8 @@ class Parser {
   bool parse_join_clauses(std::vector<Query::JoinItem>& joins);
   bool parse_show(Query& q);
   bool parse_describe(Query& q);
-  bool parse_source_alias(Source& src, bool require_alias = false, const char* required_msg = nullptr);
+  bool parse_source_alias(Source& src, bool require_alias = false,
+                          const char* required_msg = nullptr);
 
   bool parse_expr(Expr& out);
   bool parse_and_expr(Expr& out);

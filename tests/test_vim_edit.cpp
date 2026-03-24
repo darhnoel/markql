@@ -109,8 +109,8 @@ void register_vim_edit_tests(std::vector<TestCase>& tests) {
   tests.push_back({"vim_x_deletes_single_ascii", test_vim_x_deletes_single_ascii});
   tests.push_back({"vim_count_x_deletes_multiple_ascii", test_vim_count_x_deletes_multiple_ascii});
   tests.push_back({"vim_count_x_clamps_at_eof", test_vim_count_x_clamps_at_eof});
-  tests.push_back({"vim_x_handles_utf8_codepoint_boundaries",
-                   test_vim_x_handles_utf8_codepoint_boundaries});
+  tests.push_back(
+      {"vim_x_handles_utf8_codepoint_boundaries", test_vim_x_handles_utf8_codepoint_boundaries});
   tests.push_back({"vim_x_at_eof_is_noop", test_vim_x_at_eof_is_noop});
   tests.push_back({"vim_word_forward_small_vs_big", test_vim_word_forward_small_vs_big});
   tests.push_back({"vim_word_backward_small_vs_big", test_vim_word_backward_small_vs_big});

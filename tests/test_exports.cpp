@@ -119,7 +119,8 @@ void test_json_export_integration() {
       "<a href='y'>line1\nline2</a>";
   auto path = std::filesystem::temp_directory_path() / "markql_json_integration_test.json";
   std::string query =
-      "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL TO JSON(\"" + path.string() + "\")";
+      "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL TO JSON(\"" +
+      path.string() + "\")";
   auto result = run_query(html, query);
   std::string error;
   bool ok = markql::cli::export_result(result, error);
@@ -139,7 +140,8 @@ void test_ndjson_export_integration() {
       "<a href='y'>Two</a>";
   auto path = std::filesystem::temp_directory_path() / "markql_ndjson_integration_test.ndjson";
   std::string query =
-      "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL TO NDJSON(\"" + path.string() + "\")";
+      "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL TO NDJSON(\"" +
+      path.string() + "\")";
   auto result = run_query(html, query);
   std::string error;
   bool ok = markql::cli::export_result(result, error);
@@ -156,7 +158,8 @@ void test_ndjson_export_integration() {
 void test_json_ndjson_stdout_fallback() {
   std::string html = "<a href='x'>One</a>";
   {
-    std::string query = "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL TO JSON()";
+    std::string query =
+        "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL TO JSON()";
     auto result = run_query(html, query);
     std::ostringstream captured;
     auto* old = std::cout.rdbuf(captured.rdbuf());
@@ -165,10 +168,12 @@ void test_json_ndjson_stdout_fallback() {
     std::cout.rdbuf(old);
     expect_true(ok, "json stdout export ok");
     expect_true(error.empty(), "json stdout export no error");
-    expect_true(captured.str() == "[{\"href\":\"x\",\"text\":\"One\"}]\n", "json stdout export content");
+    expect_true(captured.str() == "[{\"href\":\"x\",\"text\":\"One\"}]\n",
+                "json stdout export content");
   }
   {
-    std::string query = "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL TO NDJSON()";
+    std::string query =
+        "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL TO NDJSON()";
     auto result = run_query(html, query);
     std::ostringstream captured;
     auto* old = std::cout.rdbuf(captured.rdbuf());
@@ -177,7 +182,8 @@ void test_json_ndjson_stdout_fallback() {
     std::cout.rdbuf(old);
     expect_true(ok, "ndjson stdout export ok");
     expect_true(error.empty(), "ndjson stdout export no error");
-    expect_true(captured.str() == "{\"href\":\"x\",\"text\":\"One\"}\n", "ndjson stdout export content");
+    expect_true(captured.str() == "{\"href\":\"x\",\"text\":\"One\"}\n",
+                "ndjson stdout export content");
   }
 }
 
@@ -185,7 +191,8 @@ void test_csv_stdout_fallback() {
   std::string html =
       "<a href='x'>One</a>"
       "<a href='y'>Two,Too</a>";
-  auto result = run_query(html, "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL");
+  auto result =
+      run_query(html, "SELECT a.href, TEXT(a) FROM document WHERE attributes.href IS NOT NULL");
   std::ostringstream captured;
   auto* old = std::cout.rdbuf(captured.rdbuf());
   std::string error;

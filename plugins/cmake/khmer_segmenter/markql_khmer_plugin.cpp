@@ -55,12 +55,8 @@ bool ensure_segmenter(KhmerPluginState& state, std::string& error) {
   return true;
 }
 
-bool tokenize_khmer(const char* text,
-                    void* user_data,
-                    char* out_tokens,
-                    size_t out_tokens_size,
-                    char* out_error,
-                    size_t out_error_size) {
+bool tokenize_khmer(const char* text, void* user_data, char* out_tokens, size_t out_tokens_size,
+                    char* out_error, size_t out_error_size) {
   if (!text || !out_tokens || out_tokens_size == 0) {
     if (out_error && out_error_size > 0) {
       std::snprintf(out_error, out_error_size, "Invalid tokenizer buffer.");
@@ -103,9 +99,8 @@ bool tokenize_khmer(const char* text,
 
 }  // namespace
 
-extern "C" bool markql_register_plugin(const XsqlPluginHost* host,
-                                      char* out_error,
-                                      size_t out_error_size) {
+extern "C" bool markql_register_plugin(const XsqlPluginHost* host, char* out_error,
+                                       size_t out_error_size) {
   if (!host || host->api_version != MARKQL_PLUGIN_API_VERSION) {
     if (out_error && out_error_size > 0) {
       std::snprintf(out_error, out_error_size, "Unsupported plugin API version.");
@@ -113,11 +108,7 @@ extern "C" bool markql_register_plugin(const XsqlPluginHost* host,
     return false;
   }
   static KhmerPluginState state;
-  if (!host->register_tokenizer(host->host_context,
-                                "khmer",
-                                &tokenize_khmer,
-                                &state,
-                                out_error,
+  if (!host->register_tokenizer(host->host_context, "khmer", &tokenize_khmer, &state, out_error,
                                 out_error_size)) {
     return false;
   }

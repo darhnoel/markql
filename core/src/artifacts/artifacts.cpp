@@ -61,19 +61,17 @@ ArtifactInfo inspect_artifact_file(const std::string& path) {
   return inspect_artifact_bytes(detail::read_file_bytes(path), false);
 }
 
-void write_document_artifact_file(const HtmlDocument& document,
-                                  const std::string& source_uri,
+void write_document_artifact_file(const HtmlDocument& document, const std::string& source_uri,
                                   const std::string& path) {
   detail::validate_document(document);
   std::vector<detail::SectionView> sections;
   sections.push_back(detail::SectionView{
       "META", detail::build_document_meta_payload(source_uri, document.nodes.size())});
   sections.push_back(detail::SectionView{"DOCN", detail::build_document_nodes_payload(document)});
-  detail::write_file_bytes(path,
-                           detail::build_artifact_bytes(ArtifactKind::DocumentSnapshot,
-                                                        detail::current_producer_major(),
-                                                        detail::document_required_features(),
-                                                        sections));
+  detail::write_file_bytes(
+      path,
+      detail::build_artifact_bytes(ArtifactKind::DocumentSnapshot, detail::current_producer_major(),
+                                   detail::document_required_features(), sections));
 }
 
 DocumentArtifact read_document_artifact_file(const std::string& path) {
@@ -84,7 +82,8 @@ DocumentArtifact read_document_artifact_file(const std::string& path) {
                  "Unsupported artifact: expected .mqd document snapshot");
   detail::BinaryReader reader(data);
   (void)detail::read_header(reader);
-  const std::vector<detail::SectionView> sections = detail::read_sections(reader, artifact.info.header);
+  const std::vector<detail::SectionView> sections =
+      detail::read_sections(reader, artifact.info.header);
   const detail::SectionView* nodes = detail::find_section(sections, "DOCN");
   detail::ensure(nodes != nullptr, "Corrupted artifact: missing DOCN section");
   artifact.document = detail::parse_document_nodes(artifact.info.header, nodes->payload);
@@ -93,18 +92,15 @@ DocumentArtifact read_document_artifact_file(const std::string& path) {
   return artifact;
 }
 
-void write_prepared_query_artifact_file(const Query& query,
-                                        const std::string& original_query,
+void write_prepared_query_artifact_file(const Query& query, const std::string& original_query,
                                         const std::string& path) {
   std::vector<detail::SectionView> sections;
-  sections.push_back(detail::SectionView{
-      "META", detail::build_prepared_meta_payload(query, original_query)});
+  sections.push_back(
+      detail::SectionView{"META", detail::build_prepared_meta_payload(query, original_query)});
   sections.push_back(detail::SectionView{"QAST", detail::build_prepared_query_payload(query)});
-  detail::write_file_bytes(path,
-                           detail::build_artifact_bytes(ArtifactKind::PreparedQuery,
-                                                        detail::current_producer_major(),
-                                                        detail::prepared_query_required_features(),
-                                                        sections));
+  detail::write_file_bytes(path, detail::build_artifact_bytes(
+                                     ArtifactKind::PreparedQuery, detail::current_producer_major(),
+                                     detail::prepared_query_required_features(), sections));
 }
 
 PreparedQueryArtifact prepare_query_artifact(const std::string& query_text) {
@@ -140,10 +136,12 @@ PreparedQueryArtifact read_prepared_query_artifact_file(const std::string& path)
                  "Unsupported artifact: expected .mqp prepared query");
   detail::BinaryReader reader(data);
   (void)detail::read_header(reader);
-  const std::vector<detail::SectionView> sections = detail::read_sections(reader, artifact.info.header);
+  const std::vector<detail::SectionView> sections =
+      detail::read_sections(reader, artifact.info.header);
   const detail::SectionView* query_payload = detail::find_section(sections, "QAST");
   detail::ensure(query_payload != nullptr, "Corrupted artifact: missing QAST section");
-  artifact.query = detail::parse_prepared_query_payload(artifact.info.header, query_payload->payload);
+  artifact.query =
+      detail::parse_prepared_query_payload(artifact.info.header, query_payload->payload);
   validate_query_for_execution(artifact.query);
   detail::ensure(artifact.query.kind == artifact.info.query_kind,
                  "Corrupted artifact: query metadata mismatch");
@@ -153,8 +151,7 @@ PreparedQueryArtifact read_prepared_query_artifact_file(const std::string& path)
 }
 
 QueryResult execute_prepared_query_on_html(const PreparedQueryArtifact& artifact,
-                                           const std::string& html,
-                                           const std::string& source_uri) {
+                                           const std::string& html, const std::string& source_uri) {
   if (artifact.query.kind != Query::Kind::Select) {
     return execute_meta_query(artifact.query, source_uri);
   }
@@ -166,8 +163,8 @@ QueryResult execute_prepared_query_on_document(const PreparedQueryArtifact& arti
   if (artifact.query.kind != Query::Kind::Select) {
     return execute_meta_query(artifact.query, document.info.source_uri);
   }
-  return execute_query_with_source(
-      artifact.query, nullptr, &document.document, document.info.source_uri);
+  return execute_query_with_source(artifact.query, nullptr, &document.document,
+                                   document.info.source_uri);
 }
 
 QueryResult execute_query_text_on_document(const std::string& query_text,
@@ -180,8 +177,8 @@ QueryResult execute_query_text_on_document(const std::string& query_text,
   if (parsed.query->kind != Query::Kind::Select) {
     return execute_meta_query(*parsed.query, document.info.source_uri);
   }
-  return execute_query_with_source(
-      *parsed.query, nullptr, &document.document, document.info.source_uri);
+  return execute_query_with_source(*parsed.query, nullptr, &document.document,
+                                   document.info.source_uri);
 }
 
 }  // namespace markql::artifacts

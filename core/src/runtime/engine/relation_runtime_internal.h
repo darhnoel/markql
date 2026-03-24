@@ -72,44 +72,33 @@ struct RelationRuntimeCache {
 };
 
 std::string lower_alias_name(const std::string& alias);
-void merge_alias_columns(Relation& rel,
-                         const std::string& alias,
-                         const RelationRecord& record);
+void merge_alias_columns(Relation& rel, const std::string& alias, const RelationRecord& record);
 std::optional<int64_t> parse_optional_i64(const std::optional<std::string>& value);
 void fill_result_core_from_record(QueryResultRow& out, const RelationRecord& record);
 const RelationRecord* resolve_record(const RelationRow& row,
                                      const std::optional<std::string>& qualifier,
                                      const std::optional<std::string>& active_alias);
-std::optional<std::string> relation_operand_value(const Operand& operand,
-                                                  const RelationRow& row,
+std::optional<std::string> relation_operand_value(const Operand& operand, const RelationRow& row,
                                                   const std::optional<std::string>& active_alias);
-std::optional<std::string> eval_relation_scalar_expr(const ScalarExpr& expr,
-                                                     const RelationRow& row,
-                                                     const std::optional<std::string>& active_alias,
-                                                     RelationRuntimeCache::Profile* profile = nullptr);
+std::optional<std::string> eval_relation_scalar_expr(
+    const ScalarExpr& expr, const RelationRow& row, const std::optional<std::string>& active_alias,
+    RelationRuntimeCache::Profile* profile = nullptr);
 std::optional<std::string> eval_relation_project_expr(
-    const Query::SelectItem::FlattenExtractExpr& expr,
-    const RelationRow& row,
+    const Query::SelectItem::FlattenExtractExpr& expr, const RelationRow& row,
     const std::optional<std::string>& active_alias,
     const std::unordered_map<std::string, std::string>& bindings,
     RelationRuntimeCache::Profile* profile = nullptr);
-bool eval_relation_expr(const Expr& expr,
-                        const RelationRow& row,
+bool eval_relation_expr(const Expr& expr, const RelationRow& row,
                         const std::optional<std::string>& active_alias,
                         RelationRuntimeCache::Profile* profile = nullptr);
 int compare_optional_relation_values(const std::optional<std::string>& left,
                                      const std::optional<std::string>& right);
-std::optional<std::string> relation_field_by_name(const RelationRow& row,
-                                                  const std::string& field,
+std::optional<std::string> relation_field_by_name(const RelationRow& row, const std::string& field,
                                                   const std::optional<std::string>& active_alias);
-QueryResult query_result_from_relation(const Query& query,
-                                       const Relation& relation,
+QueryResult query_result_from_relation(const Query& query, const Relation& relation,
                                        RelationRuntimeCache::Profile* profile);
-bool merge_row_aliases(RelationRow& target,
-                       const RelationRow& add,
-                       std::string* duplicate_alias);
-Relation execute_relation_join_non_lateral(const Query::JoinItem& join,
-                                           const Relation& left_rel,
+bool merge_row_aliases(RelationRow& target, const RelationRow& add, std::string* duplicate_alias);
+Relation execute_relation_join_non_lateral(const Query::JoinItem& join, const Relation& left_rel,
                                            const Relation& right_rel,
                                            const std::optional<std::string>& active_alias,
                                            const std::string& join_label,

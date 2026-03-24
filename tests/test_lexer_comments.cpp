@@ -84,12 +84,10 @@ void test_unterminated_block_comment_error() {
 }
 
 void test_comment_markers_inside_string_literals() {
-  auto parsed_dash = markql::parse_query(
-      "SELECT div FROM document WHERE text = 'a--b'");
+  auto parsed_dash = markql::parse_query("SELECT div FROM document WHERE text = 'a--b'");
   expect_true(parsed_dash.query.has_value(), "-- inside string literal is not comment");
 
-  auto parsed_block = markql::parse_query(
-      "SELECT div FROM document WHERE text = '/*x*/'");
+  auto parsed_block = markql::parse_query("SELECT div FROM document WHERE text = '/*x*/'");
   expect_true(parsed_block.query.has_value(), "/* */ inside string literal is not comment");
 }
 
@@ -110,6 +108,8 @@ void register_lexer_comment_tests(std::vector<TestCase>& tests) {
   tests.push_back({"block_comment_single_line", test_block_comment_single_line});
   tests.push_back({"block_comment_multi_line", test_block_comment_multi_line});
   tests.push_back({"unterminated_block_comment_error", test_unterminated_block_comment_error});
-  tests.push_back({"comment_markers_inside_string_literals", test_comment_markers_inside_string_literals});
-  tests.push_back({"query_without_comments_unchanged_behavior", test_query_without_comments_unchanged_behavior});
+  tests.push_back(
+      {"comment_markers_inside_string_literals", test_comment_markers_inside_string_literals});
+  tests.push_back({"query_without_comments_unchanged_behavior",
+                   test_query_without_comments_unchanged_behavior});
 }

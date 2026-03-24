@@ -29,8 +29,8 @@ CommandHandler make_reload_config_command() {
       }
     }
     std::string apply_error;
-    if (!apply_repl_settings(settings, ctx.config, ctx.editor, ctx.display_full,
-                             ctx.max_rows, apply_error)) {
+    if (!apply_repl_settings(settings, ctx.config, ctx.editor, ctx.display_full, ctx.max_rows,
+                             apply_error)) {
       if (ctx.config.color) std::cerr << kColor.red;
       std::cerr << "Error: " << apply_error << std::endl;
       if (ctx.config.color) std::cerr << kColor.reset;

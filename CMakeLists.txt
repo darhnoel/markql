@@ -72,11 +72,16 @@ add_library(markql_core
   core/src/artifacts/artifact_query_flatbuffers.cpp
   core/src/lang/ast.cpp
   core/src/lang/diagnostics.cpp
+  core/src/lang/diagnostics_parse_support.cpp
+  core/src/lang/diagnostics_details.cpp
+  core/src/lang/diagnostics_render.cpp
   core/src/lang/markql_parser.cpp
   core/src/lang/parser/parser.cpp
   core/src/lang/parser/parser_expr.cpp
+  core/src/lang/parser/parser_expr_scalar.cpp
   core/src/lang/parser/parser_query.cpp
   core/src/lang/parser/parser_select.cpp
+  core/src/lang/parser/parser_select_extract.cpp
   core/src/lang/parser/parser_source.cpp
   core/src/lang/parser/parser_util.cpp
   core/src/lang/parser/lexer.cpp
@@ -85,6 +90,7 @@ add_library(markql_core
   core/src/dom/backend/parser_libxml2.cpp
   core/src/runtime/executor/executor.cpp
   core/src/runtime/executor/filter.cpp
+  core/src/runtime/executor/filter_scalar.cpp
   core/src/runtime/executor/order.cpp
   core/src/util/string_util.cpp
   core/src/runtime/engine/execute.cpp
@@ -247,8 +253,11 @@ if (MARKQL_BUILD_CLI)
     cli/main.cpp
     cli/cli_args.cpp
     cli/cli_utils.cpp
+    cli/cli_utils_json.cpp
     cli/render/query_template_renderer.cpp
     cli/explore/dom_explorer.cpp
+    cli/explore/dom_explorer_run.cpp
+    cli/explore/dom_explorer_view.cpp
     cli/explore/inner_html_search.cpp
     cli/explore/markql_suggestor.cpp
     cli/script_runner.cpp
@@ -356,6 +365,8 @@ if (MARKQL_BUILD_TESTS)
     tests/test_render.cpp
     tests/test_dom_explorer.cpp
     cli/explore/dom_explorer.cpp
+    cli/explore/dom_explorer_run.cpp
+    cli/explore/dom_explorer_view.cpp
     cli/explore/inner_html_search.cpp
     cli/explore/markql_suggestor.cpp
     tests/test_explore_search.cpp
@@ -391,6 +402,7 @@ if (MARKQL_BUILD_TESTS)
     cli/repl/commands/summarize_content_command.cpp
     cli/cli_args.cpp
     cli/cli_utils.cpp
+    cli/cli_utils_json.cpp
     cli/render/query_template_renderer.cpp
     cli/script_runner.cpp
     cli/ui/color.cpp

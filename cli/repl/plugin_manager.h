@@ -26,9 +26,7 @@ class PluginManager {
   bool load(const std::string& name_or_path, std::string& error);
   bool unload(const std::string& name, std::string& error);
   bool is_loaded(const std::string& name) const;
-  bool tokenize(const std::string& lang,
-                const std::string& text,
-                std::vector<std::string>& tokens,
+  bool tokenize(const std::string& lang, const std::string& text, std::vector<std::string>& tokens,
                 std::string& error) const;
   bool has_tokenizer(const std::string& lang) const;
   const std::vector<PluginInfo>& plugins() const;
@@ -46,19 +44,11 @@ class PluginManager {
     std::string current_plugin;
   };
 
-  static bool register_command(void* host_context,
-                               const char* name,
-                               const char* help,
-                               XsqlPluginCommandFn fn,
-                               void* user_data,
-                               char* out_error,
+  static bool register_command(void* host_context, const char* name, const char* help,
+                               XsqlPluginCommandFn fn, void* user_data, char* out_error,
                                size_t out_error_size);
-  static bool register_tokenizer(void* host_context,
-                                 const char* lang,
-                                 XsqlTokenizerFn fn,
-                                 void* user_data,
-                                 char* out_error,
-                                 size_t out_error_size);
+  static bool register_tokenizer(void* host_context, const char* lang, XsqlTokenizerFn fn,
+                                 void* user_data, char* out_error, size_t out_error_size);
   static void print_message(void* host_context, const char* message, bool is_error);
 
   std::string resolve_plugin_path(const std::string& name_or_path) const;

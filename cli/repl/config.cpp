@@ -269,12 +269,8 @@ bool load_repl_config(const std::string& path, ReplSettings& out, std::string& e
   return true;
 }
 
-bool apply_repl_settings(const ReplSettings& settings,
-                         ReplConfig& config,
-                         LineEditor& editor,
-                         bool& display_full,
-                         size_t& max_rows,
-                         std::string& error) {
+bool apply_repl_settings(const ReplSettings& settings, ReplConfig& config, LineEditor& editor,
+                         bool& display_full, size_t& max_rows, std::string& error) {
   if (settings.history_max_entries.has_value()) {
     editor.set_history_size(*settings.history_max_entries);
   }
@@ -287,9 +283,8 @@ bool apply_repl_settings(const ReplSettings& settings,
     config.output_mode = *settings.output_mode;
   }
   if (settings.colname_mode.has_value()) {
-    config.colname_mode = *settings.colname_mode == "raw"
-                              ? markql::ColumnNameMode::Raw
-                              : markql::ColumnNameMode::Normalize;
+    config.colname_mode = *settings.colname_mode == "raw" ? markql::ColumnNameMode::Raw
+                                                          : markql::ColumnNameMode::Normalize;
   }
   if (settings.editor_mode.has_value()) {
     if (*settings.editor_mode == "vim") {

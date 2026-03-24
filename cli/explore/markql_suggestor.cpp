@@ -32,7 +32,9 @@ std::string escape_single_quotes(std::string_view text) {
   return out;
 }
 
-std::string sql_quote(std::string_view text) { return "'" + escape_single_quotes(text) + "'"; }
+std::string sql_quote(std::string_view text) {
+  return "'" + escape_single_quotes(text) + "'";
+}
 
 std::string first_class_token(const markql::HtmlNode& node) {
   auto it = node.attributes.find("class");
@@ -67,7 +69,9 @@ std::string to_snake_case(std::string_view input) {
 
 bool contains_ci(std::string_view text, std::string_view needle) {
   if (needle.empty() || text.empty()) return false;
-  auto lower = [](char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); };
+  auto lower = [](char c) {
+    return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  };
   for (size_t i = 0; i + needle.size() <= text.size(); ++i) {
     bool ok = true;
     for (size_t j = 0; j < needle.size(); ++j) {
@@ -109,7 +113,8 @@ std::vector<int64_t> ancestor_chain(const markql::HtmlDocument& doc, int64_t nod
 
 }  // namespace
 
-MarkqlSuggestion suggest_markql_statement(const markql::HtmlDocument& doc, int64_t selected_node_id) {
+MarkqlSuggestion suggest_markql_statement(const markql::HtmlDocument& doc,
+                                          int64_t selected_node_id) {
   MarkqlSuggestion suggestion;
   if (doc.nodes.empty()) {
     suggestion.reason = "empty document";
@@ -200,7 +205,8 @@ MarkqlSuggestion suggest_markql_statement(const markql::HtmlDocument& doc, int64
   };
 
   auto selected_id_it = selected.attributes.find("id");
-  if (selected_tag_valid && selected_id_it != selected.attributes.end() && !selected_id_it->second.empty()) {
+  if (selected_tag_valid && selected_id_it != selected.attributes.end() &&
+      !selected_id_it->second.empty()) {
     add_field(selected.tag + "_id", "ATTR(" + selected.tag + ", id)");
   }
 
@@ -239,9 +245,8 @@ MarkqlSuggestion suggest_markql_statement(const markql::HtmlDocument& doc, int64
   }
   if (title_selector.has_value()) {
     if (title_predicate.has_value()) {
-      add_field("title",
-                "TEXT(" + *title_selector + " WHERE attributes.class CONTAINS " +
-                    sql_quote(*title_predicate) + ")");
+      add_field("title", "TEXT(" + *title_selector + " WHERE attributes.class CONTAINS " +
+                             sql_quote(*title_predicate) + ")");
     } else {
       add_field("title", "TEXT(" + *title_selector + ")");
     }
@@ -295,8 +300,8 @@ MarkqlSuggestion suggest_markql_statement(const markql::HtmlDocument& doc, int64
 
   if (use_project) {
     suggestion.strategy = MarkqlSuggestionStrategy::Project;
-    suggestion.reason =
-        "repeated row shape detected (" + std::to_string(repeated_rows) + ") with extractable fields";
+    suggestion.reason = "repeated row shape detected (" + std::to_string(repeated_rows) +
+                        ") with extractable fields";
     std::string sql = "SELECT " + row.tag + ".node_id,\n       PROJECT(" + row.tag + ") AS (\n";
     for (size_t i = 0; i < fields.size(); ++i) {
       sql += "         " + fields[i].first + ": " + fields[i].second;
@@ -310,23 +315,25 @@ MarkqlSuggestion suggest_markql_statement(const markql::HtmlDocument& doc, int64
         "row pattern is weak for PROJECT; flattening is safer for first-pass extraction";
     if (row_tag_valid) {
       // WHY: include explicit depth + alias tuple because parser expects AS (...) for FLATTEN output.
-      suggestion.statement = "SELECT " + row.tag + ".node_id,\n"
-                            "       FLATTEN(" +
-                            row.tag +
-                            ", 2) AS (flat_text)\n"
-                            "FROM doc\n"
-                            "WHERE " +
-                            where_sql +
-                            "\n"
-                            "ORDER BY node_id;";
+      suggestion.statement = "SELECT " + row.tag +
+                             ".node_id,\n"
+                             "       FLATTEN(" +
+                             row.tag +
+                             ", 2) AS (flat_text)\n"
+                             "FROM doc\n"
+                             "WHERE " +
+                             where_sql +
+                             "\n"
+                             "ORDER BY node_id;";
     } else {
-      suggestion.statement = "SELECT self.node_id,\n"
-                            "       TEXT(self) AS text\n"
-                            "FROM doc\n"
-                            "WHERE " +
-                            where_sql +
-                            "\n"
-                            "ORDER BY node_id;";
+      suggestion.statement =
+          "SELECT self.node_id,\n"
+          "       TEXT(self) AS text\n"
+          "FROM doc\n"
+          "WHERE " +
+          where_sql +
+          "\n"
+          "ORDER BY node_id;";
     }
   }
   suggestion.confidence = std::max(10, confidence - (use_project ? 0 : 10));

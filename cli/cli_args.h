@@ -58,14 +58,10 @@ bool is_supported_output_mode(const std::string& mode);
 
 /// Resolves whether general CLI color output should be enabled.
 /// MUST honor NO_COLOR and TTY-aware auto mode.
-bool resolve_output_color_enabled(const CliOptions& options,
-                                  bool is_tty,
-                                  bool no_color_env);
+bool resolve_output_color_enabled(const CliOptions& options, bool is_tty, bool no_color_env);
 /// Resolves whether lint text diagnostics should render ANSI color.
 /// MUST keep legacy/default lint rendering plain unless explicitly opted in.
-bool resolve_diagnostics_color_enabled(const CliOptions& options,
-                                       bool is_tty,
-                                       bool no_color_env);
+bool resolve_diagnostics_color_enabled(const CliOptions& options, bool is_tty, bool no_color_env);
 /// Returns true when NO_COLOR is set and non-empty.
 bool no_color_env_present();
 

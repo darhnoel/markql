@@ -21,8 +21,7 @@ std::string shared_library_suffix() {
 #endif
 }
 
-std::string resolve_artifact_name(const PluginRegistryEntry* entry,
-                                  const std::string& name) {
+std::string resolve_artifact_name(const PluginRegistryEntry* entry, const std::string& name) {
   std::string artifact;
   if (entry && !entry->artifact.empty()) {
     artifact = entry->artifact;
@@ -56,7 +55,8 @@ CommandHandler make_plugin_command() {
     iss >> subcmd;
     if (subcmd.empty()) {
       std::cerr << "Usage: .plugin list | .plugin load <name|path> | .plugin unload <name>\n"
-                   "       .plugin install <name> | .plugin remove <name>" << std::endl;
+                   "       .plugin install <name> | .plugin remove <name>"
+                << std::endl;
       return true;
     }
     if (subcmd == "list") {
@@ -158,7 +158,8 @@ CommandHandler make_plugin_command() {
     }
     std::cerr << "Unknown subcommand: " << subcmd << std::endl;
     std::cerr << "Usage: .plugin list | .plugin load <name|path> | .plugin unload <name>\n"
-                 "       .plugin install <name> | .plugin remove <name>" << std::endl;
+                 "       .plugin install <name> | .plugin remove <name>"
+              << std::endl;
     return true;
   };
 }

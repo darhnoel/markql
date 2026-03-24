@@ -7,7 +7,9 @@ namespace markql {
 /// Constructs a parser for a given query input.
 /// MUST immediately read the first token to initialize state.
 /// Inputs are query strings; side effects include token consumption.
-Parser::Parser(const std::string& input) : lexer_(input) { advance(); }
+Parser::Parser(const std::string& input) : lexer_(input) {
+  advance();
+}
 
 /// Parses a full query and returns either a Query or a ParseError.
 /// MUST consume all tokens or report an unexpected trailing token.

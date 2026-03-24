@@ -73,16 +73,16 @@ FragmentSource collect_html_fragments(const QueryResult& result, const std::stri
   for (const auto& row : result.rows) {
     std::optional<std::string> value = field_value_string(row, field);
     if (!value.has_value()) {
-      throw std::runtime_error(
-          source_name + " expects HTML strings (use inner_html(...) or RAW('<...>'))");
+      throw std::runtime_error(source_name +
+                               " expects HTML strings (use inner_html(...) or RAW('<...>'))");
     }
     std::string trimmed = util::trim_ws(*value);
     if (trimmed.empty()) {
       continue;
     }
     if (!looks_like_html_fragment(trimmed)) {
-      throw std::runtime_error(
-          source_name + " expects HTML strings (use inner_html(...) or RAW('<...>'))");
+      throw std::runtime_error(source_name +
+                               " expects HTML strings (use inner_html(...) or RAW('<...>'))");
     }
     if (trimmed.size() > markql_internal::kMaxFragmentHtmlBytes) {
       throw std::runtime_error(source_name + " HTML fragment exceeds maximum size");

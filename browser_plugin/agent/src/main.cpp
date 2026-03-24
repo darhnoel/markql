@@ -109,16 +109,15 @@ class SnapshotCache {
 class IXsqlExecutor {
  public:
   virtual ~IXsqlExecutor() = default;
-  virtual ExecutionOutcome execute(const std::shared_ptr<const markql::ParsedDocumentHandle>& prepared,
-                                   const std::string& query,
-                                   int timeout_ms) = 0;
+  virtual ExecutionOutcome execute(
+      const std::shared_ptr<const markql::ParsedDocumentHandle>& prepared, const std::string& query,
+      int timeout_ms) = 0;
 };
 
 class CoreExecutor final : public IXsqlExecutor {
  public:
   ExecutionOutcome execute(const std::shared_ptr<const markql::ParsedDocumentHandle>& prepared,
-                           const std::string& query,
-                           int timeout_ms) override {
+                           const std::string& query, int timeout_ms) override {
     if (timeout_ms <= 0) {
       timeout_ms = kDefaultTimeoutMs;
     }
@@ -211,9 +210,7 @@ json diagnostics_to_json(const std::vector<markql::Diagnostic>& diagnostics) {
   return parsed;
 }
 
-json build_error(int elapsed,
-                 const std::string& code,
-                 const std::string& message,
+json build_error(int elapsed, const std::string& code, const std::string& message,
                  const json& diagnostics = json::array()) {
   return json{
       {"elapsed_ms", elapsed},
@@ -224,11 +221,8 @@ json build_error(int elapsed,
   };
 }
 
-bool parse_request(const httplib::Request& req,
-                   std::string& html,
-                   std::string& query,
-                   QueryOptions& options,
-                   std::string& error) {
+bool parse_request(const httplib::Request& req, std::string& html, std::string& query,
+                   QueryOptions& options, std::string& error) {
   const json body = json::parse(req.body, nullptr, false);
   if (body.is_discarded() || !body.is_object()) {
     error = "Request body must be a JSON object";
@@ -316,8 +310,8 @@ json value_for_field(const std::string& field, const markql::QueryResultRow& row
 }
 
 std::string infer_column_type(const std::string& field) {
-  if (field == "node_id" || field == "count" || field == "parent_id" ||
-      field == "sibling_pos" || field == "max_depth" || field == "doc_order") {
+  if (field == "node_id" || field == "count" || field == "parent_id" || field == "sibling_pos" ||
+      field == "max_depth" || field == "doc_order") {
     return "number";
   }
   if (field == "attributes" || field == "terms_score") {
@@ -464,9 +458,8 @@ int main() {
 
     const std::string provided_token = req.get_header_value("X-XSQL-Token");
     if (provided_token.empty() || provided_token != token) {
-      const json error = build_error(elapsed_ms(started_at),
-                                     "UNAUTHORIZED",
-                                     "Missing or invalid X-XSQL-Token");
+      const json error =
+          build_error(elapsed_ms(started_at), "UNAUTHORIZED", "Missing or invalid X-XSQL-Token");
       write_json(res, 401, error);
       return;
     }
@@ -490,12 +483,14 @@ int main() {
       return;
     }
 
-    const ExecutionOutcome execution = executor.execute(snapshot.prepared, query, options.timeout_ms);
+    const ExecutionOutcome execution =
+        executor.execute(snapshot.prepared, query, options.timeout_ms);
     if (!execution.ok) {
       const std::string code = execution.timed_out ? "TIMEOUT" : "QUERY_ERROR";
-      const json diagnostics = diagnostics_to_json(
-          markql::diagnose_query_failure(query, execution.error_message));
-      const json error = build_error(elapsed_ms(started_at), code, execution.error_message, diagnostics);
+      const json diagnostics =
+          diagnostics_to_json(markql::diagnose_query_failure(query, execution.error_message));
+      const json error =
+          build_error(elapsed_ms(started_at), code, execution.error_message, diagnostics);
       write_json(res, execution.timed_out ? 408 : 200, error);
       return;
     }
@@ -503,8 +498,7 @@ int main() {
     QueryResponse payload = map_result(execution.result, options.max_rows);
     payload.elapsed_ms = elapsed_ms(started_at);
 
-    write_json(res,
-               200,
+    write_json(res, 200,
                {
                    {"elapsed_ms", payload.elapsed_ms},
                    {"columns", payload.columns},

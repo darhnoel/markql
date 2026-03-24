@@ -10,7 +10,8 @@
 namespace {
 
 void test_split_script_ignores_empty_statements() {
-  auto split = markql::cli::split_sql_script(";; SELECT div FROM document; ; SELECT span FROM document;;");
+  auto split =
+      markql::cli::split_sql_script(";; SELECT div FROM document; ; SELECT span FROM document;;");
   expect_true(!split.error_message.has_value(), "split script has no lexer error");
   expect_eq(split.statements.size(), 2, "empty statements are ignored");
 }
@@ -106,8 +107,7 @@ void test_run_script_stops_on_first_error_by_default() {
   std::string stderr_text = err.str();
   expect_true(stderr_text.find("statement 2/3") != std::string::npos,
               "error includes statement index");
-  expect_true(stderr_text.find("line ") != std::string::npos,
-              "error includes line information");
+  expect_true(stderr_text.find("line ") != std::string::npos, "error includes line information");
 }
 
 void test_run_script_continue_on_error() {
@@ -140,8 +140,7 @@ void test_run_script_quiet_suppresses_delimiter() {
   options.quiet = true;
   int code = markql::cli::run_sql_script(script, options, exec, out, err);
   expect_eq(code, 0, "quiet mode script exits 0");
-  expect_true(out.str().find("== stmt") == std::string::npos,
-              "quiet mode suppresses delimiters");
+  expect_true(out.str().find("== stmt") == std::string::npos, "quiet mode suppresses delimiters");
 }
 
 void test_run_script_repl_style_multiline_two_selects() {
@@ -157,9 +156,7 @@ void test_run_script_repl_style_multiline_two_selects() {
   std::ostringstream out;
   std::ostringstream err;
   std::vector<std::string> executed;
-  auto exec = [&](const std::string& statement) {
-    executed.push_back(statement);
-  };
+  auto exec = [&](const std::string& statement) { executed.push_back(statement); };
   markql::cli::ScriptRunOptions options;
   options.quiet = true;
   int code = markql::cli::run_sql_script(script, options, exec, out, err);
@@ -176,24 +173,30 @@ void test_utf8_validation_for_script_file_content() {
               "valid UTF-8 script is accepted");
   std::string invalid = "SELECT ";
   invalid.push_back(static_cast<char>(0xC3));
-  expect_true(!markql::cli::is_valid_utf8(invalid),
-              "invalid UTF-8 script content is rejected");
+  expect_true(!markql::cli::is_valid_utf8(invalid), "invalid UTF-8 script content is rejected");
 }
 
 }  // namespace
 
 void register_script_runner_tests(std::vector<TestCase>& tests) {
-  tests.push_back({"split_script_ignores_empty_statements", test_split_script_ignores_empty_statements});
+  tests.push_back(
+      {"split_script_ignores_empty_statements", test_split_script_ignores_empty_statements});
   tests.push_back({"split_script_with_comments", test_split_script_with_comments});
-  tests.push_back({"split_script_unterminated_block_comment", test_split_script_unterminated_block_comment});
+  tests.push_back(
+      {"split_script_unterminated_block_comment", test_split_script_unterminated_block_comment});
   tests.push_back({"split_script_semicolon_and_comment_markers_inside_string_literals",
                    test_split_script_semicolon_and_comment_markers_inside_string_literals});
-  tests.push_back({"run_script_multi_statement_delimiters", test_run_script_multi_statement_delimiters});
-  tests.push_back({"run_script_comments_and_empty_statements", test_run_script_comments_and_empty_statements});
-  tests.push_back({"run_script_stops_on_first_error_by_default", test_run_script_stops_on_first_error_by_default});
+  tests.push_back(
+      {"run_script_multi_statement_delimiters", test_run_script_multi_statement_delimiters});
+  tests.push_back(
+      {"run_script_comments_and_empty_statements", test_run_script_comments_and_empty_statements});
+  tests.push_back({"run_script_stops_on_first_error_by_default",
+                   test_run_script_stops_on_first_error_by_default});
   tests.push_back({"run_script_continue_on_error", test_run_script_continue_on_error});
-  tests.push_back({"run_script_quiet_suppresses_delimiter", test_run_script_quiet_suppresses_delimiter});
+  tests.push_back(
+      {"run_script_quiet_suppresses_delimiter", test_run_script_quiet_suppresses_delimiter});
   tests.push_back({"run_script_repl_style_multiline_two_selects",
                    test_run_script_repl_style_multiline_two_selects});
-  tests.push_back({"utf8_validation_for_script_file_content", test_utf8_validation_for_script_file_content});
+  tests.push_back(
+      {"utf8_validation_for_script_file_content", test_utf8_validation_for_script_file_content});
 }

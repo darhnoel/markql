@@ -39,10 +39,7 @@ bool write_error(char* out_error, size_t out_error_size, const std::string& mess
   return false;
 }
 
-bool handle_to_words(const char* line,
-                     void* user_data,
-                     char* out_error,
-                     size_t out_error_size) {
+bool handle_to_words(const char* line, void* user_data, char* out_error, size_t out_error_size) {
   auto* state = static_cast<KhmerNumberPluginState*>(user_data);
   if (!state || !state->print) {
     return write_error(out_error, out_error_size, "Plugin host not available.");
@@ -76,29 +73,23 @@ bool handle_to_words(const char* line,
     }
   }
   if (arg.empty()) {
-    return write_error(out_error,
-                       out_error_size,
+    return write_error(out_error, out_error_size,
                        "Usage: .number_to_khmer <number> [--compact] [--khmer-digits]");
   }
-  auto result = numerals
-                    ? markql::khmer_number::number_to_khmer_numerals(arg)
-                    : markql::khmer_number::number_to_khmer_words(arg);
+  auto result = numerals ? markql::khmer_number::number_to_khmer_numerals(arg)
+                         : markql::khmer_number::number_to_khmer_words(arg);
   if (!result.ok) {
     return write_error(out_error, out_error_size, result.error);
   }
   if (compact && !numerals) {
-    result.value.erase(
-        std::remove(result.value.begin(), result.value.end(), '-'),
-        result.value.end());
+    result.value.erase(std::remove(result.value.begin(), result.value.end(), '-'),
+                       result.value.end());
   }
   state->print(state->host_context, result.value.c_str(), false);
   return true;
 }
 
-bool handle_to_number(const char* line,
-                      void* user_data,
-                      char* out_error,
-                      size_t out_error_size) {
+bool handle_to_number(const char* line, void* user_data, char* out_error, size_t out_error_size) {
   auto* state = static_cast<KhmerNumberPluginState*>(user_data);
   if (!state || !state->print) {
     return write_error(out_error, out_error_size, "Plugin host not available.");
@@ -127,8 +118,7 @@ bool handle_to_number(const char* line,
     }
   }
   if (arg.empty()) {
-    return write_error(out_error,
-                       out_error_size,
+    return write_error(out_error, out_error_size,
                        "Usage: .khmer_to_number <khmer_text> [--khmer-digits]");
   }
   auto result = markql::khmer_number::khmer_words_to_number(arg);
@@ -136,8 +126,7 @@ bool handle_to_number(const char* line,
     return write_error(out_error, out_error_size, result.error);
   }
   if (numerals) {
-    auto numerals_result =
-        markql::khmer_number::number_to_khmer_numerals(result.value);
+    auto numerals_result = markql::khmer_number::number_to_khmer_numerals(result.value);
     if (!numerals_result.ok) {
       return write_error(out_error, out_error_size, numerals_result.error);
     }
@@ -150,9 +139,8 @@ bool handle_to_number(const char* line,
 
 }  // namespace
 
-extern "C" bool markql_register_plugin(const XsqlPluginHost* host,
-                                      char* out_error,
-                                      size_t out_error_size) {
+extern "C" bool markql_register_plugin(const XsqlPluginHost* host, char* out_error,
+                                       size_t out_error_size) {
   if (!host || host->api_version != MARKQL_PLUGIN_API_VERSION) {
     if (out_error && out_error_size > 0) {
       std::snprintf(out_error, out_error_size, "Unsupported plugin API version.");
@@ -162,21 +150,13 @@ extern "C" bool markql_register_plugin(const XsqlPluginHost* host,
   static KhmerNumberPluginState state;
   state.host_context = host->host_context;
   state.print = host->print;
-  if (!host->register_command(host->host_context,
-                              "number_to_khmer",
-                              "Convert number to Khmer words or numerals",
-                              &handle_to_words,
-                              &state,
-                              out_error,
-                              out_error_size)) {
+  if (!host->register_command(host->host_context, "number_to_khmer",
+                              "Convert number to Khmer words or numerals", &handle_to_words, &state,
+                              out_error, out_error_size)) {
     return false;
   }
-  if (!host->register_command(host->host_context,
-                              "khmer_to_number",
-                              "Convert Khmer words to number",
-                              &handle_to_number,
-                              &state,
-                              out_error,
+  if (!host->register_command(host->host_context, "khmer_to_number",
+                              "Convert Khmer words to number", &handle_to_number, &state, out_error,
                               out_error_size)) {
     return false;
   }

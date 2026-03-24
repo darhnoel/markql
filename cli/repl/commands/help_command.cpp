@@ -14,13 +14,15 @@ CommandHandler make_help_command() {
     std::cout << "  .load <path|url> [--alias <name>]  Load input (or :load)\n";
     std::cout << "  .mode duckbox|json|plain|csv  Set output mode\n";
     std::cout << "  .set colnames raw|normalize  Set output column naming mode\n";
-    std::cout << "  .lint on|off            Toggle lint warnings before query execution (or :lint)\n";
+    std::cout
+        << "  .lint on|off            Toggle lint warnings before query execution (or :lint)\n";
     std::cout << "  .display_mode more|less   Control truncation\n";
     std::cout << "  .max_rows <n|inf>        Set duckbox max rows (inf = no limit)\n";
     std::cout << "  .reload_config           Reload REPL config\n";
     std::cout << "  .explore [doc|alias|path|url]  Open DOM Explorer on input\n";
 #ifdef MARKQL_ENABLE_KHMER_NUMBER
-    std::cout << "  .number_to_khmer <number> [--compact] [--khmer-digits]   Convert number to Khmer words or numerals\n";
+    std::cout << "  .number_to_khmer <number> [--compact] [--khmer-digits]   Convert number to "
+                 "Khmer words or numerals\n";
     std::cout << "  .khmer_to_number <text> [--khmer-digits]   Convert Khmer words to number\n";
 #endif
     std::cout << "  .summarize [doc|alias|path|url]  Show tag counts\n";
@@ -37,7 +39,8 @@ CommandHandler make_help_command() {
     std::cout << "  Query export: TO CSV('file.csv') / TO PARQUET('file.parquet') / "
                  "TO JSON('file.json') / TO NDJSON('file.ndjson')\n";
     std::cout << "  Editor modes: Esc toggles normal <-> vim:normal; i/a/I/A/o/O in vim mode\n";
-    std::cout << "    Vim normal keys: h/j/k/l, x/<n>x, w/b/W/B, dw/db/dW/dB/d$, dd/d<n>d/<n>dd, <n>w/<n>b, d<n>w/d<n>b, u(undo)\n";
+    std::cout << "    Vim normal keys: h/j/k/l, x/<n>x, w/b/W/B, dw/db/dW/dB/d$, dd/d<n>d/<n>dd, "
+                 "<n>w/<n>b, d<n>w/d<n>b, u(undo)\n";
     std::cout << "  .quit / .q             Exit\n";
     return true;
   };

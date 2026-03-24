@@ -31,10 +31,7 @@ using ScriptExecutor = std::function<void(const std::string&)>;
 ScriptSplitResult split_sql_script(const std::string& script);
 /// Executes script statements sequentially using the existing query executor callback.
 /// MUST stop on first error unless continue_on_error is enabled.
-int run_sql_script(const std::string& script,
-                   const ScriptRunOptions& options,
-                   const ScriptExecutor& execute_statement,
-                   std::ostream& out,
-                   std::ostream& err);
+int run_sql_script(const std::string& script, const ScriptRunOptions& options,
+                   const ScriptExecutor& execute_statement, std::ostream& out, std::ostream& err);
 
 }  // namespace markql::cli

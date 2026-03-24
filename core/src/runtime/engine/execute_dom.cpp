@@ -24,12 +24,15 @@ namespace markql {
 namespace {
 struct ScopedProjectBenchStats {
   ProjectBenchStats stats;
-  ~ScopedProjectBenchStats() { maybe_emit_project_bench_stats(stats); }
+  ~ScopedProjectBenchStats() {
+    maybe_emit_project_bench_stats(stats);
+  }
 };
 
 }  // namespace
 
-QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const std::string& source_uri) {
+QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc,
+                              const std::string& source_uri) {
   ExecuteResult exec = execute_query(query, doc, source_uri);
   ScopedProjectBenchStats scoped_project_bench_stats;
   ProjectBenchStats* project_bench_stats =
@@ -37,9 +40,8 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
   QueryResult out;
   out.columns = markql_internal::build_columns(query);
   out.columns_implicit = !markql_internal::is_projection_query(query);
-  out.source_uri_excluded =
-      std::find(query.exclude_fields.begin(), query.exclude_fields.end(), "source_uri") !=
-      query.exclude_fields.end();
+  out.source_uri_excluded = std::find(query.exclude_fields.begin(), query.exclude_fields.end(),
+                                      "source_uri") != query.exclude_fields.end();
   out.to_list = query.to_list;
   out.to_table = query.to_table;
   out.table_has_header = query.table_has_header;
@@ -58,8 +60,7 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
     out.export_sink.path = sink.path;
   }
   if (query.export_sink.has_value() &&
-      (query.to_table || markql_internal::is_table_select(query)) &&
-      exec.nodes.size() != 1) {
+      (query.to_table || markql_internal::is_table_select(query)) && exec.nodes.size() != 1) {
     throw std::runtime_error(
         "Export requires a single table result; add a filter to select one table");
   }
@@ -80,31 +81,33 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
       summary.emplace_back(kv.first, kv.second);
     }
     if (!query.order_by.empty()) {
-      std::sort(summary.begin(), summary.end(),
-                [&](const auto& a, const auto& b) {
-                  for (const auto& order_by : query.order_by) {
-                    int cmp = 0;
-                    if (order_by.field == "count") {
-                      if (a.second < b.second) cmp = -1;
-                      else if (a.second > b.second) cmp = 1;
-                    } else {
-                      if (a.first < b.first) cmp = -1;
-                      else if (a.first > b.first) cmp = 1;
-                    }
-                    if (cmp == 0) continue;
-                    if (order_by.descending) {
-                      return cmp > 0;
-                    }
-                    return cmp < 0;
-                  }
-                  return false;
-                });
+      std::sort(summary.begin(), summary.end(), [&](const auto& a, const auto& b) {
+        for (const auto& order_by : query.order_by) {
+          int cmp = 0;
+          if (order_by.field == "count") {
+            if (a.second < b.second)
+              cmp = -1;
+            else if (a.second > b.second)
+              cmp = 1;
+          } else {
+            if (a.first < b.first)
+              cmp = -1;
+            else if (a.first > b.first)
+              cmp = 1;
+          }
+          if (cmp == 0) continue;
+          if (order_by.descending) {
+            return cmp > 0;
+          }
+          return cmp < 0;
+        }
+        return false;
+      });
     } else {
-      std::sort(summary.begin(), summary.end(),
-                [](const auto& a, const auto& b) {
-                  if (a.second != b.second) return a.second > b.second;
-                  return a.first < b.first;
-                });
+      std::sort(summary.begin(), summary.end(), [](const auto& a, const auto& b) {
+        if (a.second != b.second) return a.second > b.second;
+        return a.first < b.first;
+      });
     }
     if (query.limit.has_value() && summary.size() > *query.limit) {
       summary.resize(*query.limit);
@@ -127,8 +130,7 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
       table.node_id = node.id;
       markql_internal::collect_rows(doc, children, node.id, table.rows);
       if (!table_uses_default_output(query)) {
-        materialize_table_result(
-            table.rows, query.table_has_header, query.table_options, table);
+        materialize_table_result(table.rows, query.table_has_header, query.table_options, table);
       }
       out.tables.push_back(std::move(table));
     }
@@ -154,8 +156,8 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
       }
     }
     std::string base_tag = util::to_lower(flatten_extract_item->tag);
-    bool tag_is_alias = query.source.alias.has_value() &&
-                        util::to_lower(*query.source.alias) == base_tag;
+    bool tag_is_alias =
+        query.source.alias.has_value() && util::to_lower(*query.source.alias) == base_tag;
     bool match_all_tags = tag_is_alias || base_tag == "document";
     struct FlattenExtractRow {
       const HtmlNode* node = nullptr;
@@ -190,26 +192,25 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
       for (size_t i = 0; i < flatten_extract_item->flatten_extract_aliases.size(); ++i) {
         const auto& alias = flatten_extract_item->flatten_extract_aliases[i];
         const auto& expr = flatten_extract_item->flatten_extract_exprs[i];
-        std::optional<std::string> value =
-            eval_flatten_extract_expr(expr, node, doc, children, row.computed_fields, &row_eval_cache);
+        std::optional<std::string> value = eval_flatten_extract_expr(
+            expr, node, doc, children, row.computed_fields, &row_eval_cache);
         if (!value.has_value()) continue;
         row.computed_fields[alias] = *value;
       }
       rows.push_back(FlattenExtractRow{&node, std::move(row)});
     }
     if (!query.order_by.empty()) {
-      std::stable_sort(rows.begin(), rows.end(),
-                       [&](const auto& left, const auto& right) {
-                         for (const auto& order_by : query.order_by) {
-                           int cmp = executor_internal::compare_nodes(*left.node, *right.node, order_by.field);
-                           if (cmp == 0) continue;
-                           if (order_by.descending) {
-                             return cmp > 0;
-                           }
-                           return cmp < 0;
-                         }
-                         return false;
-                       });
+      std::stable_sort(rows.begin(), rows.end(), [&](const auto& left, const auto& right) {
+        for (const auto& order_by : query.order_by) {
+          int cmp = executor_internal::compare_nodes(*left.node, *right.node, order_by.field);
+          if (cmp == 0) continue;
+          if (order_by.descending) {
+            return cmp > 0;
+          }
+          return cmp < 0;
+        }
+        return false;
+      });
     }
     if (query.limit.has_value() && rows.size() > *query.limit) {
       rows.resize(*query.limit);
@@ -234,8 +235,8 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
       collect_descendant_tag_filter(*query.where, descendant_filter);
     }
     std::string base_tag = util::to_lower(flatten_item->tag);
-    bool tag_is_alias = query.source.alias.has_value() &&
-                        util::to_lower(*query.source.alias) == base_tag;
+    bool tag_is_alias =
+        query.source.alias.has_value() && util::to_lower(*query.source.alias) == base_tag;
     bool match_all_tags = tag_is_alias || base_tag == "document";
     struct FlattenRow {
       const HtmlNode* node = nullptr;
@@ -301,18 +302,17 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
       rows.push_back(FlattenRow{&node, std::move(row)});
     }
     if (!query.order_by.empty()) {
-      std::stable_sort(rows.begin(), rows.end(),
-                       [&](const auto& left, const auto& right) {
-                         for (const auto& order_by : query.order_by) {
-                           int cmp = executor_internal::compare_nodes(*left.node, *right.node, order_by.field);
-                           if (cmp == 0) continue;
-                           if (order_by.descending) {
-                             return cmp > 0;
-                           }
-                           return cmp < 0;
-                         }
-                         return false;
-                       });
+      std::stable_sort(rows.begin(), rows.end(), [&](const auto& left, const auto& right) {
+        for (const auto& order_by : query.order_by) {
+          int cmp = executor_internal::compare_nodes(*left.node, *right.node, order_by.field);
+          if (cmp == 0) continue;
+          if (order_by.descending) {
+            return cmp > 0;
+          }
+          return cmp < 0;
+        }
+        return false;
+      });
     }
     if (query.limit.has_value() && rows.size() > *query.limit) {
       rows.resize(*query.limit);
@@ -375,14 +375,15 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
     std::optional<size_t> effective_inner_html_depth = inner_html_depth;
     if (!effective_inner_html_depth.has_value() && use_inner_html_function) {
       // WHY: MAX_DEPTH means "full subtree for this row" without guessing a literal depth.
-      effective_inner_html_depth = inner_html_auto_depth
-                                       ? static_cast<size_t>(std::max<int64_t>(0, node.max_depth))
-                                       : 1;
+      effective_inner_html_depth =
+          inner_html_auto_depth ? static_cast<size_t>(std::max<int64_t>(0, node.max_depth)) : 1;
     }
-    row.text = use_text_function ? markql_internal::extract_direct_text(node.inner_html) : node.text;
-    row.inner_html = effective_inner_html_depth.has_value()
-                         ? markql_internal::limit_inner_html(node.inner_html, *effective_inner_html_depth)
-                         : node.inner_html;
+    row.text =
+        use_text_function ? markql_internal::extract_direct_text(node.inner_html) : node.text;
+    row.inner_html =
+        effective_inner_html_depth.has_value()
+            ? markql_internal::limit_inner_html(node.inner_html, *effective_inner_html_depth)
+            : node.inner_html;
     if (use_inner_html_function && !use_raw_inner_html_function) {
       row.inner_html = util::minify_html(row.inner_html);
     }
@@ -401,9 +402,8 @@ QueryResult execute_query_ast(const Query& query, const HtmlDocument& doc, const
     for (const auto& item : query.select_items) {
       if (!item.expr_projection || !item.field.has_value()) continue;
       if (item.project_expr.has_value()) {
-        std::optional<std::string> value =
-            eval_flatten_extract_expr(*item.project_expr, node, doc, children, row.computed_fields,
-                                      row_eval_cache_ptr);
+        std::optional<std::string> value = eval_flatten_extract_expr(
+            *item.project_expr, node, doc, children, row.computed_fields, row_eval_cache_ptr);
         if (!value.has_value()) continue;
         row.computed_fields[*item.field] = *value;
         continue;

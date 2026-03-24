@@ -67,7 +67,8 @@ int main(int argc, char** argv) {
   bool color = resolve_output_color_enabled(options, stdout_is_tty, no_color_env);
   const bool stderr_color = resolve_output_color_enabled(options, stderr_is_tty, no_color_env);
   markql::DiagnosticTextRenderOptions lint_render_options;
-  lint_render_options.use_color = resolve_diagnostics_color_enabled(options, stdout_is_tty, no_color_env);
+  lint_render_options.use_color =
+      resolve_diagnostics_color_enabled(options, stdout_is_tty, no_color_env);
   markql::DiagnosticTextRenderOptions error_render_options;
   error_render_options.use_color =
       resolve_diagnostics_color_enabled(options, stderr_is_tty, no_color_env);
@@ -149,21 +150,22 @@ int main(int argc, char** argv) {
         }
         return "unknown";
       };
-      markql::artifacts::ArtifactInfo info = markql::artifacts::inspect_artifact_file(options.artifact_info);
+      markql::artifacts::ArtifactInfo info =
+          markql::artifacts::inspect_artifact_file(options.artifact_info);
       const std::string compatibility_error =
           markql::artifacts::artifact_compatibility_error(info.header);
       const bool compatible = compatibility_error.empty();
       std::cout << "Type: "
                 << (info.header.kind == markql::artifacts::ArtifactKind::DocumentSnapshot ? "mqd"
-                                                                                         : "mqp")
+                                                                                          : "mqp")
                 << std::endl;
       std::cout << "Format: " << info.header.format_major << "." << info.header.format_minor
                 << std::endl;
-      std::cout << "Producer version: "
-                << escape_control_for_terminal(info.producer_version) << std::endl;
+      std::cout << "Producer version: " << escape_control_for_terminal(info.producer_version)
+                << std::endl;
       std::cout << "Producer major: " << info.header.producer_major << std::endl;
-      std::cout << "Language version: "
-                << escape_control_for_terminal(info.language_version) << std::endl;
+      std::cout << "Language version: " << escape_control_for_terminal(info.language_version)
+                << std::endl;
       std::cout << "Language major: " << info.header.language_major << std::endl;
       std::cout << "Required features: " << info.header.required_features << std::endl;
       std::cout << "Sections: " << info.header.section_count << std::endl;
@@ -198,8 +200,7 @@ int main(int argc, char** argv) {
         return markql::LintCoverageLevel::Mixed;
       };
 
-      auto collect_statement_diagnostics = [&](const std::string& statement,
-                                               size_t statement_index,
+      auto collect_statement_diagnostics = [&](const std::string& statement, size_t statement_index,
                                                size_t total_statements) {
         markql::LintResult statement_result = markql::lint_query_detailed(statement);
         if (total_statements > 1) {
@@ -219,9 +220,8 @@ int main(int argc, char** argv) {
               lint_result.summary.parse_succeeded && statement_result.summary.parse_succeeded;
           lint_result.summary.coverage =
               merge_coverage(lint_result.summary.coverage, statement_result.summary.coverage);
-          lint_result.summary.relation_style_query =
-              lint_result.summary.relation_style_query ||
-              statement_result.summary.relation_style_query;
+          lint_result.summary.relation_style_query = lint_result.summary.relation_style_query ||
+                                                     statement_result.summary.relation_style_query;
           lint_result.summary.used_reduced_validation =
               lint_result.summary.used_reduced_validation ||
               statement_result.summary.used_reduced_validation;
@@ -240,8 +240,8 @@ int main(int argc, char** argv) {
         std::string script = load_prepared_query_file().text;
         ScriptSplitResult split = split_sql_script(script);
         if (split.error_message.has_value()) {
-          lint_result.diagnostics.push_back(markql::make_syntax_diagnostic(
-              script, *split.error_message, split.error_position));
+          lint_result.diagnostics.push_back(
+              markql::make_syntax_diagnostic(script, *split.error_message, split.error_position));
           lint_result.summary.parse_succeeded = false;
           lint_result.summary.coverage = markql::LintCoverageLevel::ParseOnly;
           lint_result.summary.error_count = 1;
@@ -262,8 +262,7 @@ int main(int argc, char** argv) {
 
       if (options.lint_format == "json") {
       } else {
-        std::cout << markql::render_lint_result_text(lint_result, lint_render_options)
-                  << std::endl;
+        std::cout << markql::render_lint_result_text(lint_result, lint_render_options) << std::endl;
       }
       if (options.lint_format == "json") {
         std::cout << markql::render_lint_result_json(lint_result) << std::endl;
@@ -300,8 +299,8 @@ int main(int argc, char** argv) {
         ScriptSplitResult split = split_sql_script(script);
         if (split.error_message.has_value()) {
           auto [line, col] = line_col_from_offset(script, split.error_position);
-          std::cerr << "Error: " << *split.error_message
-                    << " at line " << line << ", column " << col << std::endl;
+          std::cerr << "Error: " << *split.error_message << " at line " << line << ", column "
+                    << col << std::endl;
           return 1;
         }
         if (split.statements.size() != 1) {
@@ -345,7 +344,8 @@ int main(int argc, char** argv) {
         runtime_summary_printed = true;
         const auto finished_at = std::chrono::steady_clock::now();
         const long long elapsed_ms = static_cast<long long>(
-            std::chrono::duration_cast<std::chrono::milliseconds>(finished_at - started_at).count());
+            std::chrono::duration_cast<std::chrono::milliseconds>(finished_at - started_at)
+                .count());
         const auto rss_after_bytes = read_process_rss_bytes();
         print_query_runtime_summary(rss_before_bytes, rss_after_bytes, elapsed_ms);
       };
@@ -364,8 +364,8 @@ int main(int argc, char** argv) {
           throw std::runtime_error(export_error);
         }
         if (!result.export_sink.path.empty()) {
-          std::cout << "Wrote " << export_kind_label(result.export_sink.kind)
-                    << ": " << result.export_sink.path << std::endl;
+          std::cout << "Wrote " << export_kind_label(result.export_sink.kind) << ": "
+                    << result.export_sink.path << std::endl;
         }
         return;
       }
@@ -401,11 +401,10 @@ int main(int argc, char** argv) {
               if (result.tables.size() > 1) {
                 std::cout << "Table node_id=" << result.tables[i].node_id << std::endl;
               }
-              std::cout << render_table_duckbox(result.tables[i], result.table_has_header, highlight,
-                                                color, 40)
+              std::cout << render_table_duckbox(result.tables[i], result.table_has_header,
+                                                highlight, color, 40)
                         << std::endl;
-              std::cout << "Rows: "
-                        << count_table_rows(result.tables[i], result.table_has_header)
+              std::cout << "Rows: " << count_table_rows(result.tables[i], result.table_has_header)
                         << std::endl;
             }
             emit_runtime_summary();
@@ -434,18 +433,18 @@ int main(int argc, char** argv) {
       } else if (output_mode == "csv") {
         if (result.to_table) {
           throw std::runtime_error(
-              "CSV output mode does not support TO TABLE() results; use TO TABLE(EXPORT='file.csv') instead");
+              "CSV output mode does not support TO TABLE() results; use TO "
+              "TABLE(EXPORT='file.csv') instead");
         }
         std::string error;
         if (!markql::cli::write_csv(std::cout, result, error, colname_mode)) {
           throw std::runtime_error(error);
         }
       } else {
-        std::string json_out =
-            result.to_table
-                ? build_table_json(result)
-                : (result.to_list ? build_json_list(result, colname_mode)
-                                  : build_json(result, colname_mode));
+        std::string json_out = result.to_table
+                                   ? build_table_json(result)
+                                   : (result.to_list ? build_json_list(result, colname_mode)
+                                                     : build_json(result, colname_mode));
         if (output_mode == "plain") {
           std::cout << json_out << std::endl;
         } else if (display_full) {
@@ -517,14 +516,16 @@ int main(int argc, char** argv) {
         result = markql::artifacts::execute_prepared_query_on_html(artifact, "", "document");
       } else if (input.empty() || input == "document") {
         if (!stdin_cache.has_value()) stdin_cache = read_stdin();
-        result = markql::artifacts::execute_prepared_query_on_html(artifact, *stdin_cache, "document");
+        result =
+            markql::artifacts::execute_prepared_query_on_html(artifact, *stdin_cache, "document");
       } else if (is_url(input)) {
         std::string html = markql::markql_internal::fetch_url(input, timeout_ms);
         result = markql::artifacts::execute_prepared_query_on_html(artifact, html, input);
       } else if (markql::artifacts::path_has_artifact_magic(input)) {
         markql::artifacts::ArtifactInfo info = markql::artifacts::inspect_artifact_file(input);
         if (info.header.kind != markql::artifacts::ArtifactKind::DocumentSnapshot) {
-          throw std::runtime_error("Prepared query artifacts (.mqp) cannot be used as input documents");
+          throw std::runtime_error(
+              "Prepared query artifacts (.mqp) cannot be used as input documents");
         }
         markql::artifacts::DocumentArtifact document =
             markql::artifacts::read_document_artifact_file(input);
@@ -560,9 +561,11 @@ int main(int argc, char** argv) {
       return 2;
     }
     if (!query.empty()) {
-      std::vector<markql::Diagnostic> diagnostics = markql::diagnose_query_failure(query, ex.what());
+      std::vector<markql::Diagnostic> diagnostics =
+          markql::diagnose_query_failure(query, ex.what());
       if (!diagnostics.empty()) {
-        std::cerr << markql::render_diagnostics_text(diagnostics, error_render_options) << std::endl;
+        std::cerr << markql::render_diagnostics_text(diagnostics, error_render_options)
+                  << std::endl;
         return 1;
       }
     }

@@ -69,7 +69,8 @@ void test_regex_attribute() {
 
 void test_contains_attribute() {
   std::string html = "<a href='https://techkhmer.net'></a><a href='https://example.com'></a>";
-  auto result = run_query(html, "SELECT a FROM document WHERE attributes.href CONTAINS 'TECHKHMEr'");
+  auto result =
+      run_query(html, "SELECT a FROM document WHERE attributes.href CONTAINS 'TECHKHMEr'");
   expect_eq(result.rows.size(), 1, "contains attribute");
   if (!result.rows.empty()) {
     expect_true(result.rows[0].attributes["href"] == "https://techkhmer.net",
@@ -80,9 +81,8 @@ void test_contains_attribute() {
 void test_contains_all_attribute() {
   std::string html =
       "<a href='https://example.com/docs.html'></a><a href='https://example.com/docs'></a>";
-  auto result =
-      run_query(html,
-                "SELECT a FROM document WHERE attributes.href CONTAINS ALL ('https', '.html')");
+  auto result = run_query(
+      html, "SELECT a FROM document WHERE attributes.href CONTAINS ALL ('https', '.html')");
   expect_eq(result.rows.size(), 1, "contains all attribute");
   if (!result.rows.empty()) {
     expect_true(result.rows[0].attributes["href"] == "https://example.com/docs.html",
@@ -93,9 +93,8 @@ void test_contains_all_attribute() {
 void test_contains_any_attribute() {
   std::string html =
       "<a href='https://example.com/docs.html'></a><a href='mailto:help@example.com'></a>";
-  auto result =
-      run_query(html,
-                "SELECT a FROM document WHERE attributes.href CONTAINS ANY ('https', 'mailto')");
+  auto result = run_query(
+      html, "SELECT a FROM document WHERE attributes.href CONTAINS ANY ('https', 'mailto')");
   expect_eq(result.rows.size(), 2, "contains any attribute");
   if (result.rows.size() == 2) {
     bool saw_https = false;
@@ -178,9 +177,9 @@ void test_exists_child_same_node() {
   std::string html =
       "<div id='keep'><span class='price'>1</span><h2></h2></div>"
       "<div id='skip'><span></span><h2 class='price'></h2></div>";
-  auto result = run_query(
-      html,
-      "SELECT div FROM document WHERE EXISTS(child WHERE tag = 'span' AND attributes.class = 'price')");
+  auto result = run_query(html,
+                          "SELECT div FROM document WHERE EXISTS(child WHERE tag = 'span' AND "
+                          "attributes.class = 'price')");
   expect_eq(result.rows.size(), 1, "exists child same node");
   if (!result.rows.empty()) {
     expect_true(result.rows[0].attributes["id"] == "keep", "exists child same node matched row");

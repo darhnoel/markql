@@ -13,9 +13,7 @@ size_t effective_count(size_t raw_count) {
   return raw_count == 0 ? 1 : raw_count;
 }
 
-bool delete_vim_lines(std::string& buffer,
-                      size_t& cursor,
-                      size_t count,
+bool delete_vim_lines(std::string& buffer, size_t& cursor, size_t count,
                       size_t current_line_start) {
   if (buffer.empty()) return false;
   size_t start = std::min(current_line_start, buffer.size());

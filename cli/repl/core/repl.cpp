@@ -48,23 +48,15 @@ int run_repl(ReplConfig& config) {
     config.highlight = false;
   }
 
-  LineEditor editor(history_max_entries,
-                    make_normal_repl_prompt(config.color),
+  LineEditor editor(history_max_entries, make_normal_repl_prompt(config.color),
                     normal_prompt_visible_len());
   configure_repl_editor(editor, config.color, config.highlight);
   CommandRegistry registry;
   register_default_commands(registry);
   PluginManager plugin_manager(registry);
   CommandContext command_ctx{
-      config,
-      editor,
-      sources,
-      active_alias,
-      last_full_output,
-      display_full,
-      max_rows,
-      last_schema_map,
-      plugin_manager,
+      config,       editor,   sources,         active_alias,   last_full_output,
+      display_full, max_rows, last_schema_map, plugin_manager,
   };
 
   if (!config_error.empty()) {
@@ -157,10 +149,8 @@ int run_repl(ReplConfig& config) {
           alias = *source->alias;
         }
         auto it = sources.find(alias);
-        if ((it == sources.end() || it->second.source.empty()) &&
-            source.has_value() &&
-            source->kind == markql::Source::Kind::Document &&
-            source->source_token.has_value() &&
+        if ((it == sources.end() || it->second.source.empty()) && source.has_value() &&
+            source->kind == markql::Source::Kind::Document && source->source_token.has_value() &&
             (*source->source_token == "doc" || *source->source_token == "document")) {
           auto active_it = sources.find(active_alias);
           if (active_it != sources.end() && !active_it->second.source.empty()) {
@@ -205,8 +195,8 @@ int run_repl(ReplConfig& config) {
         throw std::runtime_error(export_error);
       }
       if (!result.export_sink.path.empty()) {
-        std::cout << "Wrote " << export_kind_label(result.export_sink.kind)
-                  << ": " << result.export_sink.path << std::endl;
+        std::cout << "Wrote " << export_kind_label(result.export_sink.kind) << ": "
+                  << result.export_sink.path << std::endl;
       }
       return;
     }
@@ -245,8 +235,7 @@ int run_repl(ReplConfig& config) {
             std::cout << render_table_duckbox(result.tables[i], result.table_has_header,
                                               config.highlight, config.color, max_rows)
                       << std::endl;
-            std::cout << "Rows: "
-                      << count_table_rows(result.tables[i], result.table_has_header)
+            std::cout << "Rows: " << count_table_rows(result.tables[i], result.table_has_header)
                       << std::endl;
           }
           emit_runtime_summary();
@@ -276,7 +265,8 @@ int run_repl(ReplConfig& config) {
     } else if (config.output_mode == "csv") {
       if (result.to_table) {
         throw std::runtime_error(
-            "CSV output mode does not support TO TABLE() results; use TO TABLE(EXPORT='file.csv') instead");
+            "CSV output mode does not support TO TABLE() results; use TO TABLE(EXPORT='file.csv') "
+            "instead");
       }
       std::ostringstream csv_out;
       std::string error;
@@ -286,11 +276,10 @@ int run_repl(ReplConfig& config) {
       last_full_output = csv_out.str();
       std::cout << last_full_output;
     } else {
-      std::string json_out =
-          result.to_table
-              ? build_table_json(result)
-              : (result.to_list ? build_json_list(result, config.colname_mode)
-                                : build_json(result, config.colname_mode));
+      std::string json_out = result.to_table
+                                 ? build_table_json(result)
+                                 : (result.to_list ? build_json_list(result, config.colname_mode)
+                                                   : build_json(result, config.colname_mode));
       last_full_output = json_out;
       if (config.output_mode == "plain") {
         std::cout << json_out << std::endl;
@@ -336,8 +325,8 @@ int run_repl(ReplConfig& config) {
     if (inspection.has_error) {
       auto [line_no, col_no] = line_col_from_offset(query_text, inspection.error_position);
       if (config.color) std::cerr << kColor.red;
-      std::cerr << "Error: " << inspection.error_message
-                << " at line " << line_no << ", column " << col_no << std::endl;
+      std::cerr << "Error: " << inspection.error_message << " at line " << line_no << ", column "
+                << col_no << std::endl;
       if (config.color) std::cerr << kColor.reset;
       editor.reset_render_state();
       continue;
@@ -351,8 +340,8 @@ int run_repl(ReplConfig& config) {
       if (split.error_message.has_value()) {
         auto [line_no, col_no] = line_col_from_offset(query_text, split.error_position);
         if (config.color) std::cerr << kColor.red;
-        std::cerr << "Error: " << *split.error_message
-                  << " at line " << line_no << ", column " << col_no << std::endl;
+        std::cerr << "Error: " << *split.error_message << " at line " << line_no << ", column "
+                  << col_no << std::endl;
         if (config.color) std::cerr << kColor.reset;
         editor.reset_render_state();
         continue;

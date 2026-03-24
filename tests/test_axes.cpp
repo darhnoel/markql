@@ -68,7 +68,8 @@ void test_parent_id_filter() {
     return;
   }
   int64_t parent_id = *base.rows[0].parent_id;
-  auto result = run_query(html, "SELECT span FROM document WHERE parent_id = " + std::to_string(parent_id));
+  auto result =
+      run_query(html, "SELECT span FROM document WHERE parent_id = " + std::to_string(parent_id));
   expect_eq(result.rows.size(), 1, "parent id filter");
   if (!result.rows.empty()) {
     expect_true(result.rows[0].tag == "span", "parent id filter tag");
@@ -87,7 +88,8 @@ void test_node_id_filter() {
     return;
   }
   int64_t node_id = base.rows[0].node_id;
-  auto result = run_query(html, "SELECT span FROM document WHERE node_id = " + std::to_string(node_id));
+  auto result =
+      run_query(html, "SELECT span FROM document WHERE node_id = " + std::to_string(node_id));
   expect_eq(result.rows.size(), 1, "node id filter");
   if (!result.rows.empty()) {
     expect_true(result.rows[0].tag == "span", "node id filter tag");

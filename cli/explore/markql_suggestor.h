@@ -22,6 +22,7 @@ struct MarkqlSuggestion {
 
 /// Builds a deterministic MarkQL statement suggestion for the selected node.
 /// MUST return a full executable statement in `statement` when strategy != None.
-MarkqlSuggestion suggest_markql_statement(const markql::HtmlDocument& doc, int64_t selected_node_id);
+MarkqlSuggestion suggest_markql_statement(const markql::HtmlDocument& doc,
+                                          int64_t selected_node_id);
 
 }  // namespace markql::cli

@@ -18,8 +18,7 @@ std::vector<std::vector<int64_t>> build_children(const HtmlDocument& doc) {
   return children;
 }
 
-void assign_doc_order(HtmlDocument& doc,
-                      const std::vector<std::vector<int64_t>>& children) {
+void assign_doc_order(HtmlDocument& doc, const std::vector<std::vector<int64_t>>& children) {
   std::vector<int64_t> roots;
   roots.reserve(doc.nodes.size());
   for (const auto& node : doc.nodes) {
@@ -43,8 +42,7 @@ void assign_doc_order(HtmlDocument& doc,
   }
 }
 
-void assign_max_depth(HtmlDocument& doc,
-                      const std::vector<std::vector<int64_t>>& children) {
+void assign_max_depth(HtmlDocument& doc, const std::vector<std::vector<int64_t>>& children) {
   std::vector<int64_t> roots;
   roots.reserve(doc.nodes.size());
   for (const auto& node : doc.nodes) {
@@ -68,8 +66,7 @@ void assign_max_depth(HtmlDocument& doc,
     }
     int64_t max_child = -1;
     for (int64_t child : children.at(static_cast<size_t>(id))) {
-      max_child = std::max(max_child,
-                           doc.nodes.at(static_cast<size_t>(child)).max_depth);
+      max_child = std::max(max_child, doc.nodes.at(static_cast<size_t>(child)).max_depth);
     }
     doc.nodes.at(static_cast<size_t>(id)).max_depth = (max_child < 0) ? 0 : max_child + 1;
   }

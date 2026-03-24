@@ -42,7 +42,8 @@ CommandHandler make_summarize_command() {
             std::cerr << "No input loaded for alias '" << alias
                       << "'. Use .load <path|url> --alias " << alias << "." << std::endl;
           } else {
-            std::cerr << "No input loaded. Use .load <path|url> or start with --input <path|url>." << std::endl;
+            std::cerr << "No input loaded. Use .load <path|url> or start with --input <path|url>."
+                      << std::endl;
           }
           return true;
         }
@@ -63,11 +64,10 @@ CommandHandler make_summarize_command() {
       for (const auto& kv : counts) {
         summary.emplace_back(kv.first, kv.second);
       }
-      std::sort(summary.begin(), summary.end(),
-                [](const auto& a, const auto& b) {
-                  if (a.second != b.second) return a.second > b.second;
-                  return a.first < b.first;
-                });
+      std::sort(summary.begin(), summary.end(), [](const auto& a, const auto& b) {
+        if (a.second != b.second) return a.second > b.second;
+        return a.first < b.first;
+      });
       markql::QueryResult result;
       result.columns = {"tag", "count"};
       for (const auto& item : summary) {

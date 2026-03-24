@@ -7,26 +7,25 @@
 namespace {
 
 std::string baseline_query() {
-  return
-      "WITH rows AS ("
-      "  SELECT n.node_id AS row_id "
-      "  FROM doc AS n "
-      "  WHERE n.tag = 'tr' AND EXISTS(child WHERE tag = 'td')"
-      "), "
-      "cells AS ("
-      "  SELECT r.row_id, c.sibling_pos AS pos, TEXT(c) AS val "
-      "  FROM rows AS r "
-      "  CROSS JOIN LATERAL ("
-      "    SELECT c "
-      "    FROM doc AS c "
-      "    WHERE c.parent_id = r.row_id AND c.tag = 'td'"
-      "  ) AS c"
-      ") "
-      "SELECT r.row_id, c2.val AS item_id, c4.val AS item_name "
-      "FROM rows AS r "
-      "LEFT JOIN cells AS c2 ON c2.row_id = r.row_id AND c2.pos = 2 "
-      "LEFT JOIN cells AS c4 ON c4.row_id = r.row_id AND c4.pos = 4 "
-      "ORDER BY r.row_id";
+  return "WITH rows AS ("
+         "  SELECT n.node_id AS row_id "
+         "  FROM doc AS n "
+         "  WHERE n.tag = 'tr' AND EXISTS(child WHERE tag = 'td')"
+         "), "
+         "cells AS ("
+         "  SELECT r.row_id, c.sibling_pos AS pos, TEXT(c) AS val "
+         "  FROM rows AS r "
+         "  CROSS JOIN LATERAL ("
+         "    SELECT c "
+         "    FROM doc AS c "
+         "    WHERE c.parent_id = r.row_id AND c.tag = 'td'"
+         "  ) AS c"
+         ") "
+         "SELECT r.row_id, c2.val AS item_id, c4.val AS item_name "
+         "FROM rows AS r "
+         "LEFT JOIN cells AS c2 ON c2.row_id = r.row_id AND c2.pos = 2 "
+         "LEFT JOIN cells AS c4 ON c4.row_id = r.row_id AND c4.pos = 4 "
+         "ORDER BY r.row_id";
 }
 
 void test_parse_with_single_and_multiple_ctes() {
@@ -43,8 +42,8 @@ void test_parse_with_single_and_multiple_ctes() {
 }
 
 void test_parse_derived_table_and_joins() {
-  auto derived = markql::parse_query(
-      "SELECT t.row_id FROM (SELECT n.node_id AS row_id FROM doc AS n) AS t");
+  auto derived =
+      markql::parse_query("SELECT t.row_id FROM (SELECT n.node_id AS row_id FROM doc AS n) AS t");
   expect_true(derived.query.has_value(), "derived table source parses");
 
   auto joins = markql::parse_query(
@@ -59,8 +58,8 @@ void test_parse_derived_table_and_joins() {
       "LEFT JOIN doc AS c ON c.parent_id = r.node_id");
   expect_true(left_join.query.has_value(), "LEFT JOIN parses");
 
-  auto cross_join = markql::parse_query(
-      "SELECT r.node_id, c.node_id FROM doc AS r CROSS JOIN doc AS c");
+  auto cross_join =
+      markql::parse_query("SELECT r.node_id, c.node_id FROM doc AS r CROSS JOIN doc AS c");
   expect_true(cross_join.query.has_value(), "CROSS JOIN parses");
 }
 
@@ -91,8 +90,8 @@ void test_parse_reject_duplicate_cte_name() {
 }
 
 void test_parse_reject_derived_table_without_alias() {
-  auto parsed = markql::parse_query(
-      "SELECT row_id FROM (SELECT n.node_id AS row_id FROM doc AS n)");
+  auto parsed =
+      markql::parse_query("SELECT row_id FROM (SELECT n.node_id AS row_id FROM doc AS n)");
   expect_true(!parsed.query.has_value(), "derived table without alias fails");
   expect_true(parsed.error.has_value(), "derived table without alias error is populated");
   if (parsed.error.has_value()) {
@@ -102,13 +101,11 @@ void test_parse_reject_derived_table_without_alias() {
 }
 
 void test_parse_reject_join_without_on() {
-  auto parsed = markql::parse_query(
-      "SELECT r.node_id FROM doc AS r JOIN doc AS c");
+  auto parsed = markql::parse_query("SELECT r.node_id FROM doc AS r JOIN doc AS c");
   expect_true(!parsed.query.has_value(), "JOIN without ON fails parse");
   expect_true(parsed.error.has_value(), "JOIN without ON parse error");
   if (parsed.error.has_value()) {
-    expect_true(parsed.error->message == "JOIN requires ON clause",
-                "JOIN without ON message");
+    expect_true(parsed.error->message == "JOIN requires ON clause", "JOIN without ON message");
   }
 }
 
@@ -146,20 +143,18 @@ void test_lateral_unknown_alias_throws() {
       "</table>";
   bool threw = false;
   try {
-    run_query(
-        html,
-        "WITH rows AS (SELECT n.node_id AS row_id FROM doc AS n WHERE n.tag = 'tr') "
-        "SELECT r.row_id "
-        "FROM rows AS r "
-        "CROSS JOIN LATERAL ("
-        "  SELECT c FROM doc AS c WHERE c.parent_id = x.row_id"
-        ") AS c");
+    run_query(html,
+              "WITH rows AS (SELECT n.node_id AS row_id FROM doc AS n WHERE n.tag = 'tr') "
+              "SELECT r.row_id "
+              "FROM rows AS r "
+              "CROSS JOIN LATERAL ("
+              "  SELECT c FROM doc AS c WHERE c.parent_id = x.row_id"
+              ") AS c");
   } catch (const std::exception& ex) {
     threw = true;
-    expect_true(
-        std::string(ex.what()) ==
-            "Unknown identifier 'x' (expected a FROM alias or legacy tag binding)",
-        "unknown alias inside LATERAL message");
+    expect_true(std::string(ex.what()) ==
+                    "Unknown identifier 'x' (expected a FROM alias or legacy tag binding)",
+                "unknown alias inside LATERAL message");
   }
   expect_true(threw, "unknown alias in LATERAL should throw");
 }
@@ -191,36 +186,35 @@ void test_with_left_join_lateral_missing_right_value_null() {
   expect_eq(result.rows.size(), 2, "missing-right row count");
   if (result.rows.size() != 2) return;
   expect_true(result.rows[0].computed_fields["item_name"] == "Apple", "first row keeps item_name");
-  expect_true(result.rows[1].computed_fields.find("item_name") ==
-                  result.rows[1].computed_fields.end(),
-              "missing fourth cell becomes NULL");
+  expect_true(
+      result.rows[1].computed_fields.find("item_name") == result.rows[1].computed_fields.end(),
+      "missing fourth cell becomes NULL");
 }
 
 void test_lateral_select_self_equivalent_to_select_alias() {
-  std::string html =
-      "<div id='root'><span>A</span><span>B</span></div>";
-  auto legacy = run_query(
-      html,
-      "WITH rows AS (SELECT n.node_id AS row_id FROM doc AS n WHERE n.tag = 'div') "
-      "SELECT c.node_id "
-      "FROM rows AS r "
-      "CROSS JOIN LATERAL ("
-      "  SELECT node_span "
-      "  FROM doc AS node_span "
-      "  WHERE node_span.parent_id = r.row_id AND node_span.tag = 'span'"
-      ") AS c "
-      "ORDER BY node_id");
-  auto canonical = run_query(
-      html,
-      "WITH rows AS (SELECT n.node_id AS row_id FROM doc AS n WHERE n.tag = 'div') "
-      "SELECT c.node_id "
-      "FROM rows AS r "
-      "CROSS JOIN LATERAL ("
-      "  SELECT self "
-      "  FROM doc AS node_span "
-      "  WHERE node_span.parent_id = r.row_id AND node_span.tag = 'span'"
-      ") AS c "
-      "ORDER BY node_id");
+  std::string html = "<div id='root'><span>A</span><span>B</span></div>";
+  auto legacy =
+      run_query(html,
+                "WITH rows AS (SELECT n.node_id AS row_id FROM doc AS n WHERE n.tag = 'div') "
+                "SELECT c.node_id "
+                "FROM rows AS r "
+                "CROSS JOIN LATERAL ("
+                "  SELECT node_span "
+                "  FROM doc AS node_span "
+                "  WHERE node_span.parent_id = r.row_id AND node_span.tag = 'span'"
+                ") AS c "
+                "ORDER BY node_id");
+  auto canonical =
+      run_query(html,
+                "WITH rows AS (SELECT n.node_id AS row_id FROM doc AS n WHERE n.tag = 'div') "
+                "SELECT c.node_id "
+                "FROM rows AS r "
+                "CROSS JOIN LATERAL ("
+                "  SELECT self "
+                "  FROM doc AS node_span "
+                "  WHERE node_span.parent_id = r.row_id AND node_span.tag = 'span'"
+                ") AS c "
+                "ORDER BY node_id");
   expect_eq(canonical.rows.size(), legacy.rows.size(),
             "select self and select <alias> equivalent row count in lateral");
   if (canonical.rows.size() != legacy.rows.size()) return;
@@ -235,22 +229,23 @@ void test_with_qualified_parent_axis_and_case_projection() {
       "<table>"
       "<tr>Sunday<td data-date='2025-02-23'>A</td></tr>"
       "</table>";
-  auto result = run_query(
-      html,
-      "WITH cells AS ("
-      "  SELECT n.node_id AS node_id, LTRIM(RTRIM(n.parent.text)) AS raw_day "
-      "  FROM doc AS n "
-      "  WHERE n.tag = 'td'"
-      ") "
-      "SELECT c.raw_day, "
-      "CASE WHEN c.raw_day LIKE 'Sunday%' THEN 'Sunday' ELSE c.raw_day END AS day "
-      "FROM cells AS c "
-      "ORDER BY c.node_id");
+  auto result =
+      run_query(html,
+                "WITH cells AS ("
+                "  SELECT n.node_id AS node_id, LTRIM(RTRIM(n.parent.text)) AS raw_day "
+                "  FROM doc AS n "
+                "  WHERE n.tag = 'td'"
+                ") "
+                "SELECT c.raw_day, "
+                "CASE WHEN c.raw_day LIKE 'Sunday%' THEN 'Sunday' ELSE c.raw_day END AS day "
+                "FROM cells AS c "
+                "ORDER BY c.node_id");
   expect_eq(result.rows.size(), 1, "qualified parent axis row count");
   if (result.rows.empty()) return;
   const std::string raw = result.rows[0].computed_fields["raw_day"];
   expect_true(raw.rfind("Sunday", 0) == 0, "parent text projection");
-  expect_true(result.rows[0].computed_fields["day"] == "Sunday", "CASE projection in relation runtime");
+  expect_true(result.rows[0].computed_fields["day"] == "Sunday",
+              "CASE projection in relation runtime");
 }
 
 void test_with_join_to_csv_sets_export_sink() {
@@ -258,14 +253,13 @@ void test_with_join_to_csv_sets_export_sink() {
       "<table>"
       "<tr><td>A</td><td>ID-123</td><td>...</td><td>Apple</td></tr>"
       "</table>";
-  auto result = run_query(
-      html,
-      "WITH rows AS (SELECT n.node_id AS row_id FROM doc AS n WHERE n.tag = 'tr') "
-      "SELECT r.row_id FROM rows AS r TO CSV('out.csv')");
+  auto result =
+      run_query(html,
+                "WITH rows AS (SELECT n.node_id AS row_id FROM doc AS n WHERE n.tag = 'tr') "
+                "SELECT r.row_id FROM rows AS r TO CSV('out.csv')");
   expect_true(result.export_sink.kind == markql::QueryResult::ExportSink::Kind::Csv,
               "WITH/JOIN runtime keeps TO CSV export sink");
-  expect_true(result.export_sink.path == "out.csv",
-              "WITH/JOIN runtime keeps export path");
+  expect_true(result.export_sink.path == "out.csv", "WITH/JOIN runtime keeps export path");
 }
 
 void test_with_inner_equi_join_by_cte_field() {
@@ -274,22 +268,21 @@ void test_with_inner_equi_join_by_cte_field() {
       "<tr><td>A</td><td>B</td></tr>"
       "<tr><td>C</td></tr>"
       "</table>";
-  auto result = run_query(
-      html,
-      "WITH rows AS ("
-      "  SELECT n.node_id AS row_id "
-      "  FROM doc AS n "
-      "  WHERE n.tag = 'tr'"
-      "), "
-      "cells AS ("
-      "  SELECT n.parent_id AS row_id, TEXT(n) AS cell_text "
-      "  FROM doc AS n "
-      "  WHERE n.tag = 'td'"
-      ") "
-      "SELECT r.row_id, c.cell_text "
-      "FROM rows AS r "
-      "JOIN cells AS c ON r.row_id = c.row_id "
-      "ORDER BY r.row_id, c.cell_text");
+  auto result = run_query(html,
+                          "WITH rows AS ("
+                          "  SELECT n.node_id AS row_id "
+                          "  FROM doc AS n "
+                          "  WHERE n.tag = 'tr'"
+                          "), "
+                          "cells AS ("
+                          "  SELECT n.parent_id AS row_id, TEXT(n) AS cell_text "
+                          "  FROM doc AS n "
+                          "  WHERE n.tag = 'td'"
+                          ") "
+                          "SELECT r.row_id, c.cell_text "
+                          "FROM rows AS r "
+                          "JOIN cells AS c ON r.row_id = c.row_id "
+                          "ORDER BY r.row_id, c.cell_text");
   expect_eq(result.rows.size(), 3, "inner equi join row count");
   if (result.rows.size() != 3) return;
   expect_true(result.rows[0].computed_fields["cell_text"] == "A", "inner equi join first value");
@@ -303,29 +296,28 @@ void test_with_left_equi_join_preserves_unmatched_rows() {
       "<tr><td>A</td></tr>"
       "<tr><td>B</td></tr>"
       "</table>";
-  auto result = run_query(
-      html,
-      "WITH rows AS ("
-      "  SELECT n.node_id AS row_id "
-      "  FROM doc AS n "
-      "  WHERE n.tag = 'tr'"
-      "), "
-      "only_a AS ("
-      "  SELECT n.parent_id AS row_id, TEXT(n) AS cell_text "
-      "  FROM doc AS n "
-      "  WHERE n.tag = 'td' AND TEXT(n) = 'A'"
-      ") "
-      "SELECT r.row_id, c.cell_text "
-      "FROM rows AS r "
-      "LEFT JOIN only_a AS c ON r.row_id = c.row_id "
-      "ORDER BY r.row_id");
+  auto result = run_query(html,
+                          "WITH rows AS ("
+                          "  SELECT n.node_id AS row_id "
+                          "  FROM doc AS n "
+                          "  WHERE n.tag = 'tr'"
+                          "), "
+                          "only_a AS ("
+                          "  SELECT n.parent_id AS row_id, TEXT(n) AS cell_text "
+                          "  FROM doc AS n "
+                          "  WHERE n.tag = 'td' AND TEXT(n) = 'A'"
+                          ") "
+                          "SELECT r.row_id, c.cell_text "
+                          "FROM rows AS r "
+                          "LEFT JOIN only_a AS c ON r.row_id = c.row_id "
+                          "ORDER BY r.row_id");
   expect_eq(result.rows.size(), 2, "left equi join keeps unmatched row");
   if (result.rows.size() != 2) return;
   expect_true(result.rows[0].computed_fields["cell_text"] == "A",
               "left equi join matched row value");
-  expect_true(result.rows[1].computed_fields.find("cell_text") ==
-                  result.rows[1].computed_fields.end(),
-              "left equi join unmatched row remains NULL");
+  expect_true(
+      result.rows[1].computed_fields.find("cell_text") == result.rows[1].computed_fields.end(),
+      "left equi join unmatched row remains NULL");
 }
 
 void test_with_hash_join_preserves_duplicate_multiplicity() {
@@ -336,22 +328,21 @@ void test_with_hash_join_preserves_duplicate_multiplicity() {
       "<y>dup</y>"
       "<y>dup</y>"
       "</root>";
-  auto result = run_query(
-      html,
-      "WITH left_vals AS ("
-      "  SELECT n.text AS k "
-      "  FROM doc AS n "
-      "  WHERE n.tag = 'x'"
-      "), "
-      "right_vals AS ("
-      "  SELECT n.text AS k, n.node_id AS rid "
-      "  FROM doc AS n "
-      "  WHERE n.tag = 'y'"
-      ") "
-      "SELECT l.k, r.rid "
-      "FROM left_vals AS l "
-      "JOIN right_vals AS r ON l.k = r.k "
-      "ORDER BY l.k, r.rid");
+  auto result = run_query(html,
+                          "WITH left_vals AS ("
+                          "  SELECT n.text AS k "
+                          "  FROM doc AS n "
+                          "  WHERE n.tag = 'x'"
+                          "), "
+                          "right_vals AS ("
+                          "  SELECT n.text AS k, n.node_id AS rid "
+                          "  FROM doc AS n "
+                          "  WHERE n.tag = 'y'"
+                          ") "
+                          "SELECT l.k, r.rid "
+                          "FROM left_vals AS l "
+                          "JOIN right_vals AS r ON l.k = r.k "
+                          "ORDER BY l.k, r.rid");
   expect_eq(result.rows.size(), 4, "hash join keeps one-to-many duplicate multiplicity");
   if (result.rows.size() != 4) return;
   for (const auto& row : result.rows) {
@@ -374,42 +365,40 @@ void test_with_hash_join_null_keys_do_not_match() {
       "<y class='a'></y>"
       "<y></y>"
       "</root>";
-  auto result = run_query(
-      html,
-      "WITH left_vals AS ("
-      "  SELECT n.node_id AS lid, n.class AS cls "
-      "  FROM doc AS n "
-      "  WHERE n.tag = 'x'"
-      "), "
-      "right_vals AS ("
-      "  SELECT n.class AS cls, n.node_id AS rid "
-      "  FROM doc AS n "
-      "  WHERE n.tag = 'y'"
-      ") "
-      "SELECT l.lid, l.cls, r.rid "
-      "FROM left_vals AS l "
-      "LEFT JOIN right_vals AS r ON l.cls = r.cls "
-      "ORDER BY l.lid");
+  auto result = run_query(html,
+                          "WITH left_vals AS ("
+                          "  SELECT n.node_id AS lid, n.class AS cls "
+                          "  FROM doc AS n "
+                          "  WHERE n.tag = 'x'"
+                          "), "
+                          "right_vals AS ("
+                          "  SELECT n.class AS cls, n.node_id AS rid "
+                          "  FROM doc AS n "
+                          "  WHERE n.tag = 'y'"
+                          ") "
+                          "SELECT l.lid, l.cls, r.rid "
+                          "FROM left_vals AS l "
+                          "LEFT JOIN right_vals AS r ON l.cls = r.cls "
+                          "ORDER BY l.lid");
   expect_eq(result.rows.size(), 2, "left join row count with nullable join keys");
   if (result.rows.size() != 2) return;
   expect_true(result.rows[0].computed_fields.at("cls") == "a",
               "non-null key matches expected right row");
-  expect_true(result.rows[0].computed_fields.find("rid") !=
-                  result.rows[0].computed_fields.end(),
+  expect_true(result.rows[0].computed_fields.find("rid") != result.rows[0].computed_fields.end(),
               "non-null key produces a right-side match");
-  expect_true(result.rows[1].computed_fields.find("cls") ==
-                  result.rows[1].computed_fields.end(),
+  expect_true(result.rows[1].computed_fields.find("cls") == result.rows[1].computed_fields.end(),
               "null left key remains null");
-  expect_true(result.rows[1].computed_fields.find("rid") ==
-                  result.rows[1].computed_fields.end(),
+  expect_true(result.rows[1].computed_fields.find("rid") == result.rows[1].computed_fields.end(),
               "null key does not match null key on right side");
 }
 
 void test_with_repeated_cell_nodes_joins_correctness() {
   std::string html =
       "<table>"
-      "<tr><td class='team'>Lions</td><td class='w'>10</td><td class='l'>2</td><td class='ot'>1</td><td class='pts'>21</td></tr>"
-      "<tr><td class='team'>Bears</td><td class='w'>8</td><td class='l'>4</td><td class='ot'>0</td><td class='pts'>16</td></tr>"
+      "<tr><td class='team'>Lions</td><td class='w'>10</td><td class='l'>2</td><td "
+      "class='ot'>1</td><td class='pts'>21</td></tr>"
+      "<tr><td class='team'>Bears</td><td class='w'>8</td><td class='l'>4</td><td "
+      "class='ot'>0</td><td class='pts'>16</td></tr>"
       "</table>";
   auto result = run_query(
       html,
@@ -431,7 +420,8 @@ void test_with_repeated_cell_nodes_joins_correctness() {
       "         ot_cell.text_value AS ot_value, "
       "         pts_cell.text_value AS pts_value "
       "  FROM row_nodes AS r "
-      "  LEFT JOIN cell_nodes AS team_cell ON team_cell.row_id = r.row_id AND team_cell.cls = 'team' "
+      "  LEFT JOIN cell_nodes AS team_cell ON team_cell.row_id = r.row_id AND team_cell.cls = "
+      "'team' "
       "  LEFT JOIN cell_nodes AS w_cell ON w_cell.row_id = r.row_id AND w_cell.cls = 'w' "
       "  LEFT JOIN cell_nodes AS l_cell ON l_cell.row_id = r.row_id AND l_cell.cls = 'l' "
       "  LEFT JOIN cell_nodes AS ot_cell ON ot_cell.row_id = r.row_id AND ot_cell.cls = 'ot' "
@@ -460,17 +450,16 @@ void test_with_non_equi_join_fallback_behavior() {
       "<x>a</x>"
       "<x>b</x>"
       "</root>";
-  auto result = run_query(
-      html,
-      "WITH vals AS ("
-      "  SELECT n.text AS v "
-      "  FROM doc AS n "
-      "  WHERE n.tag = 'x'"
-      ") "
-      "SELECT l.v AS lv, r.v AS rv "
-      "FROM vals AS l "
-      "JOIN vals AS r ON l.v <> r.v "
-      "ORDER BY lv, rv");
+  auto result = run_query(html,
+                          "WITH vals AS ("
+                          "  SELECT n.text AS v "
+                          "  FROM doc AS n "
+                          "  WHERE n.tag = 'x'"
+                          ") "
+                          "SELECT l.v AS lv, r.v AS rv "
+                          "FROM vals AS l "
+                          "JOIN vals AS r ON l.v <> r.v "
+                          "ORDER BY lv, rv");
   expect_eq(result.rows.size(), 2, "non-equi join fallback row count");
   if (result.rows.size() != 2) return;
   expect_true(result.rows[0].computed_fields["lv"] == "a", "fallback row1 left");
@@ -482,36 +471,35 @@ void test_with_non_equi_join_fallback_behavior() {
 }  // namespace
 
 void register_with_join_tests(std::vector<TestCase>& tests) {
-  tests.push_back({"parse_with_single_and_multiple_ctes", test_parse_with_single_and_multiple_ctes});
+  tests.push_back(
+      {"parse_with_single_and_multiple_ctes", test_parse_with_single_and_multiple_ctes});
   tests.push_back({"parse_derived_table_and_joins", test_parse_derived_table_and_joins});
   tests.push_back({"parse_cross_join_lateral", test_parse_cross_join_lateral});
   tests.push_back({"parse_reject_duplicate_cte_name", test_parse_reject_duplicate_cte_name});
-  tests.push_back({"parse_reject_derived_table_without_alias",
-                   test_parse_reject_derived_table_without_alias});
+  tests.push_back(
+      {"parse_reject_derived_table_without_alias", test_parse_reject_derived_table_without_alias});
   tests.push_back({"parse_reject_join_without_on", test_parse_reject_join_without_on});
   tests.push_back({"parse_reject_cross_join_with_on", test_parse_reject_cross_join_with_on});
   tests.push_back({"parse_reject_lateral_without_alias", test_parse_reject_lateral_without_alias});
   tests.push_back({"lateral_unknown_alias_throws", test_lateral_unknown_alias_throws});
-  tests.push_back({"with_left_join_lateral_baseline_values",
-                   test_with_left_join_lateral_baseline_values});
+  tests.push_back(
+      {"with_left_join_lateral_baseline_values", test_with_left_join_lateral_baseline_values});
   tests.push_back({"with_left_join_lateral_missing_right_value_null",
                    test_with_left_join_lateral_missing_right_value_null});
   tests.push_back({"lateral_select_self_equivalent_to_select_alias",
                    test_lateral_select_self_equivalent_to_select_alias});
   tests.push_back({"with_qualified_parent_axis_and_case_projection",
                    test_with_qualified_parent_axis_and_case_projection});
-  tests.push_back({"with_join_to_csv_sets_export_sink",
-                   test_with_join_to_csv_sets_export_sink});
-  tests.push_back({"with_inner_equi_join_by_cte_field",
-                   test_with_inner_equi_join_by_cte_field});
+  tests.push_back({"with_join_to_csv_sets_export_sink", test_with_join_to_csv_sets_export_sink});
+  tests.push_back({"with_inner_equi_join_by_cte_field", test_with_inner_equi_join_by_cte_field});
   tests.push_back({"with_left_equi_join_preserves_unmatched_rows",
                    test_with_left_equi_join_preserves_unmatched_rows});
   tests.push_back({"with_hash_join_preserves_duplicate_multiplicity",
                    test_with_hash_join_preserves_duplicate_multiplicity});
-  tests.push_back({"with_hash_join_null_keys_do_not_match",
-                   test_with_hash_join_null_keys_do_not_match});
+  tests.push_back(
+      {"with_hash_join_null_keys_do_not_match", test_with_hash_join_null_keys_do_not_match});
   tests.push_back({"with_repeated_cell_nodes_joins_correctness",
                    test_with_repeated_cell_nodes_joins_correctness});
-  tests.push_back({"with_non_equi_join_fallback_behavior",
-                   test_with_non_equi_join_fallback_behavior});
+  tests.push_back(
+      {"with_non_equi_join_fallback_behavior", test_with_non_equi_join_fallback_behavior});
 }

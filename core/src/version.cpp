@@ -35,4 +35,3 @@ std::string version_string() {
 }
 
 }  // namespace markql
-

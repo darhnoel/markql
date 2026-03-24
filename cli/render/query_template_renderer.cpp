@@ -109,9 +109,8 @@ std::string render_j2_query_file(const std::string& query_file, const std::strin
 
   std::ostringstream command;
   command << "env PYTHONPATH=" << shell_quote_single(python_path.string()) << " "
-          << shell_quote_single(python_executable()) << " -m markql._render_cli"
-          << " --render " << shell_quote_single("j2")
-          << " --template " << shell_quote_single(query_file);
+          << shell_quote_single(python_executable()) << " -m markql._render_cli" << " --render "
+          << shell_quote_single("j2") << " --template " << shell_quote_single(query_file);
   if (!vars_file.empty()) {
     command << " --vars " << shell_quote_single(vars_file);
   }
@@ -155,7 +154,8 @@ QueryRenderResult load_query_file_text(const std::string& query_file,
   return {rendered, true};
 }
 
-void write_rendered_query_output(const std::string& destination, const std::string& rendered_query) {
+void write_rendered_query_output(const std::string& destination,
+                                 const std::string& rendered_query) {
   if (destination.empty()) return;
   if (destination == "-") {
     std::cout << rendered_query;

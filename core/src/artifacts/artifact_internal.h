@@ -44,8 +44,12 @@ size_t checked_next_depth(size_t depth, size_t max_depth, const std::string& mes
 
 class BinaryWriter {
  public:
-  void write_u8(uint8_t value) { data_.push_back(static_cast<char>(value)); }
-  void write_bool(bool value) { write_u8(value ? 1 : 0); }
+  void write_u8(uint8_t value) {
+    data_.push_back(static_cast<char>(value));
+  }
+  void write_bool(bool value) {
+    write_u8(value ? 1 : 0);
+  }
 
   void write_u16(uint16_t value) {
     write_u8(static_cast<uint8_t>(value & 0xffu));
@@ -64,12 +68,15 @@ class BinaryWriter {
     }
   }
 
-  void write_i64(int64_t value) { write_u64(static_cast<uint64_t>(value)); }
+  void write_i64(int64_t value) {
+    write_u64(static_cast<uint64_t>(value));
+  }
 
-  void write_bytes(const char* bytes, size_t size) { data_.append(bytes, size); }
+  void write_bytes(const char* bytes, size_t size) {
+    data_.append(bytes, size);
+  }
 
-  void write_string(const std::string& value,
-                    const std::string& field_name = "artifact string") {
+  void write_string(const std::string& value, const std::string& field_name = "artifact string") {
     validate_utf8_text(value, field_name);
     write_u64(static_cast<uint64_t>(value.size()));
     write_bytes(value.data(), value.size());
@@ -91,7 +98,9 @@ class BinaryWriter {
     if (value.has_value()) write_i64(*value);
   }
 
-  const std::string& data() const { return data_; }
+  const std::string& data() const {
+    return data_;
+  }
 
  private:
   std::string data_;
@@ -101,10 +110,18 @@ class BinaryReader {
  public:
   explicit BinaryReader(const std::string& data) : data_(data) {}
 
-  bool has_remaining(size_t bytes) const { return bytes <= remaining(); }
-  bool done() const { return pos_ == data_.size(); }
-  size_t position() const { return pos_; }
-  size_t remaining() const { return data_.size() - pos_; }
+  bool has_remaining(size_t bytes) const {
+    return bytes <= remaining();
+  }
+  bool done() const {
+    return pos_ == data_.size();
+  }
+  size_t position() const {
+    return pos_;
+  }
+  size_t remaining() const {
+    return data_.size() - pos_;
+  }
 
   uint8_t read_u8() {
     require(1);
@@ -135,7 +152,9 @@ class BinaryReader {
     return value;
   }
 
-  int64_t read_i64() { return static_cast<int64_t>(read_u64()); }
+  int64_t read_i64() {
+    return static_cast<int64_t>(read_u64());
+  }
 
   std::string read_bytes(size_t size) {
     require(size);
@@ -156,9 +175,8 @@ class BinaryReader {
     return value;
   }
 
-  std::optional<std::string> read_optional_string(
-      const std::string& field_name = "artifact string",
-      size_t max_bytes = kMaxStringBytes) {
+  std::optional<std::string> read_optional_string(const std::string& field_name = "artifact string",
+                                                  size_t max_bytes = kMaxStringBytes) {
     if (!read_bool()) return std::nullopt;
     return read_string(field_name, max_bytes);
   }
@@ -196,12 +214,9 @@ ArtifactKind kind_from_magic(const std::string& magic);
 const char* magic_for_kind(ArtifactKind kind);
 std::string read_file_bytes(const std::string& path);
 void write_file_bytes(const std::string& path, const std::string& data);
-size_t read_bounded_count(BinaryReader& reader,
-                          size_t max_count,
-                          const std::string& message);
+size_t read_bounded_count(BinaryReader& reader, size_t max_count, const std::string& message);
 bool is_valid_section_tag(const std::string& tag);
-std::string build_artifact_bytes(ArtifactKind kind,
-                                 uint32_t producer_major,
+std::string build_artifact_bytes(ArtifactKind kind, uint32_t producer_major,
                                  uint64_t required_features,
                                  const std::vector<SectionView>& sections);
 ArtifactHeader read_header(BinaryReader& reader);

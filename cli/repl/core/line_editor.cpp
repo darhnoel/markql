@@ -72,10 +72,8 @@ void LineEditor::set_keyword_color(bool enabled) {
   keyword_color_ = enabled;
 }
 
-void LineEditor::set_mode_prompts(std::string vim_normal_prompt,
-                                  size_t vim_normal_prompt_len,
-                                  std::string vim_insert_prompt,
-                                  size_t vim_insert_prompt_len) {
+void LineEditor::set_mode_prompts(std::string vim_normal_prompt, size_t vim_normal_prompt_len,
+                                  std::string vim_insert_prompt, size_t vim_insert_prompt_len) {
   vim_normal_prompt_ = std::move(vim_normal_prompt);
   vim_normal_prompt_len_ = vim_normal_prompt_len;
   vim_normal_prompt_extra_lines_ = count_prompt_extra_lines(vim_normal_prompt_);
@@ -153,8 +151,7 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
   constexpr size_t kMaxUndoStates = 256;
 
   auto push_undo_snapshot = [&](const std::string& prev_buffer, size_t prev_cursor) {
-    if (!undo_stack.empty() &&
-        undo_stack.back().buffer == prev_buffer &&
+    if (!undo_stack.empty() && undo_stack.back().buffer == prev_buffer &&
         undo_stack.back().cursor == prev_cursor) {
       return;
     }
@@ -164,9 +161,7 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
     undo_stack.push_back(UndoState{prev_buffer, prev_cursor});
   };
 
-  auto push_undo_current = [&]() {
-    push_undo_snapshot(buffer, cursor);
-  };
+  auto push_undo_current = [&]() { push_undo_snapshot(buffer, cursor); };
 
   auto apply_undo = [&]() {
     if (undo_stack.empty()) return;
@@ -242,9 +237,7 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
       if (current_line_end_pos == std::string::npos) current_line_end_pos = buffer.size();
       size_t current_len = column_width(buffer, current_line_start, current_line_end_pos);
       size_t prev_len = column_width(buffer, prev_line_start, prev_line_end);
-      cursor = column_to_index(buffer,
-                               prev_line_start,
-                               prev_line_end,
+      cursor = column_to_index(buffer, prev_line_start, prev_line_end,
                                proportional_column(col, current_len, prev_len));
       redraw_line(buffer, cursor);
     } else if (allow_history_fallback && !history_.empty()) {
@@ -283,9 +276,7 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
       size_t col = column_width(buffer, current_line_start, cursor);
       size_t current_len = column_width(buffer, current_line_start, line_end);
       size_t next_len = column_width(buffer, next_line_start, next_line_end);
-      cursor = column_to_index(buffer,
-                               next_line_start,
-                               next_line_end,
+      cursor = column_to_index(buffer, next_line_start, next_line_end,
                                proportional_column(col, current_len, next_len));
       redraw_line(buffer, cursor);
     } else if (allow_history_fallback && !history_.empty()) {
@@ -348,8 +339,7 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
 
     auto flush_utf8_pending = [&]() {
       if (!utf8_pending.empty()) {
-        buffer.insert(buffer.begin() + static_cast<long>(cursor),
-                      utf8_pending.begin(),
+        buffer.insert(buffer.begin() + static_cast<long>(cursor), utf8_pending.begin(),
                       utf8_pending.end());
         cursor += utf8_pending.size();
         utf8_pending.clear();
@@ -373,9 +363,7 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
         buffer.insert(buffer.begin() + static_cast<long>(cursor), '\n');
         ++cursor;
         if (!indent.empty()) {
-          buffer.insert(buffer.begin() + static_cast<long>(cursor),
-                        indent.begin(),
-                        indent.end());
+          buffer.insert(buffer.begin() + static_cast<long>(cursor), indent.begin(), indent.end());
           cursor += indent.size();
         }
         redraw_line(buffer, cursor);
@@ -549,8 +537,7 @@ bool LineEditor::read_line(std::string& out, const std::string& initial) {
         utf8_pending.push_back(c);
         if (utf8_expected > 0 && utf8_pending.size() >= utf8_expected) {
           push_undo_current();
-          buffer.insert(buffer.begin() + static_cast<long>(cursor),
-                        utf8_pending.begin(),
+          buffer.insert(buffer.begin() + static_cast<long>(cursor), utf8_pending.begin(),
                         utf8_pending.end());
           cursor += utf8_pending.size();
           utf8_pending.clear();
@@ -605,7 +592,8 @@ void LineEditor::redraw_line(const std::string& buffer, size_t cursor) {
   render_buffer(buffer, keyword_color_, cont_prompt_);
 
   int end_line = compute_render_lines(buffer, prompt_, prompt_len_, prompt_extra_lines_,
-                                      cont_prompt_, cont_prompt_len_, width) - 1;
+                                      cont_prompt_, cont_prompt_len_, width) -
+                 1;
   int cursor_line = compute_cursor_line(buffer, cursor, prompt_, prompt_len_, prompt_extra_lines_,
                                         cont_prompt_, cont_prompt_len_, width);
 

@@ -11,7 +11,8 @@ namespace markql {
 /// Executes a query against a parsed HTML document.
 /// MUST respect WHERE, ORDER BY, and LIMIT semantics deterministically.
 /// Inputs are query/doc/source_uri; outputs are ExecuteResult with no side effects.
-ExecuteResult execute_query(const Query& query, const HtmlDocument& doc, const std::string& source_uri) {
+ExecuteResult execute_query(const Query& query, const HtmlDocument& doc,
+                            const std::string& source_uri) {
   ExecuteResult result;
   std::vector<std::string> select_tags;
   select_tags.reserve(query.select_items.size());
@@ -39,10 +40,10 @@ ExecuteResult execute_query(const Query& query, const HtmlDocument& doc, const s
       select_all = true;
       break;
     }
-    const bool alias_binding =
-        source_alias.has_value() &&
-        util::to_lower(item.tag) == *source_alias &&
-        (item.field.has_value() || item.flatten_text || item.flatten_extract || item.expr_projection);
+    const bool alias_binding = source_alias.has_value() &&
+                               util::to_lower(item.tag) == *source_alias &&
+                               (item.field.has_value() || item.flatten_text ||
+                                item.flatten_extract || item.expr_projection);
     if (alias_binding) {
       select_all = true;
       break;

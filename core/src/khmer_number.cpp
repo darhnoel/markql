@@ -15,16 +15,14 @@ namespace {
 
 using boost::multiprecision::cpp_int;
 
-constexpr std::array<std::string_view, 10> kDigitWords = {
-    "សូន្យ", "មួយ", "ពីរ", "បី", "បួន",
-    "ប្រាំ", "ប្រាំមួយ", "ប្រាំពីរ", "ប្រាំបី", "ប្រាំបួន"};
+constexpr std::array<std::string_view, 10> kDigitWords = {"សូន្យ", "មួយ",    "ពីរ",    "បី",    "បួន",
+                                                          "ប្រាំ", "ប្រាំមួយ", "ប្រាំពីរ", "ប្រាំបី", "ប្រាំបួន"};
 
-constexpr std::array<std::string_view, 10> kDigitNumerals = {
-    "០", "១", "២", "៣", "៤", "៥", "៦", "៧", "៨", "៩"};
+constexpr std::array<std::string_view, 10> kDigitNumerals = {"០", "១", "២", "៣", "៤",
+                                                             "៥", "៦", "៧", "៨", "៩"};
 
-constexpr std::array<std::string_view, 10> kTensWords = {
-    "", "", "ម្ភៃ", "សាមសិប", "សែសិប",
-    "ហាសិប", "ហុកសិប", "ចិតសិប", "ប៉ែតសិប", "កៅសិប"};
+constexpr std::array<std::string_view, 10> kTensWords = {"",     "",     "ម្ភៃ",  "សាមសិប", "សែសិប",
+                                                         "ហាសិប", "ហុកសិប", "ចិតសិប", "ប៉ែតសិប", "កៅសិប"};
 
 constexpr std::string_view kDecimalMarker = "ក្បៀស";
 constexpr std::string_view kNegativeMarker = "ដក";
@@ -106,13 +104,12 @@ const std::vector<std::string_view>& known_tokens() {
     }
     values.push_back(kDecimalMarker);
     values.push_back(kNegativeMarker);
-    std::sort(values.begin(), values.end(),
-              [](std::string_view a, std::string_view b) {
-                if (a.size() != b.size()) {
-                  return a.size() > b.size();
-                }
-                return a < b;
-              });
+    std::sort(values.begin(), values.end(), [](std::string_view a, std::string_view b) {
+      if (a.size() != b.size()) {
+        return a.size() > b.size();
+      }
+      return a < b;
+    });
     values.erase(std::unique(values.begin(), values.end()), values.end());
     return values;
   }();
@@ -413,8 +410,7 @@ std::string digits_to_khmer_numerals(std::string_view digits) {
   return out;
 }
 
-Result<cpp_int> parse_integer_tokens(const std::vector<std::string>& tokens,
-                                     size_t start,
+Result<cpp_int> parse_integer_tokens(const std::vector<std::string>& tokens, size_t start,
                                      size_t end) {
   if (start >= end) {
     return Result<cpp_int>::failure("Missing integer tokens.");

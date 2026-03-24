@@ -89,10 +89,8 @@ std::vector<std::vector<int64_t>> build_children(const HtmlDocument& doc);
 /// Collects table cell text for TO TABLE export and rendering.
 /// MUST preserve row order and MUST ignore empty rows.
 /// Inputs are doc/children/table_id; outputs are row vectors.
-void collect_rows(const HtmlDocument& doc,
-                  const std::vector<std::vector<int64_t>>& children,
-                  int64_t table_id,
-                  std::vector<std::vector<std::string>>& out_rows);
+void collect_rows(const HtmlDocument& doc, const std::vector<std::vector<int64_t>>& children,
+                  int64_t table_id, std::vector<std::vector<std::string>>& out_rows);
 /// Limits inner_html content to a maximum nesting depth.
 /// MUST preserve tag balance up to max_depth and MUST be deterministic.
 /// Inputs are HTML and depth; outputs are truncated HTML strings.

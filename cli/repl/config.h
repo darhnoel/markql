@@ -23,11 +23,7 @@ struct ReplSettings {
 std::string resolve_repl_config_path();
 bool load_repl_config(const std::string& path, ReplSettings& out, std::string& error);
 std::string resolve_default_history_path();
-bool apply_repl_settings(const ReplSettings& settings,
-                         ReplConfig& config,
-                         LineEditor& editor,
-                         bool& display_full,
-                         size_t& max_rows,
-                         std::string& error);
+bool apply_repl_settings(const ReplSettings& settings, ReplConfig& config, LineEditor& editor,
+                         bool& display_full, size_t& max_rows, std::string& error);
 
 }  // namespace markql::cli

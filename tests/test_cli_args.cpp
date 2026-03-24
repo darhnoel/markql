@@ -8,11 +8,7 @@ namespace {
 
 void test_parse_cli_args_accepts_script_flags() {
   const char* argv[] = {
-      "markql",
-      "--query-file",
-      "script.sql",
-      "--continue-on-error",
-      "--quiet",
+      "markql", "--query-file", "script.sql", "--continue-on-error", "--quiet",
   };
   int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
   markql::cli::CliOptions options;
@@ -54,11 +50,7 @@ void test_parse_cli_args_rejects_unknown_argument() {
 
 void test_parse_cli_args_rejects_query_and_query_file_together() {
   const char* argv[] = {
-      "markql",
-      "--query",
-      "SELECT div FROM document",
-      "--query-file",
-      "script.sql",
+      "markql", "--query", "SELECT div FROM document", "--query-file", "script.sql",
   };
   int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
   markql::cli::CliOptions options;
@@ -86,11 +78,7 @@ void test_parse_cli_args_accepts_lint_inline_query() {
 
 void test_parse_cli_args_accepts_lint_json_format() {
   const char* argv[] = {
-      "markql",
-      "--lint",
-      "SELECT FROM doc",
-      "--format",
-      "json",
+      "markql", "--lint", "SELECT FROM doc", "--format", "json",
   };
   int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
   markql::cli::CliOptions options;
@@ -130,15 +118,8 @@ void test_parse_cli_args_accepts_version_flag() {
 
 void test_parse_cli_args_accepts_render_flags() {
   const char* argv[] = {
-      "markql",
-      "--query-file",
-      "query.mql.j2",
-      "--render",
-      "j2",
-      "--vars",
-      "query.toml",
-      "--rendered-out",
-      "rendered.mql",
+      "markql", "--query-file", "query.mql.j2",   "--render",     "j2",
+      "--vars", "query.toml",   "--rendered-out", "rendered.mql",
   };
   int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
   markql::cli::CliOptions options;
@@ -152,11 +133,7 @@ void test_parse_cli_args_accepts_render_flags() {
 
 void test_parse_cli_args_rejects_vars_without_render() {
   const char* argv[] = {
-      "markql",
-      "--query-file",
-      "query.mql.j2",
-      "--vars",
-      "query.toml",
+      "markql", "--query-file", "query.mql.j2", "--vars", "query.toml",
   };
   int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
   markql::cli::CliOptions options;
@@ -169,11 +146,7 @@ void test_parse_cli_args_rejects_vars_without_render() {
 
 void test_parse_cli_args_rejects_render_without_query_file() {
   const char* argv[] = {
-      "markql",
-      "--query",
-      "SELECT 1",
-      "--render",
-      "j2",
+      "markql", "--query", "SELECT 1", "--render", "j2",
   };
   int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
   markql::cli::CliOptions options;
@@ -186,11 +159,7 @@ void test_parse_cli_args_rejects_render_without_query_file() {
 
 void test_parse_cli_args_rejects_unknown_render_mode() {
   const char* argv[] = {
-      "markql",
-      "--query-file",
-      "query.mql.j2",
-      "--render",
-      "liquid",
+      "markql", "--query-file", "query.mql.j2", "--render", "liquid",
   };
   int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
   markql::cli::CliOptions options;
@@ -203,14 +172,7 @@ void test_parse_cli_args_rejects_unknown_render_mode() {
 
 void test_parse_cli_args_rejects_render_stdout_with_lint() {
   const char* argv[] = {
-      "markql",
-      "--query-file",
-      "query.mql.j2",
-      "--render",
-      "j2",
-      "--rendered-out",
-      "-",
-      "--lint",
+      "markql", "--query-file", "query.mql.j2", "--render", "j2", "--rendered-out", "-", "--lint",
   };
   int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
   markql::cli::CliOptions options;
@@ -311,21 +273,24 @@ void test_supported_output_mode_includes_csv() {
 }  // namespace
 
 void register_cli_args_tests(std::vector<TestCase>& tests) {
-  tests.push_back({"parse_cli_args_accepts_script_flags", test_parse_cli_args_accepts_script_flags});
-  tests.push_back({"parse_cli_args_rejects_missing_value", test_parse_cli_args_rejects_missing_value});
-  tests.push_back({"parse_cli_args_rejects_unknown_argument", test_parse_cli_args_rejects_unknown_argument});
+  tests.push_back(
+      {"parse_cli_args_accepts_script_flags", test_parse_cli_args_accepts_script_flags});
+  tests.push_back(
+      {"parse_cli_args_rejects_missing_value", test_parse_cli_args_rejects_missing_value});
+  tests.push_back(
+      {"parse_cli_args_rejects_unknown_argument", test_parse_cli_args_rejects_unknown_argument});
   tests.push_back({"parse_cli_args_rejects_query_and_query_file_together",
                    test_parse_cli_args_rejects_query_and_query_file_together});
-  tests.push_back({"parse_cli_args_accepts_lint_inline_query",
-                   test_parse_cli_args_accepts_lint_inline_query});
-  tests.push_back({"parse_cli_args_accepts_lint_json_format",
-                   test_parse_cli_args_accepts_lint_json_format});
+  tests.push_back(
+      {"parse_cli_args_accepts_lint_inline_query", test_parse_cli_args_accepts_lint_inline_query});
+  tests.push_back(
+      {"parse_cli_args_accepts_lint_json_format", test_parse_cli_args_accepts_lint_json_format});
   tests.push_back({"parse_cli_args_rejects_format_without_lint",
                    test_parse_cli_args_rejects_format_without_lint});
-  tests.push_back({"parse_cli_args_accepts_version_flag",
-                   test_parse_cli_args_accepts_version_flag});
-  tests.push_back({"parse_cli_args_accepts_render_flags",
-                   test_parse_cli_args_accepts_render_flags});
+  tests.push_back(
+      {"parse_cli_args_accepts_version_flag", test_parse_cli_args_accepts_version_flag});
+  tests.push_back(
+      {"parse_cli_args_accepts_render_flags", test_parse_cli_args_accepts_render_flags});
   tests.push_back({"parse_cli_args_rejects_vars_without_render",
                    test_parse_cli_args_rejects_vars_without_render});
   tests.push_back({"parse_cli_args_rejects_render_without_query_file",
@@ -334,14 +299,12 @@ void register_cli_args_tests(std::vector<TestCase>& tests) {
                    test_parse_cli_args_rejects_unknown_render_mode});
   tests.push_back({"parse_cli_args_rejects_render_stdout_with_lint",
                    test_parse_cli_args_rejects_render_stdout_with_lint});
-  tests.push_back({"parse_cli_args_accepts_color_modes",
-                   test_parse_cli_args_accepts_color_modes});
+  tests.push_back({"parse_cli_args_accepts_color_modes", test_parse_cli_args_accepts_color_modes});
   tests.push_back({"parse_cli_args_rejects_invalid_color_mode",
                    test_parse_cli_args_rejects_invalid_color_mode});
   tests.push_back({"diagnostics_color_policy_modes_and_no_color_precedence",
                    test_diagnostics_color_policy_modes_and_no_color_precedence});
-  tests.push_back({"output_color_policy_auto_and_no_color",
-                   test_output_color_policy_auto_and_no_color});
-  tests.push_back({"supported_output_mode_includes_csv",
-                   test_supported_output_mode_includes_csv});
+  tests.push_back(
+      {"output_color_policy_auto_and_no_color", test_output_color_policy_auto_and_no_color});
+  tests.push_back({"supported_output_mode_includes_csv", test_supported_output_mode_includes_csv});
 }

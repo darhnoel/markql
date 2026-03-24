@@ -11,21 +11,19 @@ namespace {
 
 std::string trim_copy(const std::string& value) {
   size_t start = 0;
-  while (start < value.size() &&
-         std::isspace(static_cast<unsigned char>(value[start]))) {
+  while (start < value.size() && std::isspace(static_cast<unsigned char>(value[start]))) {
     ++start;
   }
   size_t end = value.size();
-  while (end > start &&
-         std::isspace(static_cast<unsigned char>(value[end - 1]))) {
+  while (end > start && std::isspace(static_cast<unsigned char>(value[end - 1]))) {
     --end;
   }
   return value.substr(start, end - start);
 }
 
 bool is_reserved_keyword(const std::string& value) {
-  static const std::unordered_set<std::string> kReserved = {
-      "select", "from", "where", "group", "order", "join", "limit"};
+  static const std::unordered_set<std::string> kReserved = {"select", "from", "where", "group",
+                                                            "order",  "join", "limit"};
   return kReserved.find(value) != kReserved.end();
 }
 
@@ -44,9 +42,7 @@ std::string normalize_colname(const std::string& raw, bool lowercase) {
   bool last_was_underscore = false;
   for (char c : value) {
     const unsigned char uc = static_cast<unsigned char>(c);
-    const bool is_ident =
-        std::isalnum(uc) ||
-        c == '_';
+    const bool is_ident = std::isalnum(uc) || c == '_';
     if (is_ident) {
       normalized.push_back(c);
       last_was_underscore = false;
@@ -86,8 +82,7 @@ std::string normalize_colname(const std::string& raw, bool lowercase) {
   if (collapsed.empty()) {
     collapsed = "col";
   }
-  if (!collapsed.empty() &&
-      std::isdigit(static_cast<unsigned char>(collapsed[0]))) {
+  if (!collapsed.empty() && std::isdigit(static_cast<unsigned char>(collapsed[0]))) {
     collapsed = "c_" + collapsed;
   }
   if (is_reserved_keyword(collapsed)) {
@@ -96,17 +91,14 @@ std::string normalize_colname(const std::string& raw, bool lowercase) {
   return collapsed;
 }
 
-std::vector<ColumnNameMapping> build_column_name_map(
-    const std::vector<std::string>& raw_columns,
-    ColumnNameMode mode,
-    bool lowercase) {
+std::vector<ColumnNameMapping> build_column_name_map(const std::vector<std::string>& raw_columns,
+                                                     ColumnNameMode mode, bool lowercase) {
   std::vector<ColumnNameMapping> out;
   out.reserve(raw_columns.size());
   std::unordered_map<std::string, size_t> seen;
   for (const auto& raw : raw_columns) {
     std::string base =
-        mode == ColumnNameMode::Normalize ? normalize_colname(raw, lowercase)
-                                          : trim_copy(raw);
+        mode == ColumnNameMode::Normalize ? normalize_colname(raw, lowercase) : trim_copy(raw);
     // WHY: empty/blank headers break downstream tabular tools.
     if (base.empty()) {
       base = "col";

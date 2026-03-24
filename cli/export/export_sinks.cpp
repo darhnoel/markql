@@ -47,11 +47,10 @@ struct CellValue {
 std::string term_scores_to_string(const std::unordered_map<std::string, double>& scores) {
   if (scores.empty()) return "{}";
   std::vector<std::pair<std::string, double>> items(scores.begin(), scores.end());
-  std::sort(items.begin(), items.end(),
-            [](const auto& a, const auto& b) {
-              if (a.first != b.first) return a.first < b.first;
-              return a.second < b.second;
-            });
+  std::sort(items.begin(), items.end(), [](const auto& a, const auto& b) {
+    if (a.first != b.first) return a.first < b.first;
+    return a.second < b.second;
+  });
   std::ostringstream oss;
   oss << "{";
   oss << std::fixed << std::setprecision(6);
@@ -114,13 +113,27 @@ std::string json_escape(const std::string& value) {
   out.reserve(value.size() + 8);
   for (char c : value) {
     switch (c) {
-      case '\"': out += "\\\""; break;
-      case '\\': out += "\\\\"; break;
-      case '\b': out += "\\b"; break;
-      case '\f': out += "\\f"; break;
-      case '\n': out += "\\n"; break;
-      case '\r': out += "\\r"; break;
-      case '\t': out += "\\t"; break;
+      case '\"':
+        out += "\\\"";
+        break;
+      case '\\':
+        out += "\\\\";
+        break;
+      case '\b':
+        out += "\\b";
+        break;
+      case '\f':
+        out += "\\f";
+        break;
+      case '\n':
+        out += "\\n";
+        break;
+      case '\r':
+        out += "\\r";
+        break;
+      case '\t':
+        out += "\\t";
+        break;
       default:
         if (static_cast<unsigned char>(c) < 0x20) {
           std::ostringstream hex;
@@ -136,8 +149,7 @@ std::string json_escape(const std::string& value) {
   return out;
 }
 
-void write_json_row(std::ostream& out,
-                    const markql::QueryResultRow& row,
+void write_json_row(std::ostream& out, const markql::QueryResultRow& row,
                     const std::vector<markql::ColumnNameMapping>& schema) {
   out << "{";
   for (size_t i = 0; i < schema.size(); ++i) {
@@ -166,7 +178,7 @@ bool validate_rectangular(const markql::QueryResult& result, std::string& error)
 }
 
 std::vector<markql::ColumnNameMapping> result_schema(const markql::QueryResult& result,
-                                                   markql::ColumnNameMode colname_mode) {
+                                                     markql::ColumnNameMode colname_mode) {
   return markql::build_column_name_map(result.columns, colname_mode);
 }
 
@@ -174,9 +186,7 @@ std::vector<markql::ColumnNameMapping> result_schema(const markql::QueryResult& 
 
 static std::vector<std::string> table_columns(const markql::QueryResult::TableResult& table);
 
-bool write_csv(std::ostream& out,
-               const markql::QueryResult& result,
-               std::string& error,
+bool write_csv(std::ostream& out, const markql::QueryResult& result, std::string& error,
                markql::ColumnNameMode colname_mode) {
   if (!validate_rectangular(result, error)) return false;
   std::vector<markql::ColumnNameMapping> schema = result_schema(result, colname_mode);
@@ -197,9 +207,7 @@ bool write_csv(std::ostream& out,
   return true;
 }
 
-bool write_csv(const markql::QueryResult& result,
-               const std::string& path,
-               std::string& error,
+bool write_csv(const markql::QueryResult& result, const std::string& path, std::string& error,
                markql::ColumnNameMode colname_mode) {
   std::ofstream file;
   std::ostream* out = &std::cout;
@@ -214,9 +222,7 @@ bool write_csv(const markql::QueryResult& result,
   return write_csv(*out, result, error, colname_mode);
 }
 
-bool write_json(const markql::QueryResult& result,
-                const std::string& path,
-                std::string& error,
+bool write_json(const markql::QueryResult& result, const std::string& path, std::string& error,
                 markql::ColumnNameMode colname_mode) {
   if (!validate_rectangular(result, error)) return false;
   std::vector<markql::ColumnNameMapping> schema = result_schema(result, colname_mode);
@@ -242,9 +248,7 @@ bool write_json(const markql::QueryResult& result,
   return true;
 }
 
-bool write_ndjson(const markql::QueryResult& result,
-                  const std::string& path,
-                  std::string& error,
+bool write_ndjson(const markql::QueryResult& result, const std::string& path, std::string& error,
                   markql::ColumnNameMode colname_mode) {
   if (!validate_rectangular(result, error)) return false;
   std::vector<markql::ColumnNameMapping> schema = result_schema(result, colname_mode);
@@ -265,10 +269,8 @@ bool write_ndjson(const markql::QueryResult& result,
   return true;
 }
 
-bool write_table_csv(const markql::QueryResult::TableResult& table,
-                     const std::string& path,
-                     std::string& error,
-                     bool table_has_header) {
+bool write_table_csv(const markql::QueryResult::TableResult& table, const std::string& path,
+                     std::string& error, bool table_has_header) {
   std::ofstream out(path, std::ios::binary);
   if (!out) {
     error = "Failed to open file for writing: " + path;
@@ -309,9 +311,7 @@ static std::vector<std::string> table_columns(const markql::QueryResult::TableRe
   return cols;
 }
 
-bool write_parquet(const markql::QueryResult& result,
-                   const std::string& path,
-                   std::string& error,
+bool write_parquet(const markql::QueryResult& result, const std::string& path, std::string& error,
                    markql::ColumnNameMode colname_mode) {
   if (!validate_rectangular(result, error)) return false;
   std::vector<markql::ColumnNameMapping> col_schema = result_schema(result, colname_mode);
@@ -378,8 +378,7 @@ bool write_parquet(const markql::QueryResult& result,
 #endif
 }
 
-bool write_table_parquet(const markql::QueryResult::TableResult& table,
-                         const std::string& path,
+bool write_table_parquet(const markql::QueryResult::TableResult& table, const std::string& path,
                          std::string& error) {
 #ifdef MARKQL_USE_ARROW
   std::vector<std::string> cols = table_columns(table);
@@ -447,8 +446,7 @@ bool write_table_parquet(const markql::QueryResult::TableResult& table,
 #endif
 }
 
-bool export_result(const markql::QueryResult& result,
-                   std::string& error,
+bool export_result(const markql::QueryResult& result, std::string& error,
                    markql::ColumnNameMode colname_mode) {
   if (result.export_sink.kind == markql::QueryResult::ExportSink::Kind::None) {
     return false;
@@ -458,7 +456,8 @@ bool export_result(const markql::QueryResult& result,
       error = "Export requires a single table result; add a filter to select one table";
       return false;
     }
-    const bool sparse = result.table_options.format == markql::QueryResult::TableOptions::Format::Sparse;
+    const bool sparse =
+        result.table_options.format == markql::QueryResult::TableOptions::Format::Sparse;
     const bool sparse_long =
         result.table_options.sparse_shape == markql::QueryResult::TableOptions::SparseShape::Long;
     if (sparse && !sparse_long) {

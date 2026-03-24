@@ -8,17 +8,11 @@
 #include "sql_keywords.h"
 
 namespace markql::cli {
-namespace {
+namespace {}  // namespace
 
-}  // namespace
-
-int compute_render_lines(const std::string& buffer,
-                         const std::string& prompt,
-                         size_t prompt_len,
-                         int prompt_extra_lines,
-                         const std::string& cont_prompt,
-                         size_t cont_prompt_len,
-                         int width) {
+int compute_render_lines(const std::string& buffer, const std::string& prompt, size_t prompt_len,
+                         int prompt_extra_lines, const std::string& cont_prompt,
+                         size_t cont_prompt_len, int width) {
   int line = std::max(0, prompt_extra_lines);
   int col = static_cast<int>(prompt_len);
   size_t i = 0;
@@ -46,14 +40,9 @@ int compute_render_lines(const std::string& buffer,
   return line + 1;
 }
 
-int compute_cursor_line(const std::string& buffer,
-                        size_t cursor,
-                        const std::string& prompt,
-                        size_t prompt_len,
-                        int prompt_extra_lines,
-                        const std::string& cont_prompt,
-                        size_t cont_prompt_len,
-                        int width) {
+int compute_cursor_line(const std::string& buffer, size_t cursor, const std::string& prompt,
+                        size_t prompt_len, int prompt_extra_lines, const std::string& cont_prompt,
+                        size_t cont_prompt_len, int width) {
   int line = std::max(0, prompt_extra_lines);
   int col = static_cast<int>(prompt_len);
   size_t i = 0;
@@ -84,9 +73,7 @@ int compute_cursor_line(const std::string& buffer,
   return line;
 }
 
-void render_buffer(const std::string& buffer,
-                   bool keyword_color,
-                   const std::string& cont_prompt) {
+void render_buffer(const std::string& buffer, bool keyword_color, const std::string& cont_prompt) {
   bool in_single = false;
   bool in_double = false;
   bool command_line = false;

@@ -9,21 +9,33 @@ namespace markql::cli {
 
 AutoCompleter::AutoCompleter() {
   keywords_ = markql_completion_keywords();
-  commands_ = {
-      ".help", ".load", ".mode", ".set", ".lint", ".display_mode", ".max_rows", ".reload_config",
-      ".explore",
-      ".summarize", ".summarize_content",
-      ".plugin", ".quit", ".q",
-      ":help", ":load", ":lint", ":explore", ":quit", ":exit"
-  };
+  commands_ = {".help",
+               ".load",
+               ".mode",
+               ".set",
+               ".lint",
+               ".display_mode",
+               ".max_rows",
+               ".reload_config",
+               ".explore",
+               ".summarize",
+               ".summarize_content",
+               ".plugin",
+               ".quit",
+               ".q",
+               ":help",
+               ":load",
+               ":lint",
+               ":explore",
+               ":quit",
+               ":exit"};
 #ifdef MARKQL_ENABLE_KHMER_NUMBER
   commands_.push_back(".number_to_khmer");
   commands_.push_back(".khmer_to_number");
 #endif
 }
 
-bool AutoCompleter::complete(std::string& buffer,
-                             size_t& cursor,
+bool AutoCompleter::complete(std::string& buffer, size_t& cursor,
                              std::vector<std::string>& suggestions) const {
   if (cursor > buffer.size()) cursor = buffer.size();
   size_t start = cursor;

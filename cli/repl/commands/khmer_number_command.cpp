@@ -72,29 +72,25 @@ CommandHandler make_khmer_number_command() {
     }
     if (arg.empty()) {
       if (to_words) {
-        std::cerr << "Usage: .number_to_khmer <number> [--compact] [--khmer-digits]"
-                  << std::endl;
+        std::cerr << "Usage: .number_to_khmer <number> [--compact] [--khmer-digits]" << std::endl;
       } else {
-        std::cerr << "Usage: .khmer_to_number <khmer_text> [--khmer-digits]"
-                  << std::endl;
+        std::cerr << "Usage: .khmer_to_number <khmer_text> [--khmer-digits]" << std::endl;
       }
       ctx.editor.reset_render_state();
       return true;
     }
 
     if (to_words) {
-      auto result = numerals
-                        ? markql::khmer_number::number_to_khmer_numerals(arg)
-                        : markql::khmer_number::number_to_khmer_words(arg);
+      auto result = numerals ? markql::khmer_number::number_to_khmer_numerals(arg)
+                             : markql::khmer_number::number_to_khmer_words(arg);
       if (!result.ok) {
         std::cerr << "Error: " << result.error << std::endl;
         ctx.editor.reset_render_state();
         return true;
       }
       if (compact && !numerals) {
-        result.value.erase(
-            std::remove(result.value.begin(), result.value.end(), '-'),
-            result.value.end());
+        result.value.erase(std::remove(result.value.begin(), result.value.end(), '-'),
+                           result.value.end());
       }
       std::cout << result.value << std::endl;
       ctx.editor.reset_render_state();
@@ -108,8 +104,7 @@ CommandHandler make_khmer_number_command() {
       return true;
     }
     if (numerals) {
-      auto numerals_result =
-          markql::khmer_number::number_to_khmer_numerals(result.value);
+      auto numerals_result = markql::khmer_number::number_to_khmer_numerals(result.value);
       if (!numerals_result.ok) {
         std::cerr << "Error: " << numerals_result.error << std::endl;
         ctx.editor.reset_render_state();

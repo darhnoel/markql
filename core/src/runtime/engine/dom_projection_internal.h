@@ -29,7 +29,8 @@ struct ProjectRowEvalCache {
   ProjectBenchStats* stats = nullptr;
 
   void reset_for_row(const std::vector<std::vector<int64_t>>& children, int64_t node_id);
-  const std::vector<int64_t>& nodes_for_tag(const std::string& extract_tag, const HtmlDocument& doc);
+  const std::vector<int64_t>& nodes_for_tag(const std::string& extract_tag,
+                                            const HtmlDocument& doc);
 };
 
 std::string normalize_flatten_text(const std::string& value);
@@ -43,18 +44,13 @@ struct ScalarProjectionValue {
 bool projection_is_null(const ScalarProjectionValue& value);
 std::string projection_to_string(const ScalarProjectionValue& value);
 ScalarProjectionValue eval_select_scalar_expr(
-    const ScalarExpr& expr,
-    const HtmlNode& node,
-    const HtmlDocument* doc = nullptr,
+    const ScalarExpr& expr, const HtmlNode& node, const HtmlDocument* doc = nullptr,
     const std::vector<std::vector<int64_t>>* children = nullptr);
 
 std::optional<std::string> eval_flatten_extract_expr(
-    const Query::SelectItem::FlattenExtractExpr& expr,
-    const HtmlNode& base_node,
-    const HtmlDocument& doc,
-    const std::vector<std::vector<int64_t>>& children,
-    const std::unordered_map<std::string, std::string>& bindings,
-    ProjectRowEvalCache* row_cache);
+    const Query::SelectItem::FlattenExtractExpr& expr, const HtmlNode& base_node,
+    const HtmlDocument& doc, const std::vector<std::vector<int64_t>>& children,
+    const std::unordered_map<std::string, std::string>& bindings, ProjectRowEvalCache* row_cache);
 
 std::optional<std::string> eval_parse_source_expr(const ScalarExpr& expr);
 

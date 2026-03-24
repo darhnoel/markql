@@ -20,8 +20,8 @@ void expect_true(bool condition, const std::string& message) {
 
 void expect_eq(size_t actual, size_t expected, const std::string& message) {
   if (actual != expected) {
-    std::cerr << "FAIL [" << g_current_test << "]: " << message
-              << " (expected " << expected << ", got " << actual << ")" << std::endl;
+    std::cerr << "FAIL [" << g_current_test << "]: " << message << " (expected " << expected
+              << ", got " << actual << ")" << std::endl;
     ++g_failures;
   }
 }

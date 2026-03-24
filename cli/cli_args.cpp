@@ -17,7 +17,8 @@ void print_startup_help(std::ostream& os) {
   os << "         [--rendered-out <file.mql>|-] [--input <path>]\n";
   os << "         [--continue-on-error] [--quiet]\n";
   os << "  markql --input <path> --write-mqd <file.mqd>        (experimental)\n";
-  os << "  markql (--query <query> | --query-file <file.sql>) --write-mqp <file.mqp>  (experimental)\n";
+  os << "  markql (--query <query> | --query-file <file.sql>) --write-mqp <file.mqp>  "
+        "(experimental)\n";
   os << "  markql --artifact-info <file.mqd|file.mqp>          (experimental)\n";
   os << "  markql --lint \"<query>\" [--format text|json]\n";
   os << "  markql --interactive [--input <path>]\n";
@@ -34,7 +35,8 @@ void print_startup_help(std::ostream& os) {
   os << "  - URLs are supported when libcurl is available.\n";
   os << "  - --input accepts HTML or experimental .mqd document snapshots.\n";
   os << "  - --query-file accepts SQL text files or experimental .mqp prepared-query artifacts.\n";
-  os << "  - Template rendering is opt-in: use --render j2 with --query-file and optional --vars TOML.\n";
+  os << "  - Template rendering is opt-in: use --render j2 with --query-file and optional --vars "
+        "TOML.\n";
   os << "  - --rendered-out writes rendered MarkQL to a file; use - for stdout preview only.\n";
   os << "  - Artifact workflows are experimental and may change across upcoming releases.\n";
   os << "  - TO LIST() outputs a JSON list for a single projected column.\n";
@@ -44,8 +46,10 @@ void print_startup_help(std::ostream& os) {
   os << "Examples:\n";
   os << "  markql --query \"SELECT table FROM doc\" --input ./data/index.html\n";
   os << "  markql --lint \"SELECT div FROM doc WHERE\"\n";
-  os << "  markql --query-file ./queries/stocks.mql.j2 --render j2 --vars ./queries/stocks.toml --lint\n";
-  os << "  markql --query \"SELECT link.href FROM doc WHERE attributes.rel = 'preload' TO LIST()\" --input ./data/index.html\n";
+  os << "  markql --query-file ./queries/stocks.mql.j2 --render j2 --vars ./queries/stocks.toml "
+        "--lint\n";
+  os << "  markql --query \"SELECT link.href FROM doc WHERE attributes.rel = 'preload' TO LIST()\" "
+        "--input ./data/index.html\n";
   os << "  markql --interactive --input ./data/index.html\n";
 }
 
@@ -59,7 +63,8 @@ void print_help(std::ostream& os) {
   os << "              [--rendered-out <file.mql>|-] [--input <path>]\n";
   os << "              [--continue-on-error] [--quiet]\n";
   os << "       markql --input <path> --write-mqd <file.mqd>        (experimental)\n";
-  os << "       markql (--query <query> | --query-file <file.sql>) --write-mqp <file.mqp>  (experimental)\n";
+  os << "       markql (--query <query> | --query-file <file.sql>) --write-mqp <file.mqp>  "
+        "(experimental)\n";
   os << "       markql --artifact-info <file.mqd|file.mqp>          (experimental)\n";
   os << "       markql --lint \"<query>\" [--format text|json]\n";
   os << "       markql --interactive [--input <path>]\n";
@@ -77,14 +82,16 @@ void print_help(std::ostream& os) {
         "TO NDJSON('file.ndjson') in queries to export.\n";
   os << "Use --write-mqd/--write-mqp to cache parsed documents or prepared queries.\n";
   os << "Use --render j2 to render .mql.j2 query files into plain MarkQL before lint/execute.\n";
-  os << "--vars loads TOML template variables. Missing variables fail with strict undefined behavior.\n";
+  os << "--vars loads TOML template variables. Missing variables fail with strict undefined "
+        "behavior.\n";
   os << "--rendered-out writes rendered MarkQL to a file, or to stdout when set to -.\n";
   os << "Artifact workflows are experimental and may change across upcoming releases.\n";
   os << "--artifact-info prints artifact metadata and compatibility details.\n";
   os << "--lint validates syntax + semantic rules without executing the query.\n";
   os << "--format json emits lint diagnostics as a JSON array.\n";
   os << "NO_COLOR disables ANSI color output even when --color=always/auto is set.\n";
-  os << "Explore mode keybindings: Up/Down move, Right/Enter expand, Left collapse, / search, n/N next/prev, j/k scroll inner_html, +/- zoom inner_html, q quit.\n";
+  os << "Explore mode keybindings: Up/Down move, Right/Enter expand, Left collapse, / search, n/N "
+        "next/prev, j/k scroll inner_html, +/- zoom inner_html, q quit.\n";
   os << "Explore mode restores position/expansion per input within the current process session.\n";
   os << "Exit codes: 0=success, 1=parse/runtime error, 2=CLI/IO usage error.\n";
 }
@@ -324,9 +331,7 @@ bool is_supported_output_mode(const std::string& mode) {
   return mode == "duckbox" || mode == "json" || mode == "plain" || mode == "csv";
 }
 
-bool resolve_output_color_enabled(const CliOptions& options,
-                                  bool is_tty,
-                                  bool no_color_env) {
+bool resolve_output_color_enabled(const CliOptions& options, bool is_tty, bool no_color_env) {
   if (no_color_env) return false;
   switch (options.color_mode) {
     case ColorMode::Legacy:
@@ -341,9 +346,7 @@ bool resolve_output_color_enabled(const CliOptions& options,
   return options.color;
 }
 
-bool resolve_diagnostics_color_enabled(const CliOptions& options,
-                                       bool is_tty,
-                                       bool no_color_env) {
+bool resolve_diagnostics_color_enabled(const CliOptions& options, bool is_tty, bool no_color_env) {
   if (no_color_env) return false;
   switch (options.color_mode) {
     case ColorMode::Legacy:

@@ -40,10 +40,7 @@ struct RelationJoinExecutionPlan {
 };
 
 struct RelationIndexLookupTerm {
-  enum class Kind {
-    LeftColumn,
-    Literal
-  } kind = Kind::LeftColumn;
+  enum class Kind { LeftColumn, Literal } kind = Kind::LeftColumn;
   std::string right_column;
   RelationJoinKeySpec left_key;
   std::optional<std::string> literal_value;
@@ -58,8 +55,7 @@ struct RelationIndexLookupPlan {
 std::optional<std::string> normalize_join_key(const std::optional<std::string>& raw);
 
 std::optional<std::string> operand_join_column(const Operand& operand) {
-  if (operand.axis != Operand::Axis::Self &&
-      operand.axis != Operand::Axis::Parent) {
+  if (operand.axis != Operand::Axis::Self && operand.axis != Operand::Axis::Parent) {
     return std::nullopt;
   }
   const std::string prefix = operand.axis == Operand::Axis::Parent ? "parent." : "";
@@ -91,9 +87,7 @@ std::optional<RelationJoinKeySpec> join_key_spec_from_scalar(const ScalarExpr& e
   if (!expr.operand.qualifier.has_value()) return std::nullopt;
   std::optional<std::string> column = operand_join_column(expr.operand);
   if (!column.has_value()) return std::nullopt;
-  return RelationJoinKeySpec{
-      lower_alias_name(*expr.operand.qualifier),
-      std::move(*column)};
+  return RelationJoinKeySpec{lower_alias_name(*expr.operand.qualifier), std::move(*column)};
 }
 
 bool relation_has_alias(const Relation& rel, const std::string& alias) {
@@ -103,17 +97,14 @@ bool relation_has_alias(const Relation& rel, const std::string& alias) {
 std::optional<RelationHashJoinPlan> plan_simple_hash_join(const Query::JoinItem& join,
                                                           const Relation& left_rel,
                                                           const Relation& right_rel) {
-  if (join.type != Query::JoinItem::Type::Inner &&
-      join.type != Query::JoinItem::Type::Left) {
+  if (join.type != Query::JoinItem::Type::Inner && join.type != Query::JoinItem::Type::Left) {
     return std::nullopt;
   }
   if (!join.on.has_value() || !std::holds_alternative<CompareExpr>(*join.on)) {
     return std::nullopt;
   }
   const auto& cmp = std::get<CompareExpr>(*join.on);
-  if (cmp.op != CompareExpr::Op::Eq ||
-      !cmp.lhs_expr.has_value() ||
-      !cmp.rhs_expr.has_value()) {
+  if (cmp.op != CompareExpr::Op::Eq || !cmp.lhs_expr.has_value() || !cmp.rhs_expr.has_value()) {
     return std::nullopt;
   }
   std::optional<RelationJoinKeySpec> lhs = join_key_spec_from_scalar(*cmp.lhs_expr);
@@ -153,8 +144,7 @@ bool append_compare_conjuncts(const Expr& expr, std::vector<const CompareExpr*>&
   if (!std::holds_alternative<std::shared_ptr<BinaryExpr>>(expr)) return false;
   const auto& bin = *std::get<std::shared_ptr<BinaryExpr>>(expr);
   if (bin.op != BinaryExpr::Op::And) return false;
-  return append_compare_conjuncts(bin.left, out) &&
-         append_compare_conjuncts(bin.right, out);
+  return append_compare_conjuncts(bin.left, out) && append_compare_conjuncts(bin.right, out);
 }
 
 std::optional<ScalarExpr> compare_lhs_scalar(const CompareExpr& cmp) {
@@ -190,16 +180,14 @@ bool scalar_literal_value(const ScalarExpr& expr, std::optional<std::string>* ou
   return false;
 }
 
-bool alias_is_only_in_relation(const std::string& alias,
-                               const Relation& yes_rel,
+bool alias_is_only_in_relation(const std::string& alias, const Relation& yes_rel,
                                const Relation& no_rel) {
   return relation_has_alias(yes_rel, alias) && !relation_has_alias(no_rel, alias);
 }
 
-std::optional<RelationIndexLookupTerm> lookup_term_from_compare(
-    const CompareExpr& cmp,
-    const Relation& left_rel,
-    const Relation& right_rel) {
+std::optional<RelationIndexLookupTerm> lookup_term_from_compare(const CompareExpr& cmp,
+                                                                const Relation& left_rel,
+                                                                const Relation& right_rel) {
   if (cmp.op != CompareExpr::Op::Eq) return std::nullopt;
   std::optional<ScalarExpr> lhs = compare_lhs_scalar(cmp);
   std::optional<ScalarExpr> rhs = compare_rhs_scalar(cmp);
@@ -228,8 +216,7 @@ std::optional<RelationIndexLookupTerm> lookup_term_from_compare(
     return std::nullopt;
   }
 
-  if (lhs_key.has_value() &&
-      alias_is_only_in_relation(lhs_key->alias, right_rel, left_rel)) {
+  if (lhs_key.has_value() && alias_is_only_in_relation(lhs_key->alias, right_rel, left_rel)) {
     std::optional<std::string> literal;
     if (!scalar_literal_value(*rhs, &literal)) return std::nullopt;
     RelationIndexLookupTerm term;
@@ -238,8 +225,7 @@ std::optional<RelationIndexLookupTerm> lookup_term_from_compare(
     term.literal_value = std::move(literal);
     return term;
   }
-  if (rhs_key.has_value() &&
-      alias_is_only_in_relation(rhs_key->alias, right_rel, left_rel)) {
+  if (rhs_key.has_value() && alias_is_only_in_relation(rhs_key->alias, right_rel, left_rel)) {
     std::optional<std::string> literal;
     if (!scalar_literal_value(*lhs, &literal)) return std::nullopt;
     RelationIndexLookupTerm term;
@@ -255,8 +241,7 @@ std::optional<RelationIndexLookupPlan> plan_index_lookup_join(const Query::JoinI
                                                               const Relation& left_rel,
                                                               const Relation& right_rel) {
   if (!join.on.has_value()) return std::nullopt;
-  if (join.type != Query::JoinItem::Type::Inner &&
-      join.type != Query::JoinItem::Type::Left) {
+  if (join.type != Query::JoinItem::Type::Inner && join.type != Query::JoinItem::Type::Left) {
     return std::nullopt;
   }
   if (right_rel.alias_columns.size() != 1) return std::nullopt;
@@ -344,8 +329,7 @@ std::optional<std::string> relation_index_signature(const Relation& right_rel,
   return signature;
 }
 
-RelationRow build_left_join_padded_row(const RelationRow& left_row,
-                                       const Relation& right_rel) {
+RelationRow build_left_join_padded_row(const RelationRow& left_row, const Relation& right_rel) {
   RelationRow padded = left_row;
   for (const auto& alias_cols : right_rel.alias_columns) {
     RelationRecord null_record;
@@ -360,7 +344,7 @@ RelationRow build_left_join_padded_row(const RelationRow& left_row,
 void merge_alias_columns_from_right(Relation& target, const Relation& right_rel) {
   for (const auto& alias_cols : right_rel.alias_columns) {
     target.alias_columns[alias_cols.first].insert(alias_cols.second.begin(),
-                                                   alias_cols.second.end());
+                                                  alias_cols.second.end());
   }
 }
 
@@ -383,8 +367,7 @@ bool merge_row_aliases(RelationRow& target, const RelationRow& add, std::string*
   return true;
 }
 
-Relation execute_relation_join_non_lateral(const Query::JoinItem& join,
-                                           const Relation& left_rel,
+Relation execute_relation_join_non_lateral(const Query::JoinItem& join, const Relation& left_rel,
                                            const Relation& right_rel,
                                            const std::optional<std::string>& active_alias,
                                            const std::string& join_label,
@@ -560,16 +543,11 @@ Relation execute_relation_join_non_lateral(const Query::JoinItem& join,
   if (profiling_enabled) {
     const auto finished_at = std::chrono::steady_clock::now();
     const uint64_t elapsed_ns = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            finished_at - started_at).count());
+        std::chrono::duration_cast<std::chrono::nanoseconds>(finished_at - started_at).count());
     profile->join_time_ns += elapsed_ns;
     profile->joins.push_back(RelationRuntimeCache::JoinSample{
-        join_label,
-        join_strategy_name(plan.strategy),
-        left_rel.rows.size(),
-        right_rel.rows.size(),
-        next.rows.size(),
-        pairs_evaluated});
+        join_label, join_strategy_name(plan.strategy), left_rel.rows.size(), right_rel.rows.size(),
+        next.rows.size(), pairs_evaluated});
   }
 
   return next;

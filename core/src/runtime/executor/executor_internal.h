@@ -14,12 +14,9 @@ int compare_nodes(const HtmlNode& left, const HtmlNode& right, const std::string
 /// Evaluates a predicate expression against a node and document context.
 /// MUST be deterministic and MUST respect axis semantics.
 /// Inputs are expr/doc/children/node; outputs are boolean with no side effects.
-bool eval_expr(const Expr& expr,
-               const HtmlDocument& doc,
-               const std::vector<std::vector<int64_t>>& children,
-               const HtmlNode& node);
-bool eval_expr_flatten_base(const Expr& expr,
-                            const HtmlDocument& doc,
+bool eval_expr(const Expr& expr, const HtmlDocument& doc,
+               const std::vector<std::vector<int64_t>>& children, const HtmlNode& node);
+bool eval_expr_flatten_base(const Expr& expr, const HtmlDocument& doc,
                             const std::vector<std::vector<int64_t>>& children,
                             const HtmlNode& node);
 /// Checks membership of a string in a list for filtering decisions.

@@ -20,8 +20,7 @@ std::string to_upper(const std::string& s);
 std::string trim_ws(const std::string& s);
 /// Replaces all regex matches in `input` using ECMAScript syntax.
 /// MUST return nullopt when pattern compilation is invalid.
-std::optional<std::string> regex_replace_all(const std::string& input,
-                                             const std::string& pattern,
+std::optional<std::string> regex_replace_all(const std::string& input, const std::string& pattern,
                                              const std::string& replacement);
 /// Minifies HTML conservatively by compacting whitespace without changing structure.
 /// MUST preserve attribute values and raw text content inside pre/code/textarea/script/style.

@@ -23,8 +23,9 @@ volatile size_t g_sink_rows = 0;
 double elapsed_ms(const std::chrono::steady_clock::time_point& started_at,
                   const std::chrono::steady_clock::time_point& finished_at) {
   return static_cast<double>(
-      std::chrono::duration_cast<std::chrono::microseconds>(finished_at - started_at).count()) /
-      1000.0;
+             std::chrono::duration_cast<std::chrono::microseconds>(finished_at - started_at)
+                 .count()) /
+         1000.0;
 }
 
 std::string read_file(const std::string& path) {
@@ -133,21 +134,19 @@ int main(int argc, char** argv) {
   const markql::artifacts::PreparedQueryArtifact baseline_prepared =
       markql::artifacts::prepare_query_artifact(options.query);
 
-  markql::artifacts::write_document_artifact_file(
-      baseline_document, options.fixture.string(), mqd_path.string());
-  markql::artifacts::write_prepared_query_artifact_file(
-      baseline_prepared.query, options.query, mqp_path.string());
+  markql::artifacts::write_document_artifact_file(baseline_document, options.fixture.string(),
+                                                  mqd_path.string());
+  markql::artifacts::write_prepared_query_artifact_file(baseline_prepared.query, options.query,
+                                                        mqp_path.string());
 
   const uintmax_t mqd_bytes = std::filesystem::file_size(mqd_path);
   const uintmax_t mqp_bytes = std::filesystem::file_size(mqp_path);
 
-  const std::vector<double> html_read_samples = measure_iterations(options.iterations, [&]() {
-    return read_file(options.fixture.string()).size();
-  });
+  const std::vector<double> html_read_samples = measure_iterations(
+      options.iterations, [&]() { return read_file(options.fixture.string()).size(); });
 
-  const std::vector<double> html_parse_samples = measure_iterations(options.iterations, [&]() {
-    return markql::parse_html(baseline_html).nodes.size();
-  });
+  const std::vector<double> html_parse_samples = measure_iterations(
+      options.iterations, [&]() { return markql::parse_html(baseline_html).nodes.size(); });
 
   const std::vector<double> mqd_load_samples = measure_iterations(options.iterations, [&]() {
     return markql::artifacts::read_document_artifact_file(mqd_path.string()).document.nodes.size();
@@ -175,8 +174,8 @@ int main(int argc, char** argv) {
 
   const std::vector<double> execute_query_text_on_parsed_html_doc_samples =
       measure_iterations(options.iterations, [&]() {
-        return markql::execute_query_with_source(
-                   baseline_query, nullptr, &baseline_document, options.fixture.string())
+        return markql::execute_query_with_source(baseline_query, nullptr, &baseline_document,
+                                                 options.fixture.string())
             .rows.size();
       });
 
@@ -189,7 +188,8 @@ int main(int argc, char** argv) {
 
   const std::vector<double> execute_query_text_on_loaded_mqd_doc_samples =
       measure_iterations(options.iterations, [&]() {
-        return markql::artifacts::execute_query_text_on_document(options.query, loaded_doc).rows.size();
+        return markql::artifacts::execute_query_text_on_document(options.query, loaded_doc)
+            .rows.size();
       });
 
   const std::vector<double> execute_mqp_on_loaded_mqd_doc_samples =
@@ -203,24 +203,28 @@ int main(int argc, char** argv) {
         const std::string html = read_file(options.fixture.string());
         const markql::HtmlDocument document = markql::parse_html(html);
         const markql::Query query = parse_and_validate_query(options.query);
-        return markql::execute_query_with_source(query, nullptr, &document, options.fixture.string())
+        return markql::execute_query_with_source(query, nullptr, &document,
+                                                 options.fixture.string())
             .rows.size();
       });
 
-  const std::vector<double> raw_html_mqp_total_samples = measure_iterations(options.iterations, [&]() {
-    const std::string html = read_file(options.fixture.string());
-    const markql::HtmlDocument document = markql::parse_html(html);
-    const markql::artifacts::PreparedQueryArtifact prepared =
-        markql::artifacts::read_prepared_query_artifact_file(mqp_path.string());
-    return markql::artifacts::execute_prepared_query_on_document(prepared, {loaded_doc.info, document})
-        .rows.size();
-  });
+  const std::vector<double> raw_html_mqp_total_samples =
+      measure_iterations(options.iterations, [&]() {
+        const std::string html = read_file(options.fixture.string());
+        const markql::HtmlDocument document = markql::parse_html(html);
+        const markql::artifacts::PreparedQueryArtifact prepared =
+            markql::artifacts::read_prepared_query_artifact_file(mqp_path.string());
+        return markql::artifacts::execute_prepared_query_on_document(prepared,
+                                                                     {loaded_doc.info, document})
+            .rows.size();
+      });
 
   const std::vector<double> mqd_query_text_total_samples =
       measure_iterations(options.iterations, [&]() {
         const markql::artifacts::DocumentArtifact document =
             markql::artifacts::read_document_artifact_file(mqd_path.string());
-        return markql::artifacts::execute_query_text_on_document(options.query, document).rows.size();
+        return markql::artifacts::execute_query_text_on_document(options.query, document)
+            .rows.size();
       });
 
   const std::vector<double> mqd_mqp_total_samples = measure_iterations(options.iterations, [&]() {
@@ -241,9 +245,11 @@ int main(int argc, char** argv) {
   print_metric("query_parse", query_parse_samples);
   print_metric("query_prepare", query_prepare_samples);
   print_metric("mqp_load", mqp_load_samples);
-  print_metric("execute_query_text_on_parsed_html_doc", execute_query_text_on_parsed_html_doc_samples);
+  print_metric("execute_query_text_on_parsed_html_doc",
+               execute_query_text_on_parsed_html_doc_samples);
   print_metric("execute_mqp_on_parsed_html_doc", execute_mqp_on_parsed_html_doc_samples);
-  print_metric("execute_query_text_on_loaded_mqd_doc", execute_query_text_on_loaded_mqd_doc_samples);
+  print_metric("execute_query_text_on_loaded_mqd_doc",
+               execute_query_text_on_loaded_mqd_doc_samples);
   print_metric("execute_mqp_on_loaded_mqd_doc", execute_mqp_on_loaded_mqd_doc_samples);
   print_metric("raw_html_plus_query_text_cold_total", raw_html_query_text_total_samples);
   print_metric("raw_html_plus_mqp_cold_total", raw_html_mqp_total_samples);

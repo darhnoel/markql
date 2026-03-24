@@ -22,8 +22,7 @@ namespace markql {
 
 namespace {
 
-void collect_row_scope_nodes(const std::vector<std::vector<int64_t>>& children,
-                             int64_t node_id,
+void collect_row_scope_nodes(const std::vector<std::vector<int64_t>>& children, int64_t node_id,
                              std::vector<int64_t>& out) {
   out.push_back(node_id);
   collect_descendants_any_depth(children, node_id, out);
@@ -39,7 +38,9 @@ std::string normalized_extract_text(const HtmlNode& node) {
   return normalize_flatten_text(node.text);
 }
 
-ScalarProjectionValue make_null_projection() { return ScalarProjectionValue{}; }
+ScalarProjectionValue make_null_projection() {
+  return ScalarProjectionValue{};
+}
 
 ScalarProjectionValue make_string_projection(std::string value) {
   ScalarProjectionValue out;
@@ -57,27 +58,20 @@ ScalarProjectionValue make_number_projection(int64_t value) {
 
 std::optional<int64_t> projection_to_int(const ScalarProjectionValue& value) {
   if (value.kind == ScalarProjectionValue::Kind::Number) return value.number_value;
-  if (value.kind == ScalarProjectionValue::Kind::String) return parse_int64_value(value.string_value);
+  if (value.kind == ScalarProjectionValue::Kind::String)
+    return parse_int64_value(value.string_value);
   return std::nullopt;
 }
 
 std::optional<std::string> projection_operand_value(
-    const Operand& operand,
-    const HtmlNode& base_node,
-    const HtmlDocument& doc,
+    const Operand& operand, const HtmlNode& base_node, const HtmlDocument& doc,
     const std::vector<std::vector<int64_t>>& children);
 
 std::optional<std::string> selector_value(
-    const std::string& tag,
-    const std::optional<std::string>& attr,
-    const std::optional<Expr>& where,
-    const std::optional<int64_t>& selector_index,
-    bool selector_last,
-    bool direct_text,
-    const HtmlNode& base_node,
-    const HtmlDocument& doc,
-    const std::vector<std::vector<int64_t>>& children,
-    ProjectRowEvalCache* row_cache) {
+    const std::string& tag, const std::optional<std::string>& attr,
+    const std::optional<Expr>& where, const std::optional<int64_t>& selector_index,
+    bool selector_last, bool direct_text, const HtmlNode& base_node, const HtmlDocument& doc,
+    const std::vector<std::vector<int64_t>>& children, ProjectRowEvalCache* row_cache) {
   const std::string extract_tag = util::to_lower(tag);
   std::vector<int64_t> uncached_scope_nodes;
   const std::vector<int64_t>* candidates = nullptr;
@@ -109,7 +103,8 @@ std::optional<std::string> selector_value(
       if (it == node.attributes.end() || it->second.empty()) continue;
       value = it->second;
     } else if (direct_text) {
-      std::string direct = util::trim_ws(markql_internal::extract_direct_text_strict(node.inner_html));
+      std::string direct =
+          util::trim_ws(markql_internal::extract_direct_text_strict(node.inner_html));
       if (direct.empty()) continue;
       value = std::move(direct);
     } else {
@@ -140,10 +135,9 @@ int64_t sibling_pos_for_projection(const HtmlDocument& doc,
   return 1;
 }
 
-std::vector<const HtmlNode*> projection_axis_nodes(const HtmlDocument& doc,
-                                                   const std::vector<std::vector<int64_t>>& children,
-                                                   const HtmlNode& node,
-                                                   Operand::Axis axis) {
+std::vector<const HtmlNode*> projection_axis_nodes(
+    const HtmlDocument& doc, const std::vector<std::vector<int64_t>>& children,
+    const HtmlNode& node, Operand::Axis axis) {
   std::vector<const HtmlNode*> out;
   if (axis == Operand::Axis::Self) {
     out.push_back(&node);
@@ -171,8 +165,7 @@ std::vector<const HtmlNode*> projection_axis_nodes(const HtmlDocument& doc,
     return out;
   }
   std::vector<int64_t> stack;
-  stack.insert(stack.end(),
-               children.at(static_cast<size_t>(node.id)).begin(),
+  stack.insert(stack.end(), children.at(static_cast<size_t>(node.id)).begin(),
                children.at(static_cast<size_t>(node.id)).end());
   while (!stack.empty()) {
     int64_t id = stack.back();
@@ -185,10 +178,9 @@ std::vector<const HtmlNode*> projection_axis_nodes(const HtmlDocument& doc,
   return out;
 }
 
-std::optional<std::string> projection_operand_value(const Operand& operand,
-                                                    const HtmlNode& base_node,
-                                                    const HtmlDocument& doc,
-                                                    const std::vector<std::vector<int64_t>>& children) {
+std::optional<std::string> projection_operand_value(
+    const Operand& operand, const HtmlNode& base_node, const HtmlDocument& doc,
+    const std::vector<std::vector<int64_t>>& children) {
   std::vector<const HtmlNode*> candidates =
       projection_axis_nodes(doc, children, base_node, operand.axis);
   for (const HtmlNode* candidate : candidates) {
@@ -235,18 +227,17 @@ bool project_bench_stats_enabled() {
 
 void maybe_emit_project_bench_stats(const ProjectBenchStats& stats) {
   if (!project_bench_stats_enabled()) return;
-  if (stats.selector_calls == 0 && stats.scope_builds == 0 &&
-      stats.tag_cache_builds == 0 && stats.candidate_nodes_examined == 0) {
+  if (stats.selector_calls == 0 && stats.scope_builds == 0 && stats.tag_cache_builds == 0 &&
+      stats.candidate_nodes_examined == 0) {
     return;
   }
-  std::fprintf(
-      stderr,
-      "[markql bench] project_selector_calls=%llu project_scope_builds=%llu "
-      "project_tag_cache_builds=%llu project_candidate_nodes_examined=%llu\n",
-      static_cast<unsigned long long>(stats.selector_calls),
-      static_cast<unsigned long long>(stats.scope_builds),
-      static_cast<unsigned long long>(stats.tag_cache_builds),
-      static_cast<unsigned long long>(stats.candidate_nodes_examined));
+  std::fprintf(stderr,
+               "[markql bench] project_selector_calls=%llu project_scope_builds=%llu "
+               "project_tag_cache_builds=%llu project_candidate_nodes_examined=%llu\n",
+               static_cast<unsigned long long>(stats.selector_calls),
+               static_cast<unsigned long long>(stats.scope_builds),
+               static_cast<unsigned long long>(stats.tag_cache_builds),
+               static_cast<unsigned long long>(stats.candidate_nodes_examined));
 }
 
 void ProjectRowEvalCache::reset_for_row(const std::vector<std::vector<int64_t>>& children,
@@ -261,7 +252,7 @@ void ProjectRowEvalCache::reset_for_row(const std::vector<std::vector<int64_t>>&
 }
 
 const std::vector<int64_t>& ProjectRowEvalCache::nodes_for_tag(const std::string& extract_tag,
-                                                                const HtmlDocument& doc) {
+                                                               const HtmlDocument& doc) {
   auto found = tag_nodes.find(extract_tag);
   if (found != tag_nodes.end()) {
     return found->second;
@@ -311,8 +302,7 @@ std::string projection_to_string(const ScalarProjectionValue& value) {
   return value.string_value;
 }
 
-ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr,
-                                              const HtmlNode& node,
+ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr, const HtmlNode& node,
                                               const HtmlDocument* doc,
                                               const std::vector<std::vector<int64_t>>* children) {
   switch (expr.kind) {
@@ -324,11 +314,9 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr,
       return make_number_projection(expr.number_value);
     case ScalarExpr::Kind::Operand: {
       const Operand& op = expr.operand;
-      if (op.axis != Operand::Axis::Self ||
-          op.field_kind == Operand::FieldKind::SiblingPos) {
+      if (op.axis != Operand::Axis::Self || op.field_kind == Operand::FieldKind::SiblingPos) {
         if (doc == nullptr || children == nullptr) return make_null_projection();
-        std::optional<std::string> value =
-            projection_operand_value(op, node, *doc, *children);
+        std::optional<std::string> value = projection_operand_value(op, node, *doc, *children);
         if (!value.has_value()) return make_null_projection();
         if (op.field_kind == Operand::FieldKind::NodeId ||
             op.field_kind == Operand::FieldKind::ParentId ||
@@ -348,8 +336,10 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr,
         if (!node.parent_id.has_value()) return make_null_projection();
         return make_number_projection(*node.parent_id);
       }
-      if (op.field_kind == Operand::FieldKind::MaxDepth) return make_number_projection(node.max_depth);
-      if (op.field_kind == Operand::FieldKind::DocOrder) return make_number_projection(node.doc_order);
+      if (op.field_kind == Operand::FieldKind::MaxDepth)
+        return make_number_projection(node.max_depth);
+      if (op.field_kind == Operand::FieldKind::DocOrder)
+        return make_number_projection(node.doc_order);
       if (op.field_kind == Operand::FieldKind::Attribute) {
         auto it = node.attributes.find(op.attribute);
         if (it == node.attributes.end()) return make_null_projection();
@@ -364,8 +354,8 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr,
   }
 
   std::string fn = util::to_upper(expr.function_name);
-  if (fn == "TEXT" || fn == "DIRECT_TEXT" || fn == "INNER_HTML" ||
-      fn == "RAW_INNER_HTML" || fn == "ATTR") {
+  if (fn == "TEXT" || fn == "DIRECT_TEXT" || fn == "INNER_HTML" || fn == "RAW_INNER_HTML" ||
+      fn == "ATTR") {
     if ((fn == "TEXT" || fn == "DIRECT_TEXT") && expr.args.size() != 1) {
       return make_null_projection();
     }
@@ -393,7 +383,8 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr,
 
     if (fn == "TEXT") return make_string_projection(target->text);
     if (fn == "DIRECT_TEXT") {
-      return make_string_projection(markql_internal::extract_direct_text_strict(target->inner_html));
+      return make_string_projection(
+          markql_internal::extract_direct_text_strict(target->inner_html));
     }
     if (fn == "ATTR") {
       ScalarProjectionValue attr_value = eval_select_scalar_expr(expr.args[1], node, doc, children);
@@ -406,7 +397,8 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr,
 
     size_t depth = 1;
     if (expr.args.size() == 2) {
-      ScalarProjectionValue depth_value = eval_select_scalar_expr(expr.args[1], node, doc, children);
+      ScalarProjectionValue depth_value =
+          eval_select_scalar_expr(expr.args[1], node, doc, children);
       auto parsed = projection_to_int(depth_value);
       if (!parsed.has_value() || *parsed < 0) return make_null_projection();
       depth = static_cast<size_t>(*parsed);
@@ -455,7 +447,8 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr,
     return make_string_projection(value.substr(0, end));
   }
   if (fn == "REPLACE") {
-    if (args.size() != 3 || projection_is_null(args[0]) || projection_is_null(args[1]) || projection_is_null(args[2])) {
+    if (args.size() != 3 || projection_is_null(args[0]) || projection_is_null(args[1]) ||
+        projection_is_null(args[2])) {
       return make_null_projection();
     }
     std::string out = projection_to_string(args[0]);
@@ -470,13 +463,13 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr,
     return make_string_projection(out);
   }
   if (fn == "REGEX_REPLACE") {
-    if (args.size() != 3 || projection_is_null(args[0]) || projection_is_null(args[1]) || projection_is_null(args[2])) {
+    if (args.size() != 3 || projection_is_null(args[0]) || projection_is_null(args[1]) ||
+        projection_is_null(args[2])) {
       return make_null_projection();
     }
-    std::optional<std::string> out = util::regex_replace_all(
-        projection_to_string(args[0]),
-        projection_to_string(args[1]),
-        projection_to_string(args[2]));
+    std::optional<std::string> out =
+        util::regex_replace_all(projection_to_string(args[0]), projection_to_string(args[1]),
+                                projection_to_string(args[2]));
     if (!out.has_value()) return make_null_projection();
     return make_string_projection(*out);
   }
@@ -485,7 +478,8 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr,
     return make_number_projection(static_cast<int64_t>(projection_to_string(args[0]).size()));
   }
   if (fn == "SUBSTRING" || fn == "SUBSTR") {
-    if (args.size() < 2 || args.size() > 3 || projection_is_null(args[0]) || projection_is_null(args[1])) {
+    if (args.size() < 2 || args.size() > 3 || projection_is_null(args[0]) ||
+        projection_is_null(args[1])) {
       return make_null_projection();
     }
     std::string text = projection_to_string(args[0]);
@@ -498,10 +492,12 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr,
     }
     auto len = projection_to_int(args[2]);
     if (!len.has_value() || *len <= 0) return make_string_projection("");
-    return make_string_projection(text.substr(static_cast<size_t>(from), static_cast<size_t>(*len)));
+    return make_string_projection(
+        text.substr(static_cast<size_t>(from), static_cast<size_t>(*len)));
   }
   if (fn == "POSITION" || fn == "LOCATE") {
-    if (args.size() < 2 || projection_is_null(args[0]) || projection_is_null(args[1])) return make_null_projection();
+    if (args.size() < 2 || projection_is_null(args[0]) || projection_is_null(args[1]))
+      return make_null_projection();
     std::string needle = projection_to_string(args[0]);
     std::string haystack = projection_to_string(args[1]);
     size_t start = 0;
@@ -518,12 +514,9 @@ ScalarProjectionValue eval_select_scalar_expr(const ScalarExpr& expr,
 }
 
 std::optional<std::string> eval_flatten_extract_expr(
-    const Query::SelectItem::FlattenExtractExpr& expr,
-    const HtmlNode& base_node,
-    const HtmlDocument& doc,
-    const std::vector<std::vector<int64_t>>& children,
-    const std::unordered_map<std::string, std::string>& bindings,
-    ProjectRowEvalCache* row_cache) {
+    const Query::SelectItem::FlattenExtractExpr& expr, const HtmlNode& base_node,
+    const HtmlDocument& doc, const std::vector<std::vector<int64_t>>& children,
+    const std::unordered_map<std::string, std::string>& bindings, ProjectRowEvalCache* row_cache) {
   using ExtractKind = Query::SelectItem::FlattenExtractExpr::Kind;
 
   if (expr.kind == ExtractKind::StringLiteral) {
@@ -544,12 +537,16 @@ std::optional<std::string> eval_flatten_extract_expr(
     return projection_operand_value(expr.operand, base_node, doc, children);
   }
   if (expr.kind == ExtractKind::CaseWhen) {
-    for (size_t i = 0; i < expr.case_when_conditions.size() && i < expr.case_when_values.size(); ++i) {
-      if (!executor_internal::eval_expr(expr.case_when_conditions[i], doc, children, base_node)) continue;
-      return eval_flatten_extract_expr(expr.case_when_values[i], base_node, doc, children, bindings, row_cache);
+    for (size_t i = 0; i < expr.case_when_conditions.size() && i < expr.case_when_values.size();
+         ++i) {
+      if (!executor_internal::eval_expr(expr.case_when_conditions[i], doc, children, base_node))
+        continue;
+      return eval_flatten_extract_expr(expr.case_when_values[i], base_node, doc, children, bindings,
+                                       row_cache);
     }
     if (expr.case_else != nullptr) {
-      return eval_flatten_extract_expr(*expr.case_else, base_node, doc, children, bindings, row_cache);
+      return eval_flatten_extract_expr(*expr.case_else, base_node, doc, children, bindings,
+                                       row_cache);
     }
     return std::nullopt;
   }
@@ -566,12 +563,12 @@ std::optional<std::string> eval_flatten_extract_expr(
   }
 
   if (expr.kind == ExtractKind::Text) {
-    return selector_value(expr.tag, std::nullopt, expr.where, expr.selector_index, expr.selector_last,
-                          false, base_node, doc, children, row_cache);
+    return selector_value(expr.tag, std::nullopt, expr.where, expr.selector_index,
+                          expr.selector_last, false, base_node, doc, children, row_cache);
   }
   if (expr.kind == ExtractKind::Attr) {
-    return selector_value(expr.tag, expr.attribute, expr.where, expr.selector_index, expr.selector_last,
-                          false, base_node, doc, children, row_cache);
+    return selector_value(expr.tag, expr.attribute, expr.where, expr.selector_index,
+                          expr.selector_last, false, base_node, doc, children, row_cache);
   }
 
   if (expr.kind == ExtractKind::FunctionCall) {
@@ -583,18 +580,18 @@ std::optional<std::string> eval_flatten_extract_expr(
     }
     if (fn == "TEXT") {
       if (args.size() != 1 || !args[0].has_value()) return std::nullopt;
-      return selector_value(*args[0], std::nullopt, expr.where, expr.selector_index, expr.selector_last,
-                            false, base_node, doc, children, row_cache);
+      return selector_value(*args[0], std::nullopt, expr.where, expr.selector_index,
+                            expr.selector_last, false, base_node, doc, children, row_cache);
     }
     if (fn == "DIRECT_TEXT") {
       if (args.size() != 1 || !args[0].has_value()) return std::nullopt;
-      return selector_value(*args[0], std::nullopt, expr.where, expr.selector_index, expr.selector_last,
-                            true, base_node, doc, children, row_cache);
+      return selector_value(*args[0], std::nullopt, expr.where, expr.selector_index,
+                            expr.selector_last, true, base_node, doc, children, row_cache);
     }
     if (fn == "ATTR") {
       if (args.size() != 2 || !args[0].has_value() || !args[1].has_value()) return std::nullopt;
-      return selector_value(*args[0], util::to_lower(*args[1]), expr.where, expr.selector_index, expr.selector_last,
-                            false, base_node, doc, children, row_cache);
+      return selector_value(*args[0], util::to_lower(*args[1]), expr.where, expr.selector_index,
+                            expr.selector_last, false, base_node, doc, children, row_cache);
     }
     if (fn == "CONCAT") {
       std::string out;
@@ -629,7 +626,8 @@ std::optional<std::string> eval_flatten_extract_expr(
       return args[0]->substr(0, end);
     }
     if (fn == "REPLACE") {
-      if (args.size() != 3 || !args[0].has_value() || !args[1].has_value() || !args[2].has_value()) return std::nullopt;
+      if (args.size() != 3 || !args[0].has_value() || !args[1].has_value() || !args[2].has_value())
+        return std::nullopt;
       std::string out = *args[0];
       if (args[1]->empty()) return out;
       size_t pos = 0;
@@ -640,7 +638,8 @@ std::optional<std::string> eval_flatten_extract_expr(
       return out;
     }
     if (fn == "REGEX_REPLACE") {
-      if (args.size() != 3 || !args[0].has_value() || !args[1].has_value() || !args[2].has_value()) {
+      if (args.size() != 3 || !args[0].has_value() || !args[1].has_value() ||
+          !args[2].has_value()) {
         return std::nullopt;
       }
       return util::regex_replace_all(*args[0], *args[1], *args[2]);
@@ -650,12 +649,14 @@ std::optional<std::string> eval_flatten_extract_expr(
       return std::to_string(args[0]->size());
     }
     if (fn == "SUBSTRING" || fn == "SUBSTR") {
-      if (args.size() < 2 || args.size() > 3 || !args[0].has_value() || !args[1].has_value()) return std::nullopt;
+      if (args.size() < 2 || args.size() > 3 || !args[0].has_value() || !args[1].has_value())
+        return std::nullopt;
       auto start = parse_int64_value(*args[1]);
       if (!start.has_value()) return std::nullopt;
       int64_t from = std::max<int64_t>(1, *start) - 1;
       if (static_cast<size_t>(from) >= args[0]->size()) return std::string{};
-      if (args.size() == 2 || !args[2].has_value()) return args[0]->substr(static_cast<size_t>(from));
+      if (args.size() == 2 || !args[2].has_value())
+        return args[0]->substr(static_cast<size_t>(from));
       auto len = parse_int64_value(*args[2]);
       if (!len.has_value() || *len <= 0) return std::string{};
       return args[0]->substr(static_cast<size_t>(from), static_cast<size_t>(*len));
@@ -667,7 +668,8 @@ std::optional<std::string> eval_flatten_extract_expr(
       return std::to_string(pos + 1);
     }
     if (fn == "LOCATE") {
-      if (args.size() < 2 || args.size() > 3 || !args[0].has_value() || !args[1].has_value()) return std::nullopt;
+      if (args.size() < 2 || args.size() > 3 || !args[0].has_value() || !args[1].has_value())
+        return std::nullopt;
       size_t start = 0;
       if (args.size() == 3 && args[2].has_value()) {
         auto parsed = parse_int64_value(*args[2]);
@@ -688,19 +690,31 @@ std::optional<std::string> eval_flatten_extract_expr(
         auto lnum = parse_int64_value(*args[0]);
         auto rnum = parse_int64_value(*args[1]);
         if (lnum.has_value() && rnum.has_value()) {
-          if (fn == "__CMP_EQ") result = *lnum == *rnum;
-          else if (fn == "__CMP_NE") result = *lnum != *rnum;
-          else if (fn == "__CMP_LT") result = *lnum < *rnum;
-          else if (fn == "__CMP_LE") result = *lnum <= *rnum;
-          else if (fn == "__CMP_GT") result = *lnum > *rnum;
-          else result = *lnum >= *rnum;
+          if (fn == "__CMP_EQ")
+            result = *lnum == *rnum;
+          else if (fn == "__CMP_NE")
+            result = *lnum != *rnum;
+          else if (fn == "__CMP_LT")
+            result = *lnum < *rnum;
+          else if (fn == "__CMP_LE")
+            result = *lnum <= *rnum;
+          else if (fn == "__CMP_GT")
+            result = *lnum > *rnum;
+          else
+            result = *lnum >= *rnum;
         } else {
-          if (fn == "__CMP_EQ") result = *args[0] == *args[1];
-          else if (fn == "__CMP_NE") result = *args[0] != *args[1];
-          else if (fn == "__CMP_LT") result = *args[0] < *args[1];
-          else if (fn == "__CMP_LE") result = *args[0] <= *args[1];
-          else if (fn == "__CMP_GT") result = *args[0] > *args[1];
-          else result = *args[0] >= *args[1];
+          if (fn == "__CMP_EQ")
+            result = *args[0] == *args[1];
+          else if (fn == "__CMP_NE")
+            result = *args[0] != *args[1];
+          else if (fn == "__CMP_LT")
+            result = *args[0] < *args[1];
+          else if (fn == "__CMP_LE")
+            result = *args[0] <= *args[1];
+          else if (fn == "__CMP_GT")
+            result = *args[0] > *args[1];
+          else
+            result = *args[0] >= *args[1];
         }
       }
       return result ? std::string("true") : std::string("false");

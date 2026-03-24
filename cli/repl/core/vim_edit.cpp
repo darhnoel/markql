@@ -85,10 +85,7 @@ size_t move_word_backward_once(const std::string& buffer, size_t pos, bool big_w
 
 }  // namespace
 
-size_t move_vim_word_forward_n(const std::string& buffer,
-                               size_t pos,
-                               size_t count,
-                               bool big_word) {
+size_t move_vim_word_forward_n(const std::string& buffer, size_t pos, size_t count, bool big_word) {
   size_t steps = count == 0 ? 1 : count;
   size_t out = pos;
   for (size_t i = 0; i < steps; ++i) {
@@ -99,9 +96,7 @@ size_t move_vim_word_forward_n(const std::string& buffer,
   return out;
 }
 
-size_t move_vim_word_backward_n(const std::string& buffer,
-                                size_t pos,
-                                size_t count,
+size_t move_vim_word_backward_n(const std::string& buffer, size_t pos, size_t count,
                                 bool big_word) {
   size_t steps = count == 0 ? 1 : count;
   size_t out = pos;
@@ -126,10 +121,7 @@ bool delete_vim_chars_under_cursor(std::string& buffer, size_t& cursor, size_t c
   return true;
 }
 
-bool delete_vim_motion(std::string& buffer,
-                       size_t& cursor,
-                       size_t count,
-                       char motion,
+bool delete_vim_motion(std::string& buffer, size_t& cursor, size_t count, char motion,
                        size_t line_end) {
   size_t n = count == 0 ? 1 : count;
   size_t start = cursor;

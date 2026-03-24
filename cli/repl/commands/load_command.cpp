@@ -102,7 +102,9 @@ CommandHandler make_load_command() {
     }
     if (is_url(path)) {
 #ifndef MARKQL_USE_CURL
-      std::cerr << "Error: URL fetching is disabled (libcurl not available). Install libcurl and rebuild." << std::endl;
+      std::cerr
+          << "Error: URL fetching is disabled (libcurl not available). Install libcurl and rebuild."
+          << std::endl;
       return true;
 #endif
     } else {

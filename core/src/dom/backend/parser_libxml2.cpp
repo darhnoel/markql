@@ -144,12 +144,9 @@ HtmlDocument parse_html_libxml2(const std::string& html) {
   std::string charset = extract_charset(html);
   const char* encoding = charset.empty() ? "UTF-8" : charset.c_str();
   // WHY: recovery mode handles malformed HTML commonly found on the web.
-  htmlDocPtr html_doc = htmlReadMemory(
-      html.data(),
-      static_cast<int>(html.size()),
-      nullptr,
-      encoding,
-      HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
+  htmlDocPtr html_doc =
+      htmlReadMemory(html.data(), static_cast<int>(html.size()), nullptr, encoding,
+                     HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
   if (!html_doc) {
     return doc;
   }
@@ -166,12 +163,9 @@ HtmlDocument parse_html_libxml2(const std::string& html) {
 int64_t count_html_nodes_libxml2(const std::string& html) {
   std::string charset = extract_charset(html);
   const char* encoding = charset.empty() ? "UTF-8" : charset.c_str();
-  htmlDocPtr html_doc = htmlReadMemory(
-      html.data(),
-      static_cast<int>(html.size()),
-      nullptr,
-      encoding,
-      HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
+  htmlDocPtr html_doc =
+      htmlReadMemory(html.data(), static_cast<int>(html.size()), nullptr, encoding,
+                     HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
   if (!html_doc) {
     return 0;
   }

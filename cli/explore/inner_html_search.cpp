@@ -106,7 +106,8 @@ bool exact_match_signal(std::string_view haystack, std::string_view needle, Matc
   if (!hit.found) return false;
   if (!out) return true;
 
-  int score = 100000 - static_cast<int>(std::min<size_t>(hit.position, static_cast<size_t>(100000)));
+  int score =
+      100000 - static_cast<int>(std::min<size_t>(hit.position, static_cast<size_t>(100000)));
   if (hit.quality_rank >= 1) score += 20000;
   if (hit.quality_rank >= 2) score += 40000;
   out->position = hit.position;
@@ -151,15 +152,14 @@ bool fuzzy_match_signal(std::string_view haystack, std::string_view needle, Matc
   return true;
 }
 
-std::string build_match_snippet(std::string_view inner_html,
-                                size_t match_position,
-                                size_t query_len,
-                                size_t max_chars) {
+std::string build_match_snippet(std::string_view inner_html, size_t match_position,
+                                size_t query_len, size_t max_chars) {
   if (inner_html.empty() || max_chars == 0) return "(empty)";
 
   size_t radius = max_chars / 2;
   size_t start = (match_position > radius) ? (match_position - radius) : 0;
-  size_t end = std::min(inner_html.size(), match_position + std::max<size_t>(query_len, 1) + radius);
+  size_t end =
+      std::min(inner_html.size(), match_position + std::max<size_t>(query_len, 1) + radius);
   std::string snippet = compact_whitespace(inner_html.substr(start, end - start));
   if (snippet.empty()) return "(empty)";
   if (start > 0) snippet = "..." + snippet;
@@ -168,7 +168,8 @@ std::string build_match_snippet(std::string_view inner_html,
 }
 
 bool is_better_scope_candidate(const ScopeCandidate& left, const ScopeCandidate& right) {
-  if (left.source_priority != right.source_priority) return left.source_priority > right.source_priority;
+  if (left.source_priority != right.source_priority)
+    return left.source_priority > right.source_priority;
   if (left.quality_rank != right.quality_rank) return left.quality_rank > right.quality_rank;
   if (left.position != right.position) return left.position < right.position;
   return left.raw_score > right.raw_score;
@@ -196,13 +197,10 @@ int compare_ranked_match(const InnerHtmlSearchMatch& left, const InnerHtmlSearch
   return 0;
 }
 
-std::vector<InnerHtmlSearchMatch> search_inner_html_impl(const markql::HtmlDocument& doc,
-                                                         const std::string& query,
-                                                         size_t max_results,
-                                                         bool include_snippet,
-                                                         bool sort_results,
-                                                         const std::vector<int64_t>* candidate_node_ids,
-                                                         InnerHtmlSearchMode mode) {
+std::vector<InnerHtmlSearchMatch> search_inner_html_impl(
+    const markql::HtmlDocument& doc, const std::string& query, size_t max_results,
+    bool include_snippet, bool sort_results, const std::vector<int64_t>* candidate_node_ids,
+    InnerHtmlSearchMode mode) {
   std::vector<InnerHtmlSearchMatch> matches;
   if (query.empty() || max_results == 0) return matches;
 
@@ -279,7 +277,8 @@ std::vector<InnerHtmlSearchMatch> search_inner_html_impl(const markql::HtmlDocum
     };
 
     if (!node.attributes.empty()) {
-      std::vector<std::pair<std::string, std::string>> attrs(node.attributes.begin(), node.attributes.end());
+      std::vector<std::pair<std::string, std::string>> attrs(node.attributes.begin(),
+                                                             node.attributes.end());
       std::sort(attrs.begin(), attrs.end(),
                 [](const auto& left, const auto& right) { return left.first < right.first; });
       for (const auto& [key, value] : attrs) {
@@ -303,7 +302,8 @@ std::vector<InnerHtmlSearchMatch> search_inner_html_impl(const markql::HtmlDocum
     match.position_in_inner_html = best_scope.position_in_inner_html;
     if (include_snippet) {
       if (best_scope.position_in_inner_html) {
-        match.snippet = build_match_snippet(node.inner_html, best_scope.position, query.size(), 160);
+        match.snippet =
+            build_match_snippet(node.inner_html, best_scope.position, query.size(), 160);
       } else {
         match.snippet =
             build_match_snippet(best_scope.snippet_source, best_scope.position, query.size(), 160);
@@ -328,8 +328,7 @@ std::vector<InnerHtmlSearchMatch> search_inner_html_impl(const markql::HtmlDocum
   }
 
   if (sort_results) {
-    std::sort(matches.begin(),
-              matches.end(),
+    std::sort(matches.begin(), matches.end(),
               [](const InnerHtmlSearchMatch& left, const InnerHtmlSearchMatch& right) {
                 return compare_ranked_match(left, right) < 0;
               });
@@ -344,9 +343,7 @@ std::vector<InnerHtmlSearchMatch> search_inner_html_impl(const markql::HtmlDocum
 
 }  // namespace
 
-bool fuzzy_match_score(std::string_view haystack,
-                       std::string_view needle,
-                       size_t* first_position,
+bool fuzzy_match_score(std::string_view haystack, std::string_view needle, size_t* first_position,
                        int* score) {
   MatchSignal signal;
   if (!fuzzy_match_signal(haystack, needle, &signal)) return false;
@@ -355,41 +352,23 @@ bool fuzzy_match_score(std::string_view haystack,
   return true;
 }
 
-std::string make_inner_html_snippet(std::string_view inner_html,
-                                    size_t match_position,
-                                    size_t query_len,
-                                    size_t max_chars) {
+std::string make_inner_html_snippet(std::string_view inner_html, size_t match_position,
+                                    size_t query_len, size_t max_chars) {
   return build_match_snippet(inner_html, match_position, query_len, max_chars);
 }
 
-std::vector<InnerHtmlSearchMatch> fuzzy_search_inner_html(const markql::HtmlDocument& doc,
-                                                          const std::string& query,
-                                                          size_t max_results,
-                                                          bool include_snippet,
-                                                          bool sort_results,
-                                                          const std::vector<int64_t>* candidate_node_ids) {
-  return search_inner_html_impl(doc,
-                                query,
-                                max_results,
-                                include_snippet,
-                                sort_results,
-                                candidate_node_ids,
-                                InnerHtmlSearchMode::Fuzzy);
+std::vector<InnerHtmlSearchMatch> fuzzy_search_inner_html(
+    const markql::HtmlDocument& doc, const std::string& query, size_t max_results,
+    bool include_snippet, bool sort_results, const std::vector<int64_t>* candidate_node_ids) {
+  return search_inner_html_impl(doc, query, max_results, include_snippet, sort_results,
+                                candidate_node_ids, InnerHtmlSearchMode::Fuzzy);
 }
 
-std::vector<InnerHtmlSearchMatch> exact_search_inner_html(const markql::HtmlDocument& doc,
-                                                          const std::string& query,
-                                                          size_t max_results,
-                                                          bool include_snippet,
-                                                          bool sort_results,
-                                                          const std::vector<int64_t>* candidate_node_ids) {
-  return search_inner_html_impl(doc,
-                                query,
-                                max_results,
-                                include_snippet,
-                                sort_results,
-                                candidate_node_ids,
-                                InnerHtmlSearchMode::Exact);
+std::vector<InnerHtmlSearchMatch> exact_search_inner_html(
+    const markql::HtmlDocument& doc, const std::string& query, size_t max_results,
+    bool include_snippet, bool sort_results, const std::vector<int64_t>* candidate_node_ids) {
+  return search_inner_html_impl(doc, query, max_results, include_snippet, sort_results,
+                                candidate_node_ids, InnerHtmlSearchMode::Exact);
 }
 
 }  // namespace markql::cli

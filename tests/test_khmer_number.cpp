@@ -33,7 +33,9 @@ struct StreamCapture {
     }
   }
 
-  std::string str() const { return buffer.str(); }
+  std::string str() const {
+    return buffer.str();
+  }
 };
 
 void expect_ok(const markql::khmer_number::Result<std::string>& result,
@@ -80,8 +82,7 @@ std::optional<std::filesystem::path> find_fixture_path() {
 
 static void test_khmer_digits() {
   std::vector<std::string> expected = {
-      "សូន្យ", "មួយ", "ពីរ", "បី", "បួន",
-      "ប្រាំ", "ប្រាំមួយ", "ប្រាំពីរ", "ប្រាំបី", "ប្រាំបួន",
+      "សូន្យ", "មួយ", "ពីរ", "បី", "បួន", "ប្រាំ", "ប្រាំមួយ", "ប្រាំពីរ", "ប្រាំបី", "ប្រាំបួន",
   };
   for (size_t i = 0; i < expected.size(); ++i) {
     auto result = markql::khmer_number::number_to_khmer_words(std::to_string(i));
@@ -260,15 +261,8 @@ static void test_khmer_command_to_words() {
   markql::cli::CommandRegistry registry;
   markql::cli::PluginManager plugin_manager(registry);
   markql::cli::CommandContext ctx{
-      config,
-      editor,
-      sources,
-      active_alias,
-      last_full_output,
-      display_full,
-      max_rows,
-      last_schema_map,
-      plugin_manager,
+      config,       editor,   sources,         active_alias,   last_full_output,
+      display_full, max_rows, last_schema_map, plugin_manager,
   };
 
   auto handler = markql::cli::make_khmer_number_command();
@@ -298,15 +292,8 @@ static void test_khmer_command_compact() {
   markql::cli::CommandRegistry registry;
   markql::cli::PluginManager plugin_manager(registry);
   markql::cli::CommandContext ctx{
-      config,
-      editor,
-      sources,
-      active_alias,
-      last_full_output,
-      display_full,
-      max_rows,
-      last_schema_map,
-      plugin_manager,
+      config,       editor,   sources,         active_alias,   last_full_output,
+      display_full, max_rows, last_schema_map, plugin_manager,
   };
 
   auto handler = markql::cli::make_khmer_number_command();
@@ -336,15 +323,8 @@ static void test_khmer_command_numerals() {
   markql::cli::CommandRegistry registry;
   markql::cli::PluginManager plugin_manager(registry);
   markql::cli::CommandContext ctx{
-      config,
-      editor,
-      sources,
-      active_alias,
-      last_full_output,
-      display_full,
-      max_rows,
-      last_schema_map,
-      plugin_manager,
+      config,       editor,   sources,         active_alias,   last_full_output,
+      display_full, max_rows, last_schema_map, plugin_manager,
   };
 
   auto handler = markql::cli::make_khmer_number_command();
@@ -374,15 +354,8 @@ static void test_khmer_command_to_number_numerals() {
   markql::cli::CommandRegistry registry;
   markql::cli::PluginManager plugin_manager(registry);
   markql::cli::CommandContext ctx{
-      config,
-      editor,
-      sources,
-      active_alias,
-      last_full_output,
-      display_full,
-      max_rows,
-      last_schema_map,
-      plugin_manager,
+      config,       editor,   sources,         active_alias,   last_full_output,
+      display_full, max_rows, last_schema_map, plugin_manager,
   };
 
   auto handler = markql::cli::make_khmer_number_command();
@@ -406,6 +379,6 @@ void register_khmer_number_tests(std::vector<TestCase>& tests) {
   tests.push_back({"khmer_number_command_to_words", test_khmer_command_to_words});
   tests.push_back({"khmer_number_command_compact", test_khmer_command_compact});
   tests.push_back({"khmer_number_command_numerals", test_khmer_command_numerals});
-  tests.push_back({"khmer_number_command_to_number_numerals",
-                   test_khmer_command_to_number_numerals});
+  tests.push_back(
+      {"khmer_number_command_to_number_numerals", test_khmer_command_to_number_numerals});
 }

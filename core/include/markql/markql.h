@@ -83,11 +83,11 @@ struct QueryResult {
 /// Inputs are HTML/query; failures throw exceptions and side effects are none.
 QueryResult execute_query_from_document(const std::string& html, const std::string& query);
 /// Parses HTML once and returns a reusable handle for repeated query execution.
-std::shared_ptr<const ParsedDocumentHandle> prepare_document(const std::string& html,
-                                                             const std::string& source_uri = "document");
+std::shared_ptr<const ParsedDocumentHandle> prepare_document(
+    const std::string& html, const std::string& source_uri = "document");
 /// Executes a query using a prepared document handle.
-QueryResult execute_query_from_prepared_document(const std::shared_ptr<const ParsedDocumentHandle>& prepared,
-                                                 const std::string& query);
+QueryResult execute_query_from_prepared_document(
+    const std::shared_ptr<const ParsedDocumentHandle>& prepared, const std::string& query);
 /// Executes a query over a file path and loads the file contents internally.
 /// MUST read from disk and MUST report errors via exceptions on IO failures.
 /// Inputs are path/query; side effects include file reads and thrown errors.
@@ -95,7 +95,8 @@ QueryResult execute_query_from_file(const std::string& path, const std::string& 
 /// Executes a query over a URL using the configured network backend.
 /// MUST honor timeout_ms and MUST fail if network support is unavailable.
 /// Inputs are url/query/timeout; side effects include network IO and thrown errors.
-QueryResult execute_query_from_url(const std::string& url, const std::string& query, int timeout_ms);
+QueryResult execute_query_from_url(const std::string& url, const std::string& query,
+                                   int timeout_ms);
 
 }  // namespace markql
 

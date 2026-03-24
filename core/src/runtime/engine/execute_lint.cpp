@@ -17,29 +17,20 @@ namespace markql {
 namespace {
 
 bool is_node_stream_source(const Source& source) {
-  return source.kind == Source::Kind::Document ||
-         source.kind == Source::Kind::Path ||
-         source.kind == Source::Kind::Url ||
-         source.kind == Source::Kind::RawHtml ||
-         source.kind == Source::Kind::Fragments ||
-         source.kind == Source::Kind::Parse;
+  return source.kind == Source::Kind::Document || source.kind == Source::Kind::Path ||
+         source.kind == Source::Kind::Url || source.kind == Source::Kind::RawHtml ||
+         source.kind == Source::Kind::Fragments || source.kind == Source::Kind::Parse;
 }
 
 bool is_bare_identifier_node_projection(const Query::SelectItem& item) {
-  return item.aggregate == Query::SelectItem::Aggregate::None &&
-         !item.field.has_value() &&
-         !item.flatten_text &&
-         !item.flatten_extract &&
-         !item.self_node_projection &&
-         !item.expr_projection &&
-         item.tag != "*";
+  return item.aggregate == Query::SelectItem::Aggregate::None && !item.field.has_value() &&
+         !item.flatten_text && !item.flatten_extract && !item.self_node_projection &&
+         !item.expr_projection && item.tag != "*";
 }
 
 bool is_relation_runtime_query(const Query& q) {
   return q.kind == Query::Kind::Select &&
-         (q.with.has_value() ||
-          !q.joins.empty() ||
-          q.source.kind == Source::Kind::CteRef ||
+         (q.with.has_value() || !q.joins.empty() || q.source.kind == Source::Kind::CteRef ||
           q.source.kind == Source::Kind::DerivedSubquery);
 }
 
@@ -163,9 +154,9 @@ size_t bounded_edit_distance(std::string_view lhs, std::string_view rhs, size_t 
 }
 
 std::optional<std::string> suspicious_builtin_match(const std::string& name) {
-  static const std::vector<std::string> kBuiltinFields = {
-      "tag", "text", "node_id", "parent_id", "sibling_pos", "max_depth", "doc_order",
-      "attributes", "attr"};
+  static const std::vector<std::string> kBuiltinFields = {"tag",       "text",        "node_id",
+                                                          "parent_id", "sibling_pos", "max_depth",
+                                                          "doc_order", "attributes",  "attr"};
   const std::string lowered = util::to_lower(name);
   size_t best_distance = 3;
   std::optional<std::string> best_match;
@@ -215,20 +206,16 @@ std::vector<std::string> visible_bindings_for_query(const Query& query) {
   return bindings;
 }
 
-void collect_select_alias_ambiguity_warnings(const Query& q,
-                                             const std::string& query_text,
+void collect_select_alias_ambiguity_warnings(const Query& q, const std::string& query_text,
                                              std::vector<Diagnostic>& diagnostics) {
-  if (q.kind == Query::Kind::Select &&
-      q.select_items.size() == 1 &&
-      q.source.alias.has_value() &&
+  if (q.kind == Query::Kind::Select && q.select_items.size() == 1 && q.source.alias.has_value() &&
       is_node_stream_source(q.source)) {
     const Query::SelectItem& item = q.select_items.front();
     if (is_bare_identifier_node_projection(item) &&
         util::to_lower(item.tag) == util::to_lower(*q.source.alias)) {
       const size_t start = std::min(item.span.start, query_text.size());
       const size_t end = std::min(query_text.size(), start + item.tag.size());
-      diagnostics.push_back(
-          make_select_alias_ambiguity_warning(query_text, start, end));
+      diagnostics.push_back(make_select_alias_ambiguity_warning(query_text, start, end));
     }
   }
 
@@ -258,10 +245,8 @@ void collect_select_alias_ambiguity_warnings(const Query& q,
   }
 }
 
-void finalize_warning_snippet(const std::string& query,
-                              const Operand& operand,
-                              Diagnostic& diagnostic,
-                              bool qualifier_only) {
+void finalize_warning_snippet(const std::string& query, const Operand& operand,
+                              Diagnostic& diagnostic, bool qualifier_only) {
   if (!operand.qualifier.has_value()) return;
   size_t start = operand.span.start;
   size_t end = operand.span.end;
@@ -270,8 +255,7 @@ void finalize_warning_snippet(const std::string& query,
     if (operand.span.start >= qualifier.size() + 1) {
       const size_t candidate = operand.span.start - qualifier.size() - 1;
       if (candidate + qualifier.size() < query.size() &&
-          util::to_lower(query.substr(candidate, qualifier.size())) ==
-              util::to_lower(qualifier) &&
+          util::to_lower(query.substr(candidate, qualifier.size())) == util::to_lower(qualifier) &&
           query[candidate + qualifier.size()] == '.') {
         start = candidate;
         end = candidate + qualifier.size();
@@ -282,8 +266,7 @@ void finalize_warning_snippet(const std::string& query,
   diagnostic.snippet = render_code_frame_local(query, diagnostic.span);
 }
 
-void collect_relation_suspicion_warnings(const Query& q,
-                                         const std::string& query_text,
+void collect_relation_suspicion_warnings(const Query& q, const std::string& query_text,
                                          std::vector<Diagnostic>& diagnostics,
                                          std::unordered_set<std::string>& seen) {
   const bool relation_runtime = is_relation_runtime_query(q);
@@ -291,9 +274,8 @@ void collect_relation_suspicion_warnings(const Query& q,
 
   auto maybe_add = [&](Diagnostic diagnostic, const Operand& operand, bool qualifier_only) {
     finalize_warning_snippet(query_text, operand, diagnostic, qualifier_only);
-    const std::string key =
-        diagnostic.code + ":" + std::to_string(diagnostic.span.byte_start) + ":" +
-        std::to_string(diagnostic.span.byte_end);
+    const std::string key = diagnostic.code + ":" + std::to_string(diagnostic.span.byte_start) +
+                            ":" + std::to_string(diagnostic.span.byte_end);
     if (seen.insert(key).second) diagnostics.push_back(std::move(diagnostic));
   };
 
@@ -308,9 +290,11 @@ void collect_relation_suspicion_warnings(const Query& q,
           const std::string qualifier = *operand.qualifier;
           d.message = "Qualified member access looks like a misspelled built-in field";
           d.why =
-              "This is not a parse error because MarkQL allows dynamic attribute-style access such as alias.attr_name. "
-              "However, '" + qualifier + "." + operand.attribute +
-              "' is very close to the built-in field '" + *suggestion + "'.";
+              "This is not a parse error because MarkQL allows dynamic attribute-style access such "
+              "as alias.attr_name. "
+              "However, '" +
+              qualifier + "." + operand.attribute + "' is very close to the built-in field '" +
+              *suggestion + "'.";
           d.help = "If you meant the built-in field, use '" + qualifier + "." + *suggestion + "'.";
           d.example = qualifier + "." + *suggestion;
           d.expected = *suggestion;
@@ -321,9 +305,8 @@ void collect_relation_suspicion_warnings(const Query& q,
       }
       if (relation_runtime) {
         const std::string lowered = util::to_lower(*operand.qualifier);
-        const bool visible =
-            std::find(visible_bindings.begin(), visible_bindings.end(), lowered) !=
-            visible_bindings.end();
+        const bool visible = std::find(visible_bindings.begin(), visible_bindings.end(), lowered) !=
+                             visible_bindings.end();
         if (!visible) {
           Diagnostic d;
           d.severity = DiagnosticSeverity::Warning;
@@ -331,8 +314,10 @@ void collect_relation_suspicion_warnings(const Query& q,
           d.category = "binding_warning";
           d.message = "Qualifier may not be bound in this relation-style query";
           d.why =
-              "This is not a parse error because MarkQL accepts qualified member access syntactically. "
-              "This query shape currently uses reduced lint coverage, so alias binding is not fully proven here.";
+              "This is not a parse error because MarkQL accepts qualified member access "
+              "syntactically. "
+              "This query shape currently uses reduced lint coverage, so alias binding is not "
+              "fully proven here.";
           d.encountered = *operand.qualifier;
           d.doc_ref = "docs/book/appendix-grammar.md";
           if (!visible_bindings.empty()) {

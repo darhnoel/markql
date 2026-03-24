@@ -36,8 +36,7 @@ void test_fragments_count_cap() {
     for (int i = 0; i < 1001; ++i) {
       html += "<div><span>x</span></div>";
     }
-    run_query(html,
-              "SELECT li FROM FRAGMENTS(SELECT inner_html(div) FROM document) AS frag");
+    run_query(html, "SELECT li FROM FRAGMENTS(SELECT inner_html(div) FROM document) AS frag");
   } catch (const std::exception&) {
     threw = true;
   }

@@ -20,8 +20,7 @@ bool is_space_or_nbsp(const std::string& text, size_t index, size_t& consumed) {
     consumed = 1;
     return true;
   }
-  if (c == 0xC2 && index + 1 < text.size() &&
-      static_cast<unsigned char>(text[index + 1]) == 0xA0) {
+  if (c == 0xC2 && index + 1 < text.size() && static_cast<unsigned char>(text[index + 1]) == 0xA0) {
     consumed = 2;
     return true;
   }
@@ -62,8 +61,7 @@ std::string normalize_header_text(const std::string& value) {
     size_t end = normalized.find(' ', start);
     if (end == std::string::npos) end = normalized.size();
     std::string token = normalized.substr(start, end - start);
-    if (!token.empty() &&
-        (deduped_tokens.empty() || deduped_tokens.back() != token)) {
+    if (!token.empty() && (deduped_tokens.empty() || deduped_tokens.back() != token)) {
       deduped_tokens.push_back(std::move(token));
     }
     start = end + 1;
@@ -76,8 +74,7 @@ std::string normalize_header_text(const std::string& value) {
   return out;
 }
 
-bool table_cell_empty(const std::vector<std::string>& row,
-                      size_t col_index,
+bool table_cell_empty(const std::vector<std::string>& row, size_t col_index,
                       Query::TableOptions::EmptyIs empty_is) {
   if (col_index >= row.size()) {
     return empty_is == Query::TableOptions::EmptyIs::BlankOrNull ||
@@ -89,8 +86,7 @@ bool table_cell_empty(const std::vector<std::string>& row,
   return normalize_table_whitespace(row[col_index]).empty();
 }
 
-bool table_row_all_empty(const std::vector<std::string>& row,
-                         size_t max_cols,
+bool table_row_all_empty(const std::vector<std::string>& row, size_t max_cols,
                          Query::TableOptions::EmptyIs empty_is) {
   if (max_cols == 0) return true;
   for (size_t col = 0; col < max_cols; ++col) {
@@ -100,8 +96,7 @@ bool table_row_all_empty(const std::vector<std::string>& row,
 }
 
 std::vector<size_t> select_table_columns(const std::vector<std::vector<std::string>>& rows,
-                                         size_t max_cols,
-                                         const Query::TableOptions& options) {
+                                         size_t max_cols, const Query::TableOptions& options) {
   std::vector<size_t> selected;
   if (max_cols == 0) return selected;
   if (options.trim_empty_cols == Query::TableOptions::TrimEmptyCols::Off) {
@@ -160,8 +155,7 @@ struct MaterializedTable {
 };
 
 MaterializedTable materialize_table(const std::vector<std::vector<std::string>>& raw_rows,
-                                    bool has_header,
-                                    const Query::TableOptions& options) {
+                                    bool has_header, const Query::TableOptions& options) {
   MaterializedTable out;
   if (raw_rows.empty()) return out;
 
@@ -324,8 +318,7 @@ bool table_uses_default_output(const Query& query) {
 }
 
 void materialize_table_result(const std::vector<std::vector<std::string>>& raw_rows,
-                              bool has_header,
-                              const Query::TableOptions& options,
+                              bool has_header, const Query::TableOptions& options,
                               QueryResult::TableResult& table) {
   MaterializedTable materialized = materialize_table(raw_rows, has_header, options);
   table.headers = std::move(materialized.headers);

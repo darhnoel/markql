@@ -16,6 +16,7 @@ struct ExecuteResult {
   std::optional<ExecuteError> error;
 };
 
-ExecuteResult execute_query(const Query& query, const HtmlDocument& doc, const std::string& source_uri);
+ExecuteResult execute_query(const Query& query, const HtmlDocument& doc,
+                            const std::string& source_uri);
 
 }  // namespace markql

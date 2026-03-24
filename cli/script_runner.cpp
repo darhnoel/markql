@@ -24,16 +24,14 @@ ScriptSplitResult split_sql_script(const std::string& script) {
     }
     if (token.type == TokenType::End) {
       if (in_statement) {
-        out.statements.push_back(
-            ScriptStatement{script.substr(statement_start), statement_start});
+        out.statements.push_back(ScriptStatement{script.substr(statement_start), statement_start});
       }
       return out;
     }
     if (token.type == TokenType::Semicolon) {
       if (in_statement) {
-        out.statements.push_back(
-            ScriptStatement{script.substr(statement_start, token.pos - statement_start),
-                            statement_start});
+        out.statements.push_back(ScriptStatement{
+            script.substr(statement_start, token.pos - statement_start), statement_start});
         in_statement = false;
       }
       continue;
@@ -45,16 +43,12 @@ ScriptSplitResult split_sql_script(const std::string& script) {
   }
 }
 
-int run_sql_script(const std::string& script,
-                   const ScriptRunOptions& options,
-                   const ScriptExecutor& execute_statement,
-                   std::ostream& out,
-                   std::ostream& err) {
+int run_sql_script(const std::string& script, const ScriptRunOptions& options,
+                   const ScriptExecutor& execute_statement, std::ostream& out, std::ostream& err) {
   ScriptSplitResult split = split_sql_script(script);
   if (split.error_message.has_value()) {
     auto [line, col] = line_col_from_offset(script, split.error_position);
-    err << "Error: " << *split.error_message
-        << " at line " << line << ", column " << col << "\n";
+    err << "Error: " << *split.error_message << " at line " << line << ", column " << col << "\n";
     return 1;
   }
   if (split.statements.empty()) {
@@ -77,13 +71,14 @@ int run_sql_script(const std::string& script,
         error_pos += parsed.error->position;
       }
       auto [line, col] = line_col_from_offset(script, error_pos);
-      err << "Error: statement " << statement_index << "/" << total
-          << " at line " << line << ", column " << col << "\n";
+      err << "Error: statement " << statement_index << "/" << total << " at line " << line
+          << ", column " << col << "\n";
       const std::string parse_message =
           parsed.error.has_value() ? parsed.error->message : "Query parse error";
       const size_t parse_pos = parsed.error.has_value() ? parsed.error->position : 0;
       std::vector<markql::Diagnostic> diagnostics;
-      diagnostics.push_back(markql::make_syntax_diagnostic(statement.text, parse_message, parse_pos));
+      diagnostics.push_back(
+          markql::make_syntax_diagnostic(statement.text, parse_message, parse_pos));
       err << markql::render_diagnostics_text(diagnostics) << "\n";
       had_error = true;
       if (!options.continue_on_error) return 1;
@@ -94,8 +89,8 @@ int run_sql_script(const std::string& script,
       execute_statement(statement.text);
     } catch (const std::exception& ex) {
       auto [line, col] = line_col_from_offset(script, statement.start_pos);
-      err << "Error: statement " << statement_index << "/" << total
-          << " at line " << line << ", column " << col << "\n";
+      err << "Error: statement " << statement_index << "/" << total << " at line " << line
+          << ", column " << col << "\n";
       std::vector<markql::Diagnostic> diagnostics =
           markql::diagnose_query_failure(statement.text, ex.what());
       if (!diagnostics.empty()) {

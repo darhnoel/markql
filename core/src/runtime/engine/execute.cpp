@@ -14,12 +14,11 @@ struct ParsedDocumentHandle {
   std::string source_uri;
 };
 
-QueryResult execute_query_with_source(const Query& query,
-                                      const std::string* default_html,
+QueryResult execute_query_with_source(const Query& query, const std::string* default_html,
                                       const HtmlDocument* default_document,
                                       const std::string& default_source_uri) {
-  return execute_query_with_source_relation_entry(
-      query, default_html, default_document, default_source_uri);
+  return execute_query_with_source_relation_entry(query, default_html, default_document,
+                                                  default_source_uri);
 }
 
 std::shared_ptr<const ParsedDocumentHandle> prepare_document(const std::string& html,
@@ -31,8 +30,8 @@ std::shared_ptr<const ParsedDocumentHandle> prepare_document(const std::string& 
   return prepared;
 }
 
-QueryResult execute_query_from_prepared_document(const std::shared_ptr<const ParsedDocumentHandle>& prepared,
-                                                 const std::string& query) {
+QueryResult execute_query_from_prepared_document(
+    const std::shared_ptr<const ParsedDocumentHandle>& prepared, const std::string& query) {
   if (prepared == nullptr) {
     throw std::runtime_error("Prepared document handle is null");
   }
@@ -47,7 +46,8 @@ QueryResult execute_query_from_prepared_document(const std::shared_ptr<const Par
   if (parsed.query->source.kind == Source::Kind::Document) {
     return execute_query_ast(*parsed.query, prepared->doc, prepared->source_uri);
   }
-  return execute_query_with_source(*parsed.query, &prepared->html, &prepared->doc, prepared->source_uri);
+  return execute_query_with_source(*parsed.query, &prepared->html, &prepared->doc,
+                                   prepared->source_uri);
 }
 
 }  // namespace markql

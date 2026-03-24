@@ -1,0 +1,46 @@
+name: Maintainability
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  loc_guardrail:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check tracked source LOC guardrail
+        run: python3 scripts/maintenance/check_loc.py
+
+  cpp_format_changed_files:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format
+      - name: Check changed C++ formatting
+        run: ./scripts/format/check_cpp_format.sh --diff-base "${{ github.event.pull_request.base.sha }}"
+
+  build_and_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install vcpkg
+        run: |
+          git clone --depth 1 https://github.com/microsoft/vcpkg "${HOME}/vcpkg"
+          "${HOME}/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+      - name: Build
+        run: ./scripts/build/build.sh
+      - name: Run C++ tests
+        run: ./scripts/test/ctest.sh --output-on-failure

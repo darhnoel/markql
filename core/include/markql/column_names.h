@@ -15,8 +15,7 @@ struct ColumnNameMapping {
 std::string normalize_colname(const std::string& raw, bool lowercase = true);
 
 std::vector<ColumnNameMapping> build_column_name_map(
-    const std::vector<std::string>& raw_columns,
-    ColumnNameMode mode = ColumnNameMode::Normalize,
+    const std::vector<std::string>& raw_columns, ColumnNameMode mode = ColumnNameMode::Normalize,
     bool lowercase = true);
 
 }  // namespace markql

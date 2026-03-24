@@ -131,85 +131,83 @@ py::dict lint_summary_to_dict(const markql::LintSummary& summary) {
 PYBIND11_MODULE(_core, m) {
   m.doc() = "Native bindings for MARKQL query execution.";
 
-  m.def("execute_from_document",
-        [](const std::string& html, const std::string& query) {
-          markql::QueryResult result = markql::execute_query_from_document(html, query);
-          py::dict out;
-          out["columns"] = result.columns;
-          out["warnings"] = result.warnings;
-          py::list rows;
-          for (const auto& row : result.rows) {
-            rows.append(row_to_dict(row, result.columns));
-          }
-          out["rows"] = rows;
-          py::list tables;
-          for (const auto& table : result.tables) {
-            py::dict table_obj;
-            table_obj["node_id"] = table.node_id;
-            table_obj["rows"] = table.rows;
-            tables.append(table_obj);
-          }
-          out["tables"] = tables;
-          out["to_list"] = result.to_list;
-          out["to_table"] = result.to_table;
-          out["table_has_header"] = result.table_has_header;
-          py::dict export_sink;
-          switch (result.export_sink.kind) {
-            case markql::QueryResult::ExportSink::Kind::Csv:
-              export_sink["kind"] = "csv";
-              break;
-            case markql::QueryResult::ExportSink::Kind::Parquet:
-              export_sink["kind"] = "parquet";
-              break;
-            default:
-              export_sink["kind"] = "none";
-              break;
-          }
-          export_sink["path"] = result.export_sink.path;
-          out["export_sink"] = export_sink;
-          return out;
-        },
-        py::arg("html"),
-        py::arg("query"));
+  m.def(
+      "execute_from_document",
+      [](const std::string& html, const std::string& query) {
+        markql::QueryResult result = markql::execute_query_from_document(html, query);
+        py::dict out;
+        out["columns"] = result.columns;
+        out["warnings"] = result.warnings;
+        py::list rows;
+        for (const auto& row : result.rows) {
+          rows.append(row_to_dict(row, result.columns));
+        }
+        out["rows"] = rows;
+        py::list tables;
+        for (const auto& table : result.tables) {
+          py::dict table_obj;
+          table_obj["node_id"] = table.node_id;
+          table_obj["rows"] = table.rows;
+          tables.append(table_obj);
+        }
+        out["tables"] = tables;
+        out["to_list"] = result.to_list;
+        out["to_table"] = result.to_table;
+        out["table_has_header"] = result.table_has_header;
+        py::dict export_sink;
+        switch (result.export_sink.kind) {
+          case markql::QueryResult::ExportSink::Kind::Csv:
+            export_sink["kind"] = "csv";
+            break;
+          case markql::QueryResult::ExportSink::Kind::Parquet:
+            export_sink["kind"] = "parquet";
+            break;
+          default:
+            export_sink["kind"] = "none";
+            break;
+        }
+        export_sink["path"] = result.export_sink.path;
+        out["export_sink"] = export_sink;
+        return out;
+      },
+      py::arg("html"), py::arg("query"));
 
-  m.def("lint_query",
-        [](const std::string& query) {
-          std::vector<markql::Diagnostic> diagnostics = markql::lint_query(query);
-          py::list out;
-          for (const auto& diagnostic : diagnostics) {
-            out.append(diagnostic_to_dict(diagnostic));
-          }
-          return out;
-        },
-        py::arg("query"));
+  m.def(
+      "lint_query",
+      [](const std::string& query) {
+        std::vector<markql::Diagnostic> diagnostics = markql::lint_query(query);
+        py::list out;
+        for (const auto& diagnostic : diagnostics) {
+          out.append(diagnostic_to_dict(diagnostic));
+        }
+        return out;
+      },
+      py::arg("query"));
 
-  m.def("lint_query_detailed",
-        [](const std::string& query) {
-          markql::LintResult result = markql::lint_query_detailed(query);
-          py::dict out;
-          out["summary"] = lint_summary_to_dict(result.summary);
-          py::list diagnostics;
-          for (const auto& diagnostic : result.diagnostics) {
-            diagnostics.append(diagnostic_to_dict(diagnostic));
-          }
-          out["diagnostics"] = diagnostics;
-          return out;
-        },
-        py::arg("query"));
+  m.def(
+      "lint_query_detailed",
+      [](const std::string& query) {
+        markql::LintResult result = markql::lint_query_detailed(query);
+        py::dict out;
+        out["summary"] = lint_summary_to_dict(result.summary);
+        py::list diagnostics;
+        for (const auto& diagnostic : result.diagnostics) {
+          diagnostics.append(diagnostic_to_dict(diagnostic));
+        }
+        out["diagnostics"] = diagnostics;
+        return out;
+      },
+      py::arg("query"));
 
-  m.def("core_version",
-        []() {
-          return markql::version_string();
-        });
+  m.def("core_version", []() { return markql::version_string(); });
 
-  m.def("core_version_info",
-        []() {
-          markql::VersionInfo info = markql::get_version_info();
-          py::dict out;
-          out["version"] = info.version;
-          out["git_commit"] = info.git_commit;
-          out["git_dirty"] = info.git_dirty;
-          out["provenance"] = markql::version_string();
-          return out;
-        });
+  m.def("core_version_info", []() {
+    markql::VersionInfo info = markql::get_version_info();
+    py::dict out;
+    out["version"] = info.version;
+    out["git_commit"] = info.git_commit;
+    out["git_dirty"] = info.git_dirty;
+    out["provenance"] = markql::version_string();
+    return out;
+  });
 }

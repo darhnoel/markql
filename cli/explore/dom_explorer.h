@@ -26,8 +26,7 @@ std::vector<int64_t> collect_dom_root_ids(const markql::HtmlDocument& doc);
 /// Flattens currently visible rows based on expansion state.
 /// MUST keep preorder traversal and include collapsed nodes without descendants.
 std::vector<VisibleTreeRow> flatten_visible_tree(
-    const std::vector<int64_t>& roots,
-    const std::vector<std::vector<int64_t>>& children,
+    const std::vector<int64_t>& roots, const std::vector<std::vector<int64_t>>& children,
     const std::unordered_set<int64_t>& expanded_node_ids);
 /// Renders attribute panel lines for the selected node.
 /// MUST sort attribute keys lexicographically and always include a title line.

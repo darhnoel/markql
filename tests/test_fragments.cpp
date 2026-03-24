@@ -22,8 +22,8 @@ void test_raw_source_literal() {
 
 void test_fragments_from_raw() {
   std::string html = "<div></div>";
-  auto result = run_query(html,
-                          "SELECT li FROM FRAGMENTS(RAW('<ul><li>1</li><li>2</li></ul>')) AS frag");
+  auto result =
+      run_query(html, "SELECT li FROM FRAGMENTS(RAW('<ul><li>1</li><li>2</li></ul>')) AS frag");
   assert_two_li_values(result, "FRAGMENTS() parses RAW() fragments");
 }
 
@@ -39,8 +39,7 @@ void test_fragments_non_html_error() {
   bool threw = false;
   try {
     std::string html = "<a href='x'></a>";
-    run_query(html,
-              "SELECT li FROM FRAGMENTS(SELECT attributes.href FROM document) AS frag");
+    run_query(html, "SELECT li FROM FRAGMENTS(SELECT attributes.href FROM document) AS frag");
   } catch (const std::exception&) {
     threw = true;
   }
@@ -49,8 +48,8 @@ void test_fragments_non_html_error() {
 
 void test_fragments_warn_deprecated() {
   std::string html = "<div></div>";
-  auto result = run_query(html,
-                          "SELECT li FROM FRAGMENTS(RAW('<ul><li>1</li><li>2</li></ul>')) AS frag");
+  auto result =
+      run_query(html, "SELECT li FROM FRAGMENTS(RAW('<ul><li>1</li><li>2</li></ul>')) AS frag");
   assert_two_li_values(result, "FRAGMENTS deprecation output");
   expect_true(!result.warnings.empty(), "FRAGMENTS emits deprecation warning");
   if (!result.warnings.empty()) {
@@ -61,8 +60,7 @@ void test_fragments_warn_deprecated() {
 
 void test_parse_from_string_expr() {
   std::string html = "<div></div>";
-  auto result = run_query(html,
-                          "SELECT li FROM PARSE('<ul><li>1</li><li>2</li></ul>') AS frag");
+  auto result = run_query(html, "SELECT li FROM PARSE('<ul><li>1</li><li>2</li></ul>') AS frag");
   assert_two_li_values(result, "PARSE() parses HTML string");
   expect_true(result.warnings.empty(), "PARSE() has no deprecation warning");
 }

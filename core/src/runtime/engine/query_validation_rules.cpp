@@ -55,10 +55,7 @@ bool is_wildcard_only(const Query& query) {
   return query.select_items.size() == 1 && query.select_items[0].tag == "*";
 }
 
-bool scan_descendant_filter(const Expr& expr,
-                            size_t& count,
-                            bool& has_or,
-                            bool& invalid) {
+bool scan_descendant_filter(const Expr& expr, size_t& count, bool& has_or, bool& invalid) {
   if (std::holds_alternative<CompareExpr>(expr)) {
     const auto& cmp = std::get<CompareExpr>(expr);
     if (cmp.lhs.axis == Operand::Axis::Descendant) {
@@ -68,10 +65,8 @@ bool scan_descendant_filter(const Expr& expr,
           invalid = true;
         }
       } else if (cmp.lhs.field_kind == Operand::FieldKind::Attribute) {
-        if (cmp.op != CompareExpr::Op::Eq &&
-            cmp.op != CompareExpr::Op::In &&
-            cmp.op != CompareExpr::Op::Contains &&
-            cmp.op != CompareExpr::Op::ContainsAll &&
+        if (cmp.op != CompareExpr::Op::Eq && cmp.op != CompareExpr::Op::In &&
+            cmp.op != CompareExpr::Op::Contains && cmp.op != CompareExpr::Op::ContainsAll &&
             cmp.op != CompareExpr::Op::ContainsAny) {
           invalid = true;
         }
@@ -122,14 +117,16 @@ void validate_projection(const Query& query) {
   for (const auto& item : query.select_items) {
     if (item.flatten_text) {
       if (flatten_item != nullptr || flatten_extract_item != nullptr) {
-        throw std::runtime_error("FLATTEN_TEXT()/PROJECT()/FLATTEN_EXTRACT() supports a single instance per query");
+        throw std::runtime_error(
+            "FLATTEN_TEXT()/PROJECT()/FLATTEN_EXTRACT() supports a single instance per query");
       }
       flatten_item = &item;
       has_flatten = true;
     }
     if (item.flatten_extract) {
       if (flatten_item != nullptr || flatten_extract_item != nullptr) {
-        throw std::runtime_error("FLATTEN_TEXT()/PROJECT()/FLATTEN_EXTRACT() supports a single instance per query");
+        throw std::runtime_error(
+            "FLATTEN_TEXT()/PROJECT()/FLATTEN_EXTRACT() supports a single instance per query");
       }
       flatten_extract_item = &item;
       has_flatten_extract = true;
@@ -148,7 +145,8 @@ void validate_projection(const Query& query) {
     throw std::runtime_error("ORDER BY is not supported with aggregate queries");
   }
   if ((has_flatten || has_flatten_extract) && has_aggregate) {
-    throw std::runtime_error("FLATTEN_TEXT()/PROJECT()/FLATTEN_EXTRACT() cannot be combined with aggregates");
+    throw std::runtime_error(
+        "FLATTEN_TEXT()/PROJECT()/FLATTEN_EXTRACT() cannot be combined with aggregates");
   }
   if (has_flatten && query.where.has_value()) {
     size_t descendant_count = 0;
@@ -156,10 +154,13 @@ void validate_projection(const Query& query) {
     bool invalid = false;
     scan_descendant_filter(*query.where, descendant_count, has_or, invalid);
     if (invalid) {
-      throw std::runtime_error("descendant filters support tag (=, IN) and attributes (=, IN, CONTAINS, CONTAINS ALL/ANY)");
+      throw std::runtime_error(
+          "descendant filters support tag (=, IN) and attributes (=, IN, CONTAINS, CONTAINS "
+          "ALL/ANY)");
     }
     if (has_or) {
-      throw std::runtime_error("descendant filters cannot be combined with OR when using FLATTEN_TEXT()");
+      throw std::runtime_error(
+          "descendant filters cannot be combined with OR when using FLATTEN_TEXT()");
     }
   }
 
@@ -168,7 +169,7 @@ void validate_projection(const Query& query) {
       throw std::runtime_error("EXCLUDE requires SELECT *");
     }
     if (!query.exclude_fields.empty()) {
-      const std::vector<std::string> allowed = {"node_id", "tag", "attributes", "parent_id",
+      const std::vector<std::string> allowed = {"node_id",   "tag",       "attributes", "parent_id",
                                                 "max_depth", "doc_order", "source_uri"};
       for (const auto& field : query.exclude_fields) {
         if (std::find(allowed.begin(), allowed.end(), field) == allowed.end()) {
@@ -250,7 +251,8 @@ void validate_projection(const Query& query) {
   if (has_text_function || has_inner_html_function) {
     if (!query.where.has_value() || !has_non_tag_self_predicate(*query.where)) {
       throw std::runtime_error(
-          "TEXT()/INNER_HTML()/RAW_INNER_HTML() requires a non-tag filter (e.g., attributes or parent)");
+          "TEXT()/INNER_HTML()/RAW_INNER_HTML() requires a non-tag filter (e.g., attributes or "
+          "parent)");
     }
   }
   std::string tag;
@@ -310,10 +312,9 @@ void validate_projection(const Query& query) {
         }
       }
     }
-    if (field != "node_id" && field != "tag" && field != "text" &&
-        field != "inner_html" && field != "parent_id" && field != "source_uri" &&
-        field != "attributes" && field != "sibling_pos" &&
-        field != "max_depth" && field != "doc_order") {
+    if (field != "node_id" && field != "tag" && field != "text" && field != "inner_html" &&
+        field != "parent_id" && field != "source_uri" && field != "attributes" &&
+        field != "sibling_pos" && field != "max_depth" && field != "doc_order") {
       // Treat other fields as attribute projections (e.g., link.href).
     }
   }
@@ -351,26 +352,22 @@ void validate_qualifiers(const Query& query) {
     active_alias = util::to_lower(*query.source.alias);
   }
 
-  auto qualifier_error = [&](const std::optional<std::string>& qualifier) -> std::optional<std::string> {
+  auto qualifier_error =
+      [&](const std::optional<std::string>& qualifier) -> std::optional<std::string> {
     if (!qualifier.has_value()) return std::nullopt;
     const std::string lowered = util::to_lower(*qualifier);
     if (lowered == "self") return std::nullopt;
     if (active_alias.has_value() && lowered == *active_alias) return std::nullopt;
-    if (query.source.kind == Source::Kind::Document &&
-        lowered == "document" &&
-        active_alias.has_value() &&
-        *active_alias == "doc") {
+    if (query.source.kind == Source::Kind::Document && lowered == "document" &&
+        active_alias.has_value() && *active_alias == "doc") {
       return std::nullopt;
     }
-    if (query.source.kind == Source::Kind::Document &&
-        lowered == "doc" &&
-        active_alias.has_value() &&
-        *active_alias != "doc") {
+    if (query.source.kind == Source::Kind::Document && lowered == "doc" &&
+        active_alias.has_value() && *active_alias != "doc") {
       return "Identifier 'doc' is not bound; did you mean '" + *query.source.alias + "'?";
     }
     if (sole_tag.has_value() && lowered == *sole_tag) return std::nullopt;
-    return "Unknown identifier '" + *qualifier +
-           "' (expected a FROM alias or legacy tag binding)";
+    return "Unknown identifier '" + *qualifier + "' (expected a FROM alias or legacy tag binding)";
   };
 
   std::function<void(const Expr&)> visit = [&](const Expr& expr) {
@@ -423,14 +420,13 @@ void validate_qualifiers(const Query& query) {
           visit_extract(arg);
         }
       };
-  if (query.source.kind == Source::Kind::Document &&
-      query.source.alias.has_value() &&
+  if (query.source.kind == Source::Kind::Document && query.source.alias.has_value() &&
       util::to_lower(*query.source.alias) != "doc") {
     for (const auto& item : query.select_items) {
       if (!item.field.has_value()) continue;
       if (util::to_lower(item.tag) == "doc") {
-        throw std::runtime_error(
-            "Identifier 'doc' is not bound; did you mean '" + *query.source.alias + "'?");
+        throw std::runtime_error("Identifier 'doc' is not bound; did you mean '" +
+                                 *query.source.alias + "'?");
       }
     }
   }
@@ -461,8 +457,7 @@ void validate_predicates(const Query& query) {
       } else {
         lhs_operand = &cmp.lhs;
       }
-      if (cmp.op == CompareExpr::Op::Contains ||
-          cmp.op == CompareExpr::Op::ContainsAll ||
+      if (cmp.op == CompareExpr::Op::Contains || cmp.op == CompareExpr::Op::ContainsAll ||
           cmp.op == CompareExpr::Op::ContainsAny) {
         if (lhs_operand == nullptr || lhs_operand->field_kind != Operand::FieldKind::Attribute) {
           throw std::runtime_error("CONTAINS supports only attributes");
@@ -476,10 +471,8 @@ void validate_predicates(const Query& query) {
         }
       }
       if (cmp.op == CompareExpr::Op::HasDirectText) {
-        if (lhs_operand == nullptr ||
-            lhs_operand->axis != Operand::Axis::Self ||
-            lhs_operand->field_kind != Operand::FieldKind::Tag ||
-            lhs_operand->attribute.empty()) {
+        if (lhs_operand == nullptr || lhs_operand->axis != Operand::Axis::Self ||
+            lhs_operand->field_kind != Operand::FieldKind::Tag || lhs_operand->attribute.empty()) {
           throw std::runtime_error("HAS_DIRECT_TEXT expects a tag identifier");
         }
         if (cmp.rhs.values.size() != 1) {
@@ -568,10 +561,10 @@ void validate_order_by(const Query& query) {
       }
       continue;
     }
-    if (field != "node_id" && field != "tag" && field != "text" &&
-        field != "parent_id" && field != "sibling_pos" &&
-        field != "max_depth" && field != "doc_order") {
-      throw std::runtime_error("ORDER BY supports node_id, tag, text, parent_id, sibling_pos, max_depth, or doc_order");
+    if (field != "node_id" && field != "tag" && field != "text" && field != "parent_id" &&
+        field != "sibling_pos" && field != "max_depth" && field != "doc_order") {
+      throw std::runtime_error(
+          "ORDER BY supports node_id, tag, text, parent_id, sibling_pos, max_depth, or doc_order");
     }
   }
 }

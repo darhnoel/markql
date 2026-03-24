@@ -73,8 +73,7 @@ bool Parser::parse_source(Source& src) {
     advance();
     if (!consume(TokenType::LParen, "Expected ( after PARSE")) return false;
     src.kind = Source::Kind::Parse;
-    if (current_.type == TokenType::KeywordSelect ||
-        current_.type == TokenType::KeywordWith) {
+    if (current_.type == TokenType::KeywordSelect || current_.type == TokenType::KeywordWith) {
       std::shared_ptr<Query> subquery;
       if (!parse_subquery(subquery)) return false;
       src.parse_query = std::move(subquery);
@@ -128,7 +127,8 @@ bool Parser::parse_source(Source& src) {
     return true;
   }
   return set_error(
-      "Expected document, CTE name, derived subquery, string literal, RAW(), FRAGMENTS(), or PARSE() source");
+      "Expected document, CTE name, derived subquery, string literal, RAW(), FRAGMENTS(), or "
+      "PARSE() source");
 }
 
 /// Parses a full query inside FRAGMENTS(), stopping before a closing ).

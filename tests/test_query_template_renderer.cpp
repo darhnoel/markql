@@ -22,7 +22,8 @@ void test_query_template_renderer_matches_golden_output() {
       markql::cli::load_query_file_text(template_path.string(), "j2", vars_path.string());
 
   expect_true(result.rendered, "template query reports rendered state");
-  expect_true(result.text == read_file_to_string(golden_path), "rendered query matches golden output");
+  expect_true(result.text == read_file_to_string(golden_path),
+              "rendered query matches golden output");
 }
 
 void test_query_template_renderer_writes_exact_output_file() {

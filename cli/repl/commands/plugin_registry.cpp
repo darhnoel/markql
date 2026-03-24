@@ -121,8 +121,7 @@ bool parse_string(JsonCursor& cur, std::string& out) {
   return false;
 }
 
-bool parse_registry_json(const std::string& json,
-                         std::vector<PluginRegistryEntry>& entries,
+bool parse_registry_json(const std::string& json, std::vector<PluginRegistryEntry>& entries,
                          std::string& error) {
   JsonCursor cur{json, 0};
   if (!consume_char(cur, '[')) {

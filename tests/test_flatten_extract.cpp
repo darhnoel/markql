@@ -35,9 +35,11 @@ void test_flatten_extract_basic() {
       "TEXT(td WHERE sibling_pos = 3)),"
       "pdf_layover: COALESCE(ATTR(a, href WHERE parent.sibling_pos = 4 AND href CONTAINS '.pdf'), "
       "TEXT(td WHERE sibling_pos = 4)),"
-      "excel_direct: COALESCE(ATTR(a, href WHERE parent.sibling_pos = 5 AND href CONTAINS '.xlsx'), "
+      "excel_direct: COALESCE(ATTR(a, href WHERE parent.sibling_pos = 5 AND href CONTAINS "
+      "'.xlsx'), "
       "TEXT(td WHERE sibling_pos = 5)),"
-      "excel_layover: COALESCE(ATTR(a, href WHERE parent.sibling_pos = 6 AND href CONTAINS '.xlsx'), "
+      "excel_layover: COALESCE(ATTR(a, href WHERE parent.sibling_pos = 6 AND href CONTAINS "
+      "'.xlsx'), "
       "TEXT(td WHERE sibling_pos = 6))"
       ") "
       "FROM document "
@@ -56,16 +58,24 @@ void test_flatten_extract_basic() {
   expect_eq(result.rows.size(), 2, "flatten_extract row count");
   if (result.rows.size() >= 2) {
     expect_true(result.rows[0].computed_fields["period"] == "2025", "flatten_extract row1 period");
-    expect_true(result.rows[0].computed_fields["pdf_direct"] == "direct.pdf", "flatten_extract row1 pdf_direct");
-    expect_true(result.rows[0].computed_fields["pdf_layover"] == "N/A", "flatten_extract row1 pdf_layover fallback");
-    expect_true(result.rows[0].computed_fields["excel_direct"] == "direct.xlsx", "flatten_extract row1 excel_direct");
-    expect_true(result.rows[0].computed_fields["excel_layover"] == "Missing", "flatten_extract row1 excel_layover fallback");
+    expect_true(result.rows[0].computed_fields["pdf_direct"] == "direct.pdf",
+                "flatten_extract row1 pdf_direct");
+    expect_true(result.rows[0].computed_fields["pdf_layover"] == "N/A",
+                "flatten_extract row1 pdf_layover fallback");
+    expect_true(result.rows[0].computed_fields["excel_direct"] == "direct.xlsx",
+                "flatten_extract row1 excel_direct");
+    expect_true(result.rows[0].computed_fields["excel_layover"] == "Missing",
+                "flatten_extract row1 excel_layover fallback");
 
     expect_true(result.rows[1].computed_fields["period"] == "2024", "flatten_extract row2 period");
-    expect_true(result.rows[1].computed_fields["pdf_direct"] == "Pending", "flatten_extract row2 pdf_direct fallback");
-    expect_true(result.rows[1].computed_fields["pdf_layover"] == "layover2.pdf", "flatten_extract row2 pdf_layover");
-    expect_true(result.rows[1].computed_fields["excel_direct"] == "direct2.xlsx", "flatten_extract row2 excel_direct");
-    expect_true(result.rows[1].computed_fields["excel_layover"] == "layover2.xlsx", "flatten_extract row2 excel_layover");
+    expect_true(result.rows[1].computed_fields["pdf_direct"] == "Pending",
+                "flatten_extract row2 pdf_direct fallback");
+    expect_true(result.rows[1].computed_fields["pdf_layover"] == "layover2.pdf",
+                "flatten_extract row2 pdf_layover");
+    expect_true(result.rows[1].computed_fields["excel_direct"] == "direct2.xlsx",
+                "flatten_extract row2 excel_direct");
+    expect_true(result.rows[1].computed_fields["excel_layover"] == "layover2.xlsx",
+                "flatten_extract row2 excel_layover");
   }
 }
 
@@ -90,8 +100,9 @@ void test_flatten_extract_has_direct_text_predicate() {
   if (result.rows.size() >= 2) {
     expect_true(result.rows[0].computed_fields["period"] == "Period 2025",
                 "flatten_extract has_direct_text row1 match");
-    expect_true(result.rows[1].computed_fields.find("period") == result.rows[1].computed_fields.end(),
-                "flatten_extract has_direct_text row2 no match");
+    expect_true(
+        result.rows[1].computed_fields.find("period") == result.rows[1].computed_fields.end(),
+        "flatten_extract has_direct_text row2 no match");
   }
 }
 
@@ -108,10 +119,9 @@ void test_flatten_extract_requires_as_pairs() {
 
 void test_flatten_extract_alias_compatibility() {
   std::string html = "<table><tr><td>2025</td></tr></table>";
-  auto result = run_query(
-      html,
-      "SELECT FLATTEN_EXTRACT(tr) AS (period: TEXT(td WHERE sibling_pos = 1)) "
-      "FROM document WHERE EXISTS(child WHERE tag = 'td')");
+  auto result = run_query(html,
+                          "SELECT FLATTEN_EXTRACT(tr) AS (period: TEXT(td WHERE sibling_pos = 1)) "
+                          "FROM document WHERE EXISTS(child WHERE tag = 'td')");
   expect_eq(result.rows.size(), 1, "flatten_extract alias compatibility row count");
   if (!result.rows.empty()) {
     expect_true(result.rows[0].computed_fields["period"] == "2025",
@@ -145,33 +155,30 @@ void test_flatten_extract_table_drift_stability() {
       "</tr>"
       "</tbody></table>";
 
-  auto result = run_query(
-      html,
-      "SELECT tr.node_id, PROJECT(tr) AS ("
-      "team: TRIM(TEXT(td WHERE sibling_pos = 1)),"
-      "gp: TEXT(td WHERE sibling_pos = 2),"
-      "wins: TEXT(td WHERE sibling_pos = 3),"
-      "ot: COALESCE(TEXT(td WHERE sibling_pos = 4), ''),"
-      "pts: TEXT(td WHERE sibling_pos = 5)"
-      ") "
-      "FROM document "
-      "WHERE tag = 'tr' AND EXISTS(child WHERE tag = 'td') "
-      "ORDER BY node_id ASC");
+  auto result = run_query(html,
+                          "SELECT tr.node_id, PROJECT(tr) AS ("
+                          "team: TRIM(TEXT(td WHERE sibling_pos = 1)),"
+                          "gp: TEXT(td WHERE sibling_pos = 2),"
+                          "wins: TEXT(td WHERE sibling_pos = 3),"
+                          "ot: COALESCE(TEXT(td WHERE sibling_pos = 4), ''),"
+                          "pts: TEXT(td WHERE sibling_pos = 5)"
+                          ") "
+                          "FROM document "
+                          "WHERE tag = 'tr' AND EXISTS(child WHERE tag = 'td') "
+                          "ORDER BY node_id ASC");
 
   expect_eq(result.rows.size(), 2, "flatten_extract drift row count excludes totals");
   if (result.rows.size() >= 2) {
     expect_true(result.rows[0].computed_fields["team"].find("Boston") != std::string::npos,
                 "flatten_extract drift nested tags + whitespace row1");
-    expect_true(result.rows[0].computed_fields["ot"] == "8",
-                "flatten_extract drift ot row1");
+    expect_true(result.rows[0].computed_fields["ot"] == "8", "flatten_extract drift ot row1");
     expect_true(result.rows[0].computed_fields["pts"] == "102",
                 "flatten_extract drift points row1");
     expect_true(result.rows[1].computed_fields["team"].find("Detroit") != std::string::npos,
                 "flatten_extract drift nested tags row2");
     expect_true(result.rows[1].computed_fields["ot"] == "",
                 "flatten_extract drift missing optional cell padded blank");
-    expect_true(result.rows[1].computed_fields["pts"] == "91",
-                "flatten_extract drift points row2");
+    expect_true(result.rows[1].computed_fields["pts"] == "91", "flatten_extract drift points row2");
   }
 }
 
@@ -179,8 +186,11 @@ void test_flatten_extract_table_drift_stability() {
 
 void register_flatten_extract_tests(std::vector<TestCase>& tests) {
   tests.push_back({"flatten_extract_basic", test_flatten_extract_basic});
-  tests.push_back({"flatten_extract_has_direct_text_predicate", test_flatten_extract_has_direct_text_predicate});
+  tests.push_back({"flatten_extract_has_direct_text_predicate",
+                   test_flatten_extract_has_direct_text_predicate});
   tests.push_back({"flatten_extract_requires_as_pairs", test_flatten_extract_requires_as_pairs});
-  tests.push_back({"flatten_extract_alias_compatibility", test_flatten_extract_alias_compatibility});
-  tests.push_back({"flatten_extract_table_drift_stability", test_flatten_extract_table_drift_stability});
+  tests.push_back(
+      {"flatten_extract_alias_compatibility", test_flatten_extract_alias_compatibility});
+  tests.push_back(
+      {"flatten_extract_table_drift_stability", test_flatten_extract_table_drift_stability});
 }

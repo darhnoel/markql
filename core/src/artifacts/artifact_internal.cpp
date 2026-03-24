@@ -75,8 +75,7 @@ uint32_t current_language_major() {
 void validate_utf8_text(const std::string& value, const std::string& field_name) {
   ensure(value.size() <= kMaxStringBytes,
          "Artifact limit exceeded: " + field_name + " is too large");
-  ensure(is_valid_utf8(value),
-         "Corrupted artifact: " + field_name + " is not valid UTF-8");
+  ensure(is_valid_utf8(value), "Corrupted artifact: " + field_name + " is not valid UTF-8");
 }
 
 uint64_t fnv1a64(const std::string& data) {
@@ -130,9 +129,7 @@ void write_file_bytes(const std::string& path, const std::string& data) {
   if (!out) throw std::runtime_error("Failed to write artifact file: " + path);
 }
 
-size_t read_bounded_count(BinaryReader& reader,
-                          size_t max_count,
-                          const std::string& message) {
+size_t read_bounded_count(BinaryReader& reader, size_t max_count, const std::string& message) {
   const uint64_t count = reader.read_u64();
   ensure(count <= static_cast<uint64_t>(max_count), message);
   ensure(count <= static_cast<uint64_t>(std::numeric_limits<size_t>::max()),
@@ -148,20 +145,17 @@ bool is_valid_section_tag(const std::string& tag) {
   return true;
 }
 
-std::string build_artifact_bytes(ArtifactKind kind,
-                                 uint32_t producer_major,
+std::string build_artifact_bytes(ArtifactKind kind, uint32_t producer_major,
                                  uint64_t required_features,
                                  const std::vector<SectionView>& sections) {
-  ensure(sections.size() <= kMaxSectionCount,
-         "Artifact limit exceeded: too many sections");
+  ensure(sections.size() <= kMaxSectionCount, "Artifact limit exceeded: too many sections");
   BinaryWriter payload_writer;
   std::unordered_set<std::string> seen_tags;
   for (const auto& section : sections) {
     ensure(is_valid_section_tag(section.tag), "Invalid artifact section tag");
     ensure(section.payload.size() <= kMaxSectionBytes,
            "Artifact limit exceeded: section payload is too large");
-    ensure(seen_tags.insert(section.tag).second,
-           "Invalid artifact: duplicate section tag");
+    ensure(seen_tags.insert(section.tag).second, "Invalid artifact: duplicate section tag");
     payload_writer.write_bytes(section.tag.data(), section.tag.size());
     payload_writer.write_u64(static_cast<uint64_t>(section.payload.size()));
     payload_writer.write_bytes(section.payload.data(), section.payload.size());
@@ -191,13 +185,11 @@ std::string build_artifact_bytes(ArtifactKind kind,
 ArtifactHeader read_header(BinaryReader& reader) {
   ArtifactHeader header;
   header.kind = kind_from_magic(reader.read_bytes(4));
-  ensure(header.kind != ArtifactKind::None,
-         "Unsupported artifact: unknown magic header");
+  ensure(header.kind != ArtifactKind::None, "Unsupported artifact: unknown magic header");
   header.format_major = reader.read_u16();
   header.format_minor = reader.read_u16();
   uint32_t header_bytes = reader.read_u32();
-  ensure(header_bytes == kHeaderBytes,
-         "Unsupported artifact: unexpected header size");
+  ensure(header_bytes == kHeaderBytes, "Unsupported artifact: unexpected header size");
   header.section_count = reader.read_u32();
   ensure(header.section_count > 0 && header.section_count <= kMaxSectionCount,
          "Artifact limit exceeded: invalid section count");
@@ -224,8 +216,7 @@ std::vector<SectionView> read_sections(BinaryReader& reader, const ArtifactHeade
   const size_t payload_begin = reader.position();
   const size_t payload_end = payload_begin + static_cast<size_t>(payload_bytes);
   std::string payload_copy = reader.read_bytes(static_cast<size_t>(payload_bytes));
-  ensure(fnv1a64(payload_copy) == header.payload_checksum,
-         "Corrupted artifact: checksum mismatch");
+  ensure(fnv1a64(payload_copy) == header.payload_checksum, "Corrupted artifact: checksum mismatch");
   BinaryReader payload_reader(payload_copy);
   std::vector<SectionView> sections;
   sections.reserve(header.section_count);
@@ -235,8 +226,7 @@ std::vector<SectionView> read_sections(BinaryReader& reader, const ArtifactHeade
            "Corrupted artifact: incomplete section header");
     const std::string tag = payload_reader.read_bytes(4);
     ensure(is_valid_section_tag(tag), "Corrupted artifact: invalid section tag");
-    ensure(seen_tags.insert(tag).second,
-           "Corrupted artifact: duplicate section tag");
+    ensure(seen_tags.insert(tag).second, "Corrupted artifact: duplicate section tag");
     const uint64_t section_size = payload_reader.read_u64();
     ensure(section_size <= kMaxSectionBytes,
            "Artifact limit exceeded: section payload is too large");
@@ -248,8 +238,7 @@ std::vector<SectionView> read_sections(BinaryReader& reader, const ArtifactHeade
         SectionView{tag, payload_reader.read_bytes(static_cast<size_t>(section_size))});
   }
   ensure(payload_reader.done(), "Corrupted artifact: payload alignment mismatch");
-  ensure(sections.size() == header.section_count,
-         "Corrupted artifact: section count mismatch");
+  ensure(sections.size() == header.section_count, "Corrupted artifact: section count mismatch");
   ensure(reader.position() == payload_end, "Corrupted artifact: payload alignment mismatch");
   ensure(reader.done(), "Corrupted artifact: trailing bytes after payload");
   return sections;

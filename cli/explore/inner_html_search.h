@@ -28,36 +28,28 @@ struct InnerHtmlSearchMatch {
 
 /// Computes a fuzzy match score for `needle` within `haystack`.
 /// MUST return false when all needle characters cannot be found in order.
-bool fuzzy_match_score(std::string_view haystack,
-                       std::string_view needle,
-                       size_t* first_position,
+bool fuzzy_match_score(std::string_view haystack, std::string_view needle, size_t* first_position,
                        int* score);
 
 /// Builds a nearby snippet around the matched position for right-pane preview.
 /// MUST return compact single-line text and preserve nearest context.
-std::string make_inner_html_snippet(std::string_view inner_html,
-                                    size_t match_position,
-                                    size_t query_len,
-                                    size_t max_chars);
+std::string make_inner_html_snippet(std::string_view inner_html, size_t match_position,
+                                    size_t query_len, size_t max_chars);
 
 /// Searches node text scopes with fuzzy matching and returns ranked matches.
 /// Scopes: self attributes > self tag/text > descendant inner_html.
 /// MUST sort by ranked priority and node id ascending for deterministic output.
-std::vector<InnerHtmlSearchMatch> fuzzy_search_inner_html(const markql::HtmlDocument& doc,
-                                                          const std::string& query,
-                                                          size_t max_results,
-                                                          bool include_snippet = true,
-                                                          bool sort_results = true,
-                                                          const std::vector<int64_t>* candidate_node_ids = nullptr);
+std::vector<InnerHtmlSearchMatch> fuzzy_search_inner_html(
+    const markql::HtmlDocument& doc, const std::string& query, size_t max_results,
+    bool include_snippet = true, bool sort_results = true,
+    const std::vector<int64_t>* candidate_node_ids = nullptr);
 
 /// Searches node text scopes with exact contiguous case-insensitive matching.
 /// Scopes: self attributes > self tag/text > descendant inner_html.
 /// MUST sort by ranked priority and node id ascending for deterministic output.
-std::vector<InnerHtmlSearchMatch> exact_search_inner_html(const markql::HtmlDocument& doc,
-                                                          const std::string& query,
-                                                          size_t max_results,
-                                                          bool include_snippet = true,
-                                                          bool sort_results = true,
-                                                          const std::vector<int64_t>* candidate_node_ids = nullptr);
+std::vector<InnerHtmlSearchMatch> exact_search_inner_html(
+    const markql::HtmlDocument& doc, const std::string& query, size_t max_results,
+    bool include_snippet = true, bool sort_results = true,
+    const std::vector<int64_t>* candidate_node_ids = nullptr);
 
 }  // namespace markql::cli

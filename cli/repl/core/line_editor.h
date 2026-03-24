@@ -41,10 +41,8 @@ class LineEditor {
   void set_keyword_color(bool enabled);
   /// Sets mode-specific prompts used in Vim mode.
   /// Inputs are visible prompt strings and their visible widths.
-  void set_mode_prompts(std::string vim_normal_prompt,
-                        size_t vim_normal_prompt_len,
-                        std::string vim_insert_prompt,
-                        size_t vim_insert_prompt_len);
+  void set_mode_prompts(std::string vim_normal_prompt, size_t vim_normal_prompt_len,
+                        std::string vim_insert_prompt, size_t vim_insert_prompt_len);
   /// Sets editing behavior style.
   /// `Normal` keeps the existing non-modal editing behavior.
   /// `Vim` enables modal navigation/edit commands.

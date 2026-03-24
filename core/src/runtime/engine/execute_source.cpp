@@ -36,8 +36,7 @@ bool is_plain_count_star_document_query(const Query& query) {
   return item.aggregate == Query::SelectItem::Aggregate::Count && item.tag == "*";
 }
 
-QueryResult build_count_star_result(const Query& query,
-                                    int64_t count,
+QueryResult build_count_star_result(const Query& query, int64_t count,
                                     const std::string& source_uri) {
   QueryResult out;
   out.columns = markql_internal::build_columns(query);
@@ -55,8 +54,7 @@ QueryResult build_count_star_result(const Query& query,
 
 }  // namespace
 
-QueryResult execute_query_with_source_legacy(const Query& query,
-                                             const std::string* default_html,
+QueryResult execute_query_with_source_legacy(const Query& query, const std::string* default_html,
                                              const HtmlDocument* default_document,
                                              const std::string& default_source_uri) {
   std::string effective_source_uri = default_source_uri;
@@ -141,8 +139,7 @@ QueryResult execute_query_with_source_legacy(const Query& query,
 /// Executes a parsed query over provided HTML and assembles QueryResult.
 /// MUST apply validation before execution and MUST propagate errors as exceptions.
 /// Inputs are HTML/source/query; outputs are QueryResult with no side effects.
-QueryResult execute_query_from_html(const std::string& html,
-                                    const std::string& source_uri,
+QueryResult execute_query_from_html(const std::string& html, const std::string& source_uri,
                                     const std::string& query) {
   auto parsed = parse_query(query);
   if (!parsed.query.has_value()) {
@@ -183,7 +180,8 @@ QueryResult execute_query_from_file(const std::string& path, const std::string& 
 /// Executes a query over a URL and uses the URL as source label.
 /// MUST honor timeout_ms and MUST propagate network failures as exceptions.
 /// Inputs are url/query/timeout; outputs are QueryResult with network side effects.
-QueryResult execute_query_from_url(const std::string& url, const std::string& query, int timeout_ms) {
+QueryResult execute_query_from_url(const std::string& url, const std::string& query,
+                                   int timeout_ms) {
   std::string html = markql_internal::fetch_url(url, timeout_ms);
   return execute_query_from_html(html, url, query);
 }

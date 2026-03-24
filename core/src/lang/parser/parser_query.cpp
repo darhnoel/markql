@@ -123,7 +123,8 @@ bool Parser::parse_query_body(Query& q) {
           if (current_.type != TokenType::Identifier) {
             return set_error(
                 "Expected HEADER, NOHEADER, EXPORT, TRIM_EMPTY_ROWS, TRIM_EMPTY_COLS, "
-                "EMPTY_IS, STOP_AFTER_EMPTY_ROWS, FORMAT, SPARSE_SHAPE, or HEADER_NORMALIZE inside TABLE()");
+                "EMPTY_IS, STOP_AFTER_EMPTY_ROWS, FORMAT, SPARSE_SHAPE, or HEADER_NORMALIZE inside "
+                "TABLE()");
           }
           size_t option_start = current_.pos;
           std::string option = to_upper(current_.text);
@@ -135,8 +136,7 @@ bool Parser::parse_query_body(Query& q) {
             if (current_.type == TokenType::Comma || current_.type == TokenType::RParen) {
               q.table_has_header = true;
             } else {
-              if (current_.type != TokenType::Identifier &&
-                  current_.type != TokenType::KeywordOn) {
+              if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordOn) {
                 return set_error("Expected ON or OFF after HEADER");
               }
               std::string value = to_upper(current_.text);
@@ -183,8 +183,7 @@ bool Parser::parse_query_body(Query& q) {
             if (current_.type == TokenType::Equal) {
               advance();
             }
-            if (current_.type != TokenType::Identifier &&
-                current_.type != TokenType::KeywordOn) {
+            if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordOn) {
               return set_error("Expected ON or OFF after TRIM_EMPTY_ROWS");
             }
             const std::string value = to_upper(current_.text);
@@ -306,8 +305,7 @@ bool Parser::parse_query_body(Query& q) {
             if (current_.type == TokenType::Equal) {
               advance();
             }
-            if (current_.type != TokenType::Identifier &&
-                current_.type != TokenType::KeywordOn) {
+            if (current_.type != TokenType::Identifier && current_.type != TokenType::KeywordOn) {
               return set_error("Expected ON or OFF after HEADER_NORMALIZE");
             }
             const std::string value = to_upper(current_.text);
@@ -324,7 +322,8 @@ bool Parser::parse_query_body(Query& q) {
           } else {
             return set_error(
                 "Expected HEADER, NOHEADER, EXPORT, TRIM_EMPTY_ROWS, TRIM_EMPTY_COLS, "
-                "EMPTY_IS, STOP_AFTER_EMPTY_ROWS, FORMAT, SPARSE_SHAPE, or HEADER_NORMALIZE inside TABLE()");
+                "EMPTY_IS, STOP_AFTER_EMPTY_ROWS, FORMAT, SPARSE_SHAPE, or HEADER_NORMALIZE inside "
+                "TABLE()");
           }
           if (current_.type == TokenType::Comma) {
             advance();
@@ -343,13 +342,10 @@ bool Parser::parse_query_body(Query& q) {
                current_.type == TokenType::KeywordJson ||
                current_.type == TokenType::KeywordNdjson) {
       Query::ExportSink sink;
-      sink.kind = (current_.type == TokenType::KeywordCsv)
-                      ? Query::ExportSink::Kind::Csv
-                      : (current_.type == TokenType::KeywordParquet)
-                            ? Query::ExportSink::Kind::Parquet
-                            : (current_.type == TokenType::KeywordJson)
-                                  ? Query::ExportSink::Kind::Json
-                                  : Query::ExportSink::Kind::Ndjson;
+      sink.kind = (current_.type == TokenType::KeywordCsv)       ? Query::ExportSink::Kind::Csv
+                  : (current_.type == TokenType::KeywordParquet) ? Query::ExportSink::Kind::Parquet
+                  : (current_.type == TokenType::KeywordJson)    ? Query::ExportSink::Kind::Json
+                                                                 : Query::ExportSink::Kind::Ndjson;
       size_t start = current_.pos;
       advance();
       if (!consume(TokenType::LParen, "Expected ( after export target")) return false;
@@ -438,8 +434,7 @@ bool Parser::parse_join_clauses(std::vector<Query::JoinItem>& joins) {
     }
     if (!saw_join) break;
 
-    if (join.type == Query::JoinItem::Type::Cross &&
-        current_.type == TokenType::KeywordLateral) {
+    if (join.type == Query::JoinItem::Type::Cross && current_.type == TokenType::KeywordLateral) {
       // WHY: LATERAL is evaluated per-left-row (nested-loop flatMap), so we restrict
       // syntax to an aliased subquery for deterministic correlation scope.
       join.lateral = true;

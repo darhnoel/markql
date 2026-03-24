@@ -19,13 +19,17 @@ void test_class_in_matches_token() {
   auto result = run_query(html, "SELECT div FROM document WHERE attributes.class IN ('newest')");
   expect_eq(result.rows.size(), 1, "class IN matches token");
   if (!result.rows.empty()) {
-    expect_true(result.rows[0].attributes["class"] == "subtle newest", "class IN matched row value");
+    expect_true(result.rows[0].attributes["class"] == "subtle newest",
+                "class IN matched row value");
   }
 }
 
 void test_parent_attribute_filter() {
-  std::string html = "<div id='table-01'><table id='keep'></table></div><div id='table-02'><table id='skip'></table></div>";
-  auto result = run_query(html, "SELECT table FROM document WHERE parent.attributes.id = 'table-01'");
+  std::string html =
+      "<div id='table-01'><table id='keep'></table></div><div id='table-02'><table "
+      "id='skip'></table></div>";
+  auto result =
+      run_query(html, "SELECT table FROM document WHERE parent.attributes.id = 'table-01'");
   expect_eq(result.rows.size(), 1, "parent attribute filter");
   if (!result.rows.empty()) {
     expect_true(result.rows[0].tag == "table", "parent attribute filter tag");

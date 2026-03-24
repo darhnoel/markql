@@ -24,8 +24,7 @@ std::filesystem::path resolve_path(const std::string& relative) {
 }
 
 std::string load_fixture(const std::string& filename) {
-  const std::filesystem::path path =
-      resolve_path("tests/fixtures/tables/" + filename);
+  const std::filesystem::path path = resolve_path("tests/fixtures/tables/" + filename);
   return read_file_to_string(path);
 }
 
@@ -34,12 +33,24 @@ std::string json_escape(const std::string& value) {
   out.reserve(value.size() + 8);
   for (char c : value) {
     switch (c) {
-      case '"': out += "\\\""; break;
-      case '\\': out += "\\\\"; break;
-      case '\n': out += "\\n"; break;
-      case '\r': out += "\\r"; break;
-      case '\t': out += "\\t"; break;
-      default: out.push_back(c); break;
+      case '"':
+        out += "\\\"";
+        break;
+      case '\\':
+        out += "\\\\";
+        break;
+      case '\n':
+        out += "\\n";
+        break;
+      case '\r':
+        out += "\\r";
+        break;
+      case '\t':
+        out += "\\t";
+        break;
+      default:
+        out.push_back(c);
+        break;
     }
   }
   return out;
@@ -47,9 +58,8 @@ std::string json_escape(const std::string& value) {
 
 bool is_ascii_digits(const std::string& value) {
   if (value.empty()) return false;
-  return std::all_of(
-      value.begin(), value.end(),
-      [](unsigned char c) { return std::isdigit(c) != 0; });
+  return std::all_of(value.begin(), value.end(),
+                     [](unsigned char c) { return std::isdigit(c) != 0; });
 }
 
 std::string stable_table_json(const markql::QueryResult& result) {
@@ -89,11 +99,15 @@ std::string stable_table_json(const markql::QueryResult& result) {
       if (!first) out << ",\n";
       first = false;
       out << "  {\"row_index\":";
-      if (is_ascii_digits(row[0])) out << row[0];
-      else out << "\"" << json_escape(row[0]) << "\"";
+      if (is_ascii_digits(row[0]))
+        out << row[0];
+      else
+        out << "\"" << json_escape(row[0]) << "\"";
       out << ",\"col_index\":";
-      if (is_ascii_digits(row[1])) out << row[1];
-      else out << "\"" << json_escape(row[1]) << "\"";
+      if (is_ascii_digits(row[1]))
+        out << row[1];
+      else
+        out << "\"" << json_escape(row[1]) << "\"";
       if (include_header) {
         out << ",\"header\":\"" << json_escape(row[2]) << "\"";
         out << ",\"value\":\"" << json_escape(row[3]) << "\"";
@@ -113,8 +127,8 @@ std::string stable_table_json(const markql::QueryResult& result) {
     const auto& row = table.sparse_wide_rows[r];
     for (size_t c = 0; c < row.size(); ++c) {
       if (c > 0) out << ",";
-      out << "\"" << json_escape(row[c].first) << "\":"
-          << "\"" << json_escape(row[c].second) << "\"";
+      out << "\"" << json_escape(row[c].first) << "\":" << "\"" << json_escape(row[c].second)
+          << "\"";
     }
     out << "}";
   }
@@ -134,16 +148,12 @@ void assert_golden(const std::string& actual, const std::string& golden_relative
     return;
   }
   const std::string expected = read_file_to_string(golden);
-  expect_true(
-      actual == expected,
-      "golden mismatch: " + golden.string());
+  expect_true(actual == expected, "golden mismatch: " + golden.string());
 }
 
 void test_table_header_normalize_behavior() {
   const std::string html = load_fixture("header_noise.html");
-  auto result = run_query(
-      html,
-      "SELECT table FROM doc TO TABLE(HEADER=ON, HEADER_NORMALIZE=ON)");
+  auto result = run_query(html, "SELECT table FROM doc TO TABLE(HEADER=ON, HEADER_NORMALIZE=ON)");
   expect_true(result.to_table, "header normalize to_table");
   expect_true(!result.tables.empty(), "header normalize table exists");
   if (result.tables.empty() || result.tables[0].rows.empty()) return;
@@ -158,15 +168,12 @@ void test_table_header_normalize_behavior() {
 
 void test_table_empty_is_semantics() {
   const std::string html = load_fixture("whitespace_cells.html");
-  auto blank_or_null = run_query(
-      html,
-      "SELECT table FROM doc TO TABLE(TRIM_EMPTY_ROWS=ON, EMPTY_IS=BLANK_OR_NULL)");
-  auto null_only = run_query(
-      html,
-      "SELECT table FROM doc TO TABLE(TRIM_EMPTY_ROWS=ON, EMPTY_IS=NULL_ONLY)");
-  auto blank_only = run_query(
-      html,
-      "SELECT table FROM doc TO TABLE(TRIM_EMPTY_ROWS=ON, EMPTY_IS=BLANK_ONLY)");
+  auto blank_or_null =
+      run_query(html, "SELECT table FROM doc TO TABLE(TRIM_EMPTY_ROWS=ON, EMPTY_IS=BLANK_OR_NULL)");
+  auto null_only =
+      run_query(html, "SELECT table FROM doc TO TABLE(TRIM_EMPTY_ROWS=ON, EMPTY_IS=NULL_ONLY)");
+  auto blank_only =
+      run_query(html, "SELECT table FROM doc TO TABLE(TRIM_EMPTY_ROWS=ON, EMPTY_IS=BLANK_ONLY)");
   expect_true(!blank_or_null.tables.empty(), "empty_is blank_or_null table exists");
   expect_true(!null_only.tables.empty(), "empty_is null_only table exists");
   expect_true(!blank_only.tables.empty(), "empty_is blank_only table exists");
@@ -244,23 +251,20 @@ std::string run_and_serialize(const std::string& fixture_file, const std::string
 
 void test_golden_table_trim_baseline() {
   assert_golden(
-      run_and_serialize("trailing_empty_rows_and_cols.html",
-                        "SELECT table FROM doc TO TABLE();"),
+      run_and_serialize("trailing_empty_rows_and_cols.html", "SELECT table FROM doc TO TABLE();"),
       "tests/golden/table_trim/01_baseline.txt");
 }
 
 void test_golden_table_trim_rows() {
-  assert_golden(
-      run_and_serialize("trailing_empty_rows_and_cols.html",
-                        "SELECT table FROM doc TO TABLE(TRIM_EMPTY_ROWS=ON);"),
-      "tests/golden/table_trim/02_trim_empty_rows.txt");
+  assert_golden(run_and_serialize("trailing_empty_rows_and_cols.html",
+                                  "SELECT table FROM doc TO TABLE(TRIM_EMPTY_ROWS=ON);"),
+                "tests/golden/table_trim/02_trim_empty_rows.txt");
 }
 
 void test_golden_table_trim_trailing_cols() {
-  assert_golden(
-      run_and_serialize("trailing_empty_rows_and_cols.html",
-                        "SELECT table FROM doc TO TABLE(TRIM_EMPTY_COLS=TRAILING);"),
-      "tests/golden/table_trim/03_trim_trailing_cols.txt");
+  assert_golden(run_and_serialize("trailing_empty_rows_and_cols.html",
+                                  "SELECT table FROM doc TO TABLE(TRIM_EMPTY_COLS=TRAILING);"),
+                "tests/golden/table_trim/03_trim_trailing_cols.txt");
 }
 
 void test_golden_table_trim_rows_and_trailing_cols() {
@@ -272,45 +276,38 @@ void test_golden_table_trim_rows_and_trailing_cols() {
 }
 
 void test_golden_table_trim_all_cols() {
-  assert_golden(
-      run_and_serialize("internal_empty_col.html",
-                        "SELECT table FROM doc TO TABLE(TRIM_EMPTY_COLS=ALL);"),
-      "tests/golden/table_trim/05_trim_all_cols.txt");
+  assert_golden(run_and_serialize("internal_empty_col.html",
+                                  "SELECT table FROM doc TO TABLE(TRIM_EMPTY_COLS=ALL);"),
+                "tests/golden/table_trim/05_trim_all_cols.txt");
 }
 
 void test_golden_table_stop_after_empty_rows() {
-  assert_golden(
-      run_and_serialize("trailing_empty_rows_and_cols.html",
-                        "SELECT table FROM doc TO TABLE(STOP_AFTER_EMPTY_ROWS=2);"),
-      "tests/golden/table_trim/06_stop_after_empty_rows.txt");
+  assert_golden(run_and_serialize("trailing_empty_rows_and_cols.html",
+                                  "SELECT table FROM doc TO TABLE(STOP_AFTER_EMPTY_ROWS=2);"),
+                "tests/golden/table_trim/06_stop_after_empty_rows.txt");
 }
 
 void test_golden_table_header_normalize() {
   assert_golden(
-      run_and_serialize(
-          "header_noise.html",
-          "SELECT table FROM doc TO TABLE(HEADER=ON, HEADER_NORMALIZE=ON);"),
+      run_and_serialize("header_noise.html",
+                        "SELECT table FROM doc TO TABLE(HEADER=ON, HEADER_NORMALIZE=ON);"),
       "tests/golden/table_trim/07_header_normalize.txt");
 }
 
 void test_golden_table_sparse_long() {
-  assert_golden(
-      run_and_serialize(
-          "trailing_empty_rows_and_cols.html",
-          "SELECT table FROM doc TO TABLE("
-          "FORMAT=SPARSE, SPARSE_SHAPE=LONG, TRIM_EMPTY_ROWS=ON, "
-          "TRIM_EMPTY_COLS=TRAILING, HEADER=ON);"),
-      "tests/golden/table_sparse/08_sparse_long.txt");
+  assert_golden(run_and_serialize("trailing_empty_rows_and_cols.html",
+                                  "SELECT table FROM doc TO TABLE("
+                                  "FORMAT=SPARSE, SPARSE_SHAPE=LONG, TRIM_EMPTY_ROWS=ON, "
+                                  "TRIM_EMPTY_COLS=TRAILING, HEADER=ON);"),
+                "tests/golden/table_sparse/08_sparse_long.txt");
 }
 
 void test_golden_table_sparse_wide() {
-  assert_golden(
-      run_and_serialize(
-          "trailing_empty_rows_and_cols.html",
-          "SELECT table FROM doc TO TABLE("
-          "FORMAT=SPARSE, SPARSE_SHAPE=WIDE, TRIM_EMPTY_ROWS=ON, "
-          "TRIM_EMPTY_COLS=TRAILING, HEADER=ON);"),
-      "tests/golden/table_sparse/09_sparse_wide.txt");
+  assert_golden(run_and_serialize("trailing_empty_rows_and_cols.html",
+                                  "SELECT table FROM doc TO TABLE("
+                                  "FORMAT=SPARSE, SPARSE_SHAPE=WIDE, TRIM_EMPTY_ROWS=ON, "
+                                  "TRIM_EMPTY_COLS=TRAILING, HEADER=ON);"),
+                "tests/golden/table_sparse/09_sparse_wide.txt");
 }
 
 }  // namespace
@@ -325,7 +322,8 @@ void register_table_option_tests(std::vector<TestCase>& tests) {
   tests.push_back({"golden_table_trim_baseline", test_golden_table_trim_baseline});
   tests.push_back({"golden_table_trim_rows", test_golden_table_trim_rows});
   tests.push_back({"golden_table_trim_trailing_cols", test_golden_table_trim_trailing_cols});
-  tests.push_back({"golden_table_trim_rows_and_trailing_cols", test_golden_table_trim_rows_and_trailing_cols});
+  tests.push_back(
+      {"golden_table_trim_rows_and_trailing_cols", test_golden_table_trim_rows_and_trailing_cols});
   tests.push_back({"golden_table_trim_all_cols", test_golden_table_trim_all_cols});
   tests.push_back({"golden_table_stop_after_empty_rows", test_golden_table_stop_after_empty_rows});
   tests.push_back({"golden_table_header_normalize", test_golden_table_header_normalize});

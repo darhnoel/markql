@@ -39,11 +39,8 @@ void run_case(const std::string& html, const std::string& label, const std::stri
   auto end = std::chrono::steady_clock::now();
   auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   std::size_t bytes = total_inner_html_bytes(result);
-  std::cout << label
-            << ": rows=" << result.rows.size()
-            << " elapsed_ms=" << elapsed_ms
-            << " output_bytes=" << bytes
-            << std::endl;
+  std::cout << label << ": rows=" << result.rows.size() << " elapsed_ms=" << elapsed_ms
+            << " output_bytes=" << bytes << std::endl;
 }
 
 }  // namespace
@@ -56,11 +53,9 @@ int main(int argc, char** argv) {
 
   std::string html = build_fixture(n);
   std::cout << "fixture_bytes=" << html.size() << " nodes=" << n << std::endl;
-  run_case(html,
-           "inner_html_minified",
+  run_case(html, "inner_html_minified",
            "SELECT INNER_HTML(div) FROM document WHERE attributes.class = 'card'");
-  run_case(html,
-           "inner_html_raw",
+  run_case(html, "inner_html_raw",
            "SELECT RAW_INNER_HTML(div) FROM document WHERE attributes.class = 'card'");
   return 0;
 }

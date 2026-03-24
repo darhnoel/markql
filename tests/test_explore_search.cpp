@@ -11,10 +11,8 @@ namespace {
 void test_fuzzy_match_score_basic() {
   size_t pos = 0;
   int score = 0;
-  bool ok = markql::cli::fuzzy_match_score("<div>International scheduled flight</div>",
-                                         "intsch",
-                                         &pos,
-                                         &score);
+  bool ok = markql::cli::fuzzy_match_score("<div>International scheduled flight</div>", "intsch",
+                                           &pos, &score);
   expect_true(ok, "fuzzy score should match ordered subsequence");
   expect_true(pos < 20, "fuzzy first position should point near first letters");
   expect_true(score > 0, "fuzzy score should be positive for valid match");
@@ -44,9 +42,9 @@ void test_make_inner_html_snippet_context() {
   std::string html = "<div>alpha beta gamma delta epsilon zeta eta theta iota</div>";
   std::string snippet = markql::cli::make_inner_html_snippet(html, 20, 5, 24);
   expect_true(!snippet.empty(), "snippet should not be empty");
-  expect_true(snippet.find("gamma") != std::string::npos ||
-                  snippet.find("delta") != std::string::npos,
-              "snippet should include nearby context around match");
+  expect_true(
+      snippet.find("gamma") != std::string::npos || snippet.find("delta") != std::string::npos,
+      "snippet should include nearby context around match");
 }
 
 void test_fuzzy_search_candidate_subset() {
@@ -149,7 +147,8 @@ void test_exact_search_prioritizes_closer_container_depth() {
 
   auto matches = markql::cli::exact_search_inner_html(doc, "lists_of_unicode", 10, false, true);
   expect_true(matches.size() == 3, "all ancestor containers should match by inner_html");
-  expect_true(matches[0].node_id == 2, "direct div attribute hit should rank before ancestor descendants");
+  expect_true(matches[0].node_id == 2,
+              "direct div attribute hit should rank before ancestor descendants");
   expect_true(matches[0].source_priority > matches[1].source_priority,
               "self-attribute source priority should outrank descendant source priority");
 }
@@ -173,7 +172,8 @@ void test_exact_search_source_priority_overrides_depth() {
 
   auto matches = markql::cli::exact_search_inner_html(doc, "lists_of_unicode", 10, false, true);
   expect_true(matches.size() == 2, "both nodes should match across supported search scopes");
-  expect_true(matches[0].node_id == 0, "self-attribute hit should rank above deeper descendant-only hit");
+  expect_true(matches[0].node_id == 0,
+              "self-attribute hit should rank above deeper descendant-only hit");
 }
 
 }  // namespace
@@ -187,7 +187,8 @@ void register_explore_search_tests(std::vector<TestCase>& tests) {
                    test_fuzzy_search_prioritizes_word_level_match});
   tests.push_back({"exact_search_case_insensitive_contiguous_only",
                    test_exact_search_case_insensitive_contiguous_only});
-  tests.push_back({"exact_search_prioritizes_whole_word", test_exact_search_prioritizes_whole_word});
+  tests.push_back(
+      {"exact_search_prioritizes_whole_word", test_exact_search_prioritizes_whole_word});
   tests.push_back({"exact_search_prioritizes_closer_container_depth",
                    test_exact_search_prioritizes_closer_container_depth});
   tests.push_back({"exact_search_source_priority_overrides_depth",

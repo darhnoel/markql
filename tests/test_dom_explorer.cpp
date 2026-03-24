@@ -35,7 +35,10 @@ void test_flatten_visible_tree_order_and_depth() {
   std::unordered_set<int64_t> expanded = {0, 1};
   auto rows = markql::cli::flatten_visible_tree(roots, children, expanded);
   std::vector<std::pair<int64_t, int>> expected = {
-      {0, 0}, {1, 1}, {2, 2}, {4, 2},
+      {0, 0},
+      {1, 1},
+      {2, 2},
+      {4, 2},
   };
   expect_eq(rows.size(), expected.size(), "visible row count for partially expanded tree");
   for (size_t i = 0; i < expected.size(); ++i) {
@@ -88,6 +91,8 @@ void test_render_attribute_lines_sorted_format() {
 }  // namespace
 
 void register_dom_explorer_tests(std::vector<TestCase>& tests) {
-  tests.push_back({"flatten_visible_tree_order_and_depth", test_flatten_visible_tree_order_and_depth});
-  tests.push_back({"render_attribute_lines_sorted_format", test_render_attribute_lines_sorted_format});
+  tests.push_back(
+      {"flatten_visible_tree_order_and_depth", test_flatten_visible_tree_order_and_depth});
+  tests.push_back(
+      {"render_attribute_lines_sorted_format", test_render_attribute_lines_sorted_format});
 }

@@ -49,12 +49,8 @@ PluginManager::PluginManager(CommandRegistry& registry) : registry_(registry) {
   host_context_.manager = this;
 }
 
-bool PluginManager::register_command(void* host_context,
-                                     const char* name,
-                                     const char* help,
-                                     XsqlPluginCommandFn fn,
-                                     void* user_data,
-                                     char* out_error,
+bool PluginManager::register_command(void* host_context, const char* name, const char* help,
+                                     XsqlPluginCommandFn fn, void* user_data, char* out_error,
                                      size_t out_error_size) {
   if (!host_context || !name || !*name || !fn) {
     if (out_error && out_error_size > 0) {
@@ -87,8 +83,7 @@ bool PluginManager::register_command(void* host_context,
   }
   std::string prefix = "." + command_name;
   ctx->manager->registry_.add([prefix, fn, user_data, plugin_name, manager = ctx->manager](
-                                  const std::string& line,
-                                  CommandContext& ctx) -> bool {
+                                  const std::string& line, CommandContext& ctx) -> bool {
     if (line.rfind(prefix, 0) != 0) {
       return false;
     }
@@ -110,12 +105,8 @@ bool PluginManager::register_command(void* host_context,
   return true;
 }
 
-bool PluginManager::register_tokenizer(void* host_context,
-                                       const char* lang,
-                                       XsqlTokenizerFn fn,
-                                       void* user_data,
-                                       char* out_error,
-                                       size_t out_error_size) {
+bool PluginManager::register_tokenizer(void* host_context, const char* lang, XsqlTokenizerFn fn,
+                                       void* user_data, char* out_error, size_t out_error_size) {
   if (!host_context || !lang || !*lang || !fn) {
     if (out_error && out_error_size > 0) {
       std::snprintf(out_error, out_error_size, "Invalid tokenizer registration.");
@@ -133,9 +124,7 @@ bool PluginManager::register_tokenizer(void* host_context,
   return true;
 }
 
-void PluginManager::print_message(void*,
-                                  const char* message,
-                                  bool is_error) {
+void PluginManager::print_message(void*, const char* message, bool is_error) {
   if (!message) {
     return;
   }
@@ -146,10 +135,8 @@ void PluginManager::print_message(void*,
   }
 }
 
-bool PluginManager::tokenize(const std::string& lang,
-                             const std::string& text,
-                             std::vector<std::string>& tokens,
-                             std::string& error) const {
+bool PluginManager::tokenize(const std::string& lang, const std::string& text,
+                             std::vector<std::string>& tokens, std::string& error) const {
   auto it = tokenizers_.find(lang);
   if (it == tokenizers_.end()) {
     error = "Tokenizer not available for language: " + lang;
@@ -160,11 +147,7 @@ bool PluginManager::tokenize(const std::string& lang,
   std::string buffer;
   buffer.resize(cap);
   char err[256] = {0};
-  if (!it->second.fn(text.c_str(),
-                     it->second.user_data,
-                     buffer.data(),
-                     buffer.size(),
-                     err,
+  if (!it->second.fn(text.c_str(), it->second.user_data, buffer.data(), buffer.size(), err,
                      sizeof(err))) {
     error = err[0] ? err : "Tokenizer failed.";
     return false;
@@ -288,14 +271,13 @@ bool PluginManager::load(const std::string& name_or_path, std::string& error) {
 }
 
 bool PluginManager::unload(const std::string& name, std::string& error) {
-  auto it = std::find_if(plugins_.begin(), plugins_.end(),
-                         [&name](const LoadedPlugin& plugin) {
-                           if (plugin.name == name || plugin.path == name) {
-                             return true;
-                           }
-                           std::filesystem::path path = plugin.path;
-                           return !path.stem().empty() && path.stem() == name;
-                         });
+  auto it = std::find_if(plugins_.begin(), plugins_.end(), [&name](const LoadedPlugin& plugin) {
+    if (plugin.name == name || plugin.path == name) {
+      return true;
+    }
+    std::filesystem::path path = plugin.path;
+    return !path.stem().empty() && path.stem() == name;
+  });
   if (it == plugins_.end()) {
     error = "Plugin not loaded: " + name;
     return false;
@@ -308,11 +290,10 @@ bool PluginManager::unload(const std::string& name, std::string& error) {
       ++iter;
     }
   }
-  plugin_info_.erase(std::remove_if(plugin_info_.begin(), plugin_info_.end(),
-                                    [&plugin_name](const PluginInfo& info) {
-                                      return info.name == plugin_name;
-                                    }),
-                     plugin_info_.end());
+  plugin_info_.erase(
+      std::remove_if(plugin_info_.begin(), plugin_info_.end(),
+                     [&plugin_name](const PluginInfo& info) { return info.name == plugin_name; }),
+      plugin_info_.end());
 #if defined(_WIN32)
   if (it->handle) {
     FreeLibrary(static_cast<HMODULE>(it->handle));

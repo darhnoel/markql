@@ -43,10 +43,9 @@ inline std::string make_normal_repl_prompt(bool color_enabled) {
 }
 
 inline void configure_repl_editor(LineEditor& editor, bool color_enabled, bool highlight_enabled) {
-  editor.set_mode_prompts(make_prompt_text(kPromptVimNormalPlain, color_enabled),
-                          vim_normal_prompt_visible_len(),
-                          make_prompt_text(kPromptVimInsertPlain, color_enabled),
-                          vim_insert_prompt_visible_len());
+  editor.set_mode_prompts(
+      make_prompt_text(kPromptVimNormalPlain, color_enabled), vim_normal_prompt_visible_len(),
+      make_prompt_text(kPromptVimInsertPlain, color_enabled), vim_insert_prompt_visible_len());
   editor.set_keyword_color(color_enabled && highlight_enabled);
   editor.set_cont_prompt(kPromptContinuationPlain, kPromptContinuationVisibleLen);
 }

@@ -32,9 +32,7 @@ std::string shell_quote_arg(const std::string& value) {
 #endif
 }
 
-int run_command(const std::string& command,
-                bool verbose,
-                const std::filesystem::path& log_path) {
+int run_command(const std::string& command, bool verbose, const std::filesystem::path& log_path) {
   if (verbose) {
     return std::system(command.c_str());
   }
@@ -105,8 +103,7 @@ CommandHandler make_plugin_install_command() {
         use_local_source ? std::filesystem::current_path()
                          : std::filesystem::path("plugins") / "src" / match->name;
     std::filesystem::path source_root = plugin_root / match->path;
-    std::filesystem::path wrapper_root =
-        std::filesystem::path("plugins") / "cmake" / match->name;
+    std::filesystem::path wrapper_root = std::filesystem::path("plugins") / "cmake" / match->name;
     std::filesystem::path cmake_root = source_root;
     if (std::filesystem::exists(wrapper_root / "CMakeLists.txt")) {
       cmake_root = wrapper_root;
@@ -115,18 +112,17 @@ CommandHandler make_plugin_install_command() {
     std::filesystem::path bin_root = std::filesystem::path("plugins") / "bin";
     std::filesystem::create_directories(bin_root);
 
-    std::filesystem::path log_dir =
-        std::filesystem::path("plugins") / ".markql_logs" / match->name;
+    std::filesystem::path log_dir = std::filesystem::path("plugins") / ".markql_logs" / match->name;
     std::filesystem::create_directories(log_dir);
     std::filesystem::path git_log = log_dir / "git.log";
     std::filesystem::path cmake_log = log_dir / "cmake.log";
 
     if (!use_local_source) {
       if (std::filesystem::exists(plugin_root) && !std::filesystem::exists(plugin_root / ".git")) {
-        std::cerr << "Error: plugin source already exists but is not a git repo: "
-                  << plugin_root << std::endl;
-        std::cerr << "Run: .plugin remove " << match->name << " (or delete the folder) and try again."
+        std::cerr << "Error: plugin source already exists but is not a git repo: " << plugin_root
                   << std::endl;
+        std::cerr << "Run: .plugin remove " << match->name
+                  << " (or delete the folder) and try again." << std::endl;
         return true;
       }
 
@@ -145,9 +141,8 @@ CommandHandler make_plugin_install_command() {
       } else {
         std::cout << "Step 1/2: Cloning source..." << std::endl;
         std::filesystem::create_directories(plugin_root.parent_path());
-        std::string clone_cmd =
-            "git clone " + shell_quote_arg(match->repo) + " " +
-            shell_quote_arg(plugin_root.string());
+        std::string clone_cmd = "git clone " + shell_quote_arg(match->repo) + " " +
+                                shell_quote_arg(plugin_root.string());
         if (run_command(clone_cmd, verbose, git_log) != 0) {
           std::cerr << "Error: git clone failed for " << match->name << std::endl;
           if (!verbose && std::filesystem::exists(git_log)) {
@@ -168,11 +163,10 @@ CommandHandler make_plugin_install_command() {
     std::cout << "Step 2/2: Building plugin..." << std::endl;
     std::string markql_root = std::filesystem::current_path().string();
     std::string plugin_source = std::filesystem::absolute(plugin_root).string();
-    std::string cmake_config =
-        "cmake -S " + shell_quote_arg(cmake_root.string()) + " -B " +
-        shell_quote_arg(build_dir.string()) + " " +
-        shell_quote_arg("-DMARKQL_ROOT=" + markql_root) + " " +
-        shell_quote_arg("-DPLUGIN_SOURCE=" + plugin_source);
+    std::string cmake_config = "cmake -S " + shell_quote_arg(cmake_root.string()) + " -B " +
+                               shell_quote_arg(build_dir.string()) + " " +
+                               shell_quote_arg("-DMARKQL_ROOT=" + markql_root) + " " +
+                               shell_quote_arg("-DPLUGIN_SOURCE=" + plugin_source);
     if (run_command(cmake_config, verbose, cmake_log) != 0) {
       std::cerr << "Error: CMake configure failed for " << match->name << std::endl;
       if (!verbose && std::filesystem::exists(cmake_log)) {
@@ -214,7 +208,8 @@ CommandHandler make_plugin_install_command() {
                                  std::filesystem::copy_options::overwrite_existing);
       std::cout << "Installed plugin binary: " << dest_path << std::endl;
     } else {
-      std::cout << "Build completed. Configure plugin binary path in registry if needed." << std::endl;
+      std::cout << "Build completed. Configure plugin binary path in registry if needed."
+                << std::endl;
     }
 
     std::cout << "Plugin installed: " << match->name << std::endl;

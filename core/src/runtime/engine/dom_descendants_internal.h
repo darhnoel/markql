@@ -22,12 +22,9 @@ struct DescendantTagFilter {
 };
 
 void collect_descendants_at_depth(const std::vector<std::vector<int64_t>>& children,
-                                  int64_t node_id,
-                                  size_t depth,
-                                  std::vector<int64_t>& out);
+                                  int64_t node_id, size_t depth, std::vector<int64_t>& out);
 void collect_descendants_any_depth(const std::vector<std::vector<int64_t>>& children,
-                                   int64_t node_id,
-                                   std::vector<int64_t>& out);
+                                   int64_t node_id, std::vector<int64_t>& out);
 bool collect_descendant_tag_filter(const Expr& expr, DescendantTagFilter& filter);
 bool match_descendant_predicate(const HtmlNode& node, const DescendantTagFilter::Predicate& pred);
 

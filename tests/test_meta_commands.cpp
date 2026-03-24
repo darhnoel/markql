@@ -10,15 +10,13 @@ void test_parse_show_describe() {
   auto show_inputs = markql::parse_query("SHOW INPUTS");
   expect_true(show_inputs.query.has_value(), "SHOW INPUTS parses");
   if (show_inputs.query.has_value()) {
-    expect_true(show_inputs.query->kind == markql::Query::Kind::ShowInputs,
-                "SHOW INPUTS kind");
+    expect_true(show_inputs.query->kind == markql::Query::Kind::ShowInputs, "SHOW INPUTS kind");
   }
 
   auto describe = markql::parse_query("DESCRIBE doc");
   expect_true(describe.query.has_value(), "DESCRIBE doc parses");
   if (describe.query.has_value()) {
-    expect_true(describe.query->kind == markql::Query::Kind::DescribeDoc,
-                "DESCRIBE doc kind");
+    expect_true(describe.query->kind == markql::Query::Kind::DescribeDoc, "DESCRIBE doc kind");
   }
 
   auto describe_language = markql::parse_query("DESCRIBE language");
@@ -66,8 +64,8 @@ void test_describe_language_output() {
   for (const auto& row : result.rows) {
     auto cat = row.attributes.find("category");
     auto name = row.attributes.find("name");
-    if (cat != row.attributes.end() && name != row.attributes.end() &&
-        cat->second == "clause" && name->second == "SELECT") {
+    if (cat != row.attributes.end() && name != row.attributes.end() && cat->second == "clause" &&
+        name->second == "SELECT") {
       saw_select = true;
       break;
     }

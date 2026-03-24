@@ -51,10 +51,9 @@ void print_usage() {
 }  // namespace
 
 CommandHandler make_explore_command() {
-  return make_explore_command_with_runner(
-      [](const std::string& input, std::ostream& err) {
-        return run_dom_explorer_from_input(input, err);
-      });
+  return make_explore_command_with_runner([](const std::string& input, std::ostream& err) {
+    return run_dom_explorer_from_input(input, err);
+  });
 }
 
 CommandHandler make_explore_command_with_runner(ExploreRunner runner) {
@@ -91,8 +90,8 @@ CommandHandler make_explore_command_with_runner(ExploreRunner runner) {
       auto it = ctx.sources.find(alias);
       if (it == ctx.sources.end() || it->second.source.empty()) {
         if (!alias.empty()) {
-          std::cerr << "No input loaded for alias '" << alias
-                    << "'. Use .load <path|url> --alias " << alias << "." << std::endl;
+          std::cerr << "No input loaded for alias '" << alias << "'. Use .load <path|url> --alias "
+                    << alias << "." << std::endl;
         } else {
           std::cerr << "No input loaded. Use .load <path|url> or start with --input <path|url>."
                     << std::endl;

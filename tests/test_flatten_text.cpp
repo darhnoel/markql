@@ -22,13 +22,13 @@ void test_flatten_text_default_all_descendants() {
   std::string html =
       "<div id='a'><section><p>One</p><span>Two</span></section></div>"
       "<div id='b'><section><p>Three</p></section></div>";
-  auto result = run_query(
-      html,
-      "SELECT div.node_id, FLATTEN_TEXT(div) AS (col1, col2) "
-      "FROM document WHERE descendant.tag IN ('p','span')");
+  auto result = run_query(html,
+                          "SELECT div.node_id, FLATTEN_TEXT(div) AS (col1, col2) "
+                          "FROM document WHERE descendant.tag IN ('p','span')");
   expect_eq(result.rows.size(), 2, "flatten_text default row count");
   if (result.rows.size() == 2) {
-    expect_true(result.rows[0].node_id < result.rows[1].node_id, "flatten_text preserves doc order");
+    expect_true(result.rows[0].node_id < result.rows[1].node_id,
+                "flatten_text preserves doc order");
     expect_true(result.rows[0].computed_fields["col1"] == "One", "flatten_text first value");
     expect_true(result.rows[0].computed_fields["col2"] == "Two", "flatten_text second value");
     expect_true(result.rows[1].computed_fields["col1"] == "Three", "flatten_text second row value");
@@ -39,9 +39,7 @@ void test_flatten_text_default_all_descendants() {
 
 void test_flatten_text_explicit_depth() {
   std::string html = "<div><section> Alpha <p>One</p></section></div>";
-  auto result = run_query(
-      html,
-      "SELECT div.node_id, FLATTEN_TEXT(div, 1) AS (col1) FROM document");
+  auto result = run_query(html, "SELECT div.node_id, FLATTEN_TEXT(div, 1) AS (col1) FROM document");
   expect_eq(result.rows.size(), 1, "flatten_text depth row count");
   if (!result.rows.empty()) {
     expect_true(result.rows[0].computed_fields["col1"] == "Alpha",
@@ -51,13 +49,13 @@ void test_flatten_text_explicit_depth() {
 
 void test_flatten_text_descendant_tag_eq() {
   std::string html = "<div><section><p>One</p><span>Two</span></section></div>";
-  auto result = run_query(
-      html,
-      "SELECT div.node_id, FLATTEN_TEXT(div) AS (col1, col2) "
-      "FROM document WHERE descendant.tag = 'p'");
+  auto result = run_query(html,
+                          "SELECT div.node_id, FLATTEN_TEXT(div) AS (col1, col2) "
+                          "FROM document WHERE descendant.tag = 'p'");
   expect_eq(result.rows.size(), 1, "flatten_text descendant tag row count");
   if (!result.rows.empty()) {
-    expect_true(result.rows[0].computed_fields["col1"] == "One", "flatten_text descendant tag value");
+    expect_true(result.rows[0].computed_fields["col1"] == "One",
+                "flatten_text descendant tag value");
     expect_true(result.rows[0].computed_fields.find("col2") == result.rows[0].computed_fields.end(),
                 "flatten_text descendant tag truncates");
   }
@@ -70,8 +68,7 @@ void test_flatten_text_truncation() {
       "SELECT div.node_id, FLATTEN_TEXT(div) AS (col1) FROM document WHERE descendant.tag = 'p'");
   expect_eq(result.rows.size(), 1, "flatten_text truncation row count");
   if (!result.rows.empty()) {
-    expect_true(result.rows[0].computed_fields["col1"] == "One",
-                "flatten_text truncates extras");
+    expect_true(result.rows[0].computed_fields["col1"] == "One", "flatten_text truncates extras");
   }
 }
 
@@ -104,8 +101,7 @@ void test_flatten_alias_function() {
   auto result = run_query(html, "SELECT FLATTEN(div) FROM document");
   expect_eq(result.columns.size(), 1, "flatten alias column count");
   if (!result.rows.empty()) {
-    expect_true(result.rows[0].computed_fields["flatten_text"] == "One",
-                "flatten alias value");
+    expect_true(result.rows[0].computed_fields["flatten_text"] == "One", "flatten alias value");
   }
 }
 
@@ -143,22 +139,18 @@ void test_flatten_text_realistic_flight_card() {
       "<span data-testid='price'>US$463</span>"
       "</div>"
       "</div>";
-  auto result = run_query(
-      html,
-      "SELECT div.node_id, FLATTEN_TEXT(div) AS (t1, dur, layover, t2, price) "
-      "FROM document WHERE div.attributes.class = 'section-root' "
-      "AND descendant.attributes.data-testid CONTAINS ANY "
-      "('time-depart', 'duration', 'layover', 'time-arrive', 'price')");
+  auto result = run_query(html,
+                          "SELECT div.node_id, FLATTEN_TEXT(div) AS (t1, dur, layover, t2, price) "
+                          "FROM document WHERE div.attributes.class = 'section-root' "
+                          "AND descendant.attributes.data-testid CONTAINS ANY "
+                          "('time-depart', 'duration', 'layover', 'time-arrive', 'price')");
   expect_eq(result.rows.size(), 1, "flatten_text realistic row count");
   if (!result.rows.empty()) {
-    expect_true(result.rows[0].computed_fields["t1"] == "08:00",
-                "flatten_text realistic t1");
-    expect_true(result.rows[0].computed_fields["dur"] == "10h",
-                "flatten_text realistic duration");
+    expect_true(result.rows[0].computed_fields["t1"] == "08:00", "flatten_text realistic t1");
+    expect_true(result.rows[0].computed_fields["dur"] == "10h", "flatten_text realistic duration");
     expect_true(result.rows[0].computed_fields["layover"] == "3h 20m in Guangzhou",
                 "flatten_text realistic layover");
-    expect_true(result.rows[0].computed_fields["t2"] == "20:00",
-                "flatten_text realistic t2");
+    expect_true(result.rows[0].computed_fields["t2"] == "20:00", "flatten_text realistic t2");
     expect_true(result.rows[0].computed_fields["price"] == "US$463",
                 "flatten_text realistic price");
   }
@@ -168,13 +160,16 @@ void test_flatten_text_realistic_flight_card() {
 
 void register_flatten_text_tests(std::vector<TestCase>& tests) {
   tests.push_back({"max_depth_values", test_max_depth_values});
-  tests.push_back({"flatten_text_default_all_descendants", test_flatten_text_default_all_descendants});
+  tests.push_back(
+      {"flatten_text_default_all_descendants", test_flatten_text_default_all_descendants});
   tests.push_back({"flatten_text_explicit_depth", test_flatten_text_explicit_depth});
   tests.push_back({"flatten_text_descendant_tag_eq", test_flatten_text_descendant_tag_eq});
   tests.push_back({"flatten_text_truncation", test_flatten_text_truncation});
-  tests.push_back({"flatten_text_default_uses_deepest_text", test_flatten_text_default_uses_deepest_text});
+  tests.push_back(
+      {"flatten_text_default_uses_deepest_text", test_flatten_text_default_uses_deepest_text});
   tests.push_back({"flatten_text_default_alias", test_flatten_text_default_alias});
   tests.push_back({"flatten_alias_function", test_flatten_alias_function});
-  tests.push_back({"flatten_text_descendant_attribute_filter", test_flatten_text_descendant_attribute_filter});
+  tests.push_back(
+      {"flatten_text_descendant_attribute_filter", test_flatten_text_descendant_attribute_filter});
   tests.push_back({"flatten_text_realistic_flight_card", test_flatten_text_realistic_flight_card});
 }

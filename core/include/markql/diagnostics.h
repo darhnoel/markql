@@ -86,8 +86,7 @@ struct LintResult {
 
 /// Builds a syntax diagnostic anchored at a byte position.
 /// MUST return deterministic code/help/doc mappings for known parser errors.
-Diagnostic make_syntax_diagnostic(const std::string& query,
-                                  const std::string& parser_message,
+Diagnostic make_syntax_diagnostic(const std::string& query, const std::string& parser_message,
                                   size_t error_byte);
 /// Builds a semantic validation diagnostic from a validation error message.
 /// MUST map known validation errors to stable codes with help and docs.
@@ -95,12 +94,10 @@ Diagnostic make_semantic_diagnostic(const std::string& query,
                                     const std::string& validation_message);
 /// Builds a generic runtime diagnostic when an execution error is not a validation rule.
 /// MUST still provide actionable guidance and docs reference.
-Diagnostic make_runtime_diagnostic(const std::string& query,
-                                   const std::string& runtime_message);
+Diagnostic make_runtime_diagnostic(const std::string& query, const std::string& runtime_message);
 /// Builds a lint warning for ambiguous node selection via FROM alias sugar.
 /// MUST keep code/message/help/doc_ref stable for migration tooling.
-Diagnostic make_select_alias_ambiguity_warning(const std::string& query,
-                                               size_t byte_start,
+Diagnostic make_select_alias_ambiguity_warning(const std::string& query, size_t byte_start,
                                                size_t byte_end);
 
 /// Renders diagnostics in a human-readable multi-block text format.

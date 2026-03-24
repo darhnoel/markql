@@ -29,9 +29,7 @@ std::string read_file(const std::string& path) {
 namespace {
 
 void ensure_curl_global_init() {
-  static const auto init_result = []() {
-    return curl_global_init(CURL_GLOBAL_DEFAULT);
-  }();
+  static const auto init_result = []() { return curl_global_init(CURL_GLOBAL_DEFAULT); }();
   if (init_result != CURLE_OK) {
     throw std::runtime_error("Failed to initialize curl globals");
   }
@@ -141,10 +139,8 @@ void validate_content_type(CURL* curl) {
   if (content_type.empty()) {
     throw std::runtime_error("Missing Content-Type for URL");
   }
-  if (content_type == "text/html" ||
-      content_type == "application/xhtml+xml" ||
-      content_type == "application/xml" ||
-      content_type == "text/xml") {
+  if (content_type == "text/html" || content_type == "application/xhtml+xml" ||
+      content_type == "application/xml" || content_type == "text/xml") {
     return;
   }
   throw std::runtime_error("Unsupported Content-Type for HTML fetch: " + content_type);

@@ -23,8 +23,7 @@ QueryRenderResult load_query_file_text(const std::string& query_file,
 
 /// Writes rendered MarkQL exactly as produced, without adding formatting.
 /// MUST write to stdout when destination is "-" and to a file otherwise.
-void write_rendered_query_output(const std::string& destination,
-                                 const std::string& rendered_query);
+void write_rendered_query_output(const std::string& destination, const std::string& rendered_query);
 
 /// Returns true when the rendered output destination is stdout preview mode.
 bool render_to_stdout_only(const std::string& destination);

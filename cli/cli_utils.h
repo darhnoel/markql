@@ -55,8 +55,7 @@ std::string format_bytes_iec(size_t bytes);
 /// Prints time and memory summary lines for a completed query.
 /// MUST keep output stable for CLI parsing and user inspection.
 void print_query_runtime_summary(std::optional<size_t> rss_before_bytes,
-                                 std::optional<size_t> rss_after_bytes,
-                                 long long elapsed_ms);
+                                 std::optional<size_t> rss_after_bytes, long long elapsed_ms);
 /// Rewrites bare FROM paths into quoted string literals for parsing.
 /// MUST only rewrite likely paths and MUST preserve user intent otherwise.
 /// Inputs are the query string; outputs are rewritten query with no side effects.
@@ -111,8 +110,9 @@ std::string build_json(const markql::QueryResult& result,
 /// Serializes a single-column result into a JSON list.
 /// MUST enforce single-column output and MUST represent NULLs explicitly.
 /// Inputs are QueryResult rows; outputs are JSON list text with no side effects.
-std::string build_json_list(const markql::QueryResult& result,
-                            markql::ColumnNameMode colname_mode = markql::ColumnNameMode::Normalize);
+std::string build_json_list(
+    const markql::QueryResult& result,
+    markql::ColumnNameMode colname_mode = markql::ColumnNameMode::Normalize);
 /// Serializes table extraction output into JSON arrays.
 /// MUST preserve row ordering and MUST keep cells as string values.
 /// Inputs are table results; outputs are JSON text with no side effects.
@@ -140,24 +140,19 @@ size_t count_table_rows(const markql::QueryResult::TableResult& table, bool has_
 size_t count_result_rows(const markql::QueryResult& result);
 /// Builds a SHOW INPUT result or reports a missing-input error.
 /// MUST return false when no active source is available.
-bool build_show_input_result(const std::string& source_uri,
-                             markql::QueryResult& out,
+bool build_show_input_result(const std::string& source_uri, markql::QueryResult& out,
                              std::string& error);
 /// Builds a SHOW INPUTS result from the last sources or active source.
 /// MUST return false when no sources are available.
 bool build_show_inputs_result(const std::vector<std::string>& sources,
-                              const std::string& fallback_source,
-                              markql::QueryResult& out,
+                              const std::string& fallback_source, markql::QueryResult& out,
                               std::string& error);
 
 /// Renders an extracted HTML table into duckbox format for terminal display.
 /// MUST honor max_rows and MUST avoid color when not in a TTY.
 /// Inputs are table data and render options; outputs are formatted text.
-std::string render_table_duckbox(const markql::QueryResult::TableResult& table,
-                                 bool has_header,
-                                 bool highlight,
-                                 bool is_tty,
-                                 size_t max_rows);
+std::string render_table_duckbox(const markql::QueryResult::TableResult& table, bool has_header,
+                                 bool highlight, bool is_tty, size_t max_rows);
 
 /// Maps export sink kinds to user-facing labels for CLI messages.
 /// MUST remain stable for scripts that parse output and MUST handle None.

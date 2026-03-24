@@ -12,10 +12,9 @@ namespace {
 
 const std::unordered_set<std::string>& english_stopwords() {
   static const std::unordered_set<std::string> kStopwords = {
-      "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "from", "has",
-      "have", "he", "her", "his", "i", "in", "is", "it", "its", "of", "on", "or",
-      "she", "that", "the", "their", "they", "to", "was", "were", "with", "you"
-  };
+      "a",    "an",   "and", "are",   "as",   "at", "be",  "but",  "by",   "for", "from", "has",
+      "have", "he",   "her", "his",   "i",    "in", "is",  "it",   "its",  "of",  "on",   "or",
+      "she",  "that", "the", "their", "they", "to", "was", "were", "with", "you"};
   return kStopwords;
 }
 
@@ -152,15 +151,15 @@ std::vector<QueryResultRow> build_tfidf_rows(const Query& query,
         size_t df = doc_freq[term];
         if (df < min_df || df > max_df) continue;
         double tf = static_cast<double>(kv.second) / static_cast<double>(total);
-        double idf = std::log((static_cast<double>(doc_count) + 1.0) /
-                              (static_cast<double>(df) + 1.0)) + 1.0;
+        double idf =
+            std::log((static_cast<double>(doc_count) + 1.0) / (static_cast<double>(df) + 1.0)) +
+            1.0;
         scored.emplace_back(term, tf * idf);
       }
-      std::sort(scored.begin(), scored.end(),
-                [](const auto& a, const auto& b) {
-                  if (a.second != b.second) return a.second > b.second;
-                  return a.first < b.first;
-                });
+      std::sort(scored.begin(), scored.end(), [](const auto& a, const auto& b) {
+        if (a.second != b.second) return a.second > b.second;
+        return a.first < b.first;
+      });
       if (scored.size() > item.tfidf_top_terms) {
         scored.resize(item.tfidf_top_terms);
       }

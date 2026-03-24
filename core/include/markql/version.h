@@ -20,4 +20,3 @@ VersionInfo get_version_info();
 std::string version_string();
 
 }  // namespace markql
-

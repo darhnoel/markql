@@ -47,8 +47,8 @@ std::string build_document_nodes_payload_legacy(const HtmlDocument& document) {
 HtmlDocument parse_document_nodes_legacy(const std::string& payload) {
   BinaryReader reader(payload);
   HtmlDocument document;
-  const size_t node_count = read_bounded_count(
-      reader, kMaxNodeCount, "Artifact limit exceeded: node count is too large");
+  const size_t node_count =
+      read_bounded_count(reader, kMaxNodeCount, "Artifact limit exceeded: node count is too large");
   document.nodes.reserve(node_count);
   for (size_t i = 0; i < node_count; ++i) {
     HtmlNode node;
@@ -85,23 +85,14 @@ std::string build_document_nodes_payload_flatbuffers(const HtmlDocument& documen
     std::vector<flatbuffers::Offset<docnfb::Attribute>> attr_offsets;
     attr_offsets.reserve(attrs.size());
     for (const auto& attr : attrs) {
-      attr_offsets.push_back(
-          docnfb::CreateAttribute(builder,
-                                  builder.CreateString(attr.first),
-                                  builder.CreateString(attr.second)));
+      attr_offsets.push_back(docnfb::CreateAttribute(builder, builder.CreateString(attr.first),
+                                                     builder.CreateString(attr.second)));
     }
 
     node_offsets.push_back(docnfb::CreateNode(
-        builder,
-        node.id,
-        builder.CreateString(node.tag),
-        builder.CreateString(node.text),
-        builder.CreateString(node.inner_html),
-        builder.CreateVector(attr_offsets),
-        node.parent_id.value_or(-1),
-        node.parent_id.has_value(),
-        node.max_depth,
-        node.doc_order));
+        builder, node.id, builder.CreateString(node.tag), builder.CreateString(node.text),
+        builder.CreateString(node.inner_html), builder.CreateVector(attr_offsets),
+        node.parent_id.value_or(-1), node.parent_id.has_value(), node.max_depth, node.doc_order));
   }
 
   auto document_root = docnfb::CreateDocument(builder, builder.CreateVector(node_offsets));
@@ -120,8 +111,7 @@ HtmlDocument parse_document_nodes_flatbuffers(const std::string& payload) {
   ensure(document_fb != nullptr, "Corrupted artifact: DOCN FlatBuffer root missing");
   const auto* nodes_fb = document_fb->nodes();
   ensure(nodes_fb != nullptr, "Corrupted artifact: DOCN nodes vector missing");
-  ensure(nodes_fb->size() <= kMaxNodeCount,
-         "Artifact limit exceeded: node count is too large");
+  ensure(nodes_fb->size() <= kMaxNodeCount, "Artifact limit exceeded: node count is too large");
 
   HtmlDocument document;
   document.nodes.reserve(nodes_fb->size());
@@ -145,8 +135,7 @@ HtmlDocument parse_document_nodes_flatbuffers(const std::string& payload) {
         ensure(attr_fb != nullptr, "Corrupted artifact: DOCN attribute entry missing");
         const std::string key = attr_fb->key() != nullptr ? attr_fb->key()->str() : "";
         const std::string value = attr_fb->value() != nullptr ? attr_fb->value()->str() : "";
-        ensure(seen_keys.insert(key).second,
-               "Corrupted artifact: duplicate attribute key");
+        ensure(seen_keys.insert(key).second, "Corrupted artifact: duplicate attribute key");
         node.attributes.emplace(key, value);
       }
     }
@@ -161,7 +150,9 @@ HtmlDocument parse_document_nodes_flatbuffers(const std::string& payload) {
 
 }  // namespace
 
-uint64_t document_required_features() { return kRequiredFeatureDocnFlatbuffers; }
+uint64_t document_required_features() {
+  return kRequiredFeatureDocnFlatbuffers;
+}
 
 bool document_uses_flatbuffers(const ArtifactHeader& header) {
   return (header.required_features & kRequiredFeatureDocnFlatbuffers) != 0;
@@ -193,8 +184,9 @@ std::string build_document_nodes_payload(const HtmlDocument& document) {
 }
 
 HtmlDocument parse_document_nodes(const ArtifactHeader& header, const std::string& payload) {
-  HtmlDocument document = document_uses_flatbuffers(header) ? parse_document_nodes_flatbuffers(payload)
-                                                            : parse_document_nodes_legacy(payload);
+  HtmlDocument document = document_uses_flatbuffers(header)
+                              ? parse_document_nodes_flatbuffers(payload)
+                              : parse_document_nodes_legacy(payload);
   validate_document(document);
   return document;
 }
@@ -206,8 +198,7 @@ void validate_document(const HtmlDocument& document) {
   for (const auto& node : document.nodes) {
     ensure(node.id >= 0 && static_cast<size_t>(node.id) < node_count,
            "Corrupted artifact: node_id is out of range");
-    ensure(!seen[static_cast<size_t>(node.id)],
-           "Corrupted artifact: duplicate node_id");
+    ensure(!seen[static_cast<size_t>(node.id)], "Corrupted artifact: duplicate node_id");
     seen[static_cast<size_t>(node.id)] = true;
     ensure(node.attributes.size() <= kMaxAttributeCount,
            "Artifact limit exceeded: node attribute count is too large");
@@ -219,8 +210,7 @@ void validate_document(const HtmlDocument& document) {
     if (node.parent_id.has_value()) {
       ensure(*node.parent_id >= 0 && static_cast<size_t>(*node.parent_id) < node_count,
              "Corrupted artifact: parent_id is out of range");
-      ensure(*node.parent_id != node.id,
-             "Corrupted artifact: parent_id cannot equal node_id");
+      ensure(*node.parent_id != node.id, "Corrupted artifact: parent_id cannot equal node_id");
     }
     for (const auto& attr : node.attributes) {
       validate_utf8_text(attr.first, "attribute key");

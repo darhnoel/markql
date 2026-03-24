@@ -10,35 +10,64 @@ namespace markql::artifacts::detail {
 
 namespace {
 
-uint8_t to_u8(Query::Kind value) { return static_cast<uint8_t>(value); }
-uint8_t to_u8(Source::Kind value) { return static_cast<uint8_t>(value); }
-uint8_t to_u8(Operand::Axis value) { return static_cast<uint8_t>(value); }
-uint8_t to_u8(Operand::FieldKind value) { return static_cast<uint8_t>(value); }
-uint8_t to_u8(ScalarExpr::Kind value) { return static_cast<uint8_t>(value); }
-uint8_t to_u8(CompareExpr::Op value) { return static_cast<uint8_t>(value); }
-uint8_t to_u8(BinaryExpr::Op value) { return static_cast<uint8_t>(value); }
-uint8_t to_u8(Query::JoinItem::Type value) { return static_cast<uint8_t>(value); }
-uint8_t to_u8(Query::ExportSink::Kind value) { return static_cast<uint8_t>(value); }
-uint8_t to_u8(Query::TableOptions::TrimEmptyCols value) { return static_cast<uint8_t>(value); }
-uint8_t to_u8(Query::TableOptions::EmptyIs value) { return static_cast<uint8_t>(value); }
-uint8_t to_u8(Query::TableOptions::Format value) { return static_cast<uint8_t>(value); }
-uint8_t to_u8(Query::TableOptions::SparseShape value) { return static_cast<uint8_t>(value); }
-uint8_t to_u8(Query::SelectItem::Aggregate value) { return static_cast<uint8_t>(value); }
-uint8_t to_u8(Query::SelectItem::TfidfStopwords value) { return static_cast<uint8_t>(value); }
+uint8_t to_u8(Query::Kind value) {
+  return static_cast<uint8_t>(value);
+}
+uint8_t to_u8(Source::Kind value) {
+  return static_cast<uint8_t>(value);
+}
+uint8_t to_u8(Operand::Axis value) {
+  return static_cast<uint8_t>(value);
+}
+uint8_t to_u8(Operand::FieldKind value) {
+  return static_cast<uint8_t>(value);
+}
+uint8_t to_u8(ScalarExpr::Kind value) {
+  return static_cast<uint8_t>(value);
+}
+uint8_t to_u8(CompareExpr::Op value) {
+  return static_cast<uint8_t>(value);
+}
+uint8_t to_u8(BinaryExpr::Op value) {
+  return static_cast<uint8_t>(value);
+}
+uint8_t to_u8(Query::JoinItem::Type value) {
+  return static_cast<uint8_t>(value);
+}
+uint8_t to_u8(Query::ExportSink::Kind value) {
+  return static_cast<uint8_t>(value);
+}
+uint8_t to_u8(Query::TableOptions::TrimEmptyCols value) {
+  return static_cast<uint8_t>(value);
+}
+uint8_t to_u8(Query::TableOptions::EmptyIs value) {
+  return static_cast<uint8_t>(value);
+}
+uint8_t to_u8(Query::TableOptions::Format value) {
+  return static_cast<uint8_t>(value);
+}
+uint8_t to_u8(Query::TableOptions::SparseShape value) {
+  return static_cast<uint8_t>(value);
+}
+uint8_t to_u8(Query::SelectItem::Aggregate value) {
+  return static_cast<uint8_t>(value);
+}
+uint8_t to_u8(Query::SelectItem::TfidfStopwords value) {
+  return static_cast<uint8_t>(value);
+}
 uint8_t to_u8(Query::SelectItem::FlattenExtractExpr::Kind value) {
   return static_cast<uint8_t>(value);
 }
 
 void write_string_list(BinaryWriter& writer, const std::vector<std::string>& values) {
-  ensure(values.size() <= kMaxCollectionCount,
-         "Artifact limit exceeded: string list is too large");
+  ensure(values.size() <= kMaxCollectionCount, "Artifact limit exceeded: string list is too large");
   writer.write_u64(static_cast<uint64_t>(values.size()));
   for (const auto& value : values) writer.write_string(value);
 }
 
 std::vector<std::string> read_string_list(BinaryReader& reader) {
-  const size_t count = read_bounded_count(
-      reader, kMaxCollectionCount, "Artifact limit exceeded: string list is too large");
+  const size_t count = read_bounded_count(reader, kMaxCollectionCount,
+                                          "Artifact limit exceeded: string list is too large");
   std::vector<std::string> values;
   values.reserve(count);
   for (size_t i = 0; i < count; ++i) values.push_back(reader.read_string());
@@ -54,11 +83,9 @@ void write_operand(BinaryWriter& writer, const Operand& operand) {
 
 Operand read_operand(BinaryReader& reader) {
   Operand operand;
-  operand.axis = enum_from_u8(reader.read_u8(),
-                              Operand::Axis::Descendant,
+  operand.axis = enum_from_u8(reader.read_u8(), Operand::Axis::Descendant,
                               "Corrupted artifact: invalid operand axis");
-  operand.field_kind = enum_from_u8(reader.read_u8(),
-                                    Operand::FieldKind::DocOrder,
+  operand.field_kind = enum_from_u8(reader.read_u8(), Operand::FieldKind::DocOrder,
                                     "Corrupted artifact: invalid operand field kind");
   operand.attribute = reader.read_string();
   operand.qualifier = reader.read_optional_string();
@@ -98,14 +125,11 @@ void write_flatten_extract_expr(BinaryWriter& writer,
 
 Query::SelectItem::FlattenExtractExpr read_flatten_extract_expr(BinaryReader& reader,
                                                                 size_t depth = 0) {
-  (void)checked_next_depth(depth,
-                           kMaxFlattenExprDepth,
+  (void)checked_next_depth(depth, kMaxFlattenExprDepth,
                            "Artifact limit exceeded: flatten expression nesting is too deep");
   Query::SelectItem::FlattenExtractExpr expr;
-  expr.kind = enum_from_u8(
-      reader.read_u8(),
-      Query::SelectItem::FlattenExtractExpr::Kind::CaseWhen,
-      "Corrupted artifact: invalid flatten extract kind");
+  expr.kind = enum_from_u8(reader.read_u8(), Query::SelectItem::FlattenExtractExpr::Kind::CaseWhen,
+                           "Corrupted artifact: invalid flatten extract kind");
   expr.tag = reader.read_string();
   expr.attribute = reader.read_optional_string();
   if (reader.read_bool()) expr.where = read_expr(reader, depth);
@@ -117,8 +141,7 @@ Query::SelectItem::FlattenExtractExpr read_flatten_extract_expr(BinaryReader& re
   for (size_t i = 0; i < arg_count; ++i) {
     expr.args.push_back(read_flatten_extract_expr(
         reader,
-        checked_next_depth(depth,
-                           kMaxFlattenExprDepth,
+        checked_next_depth(depth, kMaxFlattenExprDepth,
                            "Artifact limit exceeded: flatten expression nesting is too deep")));
   }
   expr.function_name = reader.read_string();
@@ -126,30 +149,26 @@ Query::SelectItem::FlattenExtractExpr read_flatten_extract_expr(BinaryReader& re
   expr.number_value = reader.read_i64();
   expr.alias_ref = reader.read_string();
   expr.operand = read_operand(reader);
-  const size_t condition_count = read_bounded_count(
-      reader,
-      kMaxCollectionCount,
-      "Artifact limit exceeded: flatten CASE conditions are too large");
+  const size_t condition_count =
+      read_bounded_count(reader, kMaxCollectionCount,
+                         "Artifact limit exceeded: flatten CASE conditions are too large");
   expr.case_when_conditions.reserve(condition_count);
-  for (size_t i = 0; i < condition_count; ++i) expr.case_when_conditions.push_back(read_expr(reader));
+  for (size_t i = 0; i < condition_count; ++i)
+    expr.case_when_conditions.push_back(read_expr(reader));
   const size_t value_count = read_bounded_count(
-      reader,
-      kMaxCollectionCount,
-      "Artifact limit exceeded: flatten CASE values are too large");
+      reader, kMaxCollectionCount, "Artifact limit exceeded: flatten CASE values are too large");
   expr.case_when_values.reserve(value_count);
   for (size_t i = 0; i < value_count; ++i) {
     expr.case_when_values.push_back(read_flatten_extract_expr(
         reader,
-        checked_next_depth(depth,
-                           kMaxFlattenExprDepth,
+        checked_next_depth(depth, kMaxFlattenExprDepth,
                            "Artifact limit exceeded: flatten expression nesting is too deep")));
   }
   if (reader.read_bool()) {
-    expr.case_else = std::make_shared<Query::SelectItem::FlattenExtractExpr>(
-        read_flatten_extract_expr(
+    expr.case_else =
+        std::make_shared<Query::SelectItem::FlattenExtractExpr>(read_flatten_extract_expr(
             reader,
-            checked_next_depth(depth,
-                               kMaxFlattenExprDepth,
+            checked_next_depth(depth, kMaxFlattenExprDepth,
                                "Artifact limit exceeded: flatten expression nesting is too deep")));
   }
   return expr;
@@ -169,15 +188,14 @@ ScalarExpr read_scalar_expr(BinaryReader& reader, size_t depth) {
   const size_t next_depth = checked_next_depth(
       depth, kMaxScalarExprDepth, "Artifact limit exceeded: scalar expression nesting is too deep");
   ScalarExpr expr;
-  expr.kind = enum_from_u8(reader.read_u8(),
-                           ScalarExpr::Kind::FunctionCall,
+  expr.kind = enum_from_u8(reader.read_u8(), ScalarExpr::Kind::FunctionCall,
                            "Corrupted artifact: invalid scalar expression kind");
   expr.operand = read_operand(reader);
   expr.string_value = reader.read_string();
   expr.number_value = reader.read_i64();
   expr.function_name = reader.read_string();
-  const size_t arg_count = read_bounded_count(
-      reader, kMaxCollectionCount, "Artifact limit exceeded: scalar args are too large");
+  const size_t arg_count = read_bounded_count(reader, kMaxCollectionCount,
+                                              "Artifact limit exceeded: scalar args are too large");
   expr.args.reserve(arg_count);
   for (size_t i = 0; i < arg_count; ++i) expr.args.push_back(read_scalar_expr(reader, next_depth));
   return expr;
@@ -197,8 +215,7 @@ void write_compare_expr(BinaryWriter& writer, const CompareExpr& expr) {
 
 CompareExpr read_compare_expr(BinaryReader& reader) {
   CompareExpr expr;
-  expr.op = enum_from_u8(reader.read_u8(),
-                         CompareExpr::Op::HasDirectText,
+  expr.op = enum_from_u8(reader.read_u8(), CompareExpr::Op::HasDirectText,
                          "Corrupted artifact: invalid compare operator");
   expr.lhs = read_operand(reader);
   expr.rhs.values = read_string_list(reader);
@@ -207,7 +224,8 @@ CompareExpr read_compare_expr(BinaryReader& reader) {
   const size_t rhs_expr_count = read_bounded_count(
       reader, kMaxCollectionCount, "Artifact limit exceeded: expression list is too large");
   expr.rhs_expr_list.reserve(rhs_expr_count);
-  for (size_t i = 0; i < rhs_expr_count; ++i) expr.rhs_expr_list.push_back(read_scalar_expr(reader));
+  for (size_t i = 0; i < rhs_expr_count; ++i)
+    expr.rhs_expr_list.push_back(read_scalar_expr(reader));
   return expr;
 }
 
@@ -219,8 +237,7 @@ void write_exists_expr(BinaryWriter& writer, const ExistsExpr& expr) {
 
 ExistsExpr read_exists_expr(BinaryReader& reader, size_t depth) {
   ExistsExpr expr;
-  expr.axis = enum_from_u8(reader.read_u8(),
-                           Operand::Axis::Descendant,
+  expr.axis = enum_from_u8(reader.read_u8(), Operand::Axis::Descendant,
                            "Corrupted artifact: invalid exists axis");
   if (reader.read_bool()) expr.where = read_expr(reader, depth);
   return expr;
@@ -234,8 +251,7 @@ void write_binary_expr(BinaryWriter& writer, const BinaryExpr& expr) {
 
 BinaryExpr read_binary_expr(BinaryReader& reader, size_t depth) {
   BinaryExpr expr;
-  expr.op = enum_from_u8(reader.read_u8(),
-                         BinaryExpr::Op::Or,
+  expr.op = enum_from_u8(reader.read_u8(), BinaryExpr::Op::Or,
                          "Corrupted artifact: invalid binary operator");
   expr.left = read_expr(reader, depth);
   expr.right = read_expr(reader, depth);
@@ -289,8 +305,7 @@ void write_source(BinaryWriter& writer, const Source& source) {
 
 Source read_source(BinaryReader& reader, size_t query_depth) {
   Source source;
-  source.kind = enum_from_u8(reader.read_u8(),
-                             Source::Kind::DerivedSubquery,
+  source.kind = enum_from_u8(reader.read_u8(), Source::Kind::DerivedSubquery,
                              "Corrupted artifact: invalid source kind");
   source.value = reader.read_string();
   source.alias = reader.read_optional_string();
@@ -298,9 +313,12 @@ Source read_source(BinaryReader& reader, size_t query_depth) {
     source.fragments_query = std::make_shared<Query>(read_query_legacy(reader, query_depth));
   }
   source.fragments_raw = reader.read_optional_string();
-  if (reader.read_bool()) source.parse_query = std::make_shared<Query>(read_query_legacy(reader, query_depth));
-  if (reader.read_bool()) source.parse_expr = std::make_shared<ScalarExpr>(read_scalar_expr(reader));
-  if (reader.read_bool()) source.derived_query = std::make_shared<Query>(read_query_legacy(reader, query_depth));
+  if (reader.read_bool())
+    source.parse_query = std::make_shared<Query>(read_query_legacy(reader, query_depth));
+  if (reader.read_bool())
+    source.parse_expr = std::make_shared<ScalarExpr>(read_scalar_expr(reader));
+  if (reader.read_bool())
+    source.derived_query = std::make_shared<Query>(read_query_legacy(reader, query_depth));
   return source;
 }
 
@@ -337,11 +355,9 @@ void write_select_item(BinaryWriter& writer, const Query::SelectItem& item) {
 
 Query::SelectItem read_select_item(BinaryReader& reader) {
   Query::SelectItem item;
-  item.aggregate = enum_from_u8(reader.read_u8(),
-                                Query::SelectItem::Aggregate::Tfidf,
+  item.aggregate = enum_from_u8(reader.read_u8(), Query::SelectItem::Aggregate::Tfidf,
                                 "Corrupted artifact: invalid aggregate kind");
-  item.tfidf_stopwords = enum_from_u8(reader.read_u8(),
-                                      Query::SelectItem::TfidfStopwords::None,
+  item.tfidf_stopwords = enum_from_u8(reader.read_u8(), Query::SelectItem::TfidfStopwords::None,
                                       "Corrupted artifact: invalid tfidf stopwords value");
   item.tag = reader.read_string();
   item.tfidf_tags = read_string_list(reader);
@@ -363,12 +379,12 @@ Query::SelectItem read_select_item(BinaryReader& reader) {
   item.flatten_depth = reader.read_optional_u64();
   item.flatten_aliases = read_string_list(reader);
   item.flatten_extract_aliases = read_string_list(reader);
-  const size_t flatten_expr_count = read_bounded_count(
-      reader,
-      kMaxCollectionCount,
-      "Artifact limit exceeded: flatten extract expressions are too large");
+  const size_t flatten_expr_count =
+      read_bounded_count(reader, kMaxCollectionCount,
+                         "Artifact limit exceeded: flatten extract expressions are too large");
   item.flatten_extract_exprs.reserve(flatten_expr_count);
-  for (size_t i = 0; i < flatten_expr_count; ++i) item.flatten_extract_exprs.push_back(read_flatten_extract_expr(reader));
+  for (size_t i = 0; i < flatten_expr_count; ++i)
+    item.flatten_extract_exprs.push_back(read_flatten_extract_expr(reader));
   if (reader.read_bool()) item.expr = read_scalar_expr(reader);
   if (reader.read_bool()) item.project_expr = read_flatten_extract_expr(reader);
   return item;
@@ -427,13 +443,12 @@ Query read_query_legacy(BinaryReader& reader, size_t depth) {
   const size_t next_depth = checked_next_depth(
       depth, kMaxQueryDepth, "Artifact limit exceeded: query nesting is too deep");
   Query query;
-  query.kind = enum_from_u8(reader.read_u8(),
-                            Query::Kind::DescribeLanguage,
+  query.kind = enum_from_u8(reader.read_u8(), Query::Kind::DescribeLanguage,
                             "Corrupted artifact: invalid query kind");
   if (reader.read_bool()) {
     query.with = Query::WithClause{};
-    const size_t cte_count = read_bounded_count(
-        reader, kMaxCollectionCount, "Artifact limit exceeded: CTE list is too large");
+    const size_t cte_count = read_bounded_count(reader, kMaxCollectionCount,
+                                                "Artifact limit exceeded: CTE list is too large");
     query.with->ctes.reserve(cte_count);
     for (size_t i = 0; i < cte_count; ++i) {
       Query::WithClause::CteDef cte;
@@ -447,13 +462,12 @@ Query read_query_legacy(BinaryReader& reader, size_t depth) {
   query.select_items.reserve(select_count);
   for (size_t i = 0; i < select_count; ++i) query.select_items.push_back(read_select_item(reader));
   query.source = read_source(reader, next_depth);
-  const size_t join_count = read_bounded_count(
-      reader, kMaxCollectionCount, "Artifact limit exceeded: join list is too large");
+  const size_t join_count = read_bounded_count(reader, kMaxCollectionCount,
+                                               "Artifact limit exceeded: join list is too large");
   query.joins.reserve(join_count);
   for (size_t i = 0; i < join_count; ++i) {
     Query::JoinItem join;
-    join.type = enum_from_u8(reader.read_u8(),
-                             Query::JoinItem::Type::Cross,
+    join.type = enum_from_u8(reader.read_u8(), Query::JoinItem::Type::Cross,
                              "Corrupted artifact: invalid join type");
     join.right_source = read_source(reader, next_depth);
     if (reader.read_bool()) join.on = read_expr(reader, next_depth);
@@ -475,30 +489,24 @@ Query read_query_legacy(BinaryReader& reader, size_t depth) {
   query.to_list = reader.read_bool();
   query.to_table = reader.read_bool();
   query.table_has_header = reader.read_bool();
-  query.table_options.trim_empty_cols = enum_from_u8(
-      reader.read_u8(),
-      Query::TableOptions::TrimEmptyCols::All,
-      "Corrupted artifact: invalid table trim-empty-cols value");
-  query.table_options.empty_is = enum_from_u8(
-      reader.read_u8(),
-      Query::TableOptions::EmptyIs::BlankOnly,
-      "Corrupted artifact: invalid table empty-is value");
-  query.table_options.format = enum_from_u8(
-      reader.read_u8(),
-      Query::TableOptions::Format::Sparse,
-      "Corrupted artifact: invalid table format value");
-  query.table_options.sparse_shape = enum_from_u8(
-      reader.read_u8(),
-      Query::TableOptions::SparseShape::Wide,
-      "Corrupted artifact: invalid sparse-shape value");
+  query.table_options.trim_empty_cols =
+      enum_from_u8(reader.read_u8(), Query::TableOptions::TrimEmptyCols::All,
+                   "Corrupted artifact: invalid table trim-empty-cols value");
+  query.table_options.empty_is =
+      enum_from_u8(reader.read_u8(), Query::TableOptions::EmptyIs::BlankOnly,
+                   "Corrupted artifact: invalid table empty-is value");
+  query.table_options.format = enum_from_u8(reader.read_u8(), Query::TableOptions::Format::Sparse,
+                                            "Corrupted artifact: invalid table format value");
+  query.table_options.sparse_shape =
+      enum_from_u8(reader.read_u8(), Query::TableOptions::SparseShape::Wide,
+                   "Corrupted artifact: invalid sparse-shape value");
   query.table_options.trim_empty_rows = reader.read_bool();
   query.table_options.stop_after_empty_rows = static_cast<size_t>(reader.read_u64());
   query.table_options.header_normalize = reader.read_bool();
   query.table_options.header_normalize_explicit = reader.read_bool();
   if (reader.read_bool()) {
     Query::ExportSink sink;
-    sink.kind = enum_from_u8(reader.read_u8(),
-                             Query::ExportSink::Kind::Ndjson,
+    sink.kind = enum_from_u8(reader.read_u8(), Query::ExportSink::Kind::Ndjson,
                              "Corrupted artifact: invalid export sink kind");
     sink.path = reader.read_string();
     query.export_sink = sink;
@@ -521,7 +529,9 @@ Query parse_prepared_query_payload_legacy(const std::string& payload) {
 
 }  // namespace
 
-uint64_t prepared_query_required_features() { return kRequiredFeatureQastFlatbuffers; }
+uint64_t prepared_query_required_features() {
+  return kRequiredFeatureQastFlatbuffers;
+}
 
 bool prepared_query_uses_flatbuffers(const ArtifactHeader& header) {
   return (header.required_features & kRequiredFeatureQastFlatbuffers) != 0;
@@ -542,11 +552,9 @@ void parse_prepared_meta(const std::string& payload, ArtifactInfo& info) {
   info.producer_version = reader.read_string("producer version");
   info.language_version = reader.read_string("language version");
   info.original_query = reader.read_string("original query");
-  info.query_kind = enum_from_u8(reader.read_u8(),
-                                 Query::Kind::DescribeLanguage,
+  info.query_kind = enum_from_u8(reader.read_u8(), Query::Kind::DescribeLanguage,
                                  "Corrupted artifact: invalid prepared query kind");
-  info.source_kind = enum_from_u8(reader.read_u8(),
-                                  Source::Kind::DerivedSubquery,
+  info.source_kind = enum_from_u8(reader.read_u8(), Source::Kind::DerivedSubquery,
                                   "Corrupted artifact: invalid prepared source kind");
   info.metadata_available = true;
   ensure(reader.done(), "Corrupted artifact: trailing prepared-query metadata");

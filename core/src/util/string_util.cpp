@@ -99,9 +99,7 @@ bool is_matching_close_tag(std::string_view html, size_t pos, std::string_view t
   return is_tag_boundary_char(boundary);
 }
 
-void append_compacted_text(std::string_view text,
-                           bool adjacent_left_tag,
-                           bool adjacent_right_tag,
+void append_compacted_text(std::string_view text, bool adjacent_left_tag, bool adjacent_right_tag,
                            std::string& out) {
   if (text.empty()) return;
 
@@ -182,8 +180,7 @@ std::string trim_ws(const std::string& s) {
   return s.substr(start, end - start);
 }
 
-std::optional<std::string> regex_replace_all(const std::string& input,
-                                             const std::string& pattern,
+std::optional<std::string> regex_replace_all(const std::string& input, const std::string& pattern,
                                              const std::string& replacement) {
   try {
     std::regex re(pattern, std::regex::ECMAScript);
@@ -237,9 +234,7 @@ std::string minify_html(std::string_view html) {
 
       auto tag_info = parse_tag_info(html, i, end);
       out.append(html.substr(i, end - i + 1));
-      if (tag_info.has_value() &&
-          !tag_info->is_end &&
-          !tag_info->self_closing &&
+      if (tag_info.has_value() && !tag_info->is_end && !tag_info->self_closing &&
           is_preserve_tag(tag_info->name)) {
         preserve_tag = tag_info->name;
       }

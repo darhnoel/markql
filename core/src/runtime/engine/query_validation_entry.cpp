@@ -12,11 +12,9 @@ void validate_query_for_execution(const Query& query) {
   if (query.kind != Query::Kind::Select) {
     return;
   }
-  const bool relation_runtime =
-      query.with.has_value() ||
-      !query.joins.empty() ||
-      query.source.kind == Source::Kind::CteRef ||
-      query.source.kind == Source::Kind::DerivedSubquery;
+  const bool relation_runtime = query.with.has_value() || !query.joins.empty() ||
+                                query.source.kind == Source::Kind::CteRef ||
+                                query.source.kind == Source::Kind::DerivedSubquery;
   if (relation_runtime) {
     if (query.to_table) {
       throw std::runtime_error("TO TABLE() is not supported with WITH/JOIN queries");

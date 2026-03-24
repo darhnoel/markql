@@ -19,9 +19,9 @@ bool is_name_char(char c) {
 /// MUST match HTML void tag semantics to avoid unbalanced output.
 /// Inputs are tag names; outputs are booleans with no side effects.
 bool is_void_tag(const std::string& tag) {
-  static const std::vector<std::string> kVoidTags = {
-      "area", "base", "br",   "col",  "embed", "hr",    "img",   "input",
-      "link", "meta", "param","source","track","wbr"};
+  static const std::vector<std::string> kVoidTags = {"area",  "base",   "br",    "col",  "embed",
+                                                     "hr",    "img",    "input", "link", "meta",
+                                                     "param", "source", "track", "wbr"};
   for (const auto& name : kVoidTags) {
     if (tag == name) return true;
   }
@@ -33,9 +33,9 @@ bool is_void_tag(const std::string& tag) {
 /// Inputs are tag names; outputs are booleans with no side effects.
 bool is_inline_tag(const std::string& tag) {
   static const std::vector<std::string> kInlineTags = {
-      "a", "abbr", "b", "bdi", "bdo", "br", "cite", "code", "data", "dfn",
-      "em", "i", "kbd", "mark", "q", "rp", "rt", "ruby", "s", "samp",
-      "small", "span", "strong", "sub", "sup", "time", "u", "var", "wbr"};
+      "a",     "abbr", "b",      "bdi",  "bdo", "br",   "cite", "code", "data", "dfn",
+      "em",    "i",    "kbd",    "mark", "q",   "rp",   "rt",   "ruby", "s",    "samp",
+      "small", "span", "strong", "sub",  "sup", "time", "u",    "var",  "wbr"};
   for (const auto& name : kInlineTags) {
     if (tag == name) return true;
   }
@@ -275,10 +275,8 @@ std::vector<std::vector<int64_t>> build_children(const HtmlDocument& doc) {
 /// Collects table rows and cell text for TO TABLE rendering/export.
 /// MUST preserve row order and MUST skip empty rows.
 /// Inputs are doc/children/table_id; outputs are row vectors.
-void collect_rows(const HtmlDocument& doc,
-                  const std::vector<std::vector<int64_t>>& children,
-                  int64_t table_id,
-                  std::vector<std::vector<std::string>>& out_rows) {
+void collect_rows(const HtmlDocument& doc, const std::vector<std::vector<int64_t>>& children,
+                  int64_t table_id, std::vector<std::vector<std::string>>& out_rows) {
   std::vector<int64_t> stack;
   stack.push_back(table_id);
   std::vector<int64_t> tr_nodes;

@@ -21,8 +21,7 @@ namespace {
 
 class ScopedScalarEvalTimer {
  public:
-  explicit ScopedScalarEvalTimer(RelationRuntimeCache::Profile* profile)
-      : profile_(profile) {
+  explicit ScopedScalarEvalTimer(RelationRuntimeCache::Profile* profile) : profile_(profile) {
     if (profile_ == nullptr || !profile_->enabled) {
       profile_ = nullptr;
       return;
@@ -39,8 +38,7 @@ class ScopedScalarEvalTimer {
     if (profile_->scalar_eval_active_depth != 0) return;
     const auto finished_at = std::chrono::steady_clock::now();
     const uint64_t elapsed_ns = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            finished_at - started_at_).count());
+        std::chrono::duration_cast<std::chrono::nanoseconds>(finished_at - started_at_).count());
     profile_->scalar_eval_time_ns += elapsed_ns;
   }
 
@@ -55,9 +53,7 @@ std::string lower_alias_name(const std::string& alias) {
   return util::to_lower(alias);
 }
 
-void merge_alias_columns(Relation& rel,
-                         const std::string& alias,
-                         const RelationRecord& record) {
+void merge_alias_columns(Relation& rel, const std::string& alias, const RelationRecord& record) {
   auto& cols = rel.alias_columns[alias];
   for (const auto& kv : record.values) {
     cols.insert(kv.first);
@@ -107,8 +103,8 @@ const RelationRecord* resolve_record(const RelationRow& row,
     if (lowered == "doc" && row.aliases.size() == 1) {
       const std::string suggestion = row.aliases.begin()->first;
       if (suggestion != "doc") {
-        throw std::runtime_error(
-            "Identifier 'doc' is not bound; did you mean '" + suggestion + "'?");
+        throw std::runtime_error("Identifier 'doc' is not bound; did you mean '" + suggestion +
+                                 "'?");
       }
     }
     throw std::runtime_error("Unknown identifier '" + *qualifier +
@@ -124,8 +120,7 @@ const RelationRecord* resolve_record(const RelationRow& row,
   return nullptr;
 }
 
-std::optional<std::string> relation_operand_value(const Operand& operand,
-                                                  const RelationRow& row,
+std::optional<std::string> relation_operand_value(const Operand& operand, const RelationRow& row,
                                                   const std::optional<std::string>& active_alias) {
   const RelationRecord* record = resolve_record(row, operand.qualifier, active_alias);
   if (record == nullptr) return std::nullopt;
@@ -140,8 +135,7 @@ std::optional<std::string> relation_operand_value(const Operand& operand,
     }
     return key;
   };
-  if (operand.axis != Operand::Axis::Self &&
-      operand.axis != Operand::Axis::Parent) {
+  if (operand.axis != Operand::Axis::Self && operand.axis != Operand::Axis::Parent) {
     return std::nullopt;
   }
   switch (operand.field_kind) {
@@ -174,8 +168,7 @@ std::optional<std::string> relation_operand_value(const Operand& operand,
   return std::nullopt;
 }
 
-std::optional<std::string> eval_relation_scalar_expr(const ScalarExpr& expr,
-                                                     const RelationRow& row,
+std::optional<std::string> eval_relation_scalar_expr(const ScalarExpr& expr, const RelationRow& row,
                                                      const std::optional<std::string>& active_alias,
                                                      RelationRuntimeCache::Profile* profile) {
   ScopedScalarEvalTimer timer(profile);
@@ -197,7 +190,8 @@ std::optional<std::string> eval_relation_scalar_expr(const ScalarExpr& expr,
     const std::string lowered_target = util::to_lower(*target);
     auto alias_it = row.aliases.find(lowered_target);
     if (alias_it != row.aliases.end()) {
-      const std::string key = (fn == "INNER_HTML" || fn == "RAW_INNER_HTML") ? "inner_html" : "text";
+      const std::string key =
+          (fn == "INNER_HTML" || fn == "RAW_INNER_HTML") ? "inner_html" : "text";
       auto it = alias_it->second.values.find(key);
       if (it == alias_it->second.values.end()) return std::nullopt;
       return it->second;
@@ -230,8 +224,7 @@ std::optional<std::string> eval_relation_scalar_expr(const ScalarExpr& expr,
   }
   if (fn == "COALESCE") {
     for (const auto& arg : expr.args) {
-      std::optional<std::string> value =
-          eval_relation_scalar_expr(arg, row, active_alias, profile);
+      std::optional<std::string> value = eval_relation_scalar_expr(arg, row, active_alias, profile);
       if (!value.has_value()) continue;
       if (util::trim_ws(*value).empty()) continue;
       return value;
@@ -289,14 +282,12 @@ std::optional<std::string> eval_relation_scalar_expr(const ScalarExpr& expr,
   return std::nullopt;
 }
 
-bool eval_relation_expr(const Expr& expr,
-                        const RelationRow& row,
+bool eval_relation_expr(const Expr& expr, const RelationRow& row,
                         const std::optional<std::string>& active_alias,
                         RelationRuntimeCache::Profile* profile);
 
 std::optional<std::string> eval_relation_project_expr(
-    const Query::SelectItem::FlattenExtractExpr& expr,
-    const RelationRow& row,
+    const Query::SelectItem::FlattenExtractExpr& expr, const RelationRow& row,
     const std::optional<std::string>& active_alias,
     const std::unordered_map<std::string, std::string>& bindings,
     RelationRuntimeCache::Profile* profile) {
@@ -380,8 +371,8 @@ std::optional<std::string> eval_relation_project_expr(
     return eval_relation_scalar_expr(scalar_expr, row, active_alias, profile);
   }
   if (expr.kind == Kind::CaseWhen) {
-    for (size_t i = 0; i < expr.case_when_conditions.size() &&
-                       i < expr.case_when_values.size(); ++i) {
+    for (size_t i = 0; i < expr.case_when_conditions.size() && i < expr.case_when_values.size();
+         ++i) {
       if (!eval_relation_expr(expr.case_when_conditions[i], row, active_alias, profile)) continue;
       return eval_relation_project_expr(expr.case_when_values[i], row, active_alias, bindings,
                                         profile);
@@ -394,8 +385,7 @@ std::optional<std::string> eval_relation_project_expr(
   return std::nullopt;
 }
 
-bool eval_relation_expr(const Expr& expr,
-                        const RelationRow& row,
+bool eval_relation_expr(const Expr& expr, const RelationRow& row,
                         const std::optional<std::string>& active_alias,
                         RelationRuntimeCache::Profile* profile) {
   if (std::holds_alternative<CompareExpr>(expr)) {
@@ -426,8 +416,7 @@ bool eval_relation_expr(const Expr& expr,
       }
       return executor_internal::string_in_list(*lhs, candidates);
     }
-    if (cmp.op == CompareExpr::Op::Contains ||
-        cmp.op == CompareExpr::Op::ContainsAll ||
+    if (cmp.op == CompareExpr::Op::Contains || cmp.op == CompareExpr::Op::ContainsAll ||
         cmp.op == CompareExpr::Op::ContainsAny) {
       if (!lhs.has_value()) return false;
       if (cmp.op == CompareExpr::Op::Contains) {
@@ -493,8 +482,7 @@ int compare_optional_relation_values(const std::optional<std::string>& left,
   return 0;
 }
 
-std::optional<std::string> relation_field_by_name(const RelationRow& row,
-                                                  const std::string& field,
+std::optional<std::string> relation_field_by_name(const RelationRow& row, const std::string& field,
                                                   const std::optional<std::string>& active_alias) {
   size_t dot = field.find('.');
   if (dot != std::string::npos) {

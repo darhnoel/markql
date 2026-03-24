@@ -17,15 +17,15 @@ void test_text_requires_non_tag_filter() {
 
 void test_inner_html_function() {
   std::string html = "<div id='root'><span>Hi</span><em>There</em></div>";
-  auto result = run_query(html, "SELECT inner_html(div) FROM document WHERE attributes.id = 'root'");
+  auto result =
+      run_query(html, "SELECT inner_html(div) FROM document WHERE attributes.id = 'root'");
   expect_eq(result.columns.size(), 1, "inner_html projection has one column");
   if (!result.columns.empty()) {
     expect_true(result.columns[0] == "inner_html", "inner_html column name");
   }
   expect_eq(result.rows.size(), 1, "inner_html row count");
   if (!result.rows.empty()) {
-    expect_true(result.rows[0].inner_html == "<span>Hi</span><em>There</em>",
-                "inner_html content");
+    expect_true(result.rows[0].inner_html == "<span>Hi</span><em>There</em>", "inner_html content");
   }
 }
 
@@ -38,15 +38,18 @@ void test_minify_html_basic() {
 void test_minify_html_preserves_attribute_quotes() {
   std::string input = "<a href=\"x y\" title='a b'>   link </a>";
   std::string got = markql::util::minify_html(input);
-  expect_true(got.find("href=\"x y\"") != std::string::npos, "minify keeps double-quoted attribute value");
-  expect_true(got.find("title='a b'") != std::string::npos, "minify keeps single-quoted attribute value");
+  expect_true(got.find("href=\"x y\"") != std::string::npos,
+              "minify keeps double-quoted attribute value");
+  expect_true(got.find("title='a b'") != std::string::npos,
+              "minify keeps single-quoted attribute value");
   expect_true(got == "<a href=\"x y\" title='a b'> link </a>", "minify normalizes text spacing");
 }
 
 void test_minify_html_preserves_protected_tags() {
   std::string input = "<pre>\n a  b\n</pre><div>\n x   y\n</div>";
   std::string got = markql::util::minify_html(input);
-  expect_true(got == "<pre>\n a  b\n</pre><div> x y </div>", "minify preserves pre and compacts div text");
+  expect_true(got == "<pre>\n a  b\n</pre><div> x y </div>",
+              "minify preserves pre and compacts div text");
 }
 
 void test_minify_html_preserves_script_style() {
@@ -55,8 +58,9 @@ void test_minify_html_preserves_script_style() {
       "<style>.a {  color: red; }</style>"
       "<div>\n z   z\n</div>";
   std::string got = markql::util::minify_html(input);
-  expect_true(got.find("<script>var  x = \"a  b\";\nif (x) { y = 1; }</script>") != std::string::npos,
-              "minify preserves script content");
+  expect_true(
+      got.find("<script>var  x = \"a  b\";\nif (x) { y = 1; }</script>") != std::string::npos,
+      "minify preserves script content");
   expect_true(got.find("<style>.a {  color: red; }</style>") != std::string::npos,
               "minify preserves style content");
   expect_true(got.find("<div> z z </div>") != std::string::npos,
@@ -65,7 +69,8 @@ void test_minify_html_preserves_script_style() {
 
 void test_inner_html_depth() {
   std::string html = "<div id='root'><span><b>Hi</b></span><em>There</em></div>";
-  auto result = run_query(html, "SELECT inner_html(div, 1) FROM document WHERE attributes.id = 'root'");
+  auto result =
+      run_query(html, "SELECT inner_html(div, 1) FROM document WHERE attributes.id = 'root'");
   expect_eq(result.rows.size(), 1, "inner_html depth row count");
   if (!result.rows.empty()) {
     expect_true(result.rows[0].inner_html == "<span>Hi</span><em>There</em>",
@@ -75,7 +80,8 @@ void test_inner_html_depth() {
 
 void test_inner_html_max_depth_auto() {
   std::string html = "<div id='root'><span><b>Hi</b></span><em>There</em></div>";
-  auto result = run_query(html, "SELECT inner_html(div, max_depth) FROM document WHERE attributes.id = 'root'");
+  auto result = run_query(
+      html, "SELECT inner_html(div, max_depth) FROM document WHERE attributes.id = 'root'");
   expect_eq(result.rows.size(), 1, "inner_html max_depth row count");
   if (!result.rows.empty()) {
     expect_true(result.rows[0].inner_html == "<span><b>Hi</b></span><em>There</em>",
@@ -85,18 +91,18 @@ void test_inner_html_max_depth_auto() {
 
 void test_trim_inner_html() {
   std::string html = "<li id='item'>\n  <a href=\"/x\">Link</a>\n</li>";
-  auto result = run_query(html, "SELECT trim(inner_html(li)) FROM document WHERE attributes.id = 'item'");
+  auto result =
+      run_query(html, "SELECT trim(inner_html(li)) FROM document WHERE attributes.id = 'item'");
   expect_eq(result.rows.size(), 1, "trim inner_html row count");
   if (!result.rows.empty()) {
-    expect_true(result.rows[0].inner_html == "<a href=\"/x\">Link</a>",
-                "trim inner_html content");
+    expect_true(result.rows[0].inner_html == "<a href=\"/x\">Link</a>", "trim inner_html content");
   }
 }
 
 void test_trim_mixed_with_other_projection() {
   std::string html = "<table><tr><td class='keep'>  Value  </td></tr></table>";
-  auto result =
-      run_query(html, "SELECT trim(text(td)), td.node_id FROM document WHERE attributes.class = 'keep'");
+  auto result = run_query(
+      html, "SELECT trim(text(td)), td.node_id FROM document WHERE attributes.class = 'keep'");
   expect_eq(result.columns.size(), 2, "trim mixed projection column count");
   if (result.columns.size() == 2) {
     expect_true(result.columns[0] == "text", "trim mixed first column");
@@ -111,7 +117,8 @@ void test_trim_mixed_with_other_projection() {
 
 void test_inner_html_minified_by_default() {
   std::string html = "<div id='root'><span>   hi   there  </span></div>";
-  auto result = run_query(html, "SELECT inner_html(div) FROM document WHERE attributes.id = 'root'");
+  auto result =
+      run_query(html, "SELECT inner_html(div) FROM document WHERE attributes.id = 'root'");
   expect_eq(result.rows.size(), 1, "inner_html minified row count");
   if (!result.rows.empty()) {
     expect_true(result.rows[0].inner_html == "<span> hi there </span>",
@@ -121,7 +128,8 @@ void test_inner_html_minified_by_default() {
 
 void test_raw_inner_html_opt_out() {
   std::string html = "<div id='root'><span>   hi   there  </span></div>";
-  auto result = run_query(html, "SELECT raw_inner_html(div) FROM document WHERE attributes.id = 'root'");
+  auto result =
+      run_query(html, "SELECT raw_inner_html(div) FROM document WHERE attributes.id = 'root'");
   expect_eq(result.rows.size(), 1, "raw inner_html row count");
   if (!result.rows.empty()) {
     expect_true(result.rows[0].inner_html == "<span>   hi   there  </span>",
@@ -162,7 +170,8 @@ void test_summarize_star() {
 
 void test_summarize_limit() {
   std::string html = "<div></div><div></div><span></span>";
-  auto result = run_query(html, "SELECT summarize(*) FROM document WHERE tag IN ('div','span') LIMIT 1");
+  auto result =
+      run_query(html, "SELECT summarize(*) FROM document WHERE tag IN ('div','span') LIMIT 1");
   expect_eq(result.rows.size(), 1, "summarize limit row count");
   if (!result.rows.empty()) {
     expect_true(result.rows[0].tag == "div", "summarize limit top tag");
@@ -211,10 +220,9 @@ void test_tfidf_output_shape() {
       "<p class='keep'>Apple banana</p>"
       "<li class='keep'>Carrot banana</li>"
       "<p class='skip'>Skip</p>";
-  auto result = run_query(
-      html,
-      "SELECT TFIDF(p, li, TOP_TERMS=2, STOPWORDS=NONE) FROM document "
-      "WHERE attributes.class = 'keep'");
+  auto result = run_query(html,
+                          "SELECT TFIDF(p, li, TOP_TERMS=2, STOPWORDS=NONE) FROM document "
+                          "WHERE attributes.class = 'keep'");
   expect_eq(result.columns.size(), 4, "tfidf columns size");
   if (result.columns.size() == 4) {
     expect_true(result.columns[0] == "node_id", "tfidf column node_id");
@@ -275,8 +283,10 @@ void register_function_tests(std::vector<TestCase>& tests) {
   tests.push_back({"text_requires_non_tag_filter", test_text_requires_non_tag_filter});
   tests.push_back({"inner_html_function", test_inner_html_function});
   tests.push_back({"minify_html_basic", test_minify_html_basic});
-  tests.push_back({"minify_html_preserves_attribute_quotes", test_minify_html_preserves_attribute_quotes});
-  tests.push_back({"minify_html_preserves_protected_tags", test_minify_html_preserves_protected_tags});
+  tests.push_back(
+      {"minify_html_preserves_attribute_quotes", test_minify_html_preserves_attribute_quotes});
+  tests.push_back(
+      {"minify_html_preserves_protected_tags", test_minify_html_preserves_protected_tags});
   tests.push_back({"minify_html_preserves_script_style", test_minify_html_preserves_script_style});
   tests.push_back({"inner_html_depth", test_inner_html_depth});
   tests.push_back({"inner_html_max_depth_auto", test_inner_html_max_depth_auto});

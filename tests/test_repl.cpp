@@ -41,7 +41,9 @@ struct StreamCapture {
     }
   }
 
-  std::string str() const { return buffer.str(); }
+  std::string str() const {
+    return buffer.str();
+  }
 };
 
 std::filesystem::path make_temp_dir(const std::string& prefix) {
@@ -120,7 +122,8 @@ static void test_summarize_content_basic() {
   markql::cli::LineEditor editor(5, "markql> ", 8);
   std::unordered_map<std::string, markql::cli::LoadedSource> sources;
   sources["doc"] = markql::cli::LoadedSource{
-      "inline", std::optional<std::string>("<html><body><div>Hello Khmer World</div></body></html>")};
+      "inline",
+      std::optional<std::string>("<html><body><div>Hello Khmer World</div></body></html>")};
   std::string active_alias = "doc";
   std::string last_full_output;
   bool display_full = true;
@@ -130,15 +133,8 @@ static void test_summarize_content_basic() {
   markql::cli::CommandRegistry registry;
   markql::cli::PluginManager plugin_manager(registry);
   markql::cli::CommandContext ctx{
-      config,
-      editor,
-      sources,
-      active_alias,
-      last_full_output,
-      display_full,
-      max_rows,
-      last_schema_map,
-      plugin_manager,
+      config,       editor,   sources,         active_alias,   last_full_output,
+      display_full, max_rows, last_schema_map, plugin_manager,
   };
 
   auto handler = markql::cli::make_summarize_content_command();
@@ -169,15 +165,8 @@ static void test_summarize_content_khmer_requires_plugin() {
   markql::cli::CommandRegistry registry;
   markql::cli::PluginManager plugin_manager(registry);
   markql::cli::CommandContext ctx{
-      config,
-      editor,
-      sources,
-      active_alias,
-      last_full_output,
-      display_full,
-      max_rows,
-      last_schema_map,
-      plugin_manager,
+      config,       editor,   sources,         active_alias,   last_full_output,
+      display_full, max_rows, last_schema_map, plugin_manager,
   };
 
   auto handler = markql::cli::make_summarize_content_command();
@@ -199,8 +188,8 @@ static void test_summarize_content_max_tokens() {
   markql::cli::LineEditor editor(5, "markql> ", 8);
   std::unordered_map<std::string, markql::cli::LoadedSource> sources;
   sources["doc"] = markql::cli::LoadedSource{
-      "inline",
-      std::optional<std::string>("<html><body><h3>Alpha Alpha Beta</h3><p>Gamma</p></body></html>")};
+      "inline", std::optional<std::string>(
+                    "<html><body><h3>Alpha Alpha Beta</h3><p>Gamma</p></body></html>")};
   std::string active_alias = "doc";
   std::string last_full_output;
   bool display_full = true;
@@ -210,15 +199,8 @@ static void test_summarize_content_max_tokens() {
   markql::cli::CommandRegistry registry;
   markql::cli::PluginManager plugin_manager(registry);
   markql::cli::CommandContext ctx{
-      config,
-      editor,
-      sources,
-      active_alias,
-      last_full_output,
-      display_full,
-      max_rows,
-      last_schema_map,
-      plugin_manager,
+      config,       editor,   sources,         active_alias,   last_full_output,
+      display_full, max_rows, last_schema_map, plugin_manager,
   };
 
   auto handler = markql::cli::make_summarize_content_command();
@@ -233,7 +215,8 @@ static void test_summarize_content_max_tokens() {
 static void test_sql_keyword_catalog_includes_new_tokens() {
   expect_true(markql::cli::is_sql_keyword_token("case"), "CASE should be highlighted as keyword");
   expect_true(markql::cli::is_sql_keyword_token("WHEN"), "WHEN should be highlighted as keyword");
-  expect_true(markql::cli::is_sql_keyword_token("ndjson"), "NDJSON should be highlighted as keyword");
+  expect_true(markql::cli::is_sql_keyword_token("ndjson"),
+              "NDJSON should be highlighted as keyword");
   expect_true(!markql::cli::is_sql_keyword_token("first_text"),
               "FIRST_TEXT is a function-like identifier, not a reserved keyword");
   expect_true(!markql::cli::is_sql_keyword_token("doc"),
@@ -262,15 +245,8 @@ static void test_set_colnames_command() {
   markql::cli::CommandRegistry registry;
   markql::cli::PluginManager plugin_manager(registry);
   markql::cli::CommandContext ctx{
-      config,
-      editor,
-      sources,
-      active_alias,
-      last_full_output,
-      display_full,
-      max_rows,
-      last_schema_map,
-      plugin_manager,
+      config,       editor,   sources,         active_alias,   last_full_output,
+      display_full, max_rows, last_schema_map, plugin_manager,
   };
   auto handler = markql::cli::make_set_command();
   bool handled = handler(".set colnames raw", ctx);
@@ -292,15 +268,8 @@ static void test_mode_command_accepts_csv() {
   markql::cli::CommandRegistry registry;
   markql::cli::PluginManager plugin_manager(registry);
   markql::cli::CommandContext ctx{
-      config,
-      editor,
-      sources,
-      active_alias,
-      last_full_output,
-      display_full,
-      max_rows,
-      last_schema_map,
-      plugin_manager,
+      config,       editor,   sources,         active_alias,   last_full_output,
+      display_full, max_rows, last_schema_map, plugin_manager,
   };
 
   auto handler = markql::cli::make_mode_command();
@@ -325,15 +294,8 @@ static void test_lint_command_toggles_on_and_off() {
   markql::cli::CommandRegistry registry;
   markql::cli::PluginManager plugin_manager(registry);
   markql::cli::CommandContext ctx{
-      config,
-      editor,
-      sources,
-      active_alias,
-      last_full_output,
-      display_full,
-      max_rows,
-      last_schema_map,
-      plugin_manager,
+      config,       editor,   sources,         active_alias,   last_full_output,
+      display_full, max_rows, last_schema_map, plugin_manager,
   };
 
   auto handler = markql::cli::make_lint_command();
@@ -369,15 +331,8 @@ static void test_lint_command_rejects_invalid_value() {
   markql::cli::CommandRegistry registry;
   markql::cli::PluginManager plugin_manager(registry);
   markql::cli::CommandContext ctx{
-      config,
-      editor,
-      sources,
-      active_alias,
-      last_full_output,
-      display_full,
-      max_rows,
-      last_schema_map,
-      plugin_manager,
+      config,       editor,   sources,         active_alias,   last_full_output,
+      display_full, max_rows, last_schema_map, plugin_manager,
   };
 
   auto handler = markql::cli::make_lint_command();
@@ -408,15 +363,8 @@ static void test_describe_last_command_outputs_map() {
   markql::cli::CommandRegistry registry;
   markql::cli::PluginManager plugin_manager(registry);
   markql::cli::CommandContext ctx{
-      config,
-      editor,
-      sources,
-      active_alias,
-      last_full_output,
-      display_full,
-      max_rows,
-      last_schema_map,
-      plugin_manager,
+      config,       editor,   sources,         active_alias,   last_full_output,
+      display_full, max_rows, last_schema_map, plugin_manager,
   };
   auto handler = markql::cli::make_describe_last_command();
   bool handled = handler("DESCRIBE LAST;", ctx);
@@ -445,15 +393,8 @@ static void test_describe_last_command_outputs_csv() {
   markql::cli::CommandRegistry registry;
   markql::cli::PluginManager plugin_manager(registry);
   markql::cli::CommandContext ctx{
-      config,
-      editor,
-      sources,
-      active_alias,
-      last_full_output,
-      display_full,
-      max_rows,
-      last_schema_map,
-      plugin_manager,
+      config,       editor,   sources,         active_alias,   last_full_output,
+      display_full, max_rows, last_schema_map, plugin_manager,
   };
   auto handler = markql::cli::make_describe_last_command();
   bool handled = handler("DESCRIBE LAST;", ctx);
@@ -479,13 +420,13 @@ static void test_explore_command_uses_active_alias_by_default() {
   markql::cli::CommandRegistry registry;
   markql::cli::PluginManager plugin_manager(registry);
   markql::cli::CommandContext ctx{
-      config, editor, sources, active_alias, last_full_output,
+      config,       editor,   sources,         active_alias,   last_full_output,
       display_full, max_rows, last_schema_map, plugin_manager,
   };
 
   std::string explored;
-  auto handler = markql::cli::make_explore_command_with_runner(
-      [&](const std::string& input, std::ostream&) {
+  auto handler =
+      markql::cli::make_explore_command_with_runner([&](const std::string& input, std::ostream&) {
         explored = input;
         return 0;
       });
@@ -511,13 +452,13 @@ static void test_explore_command_accepts_direct_target_and_alias_target() {
   markql::cli::CommandRegistry registry;
   markql::cli::PluginManager plugin_manager(registry);
   markql::cli::CommandContext ctx{
-      config, editor, sources, active_alias, last_full_output,
+      config,       editor,   sources,         active_alias,   last_full_output,
       display_full, max_rows, last_schema_map, plugin_manager,
   };
 
   std::vector<std::string> explored_targets;
-  auto handler = markql::cli::make_explore_command_with_runner(
-      [&](const std::string& input, std::ostream&) {
+  auto handler =
+      markql::cli::make_explore_command_with_runner([&](const std::string& input, std::ostream&) {
         explored_targets.push_back(input);
         return 0;
       });
@@ -607,15 +548,8 @@ static void test_plugin_remove_rejects_unsafe_name() {
     markql::cli::CommandRegistry registry;
     markql::cli::PluginManager plugin_manager(registry);
     markql::cli::CommandContext ctx{
-        config,
-        editor,
-        sources,
-        active_alias,
-        last_full_output,
-        display_full,
-        max_rows,
-        last_schema_map,
-        plugin_manager,
+        config,       editor,   sources,         active_alias,   last_full_output,
+        display_full, max_rows, last_schema_map, plugin_manager,
     };
 
     auto handler = markql::cli::make_plugin_command();
@@ -633,12 +567,11 @@ static void test_plugin_remove_rejects_unsafe_name() {
 
 void register_repl_tests(std::vector<TestCase>& tests) {
   tests.push_back({"summarize_content_basic", test_summarize_content_basic});
-  tests.push_back({"summarize_content_khmer_requires_plugin",
-                   test_summarize_content_khmer_requires_plugin});
-  tests.push_back({"summarize_content_max_tokens",
-                   test_summarize_content_max_tokens});
-  tests.push_back({"sql_keyword_catalog_includes_new_tokens",
-                   test_sql_keyword_catalog_includes_new_tokens});
+  tests.push_back(
+      {"summarize_content_khmer_requires_plugin", test_summarize_content_khmer_requires_plugin});
+  tests.push_back({"summarize_content_max_tokens", test_summarize_content_max_tokens});
+  tests.push_back(
+      {"sql_keyword_catalog_includes_new_tokens", test_sql_keyword_catalog_includes_new_tokens});
   tests.push_back({"set_colnames_command", test_set_colnames_command});
   tests.push_back({"mode_command_accepts_csv", test_mode_command_accepts_csv});
   tests.push_back({"lint_command_toggles_on_and_off", test_lint_command_toggles_on_and_off});
@@ -651,8 +584,7 @@ void register_repl_tests(std::vector<TestCase>& tests) {
                    test_explore_command_accepts_direct_target_and_alias_target});
   tests.push_back({"plugin_registry_rejects_unsafe_plugin_name",
                    test_plugin_registry_rejects_unsafe_plugin_name});
-  tests.push_back({"plugin_registry_rejects_path_traversal",
-                   test_plugin_registry_rejects_path_traversal});
-  tests.push_back({"plugin_remove_rejects_unsafe_name",
-                   test_plugin_remove_rejects_unsafe_name});
+  tests.push_back(
+      {"plugin_registry_rejects_path_traversal", test_plugin_registry_rejects_path_traversal});
+  tests.push_back({"plugin_remove_rejects_unsafe_name", test_plugin_remove_rejects_unsafe_name});
 }

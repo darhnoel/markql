@@ -7,8 +7,11 @@ Use the categorized paths for new references:
 - `scripts/build/build.sh`
 - `scripts/agent/start-agent.sh`
 - `scripts/cli/markqli.sh`
+- `scripts/format/format_cpp.sh`
+- `scripts/format/check_cpp_format.sh`
 - `scripts/install/install_markql.sh`
 - `scripts/install/uninstall_markql.sh`
+- `scripts/maintenance/check_loc.py`
 - `scripts/python/install.sh`
 - `scripts/python/test.sh`
 - `scripts/test/ctest.sh`

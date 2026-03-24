@@ -14,8 +14,7 @@ void test_parse_self_projection_and_where() {
 }
 
 void test_parse_select_self_node_projection() {
-  auto parsed = markql::parse_query(
-      "SELECT self FROM document WHERE tag = 'div' LIMIT 5");
+  auto parsed = markql::parse_query("SELECT self FROM document WHERE tag = 'div' LIMIT 5");
   expect_true(parsed.query.has_value(), "parse bare self in SELECT");
 }
 
@@ -36,10 +35,9 @@ void test_parse_self_text_attr_inner_html_functions() {
 
 void test_eval_direct_text_self_without_tag_guessing() {
   std::string html = "<div>needle</div><span>other</span>";
-  auto result = run_query(
-      html,
-      "SELECT self.node_id, self.tag, DIRECT_TEXT(self) AS dt "
-      "FROM document WHERE DIRECT_TEXT(self) LIKE '%needle%'");
+  auto result = run_query(html,
+                          "SELECT self.node_id, self.tag, DIRECT_TEXT(self) AS dt "
+                          "FROM document WHERE DIRECT_TEXT(self) LIKE '%needle%'");
   expect_eq(result.rows.size(), 1, "direct_text(self) row count");
   if (!result.rows.empty()) {
     expect_true(result.rows[0].tag == "div", "direct_text(self) keeps matching row");
@@ -50,9 +48,7 @@ void test_eval_direct_text_self_without_tag_guessing() {
 
 void test_eval_select_self_returns_current_row_node() {
   std::string html = "<div id='a'>A</div><span id='b'>B</span>";
-  auto result = run_query(
-      html,
-      "SELECT self FROM document WHERE tag = 'span'");
+  auto result = run_query(html, "SELECT self FROM document WHERE tag = 'span'");
   expect_eq(result.rows.size(), 1, "select self row count");
   if (!result.rows.empty()) {
     expect_true(result.rows[0].tag == "span", "select self keeps current row tag");
@@ -64,12 +60,11 @@ void test_eval_self_rebind_inside_exists_descendant() {
   std::string html =
       "<div id='a'><p>needle</p></div>"
       "<div id='b'><p>other</p></div>";
-  auto result = run_query(
-      html,
-      "SELECT self.node_id, self.tag, ATTR(self, id) AS id "
-      "FROM document "
-      "WHERE tag = 'div' "
-      "AND EXISTS(descendant WHERE DIRECT_TEXT(self) LIKE '%needle%')");
+  auto result = run_query(html,
+                          "SELECT self.node_id, self.tag, ATTR(self, id) AS id "
+                          "FROM document "
+                          "WHERE tag = 'div' "
+                          "AND EXISTS(descendant WHERE DIRECT_TEXT(self) LIKE '%needle%')");
   expect_eq(result.rows.size(), 1, "exists(descendant) rebind row count");
   if (!result.rows.empty()) {
     expect_true(result.rows[0].computed_fields["id"] == "a",
@@ -79,23 +74,23 @@ void test_eval_self_rebind_inside_exists_descendant() {
 
 void test_eval_text_and_attr_with_self() {
   std::string html = "<div id='x'><span>A</span></div>";
-  auto result = run_query(
-      html,
-      "SELECT TEXT(self) AS t, ATTR(self, id) AS idv "
-      "FROM document WHERE self.attributes.id IS NOT NULL");
+  auto result = run_query(html,
+                          "SELECT TEXT(self) AS t, ATTR(self, id) AS idv "
+                          "FROM document WHERE self.attributes.id IS NOT NULL");
   expect_eq(result.rows.size(), 1, "text/attr(self) row count");
   if (!result.rows.empty()) {
-    expect_true(result.rows[0].computed_fields["t"] == "A", "text(self) extracts current node text");
-    expect_true(result.rows[0].computed_fields["idv"] == "x", "attr(self, ...) reads current node attribute");
+    expect_true(result.rows[0].computed_fields["t"] == "A",
+                "text(self) extracts current node text");
+    expect_true(result.rows[0].computed_fields["idv"] == "x",
+                "attr(self, ...) reads current node attribute");
   }
 }
 
 void test_eval_inner_html_with_self() {
   std::string html = "<div id='x'><span>A</span></div>";
-  auto result = run_query(
-      html,
-      "SELECT INNER_HTML(self, MAX_DEPTH) AS ih "
-      "FROM document WHERE self.attributes.id IS NOT NULL");
+  auto result = run_query(html,
+                          "SELECT INNER_HTML(self, MAX_DEPTH) AS ih "
+                          "FROM document WHERE self.attributes.id IS NOT NULL");
   expect_eq(result.rows.size(), 1, "inner_html(self) row count");
   if (!result.rows.empty()) {
     expect_true(result.rows[0].computed_fields["ih"] == "<span>A</span>",
@@ -105,10 +100,9 @@ void test_eval_inner_html_with_self() {
 
 void test_eval_raw_inner_html_with_self() {
   std::string html = "<div id='x'><span>A</span></div>";
-  auto result = run_query(
-      html,
-      "SELECT RAW_INNER_HTML(self, MAX_DEPTH) AS rh "
-      "FROM document WHERE self.attributes.id IS NOT NULL");
+  auto result = run_query(html,
+                          "SELECT RAW_INNER_HTML(self, MAX_DEPTH) AS rh "
+                          "FROM document WHERE self.attributes.id IS NOT NULL");
   expect_eq(result.rows.size(), 1, "raw_inner_html(self) row count");
   if (!result.rows.empty()) {
     expect_true(result.rows[0].computed_fields["rh"] == "<span>A</span>",
@@ -133,11 +127,14 @@ void register_self_ref_tests(std::vector<TestCase>& tests) {
   tests.push_back({"parse_self_projection_and_where", test_parse_self_projection_and_where});
   tests.push_back({"parse_select_self_node_projection", test_parse_select_self_node_projection});
   tests.push_back({"parse_self_function_predicate", test_parse_self_function_predicate});
-  tests.push_back({"parse_self_text_attr_inner_html_functions", test_parse_self_text_attr_inner_html_functions});
-  tests.push_back({"eval_direct_text_self_without_tag_guessing", test_eval_direct_text_self_without_tag_guessing});
+  tests.push_back({"parse_self_text_attr_inner_html_functions",
+                   test_parse_self_text_attr_inner_html_functions});
+  tests.push_back({"eval_direct_text_self_without_tag_guessing",
+                   test_eval_direct_text_self_without_tag_guessing});
   tests.push_back({"eval_select_self_returns_current_row_node",
                    test_eval_select_self_returns_current_row_node});
-  tests.push_back({"eval_self_rebind_inside_exists_descendant", test_eval_self_rebind_inside_exists_descendant});
+  tests.push_back({"eval_self_rebind_inside_exists_descendant",
+                   test_eval_self_rebind_inside_exists_descendant});
   tests.push_back({"eval_text_and_attr_with_self", test_eval_text_and_attr_with_self});
   tests.push_back({"eval_inner_html_with_self", test_eval_inner_html_with_self});
   tests.push_back({"eval_raw_inner_html_with_self", test_eval_raw_inner_html_with_self});

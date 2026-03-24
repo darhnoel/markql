@@ -108,17 +108,23 @@ uint32_t decode_utf8(const std::string& text, size_t index, size_t* bytes) {
     return lead;
   }
   size_t len = 1;
-  if ((lead & 0xE0) == 0xC0) len = 2;
-  else if ((lead & 0xF0) == 0xE0) len = 3;
-  else if ((lead & 0xF8) == 0xF0) len = 4;
+  if ((lead & 0xE0) == 0xC0)
+    len = 2;
+  else if ((lead & 0xF0) == 0xE0)
+    len = 3;
+  else if ((lead & 0xF8) == 0xF0)
+    len = 4;
   if (index + len > text.size()) {
     if (bytes) *bytes = 1;
     return lead;
   }
   uint32_t cp = 0;
-  if (len == 2) cp = lead & 0x1F;
-  else if (len == 3) cp = lead & 0x0F;
-  else cp = lead & 0x07;
+  if (len == 2)
+    cp = lead & 0x1F;
+  else if (len == 3)
+    cp = lead & 0x0F;
+  else
+    cp = lead & 0x07;
   for (size_t i = 1; i < len; ++i) {
     unsigned char c = static_cast<unsigned char>(text[index + i]);
     if ((c & 0xC0) != 0x80) {
@@ -299,12 +305,11 @@ CommandHandler make_summarize_content_command() {
         double idf = std::log((1.0 + doc_count) / (1.0 + doc_freq)) + 1.0;
         scores.push_back(ScoreEntry{kv.first, freq, freq * idf});
       }
-      std::sort(scores.begin(), scores.end(),
-                [](const ScoreEntry& a, const ScoreEntry& b) {
-                  if (a.score != b.score) return a.score > b.score;
-                  if (a.count != b.count) return a.count > b.count;
-                  return a.token < b.token;
-                });
+      std::sort(scores.begin(), scores.end(), [](const ScoreEntry& a, const ScoreEntry& b) {
+        if (a.score != b.score) return a.score > b.score;
+        if (a.count != b.count) return a.count > b.count;
+        return a.token < b.token;
+      });
       size_t limit = std::min<size_t>(scores.size(), max_tokens);
       markql::QueryResult result;
       result.columns = {"token", "count", "score"};

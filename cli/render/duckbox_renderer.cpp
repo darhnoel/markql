@@ -185,11 +185,10 @@ std::string attributes_to_string(const std::unordered_map<std::string, std::stri
 std::string term_scores_to_string(const std::unordered_map<std::string, double>& scores) {
   if (scores.empty()) return "{}";
   std::vector<std::pair<std::string, double>> items(scores.begin(), scores.end());
-  std::sort(items.begin(), items.end(),
-            [](const auto& a, const auto& b) {
-              if (a.second != b.second) return a.second > b.second;
-              return a.first < b.first;
-            });
+  std::sort(items.begin(), items.end(), [](const auto& a, const auto& b) {
+    if (a.second != b.second) return a.second > b.second;
+    return a.first < b.first;
+  });
   std::ostringstream oss;
   oss << "{";
   oss << std::fixed << std::setprecision(4);
@@ -224,10 +223,8 @@ std::string field_value(const markql::QueryResultRow& row, const std::string& fi
   return it->second;
 }
 
-std::string build_separator(const std::vector<size_t>& widths,
-                            const std::string& left,
-                            const std::string& mid,
-                            const std::string& right) {
+std::string build_separator(const std::vector<size_t>& widths, const std::string& left,
+                            const std::string& mid, const std::string& right) {
   std::ostringstream oss;
   oss << left;
   for (size_t i = 0; i < widths.size(); ++i) {
@@ -332,7 +329,8 @@ std::string render_duckbox(const markql::QueryResult& result, const DuckboxOptio
   if (result.rows.size() > rows_to_render) {
     size_t content_width = total_width() >= 4 ? total_width() - 4 : 0;
     std::ostringstream msg;
-    msg << "… truncated, showing first " << rows_to_render << " of " << result.rows.size() << " rows …";
+    msg << "… truncated, showing first " << rows_to_render << " of " << result.rows.size()
+        << " rows …";
     std::string text = msg.str();
     text = truncate_with_ellipsis(text, content_width);
     text = pad_cell(text, content_width, false);

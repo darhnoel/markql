@@ -110,8 +110,10 @@ void test_json_keys_follow_colname_mode() {
 
 void register_column_name_tests(std::vector<TestCase>& tests) {
   tests.push_back({"normalize_colname_examples", test_normalize_colname_examples});
-  tests.push_back({"normalize_colname_collision_suffixing", test_normalize_colname_collision_suffixing});
-  tests.push_back({"duckbox_uses_normalized_headers_by_default", test_duckbox_uses_normalized_headers_by_default});
+  tests.push_back(
+      {"normalize_colname_collision_suffixing", test_normalize_colname_collision_suffixing});
+  tests.push_back({"duckbox_uses_normalized_headers_by_default",
+                   test_duckbox_uses_normalized_headers_by_default});
   tests.push_back({"duckbox_raw_mode_keeps_raw_header", test_duckbox_raw_mode_keeps_raw_header});
   tests.push_back({"csv_header_normalized_default", test_csv_header_normalized_default});
   tests.push_back({"csv_header_raw_mode", test_csv_header_raw_mode});
