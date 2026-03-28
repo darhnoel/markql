@@ -34,10 +34,10 @@ jobs:
         run: |
           git clone https://github.com/microsoft/vcpkg "${HOME}/vcpkg"
           "${HOME}/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=${HOME}/vcpkg" >> "${GITHUB_ENV}"
 
       - name: Build markql-agent
         env:
-          VCPKG_ROOT: ${{ env.HOME }}/vcpkg
           CMAKE_BUILD_TYPE: ${{ env.BUILD_TYPE }}
         run: ./scripts/build/build.sh
 
@@ -62,11 +62,11 @@ jobs:
         run: |
           git clone https://github.com/microsoft/vcpkg "$env:USERPROFILE\vcpkg"
           & "$env:USERPROFILE\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
+          Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_ROOT=$env:USERPROFILE\vcpkg"
 
       - name: Build markql-agent
         shell: bash
         env:
-          VCPKG_ROOT: ${{ env.USERPROFILE }}/vcpkg
           CMAKE_BUILD_TYPE: ${{ env.BUILD_TYPE }}
         run: ./scripts/build/build.sh
 
