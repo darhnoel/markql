@@ -21,6 +21,7 @@ env:
 
 jobs:
   build-agent-linux:
+    if: startsWith(github.ref, 'refs/tags/desktop-v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -48,6 +49,7 @@ jobs:
           path: build/markql-agent
 
   build-agent-windows:
+    if: startsWith(github.ref, 'refs/tags/desktop-v') || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -98,6 +100,7 @@ jobs:
           path: ${{ env.AGENT_EXE }}
 
   package-extension:
+    if: startsWith(github.ref, 'refs/tags/desktop-v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -115,6 +118,7 @@ jobs:
           path: dist/markql-extension.zip
 
   build-desktop-linux:
+    if: startsWith(github.ref, 'refs/tags/desktop-v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-22.04
     needs:
       - build-agent-linux
@@ -194,7 +198,11 @@ jobs:
       - name: Finalize Linux AppImage
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#desktop-v}"
+          if [[ "${GITHUB_REF_NAME}" == desktop-v* ]]; then
+            VERSION="${GITHUB_REF_NAME#desktop-v}"
+          else
+            VERSION="0.0.0-dev"
+          fi
           BUNDLE_DIR="desktop/target/release/bundle/appimage"
           echo "APPIMAGETOOL=${APPIMAGETOOL}"
           APPIMAGE_EXTRACT_AND_RUN=1 "${APPIMAGETOOL}" --version
@@ -246,6 +254,7 @@ DEOF
           path: dist/MarkQL-Desktop-*.AppImage
 
   build-desktop-windows:
+    if: startsWith(github.ref, 'refs/tags/desktop-v') || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     needs:
       - build-agent-windows
@@ -307,7 +316,12 @@ DEOF
       - name: Rename MSI asset
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}" -replace '^desktop-v', ''
+          $refName = "${{ github.ref_name }}"
+          if ($refName -match '^desktop-v') {
+            $version = $refName -replace '^desktop-v', ''
+          } else {
+            $version = "0.0.0-dev"
+          }
           $msi = Get-ChildItem desktop\target\release\bundle\msi\*.msi | Select-Object -First 1
           if (-not $msi) {
             Write-Error "No MSI was produced in desktop\\target\\release\\bundle\\msi"
@@ -320,6 +334,7 @@ DEOF
           path: dist/MarkQL-Desktop-*.msi
 
   publish:
+    if: startsWith(github.ref, 'refs/tags/desktop-v') || github.event_name == 'workflow_dispatch'
     needs:
       - build-desktop-linux
       - build-desktop-windows
