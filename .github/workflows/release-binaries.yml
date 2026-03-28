@@ -17,6 +17,7 @@ env:
   MARKQL_WITH_ARROW: "OFF"
   MARKQL_OPTIMIZE_FOR_SIZE: "ON"
   MARKQL_STRIP_BINARIES: "ON"
+  TAURI_LINUX_AYATANA_APPINDICATOR: "1"
 
 jobs:
   build-agent-linux:
@@ -160,6 +161,8 @@ jobs:
           [[ -x "${APPIMAGETOOL}" ]]
           echo "APPIMAGETOOL=${APPIMAGETOOL}"
           APPIMAGE_EXTRACT_AND_RUN=1 "${APPIMAGETOOL}" --version
+          pkg-config --exists ayatana-appindicator3-0.1
+          pkg-config --modversion ayatana-appindicator3-0.1
           [[ -f desktop/tauri.conf.json ]]
           [[ -f desktop/icons/icon.png ]]
           [[ -f desktop/icons/icon.ico ]]
