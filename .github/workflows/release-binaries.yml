@@ -209,6 +209,21 @@ jobs:
               echo "ERROR: No .AppImage and no .AppDir were produced in ${BUNDLE_DIR}." >&2
               exit 1
             fi
+            # Ensure a .desktop file exists at AppDir root (appimagetool requirement)
+            DESKTOP_FILE="$(find "${APPDIR}" -maxdepth 1 -name '*.desktop' | head -n 1 || true)"
+            if [[ -z "${DESKTOP_FILE}" ]]; then
+              echo "No .desktop file found in ${APPDIR}, creating one."
+              EXEC_NAME="$(find "${APPDIR}/usr/bin" -type f | head -n 1 | xargs basename || echo 'markql-desktop')"
+              cat > "${APPDIR}/markql-desktop.desktop" <<DEOF
+[Desktop Entry]
+Name=MarkQL Desktop
+Exec=${EXEC_NAME}
+Icon=icon
+Type=Application
+Categories=Utility;
+DEOF
+              echo "Desktop file created at ${APPDIR}/markql-desktop.desktop"
+            fi
             FALLBACK_APPIMAGE="${BUNDLE_DIR}/MarkQL-Desktop-${VERSION}-x86_64.AppImage"
             echo "Tauri produced only AppDir, running manual appimagetool fallback."
             printf 'Fallback command: ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 %q --verbose %q %q\n' \
