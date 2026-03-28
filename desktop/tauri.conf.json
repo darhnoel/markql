@@ -26,6 +26,7 @@
   "bundle": {
     "active": true,
     "targets": ["appimage", "deb", "msi"],
-    "externalBin": ["binaries/markql-agent"]
+    "externalBin": ["binaries/markql-agent"],
+    "icon": ["icons/icon.png", "icons/icon.ico"]
   }
 }
