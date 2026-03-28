@@ -110,7 +110,7 @@ Run interactive REPL:
 
 ## Browser Plugin MVP
 
-Build and run `xsql-agent` (localhost `127.0.0.1:7337`):
+Build and run `markql-agent` (localhost `127.0.0.1:7337`):
 
 ```bash
 ./scripts/build/build.sh
@@ -118,12 +118,13 @@ Build and run `xsql-agent` (localhost `127.0.0.1:7337`):
 ```
 
 Notes:
-- `XSQL_AGENT_TOKEN` is required by the agent.
+- `MARKQL_AGENT_TOKEN` is the primary agent token variable.
 - `scripts/agent/start-agent.sh` sets a default token if not provided.
+- A legacy agent token variable still works during the migration window.
 - You can set your own token:
 
 ```bash
-XSQL_AGENT_TOKEN=your-secret-token ./scripts/agent/start-agent.sh
+MARKQL_AGENT_TOKEN=your-secret-token ./scripts/agent/start-agent.sh
 ```
 
 Load the Chrome extension:

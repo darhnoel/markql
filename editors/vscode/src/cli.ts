@@ -20,7 +20,9 @@ type SpawnRunner = (command: string, args: string[], cwd: string) => Promise<{
 const PATH_CANDIDATES = ["markql", "xsql"];
 const WORKSPACE_CANDIDATES = [
   ["build", "markql"],
-  ["build", "xsql"]
+  ["build", "markql.exe"],
+  ["build", "xsql"],
+  ["build", "xsql.exe"]
 ];
 
 export async function resolveCliCandidates(

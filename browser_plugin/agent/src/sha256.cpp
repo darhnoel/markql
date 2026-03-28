@@ -6,7 +6,7 @@
 #include <iomanip>
 #include <sstream>
 
-namespace xsql::agent::sha256 {
+namespace markql::agent::sha256 {
 
 namespace {
 
@@ -130,4 +130,4 @@ std::string digest_hex(const std::string& input) {
   return encode_hex(state);
 }
 
-}  // namespace xsql::agent::sha256
+}  // namespace markql::agent::sha256

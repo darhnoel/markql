@@ -1,0 +1,31 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "MarkQL Desktop",
+  "version": "0.1.0",
+  "identifier": "com.markql.desktop",
+  "build": {
+    "frontendDist": "ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "settings",
+        "title": "MarkQL Desktop",
+        "width": 520,
+        "height": 620,
+        "visible": false,
+        "resizable": false,
+        "url": "index.html"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["appimage", "deb", "msi"],
+    "externalBin": ["binaries/markql-agent"]
+  }
+}

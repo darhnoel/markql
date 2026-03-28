@@ -41,7 +41,7 @@ python/markql/build/*
 python/markql/dist/*
 python/markql/__pycache__/*
 python/markql/_core.cpython-*
-python/markql.egg-info/*
+python/*.egg-info/*
 python/pyxsql.egg-info/*
 python/tests/__pycache__/*
 
@@ -77,4 +77,10 @@ bench/results/*
 # cucumber rustt
 tests/integration/rust/target
 
-python/xsql.egg-info/*
+python/markql.egg-info/*
+
+# desktop app
+desktop/target/
+desktop/binaries/*
+!desktop/binaries/.gitkeep
+desktop/gen/

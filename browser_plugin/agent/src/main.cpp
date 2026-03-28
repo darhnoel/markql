@@ -24,7 +24,7 @@ using json = nlohmann::json;
 
 constexpr const char* kAgentVersion = "0.2.0";
 constexpr const char* kBindHost = "127.0.0.1";
-constexpr int kBindPort = 7337;
+constexpr int kDefaultBindPort = 7337;
 constexpr size_t kDefaultMaxRows = 2000;
 constexpr int kDefaultTimeoutMs = 5000;
 constexpr size_t kMaxSnapshotCacheEntries = 8;
@@ -60,7 +60,7 @@ class SnapshotCache {
   explicit SnapshotCache(size_t max_entries) : max_entries_(max_entries) {}
 
   Entry get_or_insert(const std::string& html) {
-    const std::string digest = xsql::agent::sha256::digest_hex(html);
+    const std::string digest = markql::agent::sha256::digest_hex(html);
     {
       std::lock_guard<std::mutex> lock(mu_);
       auto it = entries_.find(digest);
@@ -106,15 +106,15 @@ class SnapshotCache {
   std::unordered_map<std::string, Entry> entries_;
 };
 
-class IXsqlExecutor {
+class IMarkqlExecutor {
  public:
-  virtual ~IXsqlExecutor() = default;
+  virtual ~IMarkqlExecutor() = default;
   virtual ExecutionOutcome execute(
       const std::shared_ptr<const markql::ParsedDocumentHandle>& prepared, const std::string& query,
       int timeout_ms) = 0;
 };
 
-class CoreExecutor final : public IXsqlExecutor {
+class CoreExecutor final : public IMarkqlExecutor {
  public:
   ExecutionOutcome execute(const std::shared_ptr<const markql::ParsedDocumentHandle>& prepared,
                            const std::string& query, int timeout_ms) override {
@@ -175,21 +175,43 @@ std::string generate_token() {
 }
 
 std::string resolve_token() {
-  const char* env = std::getenv("XSQL_AGENT_TOKEN");
-  if (env != nullptr && env[0] != '\0') {
-    return std::string(env);
+  const char* primary = std::getenv("MARKQL_AGENT_TOKEN");
+  if (primary != nullptr && primary[0] != '\0') {
+    return std::string(primary);
+  }
+
+  const char* legacy = std::getenv("XSQL_AGENT_TOKEN");
+  if (legacy != nullptr && legacy[0] != '\0') {
+    return std::string(legacy);
   }
   const std::string generated = generate_token();
-  std::cout << "[xsql-agent] XSQL_AGENT_TOKEN not set. Generated token:\n"
+  std::cout << "[markql-agent] MARKQL_AGENT_TOKEN not set. Generated token:\n"
             << generated << "\n"
-            << "[xsql-agent] Copy this token into the extension settings.\n";
+            << "[markql-agent] Copy this token into the extension settings.\n";
   return generated;
+}
+
+int resolve_port() {
+  const char* primary = std::getenv("MARKQL_AGENT_PORT");
+  const char* legacy = std::getenv("XSQL_AGENT_PORT");
+  const char* raw = (primary != nullptr && primary[0] != '\0') ? primary : legacy;
+  if (raw == nullptr || raw[0] == '\0') {
+    return kDefaultBindPort;
+  }
+  try {
+    const int parsed = std::stoi(raw);
+    if (parsed > 0 && parsed <= 65535) {
+      return parsed;
+    }
+  } catch (...) {
+  }
+  return kDefaultBindPort;
 }
 
 void set_cors_headers(httplib::Response& res) {
   res.set_header("Access-Control-Allow-Origin", "*");
   res.set_header("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.set_header("Access-Control-Allow-Headers", "Content-Type, X-XSQL-Token");
+  res.set_header("Access-Control-Allow-Headers", "Content-Type, X-MarkQL-Token, X-XSQL-Token");
 }
 
 void write_json(httplib::Response& res, int status, const json& payload) {
@@ -439,6 +461,7 @@ QueryResponse map_result(const markql::QueryResult& result, size_t max_rows) {
 
 int main() {
   const std::string token = resolve_token();
+  const int bind_port = resolve_port();
   SnapshotCache cache(kMaxSnapshotCacheEntries);
   CoreExecutor executor;
 
@@ -456,10 +479,13 @@ int main() {
   server.Post("/v1/query", [&](const httplib::Request& req, httplib::Response& res) {
     const auto started_at = std::chrono::steady_clock::now();
 
-    const std::string provided_token = req.get_header_value("X-XSQL-Token");
+    std::string provided_token = req.get_header_value("X-MarkQL-Token");
+    if (provided_token.empty()) {
+      provided_token = req.get_header_value("X-XSQL-Token");
+    }
     if (provided_token.empty() || provided_token != token) {
       const json error =
-          build_error(elapsed_ms(started_at), "UNAUTHORIZED", "Missing or invalid X-XSQL-Token");
+          build_error(elapsed_ms(started_at), "UNAUTHORIZED", "Missing or invalid X-MarkQL-Token");
       write_json(res, 401, error);
       return;
     }
@@ -508,11 +534,11 @@ int main() {
                });
   });
 
-  std::cout << "[xsql-agent] Listening on http://" << kBindHost << ":" << kBindPort << "\n";
-  std::cout << "[xsql-agent] Health check: http://" << kBindHost << ":" << kBindPort << "/health\n";
+  std::cout << "[markql-agent] Listening on http://" << kBindHost << ":" << bind_port << "\n";
+  std::cout << "[markql-agent] Health check: http://" << kBindHost << ":" << bind_port << "/health\n";
 
-  if (!server.listen(kBindHost, kBindPort)) {
-    std::cerr << "[xsql-agent] Failed to bind to " << kBindHost << ':' << kBindPort << "\n";
+  if (!server.listen(kBindHost, bind_port)) {
+    std::cerr << "[markql-agent] Failed to bind to " << kBindHost << ':' << bind_port << "\n";
     return 1;
   }
 

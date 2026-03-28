@@ -41,6 +41,24 @@ test("resolveCliCandidates includes workspace build binary when present", async 
   assert.equal(candidates.includes("markql"), true);
 });
 
+test("resolveCliCandidates includes Windows workspace binaries when present", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "markql-vscode-"));
+  const buildDir = path.join(root, "build");
+  fs.mkdirSync(buildDir, { recursive: true });
+  fs.writeFileSync(path.join(buildDir, "markql.exe"), "");
+
+  const api = {
+    workspace: {
+      getWorkspaceFolder() {
+        return { uri: { fsPath: root } };
+      }
+    }
+  };
+  const candidates = await resolveCliCandidates(api, { uri: { fsPath: path.join(root, "q.markql") } });
+  assert.equal(candidates[0], path.join(root, "build", "markql.exe"));
+  assert.equal(candidates.includes("markql"), true);
+});
+
 test("executeCliWithFallback skips ENOENT and uses the next candidate", async () => {
   const seen = [];
   const result = await executeCliWithFallback(

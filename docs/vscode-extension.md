@@ -49,9 +49,10 @@ Keep the association scoped to MarkQL paths instead of changing all SQL files gl
 CLI discovery fallback order when `markql.cliPath` is empty:
 
 1. workspace-local `build/markql`
-2. workspace-local `build/xsql`
-3. `markql` on `PATH`
-4. `xsql` on `PATH`
+2. workspace-local `build/markql.exe`
+3. legacy workspace-local build names
+4. `markql` on `PATH`
+5. legacy CLI names on `PATH`
 
 ## Commands
 

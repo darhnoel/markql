@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MarkQL Desktop</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <p class="eyebrow">Local Agent Companion</p>
+        <h1>MarkQL Desktop</h1>
+        <p class="lede">Run the local `markql-agent`, keep the browser extension pointed at it, and manage the token from one place.</p>
+      </section>
+
+      <section class="card status-card">
+        <div>
+          <p class="label">Agent Status</p>
+          <h2 id="statusLabel">Stopped</h2>
+          <p id="statusMeta" class="muted">Port 7337</p>
+        </div>
+        <div class="actions">
+          <button id="startBtn" class="primary">Start</button>
+          <button id="stopBtn" class="secondary">Stop</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-header">
+          <div>
+            <p class="label">Auth Token</p>
+            <p class="muted">Copy this into the Chrome extension settings.</p>
+          </div>
+          <div class="actions compact">
+            <button id="copyTokenBtn" class="secondary">Copy</button>
+            <button id="regenerateTokenBtn" class="ghost">Regenerate</button>
+          </div>
+        </div>
+        <input id="tokenInput" type="password" autocomplete="off" />
+      </section>
+
+      <section class="card">
+        <div class="section-header">
+          <div>
+            <p class="label">Settings</p>
+            <p class="muted">The port is advanced because the extension still defaults to `7337`.</p>
+          </div>
+          <button id="saveBtn" class="primary">Save Settings</button>
+        </div>
+
+        <label class="field">
+          <span>Start on login</span>
+          <input id="startOnLoginInput" type="checkbox" />
+        </label>
+
+        <label class="field">
+          <span>Query timeout</span>
+          <select id="timeoutInput">
+            <option value="5000">5 seconds</option>
+            <option value="10000">10 seconds</option>
+            <option value="30000">30 seconds</option>
+            <option value="60000">60 seconds</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Agent port</span>
+          <input id="portInput" type="number" min="1" max="65535" step="1" />
+        </label>
+      </section>
+
+      <p id="feedback" class="feedback muted">Settings are stored locally on this machine.</p>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

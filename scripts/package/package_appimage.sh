@@ -77,7 +77,15 @@ if [[ -z "${VERSION}" ]]; then
 fi
 
 echo "[1/5] Configure + build markql"
-cmake -S "${REPO_ROOT}" -B "${BUILD_DIR_ABS}" -DCMAKE_BUILD_TYPE=Release
+cmake -S "${REPO_ROOT}" -B "${BUILD_DIR_ABS}" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DMARKQL_BUILD_CLI=ON \
+  -DMARKQL_BUILD_AGENT=ON \
+  -DMARKQL_BUILD_TESTS=OFF \
+  -DMARKQL_BUILD_PYTHON=OFF \
+  -DMARKQL_WITH_ARROW=OFF \
+  -DMARKQL_OPTIMIZE_FOR_SIZE=ON \
+  -DMARKQL_STRIP_BINARIES=ON
 cmake --build "${BUILD_DIR_ABS}" -j"$(nproc)"
 
 echo "[2/5] Stage AppDir"
@@ -86,8 +94,13 @@ mkdir -p "${APPDIR_ABS}"
 cmake --install "${BUILD_DIR_ABS}" --prefix /usr --config Release --strip DESTDIR="${APPDIR_ABS}"
 
 BIN_PATH="${APPDIR_ABS}/usr/bin/markql"
+AGENT_BIN_PATH="${APPDIR_ABS}/usr/bin/markql-agent"
 if [[ ! -x "${BIN_PATH}" ]]; then
   echo "Expected binary not found at ${BIN_PATH}" >&2
+  exit 1
+fi
+if [[ ! -x "${AGENT_BIN_PATH}" ]]; then
+  echo "Expected agent binary not found at ${AGENT_BIN_PATH}" >&2
   exit 1
 fi
 
@@ -126,6 +139,7 @@ if command -v linuxdeploy >/dev/null 2>&1; then
     --desktop-file "${DESKTOP_FILE}" \
     --icon-file "${ICON_FILE}" \
     --executable "${BIN_PATH}" \
+    --executable "${AGENT_BIN_PATH}" \
     --output appimage
 
   GENERATED="$(find "${REPO_ROOT}" -maxdepth 1 -type f -name "*.AppImage" -printf "%f\n" | sort | tail -n 1 || true)"

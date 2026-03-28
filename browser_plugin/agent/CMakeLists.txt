@@ -1,12 +1,12 @@
-add_executable(xsql-agent
+add_executable(markql-agent
   src/main.cpp
   src/sha256.cpp
 )
-set_target_properties(xsql-agent PROPERTIES
+set_target_properties(markql-agent PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
 
-target_include_directories(xsql-agent
+target_include_directories(markql-agent
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
@@ -16,73 +16,73 @@ find_package(nlohmann_json CONFIG QUIET)
 
 # Resolve cpp-httplib (package first, then vendored/system include path, then FetchContent).
 if (TARGET httplib::httplib)
-  set(XSQL_AGENT_HTTPLIB_TARGET httplib::httplib)
+  set(MARKQL_AGENT_HTTPLIB_TARGET httplib::httplib)
 else()
-  set(_xsql_agent_httplib_hints
+  set(_markql_agent_httplib_hints
     ${CMAKE_SOURCE_DIR}/third_party/cpp-httplib
     ${CMAKE_SOURCE_DIR}/third_party/cpp-httplib/include
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/cpp-httplib
   )
-  find_path(XSQL_AGENT_HTTPLIB_INCLUDE_DIR
+  find_path(MARKQL_AGENT_HTTPLIB_INCLUDE_DIR
     NAMES httplib.h
-    PATHS ${_xsql_agent_httplib_hints}
+    PATHS ${_markql_agent_httplib_hints}
   )
-  if (XSQL_AGENT_HTTPLIB_INCLUDE_DIR)
-    add_library(xsql_agent_httplib INTERFACE)
-    target_include_directories(xsql_agent_httplib
-      INTERFACE ${XSQL_AGENT_HTTPLIB_INCLUDE_DIR}
+  if (MARKQL_AGENT_HTTPLIB_INCLUDE_DIR)
+    add_library(markql_agent_httplib INTERFACE)
+    target_include_directories(markql_agent_httplib
+      INTERFACE ${MARKQL_AGENT_HTTPLIB_INCLUDE_DIR}
     )
-    add_library(httplib::httplib ALIAS xsql_agent_httplib)
-    set(XSQL_AGENT_HTTPLIB_TARGET httplib::httplib)
+    add_library(httplib::httplib ALIAS markql_agent_httplib)
+    set(MARKQL_AGENT_HTTPLIB_TARGET httplib::httplib)
   endif()
 endif()
 
 # Resolve nlohmann/json (package first, then vendored/system include path, then FetchContent).
-set(_xsql_agent_needs_fetch FALSE)
-if (NOT XSQL_AGENT_HTTPLIB_TARGET)
-  set(_xsql_agent_needs_fetch TRUE)
+set(_markql_agent_needs_fetch FALSE)
+if (NOT MARKQL_AGENT_HTTPLIB_TARGET)
+  set(_markql_agent_needs_fetch TRUE)
 endif()
 if (NOT nlohmann_json_FOUND)
   if (EXISTS "${CMAKE_SOURCE_DIR}/third_party/nlohmann_json/single_include/nlohmann/json.hpp")
-    add_library(xsql_agent_nlohmann_json INTERFACE)
-    target_include_directories(xsql_agent_nlohmann_json
+    add_library(markql_agent_nlohmann_json INTERFACE)
+    target_include_directories(markql_agent_nlohmann_json
       INTERFACE ${CMAKE_SOURCE_DIR}/third_party/nlohmann_json/single_include
     )
-    add_library(nlohmann_json::nlohmann_json ALIAS xsql_agent_nlohmann_json)
+    add_library(nlohmann_json::nlohmann_json ALIAS markql_agent_nlohmann_json)
   else()
-    find_path(XSQL_AGENT_NLOHMANN_JSON_INCLUDE_DIR
+    find_path(MARKQL_AGENT_NLOHMANN_JSON_INCLUDE_DIR
       NAMES nlohmann/json.hpp
     )
-    if (XSQL_AGENT_NLOHMANN_JSON_INCLUDE_DIR)
-      add_library(xsql_agent_nlohmann_json INTERFACE)
-      target_include_directories(xsql_agent_nlohmann_json
-        INTERFACE ${XSQL_AGENT_NLOHMANN_JSON_INCLUDE_DIR}
+    if (MARKQL_AGENT_NLOHMANN_JSON_INCLUDE_DIR)
+      add_library(markql_agent_nlohmann_json INTERFACE)
+      target_include_directories(markql_agent_nlohmann_json
+        INTERFACE ${MARKQL_AGENT_NLOHMANN_JSON_INCLUDE_DIR}
       )
-      add_library(nlohmann_json::nlohmann_json ALIAS xsql_agent_nlohmann_json)
+      add_library(nlohmann_json::nlohmann_json ALIAS markql_agent_nlohmann_json)
     else()
-      set(_xsql_agent_needs_fetch TRUE)
+      set(_markql_agent_needs_fetch TRUE)
     endif()
   endif()
 endif()
 
-if (_xsql_agent_needs_fetch)
+if (_markql_agent_needs_fetch)
   if (NOT MARKQL_AGENT_FETCH_DEPS)
-    message(FATAL_ERROR "xsql-agent dependencies missing. Set MARKQL_AGENT_FETCH_DEPS=ON or provide httplib and nlohmann_json via vcpkg, system packages, or third_party/.")
+    message(FATAL_ERROR "markql-agent dependencies missing. Set MARKQL_AGENT_FETCH_DEPS=ON or provide httplib and nlohmann_json via vcpkg, system packages, or third_party/.")
   else()
     include(FetchContent)
 
-    if (NOT XSQL_AGENT_HTTPLIB_TARGET)
+    if (NOT MARKQL_AGENT_HTTPLIB_TARGET)
       FetchContent_Declare(cpp_httplib
         GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
         GIT_TAG v0.16.3
       )
       FetchContent_MakeAvailable(cpp_httplib)
-      add_library(xsql_agent_httplib INTERFACE)
-      target_include_directories(xsql_agent_httplib
+      add_library(markql_agent_httplib INTERFACE)
+      target_include_directories(markql_agent_httplib
         INTERFACE ${cpp_httplib_SOURCE_DIR}
       )
-      add_library(httplib::httplib ALIAS xsql_agent_httplib)
-      set(XSQL_AGENT_HTTPLIB_TARGET httplib::httplib)
+      add_library(httplib::httplib ALIAS markql_agent_httplib)
+      set(MARKQL_AGENT_HTTPLIB_TARGET httplib::httplib)
     endif()
 
     if (NOT TARGET nlohmann_json::nlohmann_json)
@@ -95,18 +95,18 @@ if (_xsql_agent_needs_fetch)
   endif()
 endif()
 
-if (NOT XSQL_AGENT_HTTPLIB_TARGET)
-  message(FATAL_ERROR "Could not locate cpp-httplib for xsql-agent")
+if (NOT MARKQL_AGENT_HTTPLIB_TARGET)
+  message(FATAL_ERROR "Could not locate cpp-httplib for markql-agent")
 endif()
 
 find_package(Threads REQUIRED)
 
-target_link_libraries(xsql-agent
+target_link_libraries(markql-agent
   PRIVATE
     markql_core
-    ${XSQL_AGENT_HTTPLIB_TARGET}
+    ${MARKQL_AGENT_HTTPLIB_TARGET}
     nlohmann_json::nlohmann_json
     Threads::Threads
 )
 
-target_compile_features(xsql-agent PRIVATE cxx_std_20)
+target_compile_features(markql-agent PRIVATE cxx_std_20)

@@ -31,9 +31,10 @@ It does not claim every `.sql` file by default. For existing MarkQL `.sql` files
 When `markql.cliPath` is empty, the extension tries:
 
 1. workspace `build/markql`
-2. workspace `build/xsql`
-3. `markql` on `PATH`
-4. `xsql` on `PATH`
+2. workspace `build/markql.exe`
+3. legacy workspace build names
+4. `markql` on `PATH`
+5. legacy CLI names on `PATH`
 
 ## Requirements
 

@@ -82,11 +82,15 @@ echo "[1/3] Configure project (${BUILD_TYPE})"
 cmake -S "${REPO_ROOT}" -B "${BUILD_DIR_ABS}" \
   -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
   -DMARKQL_BUILD_CLI=ON \
+  -DMARKQL_BUILD_AGENT=ON \
   -DMARKQL_BUILD_TESTS="${WITH_TESTS}" \
-  -DMARKQL_BUILD_PYTHON=OFF
+  -DMARKQL_BUILD_PYTHON=OFF \
+  -DMARKQL_WITH_ARROW=OFF \
+  -DMARKQL_OPTIMIZE_FOR_SIZE=ON \
+  -DMARKQL_STRIP_BINARIES=ON
 
-echo "[2/3] Build CLI target"
-cmake --build "${BUILD_DIR_ABS}" --target markql -j"${JOBS}"
+echo "[2/3] Build CLI and agent targets"
+cmake --build "${BUILD_DIR_ABS}" --target markql markql-agent -j"${JOBS}"
 
 if [[ ! -f "${BUILD_DIR_ABS}/CPackConfig.cmake" ]]; then
   echo "CPack config not found: ${BUILD_DIR_ABS}/CPackConfig.cmake" >&2

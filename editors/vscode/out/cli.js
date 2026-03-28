@@ -1,18 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resolveCliCandidates = resolveCliCandidates;
-exports.executeCliWithFallback = executeCliWithFallback;
-exports.buildLintArgs = buildLintArgs;
-exports.buildRunArgs = buildRunArgs;
-exports.getCommandCwd = getCommandCwd;
-exports.describeCommand = describeCommand;
+exports.describeCommand = exports.getCommandCwd = exports.buildRunArgs = exports.buildLintArgs = exports.executeCliWithFallback = exports.resolveCliCandidates = void 0;
 const node_child_process_1 = require("node:child_process");
 const promises_1 = require("node:fs/promises");
 const node_path_1 = require("node:path");
 const PATH_CANDIDATES = ["markql", "xsql"];
 const WORKSPACE_CANDIDATES = [
     ["build", "markql"],
-    ["build", "xsql"]
+    ["build", "markql.exe"],
+    ["build", "xsql"],
+    ["build", "xsql.exe"]
 ];
 async function resolveCliCandidates(api, document, explicitCliPath) {
     const trimmed = (explicitCliPath || "").trim();
@@ -32,6 +29,7 @@ async function resolveCliCandidates(api, document, explicitCliPath) {
     }
     return candidates.concat(PATH_CANDIDATES);
 }
+exports.resolveCliCandidates = resolveCliCandidates;
 async function executeCliWithFallback(cliCandidates, args, cwd, runner = spawnCommand) {
     let lastError;
     for (const cliPath of cliCandidates) {
@@ -60,18 +58,21 @@ async function executeCliWithFallback(cliCandidates, args, cwd, runner = spawnCo
     }
     throw notFoundError;
 }
+exports.executeCliWithFallback = executeCliWithFallback;
 function buildLintArgs(document) {
     if (isBackedBySavedFile(document)) {
         return ["--lint", "--query-file", document.uri.fsPath, "--format", "json"];
     }
     return ["--lint", document.getText(), "--format", "json"];
 }
+exports.buildLintArgs = buildLintArgs;
 function buildRunArgs(document) {
     if (isBackedBySavedFile(document)) {
         return ["--query-file", document.uri.fsPath];
     }
     return ["--query", document.getText()];
 }
+exports.buildRunArgs = buildRunArgs;
 function getCommandCwd(api, document) {
     const workspaceFolder = api.workspace.getWorkspaceFolder?.(document?.uri);
     if (workspaceFolder?.uri?.fsPath) {
@@ -82,9 +83,11 @@ function getCommandCwd(api, document) {
     }
     return ".";
 }
+exports.getCommandCwd = getCommandCwd;
 function describeCommand(cliPath, args) {
     return [cliPath].concat(args.map(quoteArg)).join(" ");
 }
+exports.describeCommand = describeCommand;
 async function pathExists(path) {
     try {
         await (0, promises_1.access)(path);

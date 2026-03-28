@@ -215,7 +215,7 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-XSQL-Token": token
+        "X-MarkQL-Token": token
       },
       body: JSON.stringify({
         html: state.snapshotHtml,

@@ -120,7 +120,7 @@
         "markql.cliPath": {
           "type": "string",
           "default": "",
-          "description": "Path to the MarkQL CLI binary. When empty, the extension tries workspace-local build/markql, build/xsql, then PATH candidates."
+          "description": "Path to the MarkQL CLI binary. When empty, the extension tries workspace-local markql build outputs, then PATH candidates including legacy compatibility names."
         },
         "markql.enableLintOnSave": {
           "type": "boolean",
