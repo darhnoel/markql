@@ -66,15 +66,14 @@ fn stage_sidecar() -> Result<(), String> {
 }
 
 fn sidecar_sources(repo_root: &Path) -> Vec<PathBuf> {
-    let candidates = vec![
-        repo_root.join("build/markql-agent"),
-        repo_root.join("build/browser_plugin/agent/markql-agent"),
-        repo_root.join("build/xsql-agent"),
-        repo_root.join("build/browser_plugin/agent/xsql-agent"),
-    ];
-
     #[cfg(target_os = "windows")]
     {
+        let mut candidates = vec![
+            repo_root.join("build/markql-agent"),
+            repo_root.join("build/browser_plugin/agent/markql-agent"),
+            repo_root.join("build/xsql-agent"),
+            repo_root.join("build/browser_plugin/agent/xsql-agent"),
+        ];
         candidates.splice(
             0..0,
             [
@@ -84,9 +83,18 @@ fn sidecar_sources(repo_root: &Path) -> Vec<PathBuf> {
                 repo_root.join("build/browser_plugin/agent/xsql-agent.exe"),
             ],
         );
+        candidates
     }
 
-    candidates
+    #[cfg(not(target_os = "windows"))]
+    {
+        vec![
+            repo_root.join("build/markql-agent"),
+            repo_root.join("build/browser_plugin/agent/markql-agent"),
+            repo_root.join("build/xsql-agent"),
+            repo_root.join("build/browser_plugin/agent/xsql-agent"),
+        ]
+    }
 }
 
 fn sidecar_filename() -> &'static str {
