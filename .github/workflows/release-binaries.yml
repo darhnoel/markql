@@ -158,6 +158,7 @@ jobs:
           set -euo pipefail
           command -v appimagetool
           [[ -x "${APPIMAGETOOL}" ]]
+          echo "APPIMAGETOOL=${APPIMAGETOOL}"
           APPIMAGE_EXTRACT_AND_RUN=1 "${APPIMAGETOOL}" --version
           [[ -f desktop/tauri.conf.json ]]
           [[ -f desktop/icons/icon.png ]]
@@ -187,22 +188,37 @@ jobs:
           projectPath: desktop
           args: --bundles appimage --verbose
 
-      - name: Rename AppImage asset
+      - name: Finalize Linux AppImage
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#desktop-v}"
-          echo "Listing desktop/target/release/bundle/appimage:"
-          ls -la desktop/target/release/bundle/appimage || true
-          find desktop/target/release/bundle/appimage -maxdepth 2 -print || true
+          BUNDLE_DIR="desktop/target/release/bundle/appimage"
+          echo "APPIMAGETOOL=${APPIMAGETOOL}"
+          APPIMAGE_EXTRACT_AND_RUN=1 "${APPIMAGETOOL}" --version
+          echo "Listing ${BUNDLE_DIR} before fallback:"
+          ls -la "${BUNDLE_DIR}" || true
+          find "${BUNDLE_DIR}" -maxdepth 3 -print || true
           mkdir -p dist
-          APPIMAGE="$(find desktop/target/release/bundle/appimage -type f -name '*.AppImage' | head -n 1 || true)"
+          APPIMAGE="$(find "${BUNDLE_DIR}" -type f -name '*.AppImage' | head -n 1 || true)"
           if [[ -z "${APPIMAGE}" ]]; then
-            if find desktop/target/release/bundle/appimage -maxdepth 2 -type d -name '*.AppDir' | grep -q .; then
-              echo "ERROR: AppImage packaging only produced an AppDir. appimagetool did not finalize a .AppImage." >&2
-            else
-              echo "ERROR: No .AppImage produced in desktop/target/release/bundle/appimage." >&2
+            APPDIR="$(find "${BUNDLE_DIR}" -maxdepth 2 -type d -name '*.AppDir' | head -n 1 || true)"
+            if [[ -z "${APPDIR}" ]]; then
+              echo "ERROR: No .AppImage and no .AppDir were produced in ${BUNDLE_DIR}." >&2
+              exit 1
             fi
-            exit 1
+            FALLBACK_APPIMAGE="${BUNDLE_DIR}/MarkQL-Desktop-${VERSION}-x86_64.AppImage"
+            echo "Tauri produced only AppDir, running manual appimagetool fallback."
+            printf 'Fallback command: ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 %q --verbose %q %q\n' \
+              "${APPIMAGETOOL}" "${APPDIR}" "${FALLBACK_APPIMAGE}"
+            ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "${APPIMAGETOOL}" --verbose "${APPDIR}" "${FALLBACK_APPIMAGE}"
+            echo "Listing ${BUNDLE_DIR} after fallback:"
+            ls -la "${BUNDLE_DIR}" || true
+            find "${BUNDLE_DIR}" -maxdepth 3 -print || true
+            if [[ ! -f "${FALLBACK_APPIMAGE}" ]]; then
+              echo "ERROR: appimagetool fallback did not produce ${FALLBACK_APPIMAGE}." >&2
+              exit 1
+            fi
+            APPIMAGE="${FALLBACK_APPIMAGE}"
           fi
           cp "${APPIMAGE}" "dist/MarkQL-Desktop-${VERSION}-linux-x86_64.AppImage"
 
