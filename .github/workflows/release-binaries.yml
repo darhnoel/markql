@@ -151,7 +151,17 @@ jobs:
             https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
           sudo chmod +x /usr/local/bin/appimagetool
           echo "APPIMAGE_EXTRACT_AND_RUN=1" >> "${GITHUB_ENV}"
-          APPIMAGE_EXTRACT_AND_RUN=1 /usr/local/bin/appimagetool --version || true
+          echo "APPIMAGETOOL=/usr/local/bin/appimagetool" >> "${GITHUB_ENV}"
+
+      - name: Linux packaging preflight
+        run: |
+          set -euo pipefail
+          command -v appimagetool
+          [[ -x "${APPIMAGETOOL}" ]]
+          APPIMAGE_EXTRACT_AND_RUN=1 "${APPIMAGETOOL}" --version
+          [[ -f desktop/tauri.conf.json ]]
+          [[ -f desktop/icons/icon.png ]]
+          [[ -f desktop/icons/icon.ico ]]
 
       - name: Export pkg-config search path
         run: echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig" >> "${GITHUB_ENV}"
@@ -167,6 +177,11 @@ jobs:
           cp /tmp/markql-agent-linux/markql-agent desktop/binaries/markql-agent-x86_64-unknown-linux-gnu
           chmod +x desktop/binaries/markql-agent-x86_64-unknown-linux-gnu
 
+      - name: Verify Linux sidecar staging
+        run: |
+          set -euo pipefail
+          [[ -x desktop/binaries/markql-agent-x86_64-unknown-linux-gnu ]]
+
       - uses: tauri-apps/tauri-action@v0
         with:
           projectPath: desktop
@@ -180,9 +195,13 @@ jobs:
           ls -la desktop/target/release/bundle/appimage || true
           find desktop/target/release/bundle/appimage -maxdepth 2 -print || true
           mkdir -p dist
-          APPIMAGE="$(find desktop/target/release/bundle/appimage -maxdepth 1 -type f -name '*.AppImage' | head -n 1 || true)"
+          APPIMAGE="$(find desktop/target/release/bundle/appimage -type f -name '*.AppImage' | head -n 1 || true)"
           if [[ -z "${APPIMAGE}" ]]; then
-            echo "ERROR: No .AppImage produced in desktop/target/release/bundle/appimage." >&2
+            if find desktop/target/release/bundle/appimage -maxdepth 2 -type d -name '*.AppDir' | grep -q .; then
+              echo "ERROR: AppImage packaging only produced an AppDir. appimagetool did not finalize a .AppImage." >&2
+            else
+              echo "ERROR: No .AppImage produced in desktop/target/release/bundle/appimage." >&2
+            fi
             exit 1
           fi
           cp "${APPIMAGE}" "dist/MarkQL-Desktop-${VERSION}-linux-x86_64.AppImage"
@@ -209,6 +228,19 @@ jobs:
           name: markql-agent-windows
           path: C:\temp\markql-agent-windows
 
+      - name: Windows packaging preflight
+        shell: pwsh
+        run: |
+          if (!(Test-Path "desktop/icons/icon.ico")) {
+            Write-Error "desktop/icons/icon.ico is required for Windows MSI bundling."
+          }
+          if (!(Test-Path "desktop/icons/icon.png")) {
+            Write-Error "desktop/icons/icon.png is required for desktop bundling."
+          }
+          if (!(Test-Path "desktop/tauri.conf.json")) {
+            Write-Error "desktop/tauri.conf.json is missing."
+          }
+
       - name: Prepare Windows sidecar
         shell: pwsh
         run: |
@@ -226,6 +258,13 @@ jobs:
           }
           Copy-Item $found desktop\binaries\markql-agent-x86_64-pc-windows-msvc.exe
 
+      - name: Verify Windows sidecar staging
+        shell: pwsh
+        run: |
+          if (!(Test-Path "desktop/binaries/markql-agent-x86_64-pc-windows-msvc.exe")) {
+            Write-Error "Expected staged Windows sidecar desktop/binaries/markql-agent-x86_64-pc-windows-msvc.exe"
+          }
+
       - uses: tauri-apps/tauri-action@v0
         with:
           projectPath: desktop
@@ -236,6 +275,9 @@ jobs:
         run: |
           $version = "${{ github.ref_name }}" -replace '^desktop-v', ''
           $msi = Get-ChildItem desktop\target\release\bundle\msi\*.msi | Select-Object -First 1
+          if (-not $msi) {
+            Write-Error "No MSI was produced in desktop\\target\\release\\bundle\\msi"
+          }
           Copy-Item $msi.FullName "dist\MarkQL-Desktop-$version-windows-x86_64.msi"
 
       - uses: actions/upload-artifact@v4
