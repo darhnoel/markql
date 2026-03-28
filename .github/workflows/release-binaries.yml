@@ -75,17 +75,26 @@ jobs:
           CMAKE_BUILD_TYPE: ${{ env.BUILD_TYPE }}
         run: ./scripts/build/build.sh
 
-      - name: Verify markql-agent.exe exists
+      - name: Locate markql-agent.exe
         shell: pwsh
         run: |
-          if (!(Test-Path "build/markql-agent.exe")) {
-            Write-Error "Expected build/markql-agent.exe but it was not found."
+          $candidates = @(
+            "build\MinSizeRel\markql-agent.exe",
+            "build\Release\markql-agent.exe",
+            "build\Debug\markql-agent.exe",
+            "build\markql-agent.exe"
+          )
+          $found = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $found) {
+            Write-Error "markql-agent.exe not found. Searched: $($candidates -join ', ')"
           }
+          "AGENT_EXE=$found" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "Using agent artifact: $found"
 
       - uses: actions/upload-artifact@v4
         with:
           name: markql-agent-windows
-          path: build/markql-agent.exe
+          path: ${{ env.AGENT_EXE }}
 
   package-extension:
     runs-on: ubuntu-latest
@@ -157,6 +166,7 @@ jobs:
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#desktop-v}"
           CANDIDATE_DIRS=(
+            "desktop/desktop/target/release/bundle/appimage"
             "desktop/target/release/bundle/appimage"
             "target/release/bundle/appimage"
           )
@@ -164,8 +174,9 @@ jobs:
             echo "Listing ${dir}:"
             ls -la "${dir}" || true
           done
+          mkdir -p dist
           APPIMAGE="$(
-            find "${CANDIDATE_DIRS[@]}" -maxdepth 1 -type f -name '*.AppImage' 2>/dev/null | head -n 1 || true
+            find "${CANDIDATE_DIRS[@]}" -type f -name '*.AppImage' 2>/dev/null | head -n 1 || true
           )"
           if [[ -z "${APPIMAGE}" ]]; then
             echo "ERROR: No .AppImage produced in the expected bundle directories." >&2
@@ -200,7 +211,17 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path desktop\binaries | Out-Null
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Copy-Item C:\temp\markql-agent-windows\markql-agent.exe desktop\binaries\markql-agent-x86_64-pc-windows-msvc.exe
+          $candidates = @(
+            "C:\temp\markql-agent-windows\markql-agent.exe",
+            "C:\temp\markql-agent-windows\MinSizeRel\markql-agent.exe",
+            "C:\temp\markql-agent-windows\Release\markql-agent.exe",
+            "C:\temp\markql-agent-windows\Debug\markql-agent.exe"
+          )
+          $found = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $found) {
+            Write-Error "Downloaded markql-agent.exe not found. Searched: $($candidates -join ', ')"
+          }
+          Copy-Item $found desktop\binaries\markql-agent-x86_64-pc-windows-msvc.exe
 
       - uses: tauri-apps/tauri-action@v0
         with:
