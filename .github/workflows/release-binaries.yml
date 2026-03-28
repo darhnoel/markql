@@ -51,6 +51,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
       - name: Cache vcpkg installed tree
         uses: actions/cache@v4
         with:
@@ -69,6 +74,13 @@ jobs:
         env:
           CMAKE_BUILD_TYPE: ${{ env.BUILD_TYPE }}
         run: ./scripts/build/build.sh
+
+      - name: Verify markql-agent.exe exists
+        shell: pwsh
+        run: |
+          if (!(Test-Path "build/markql-agent.exe")) {
+            Write-Error "Expected build/markql-agent.exe but it was not found."
+          }
 
       - uses: actions/upload-artifact@v4
         with:
@@ -100,7 +112,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
 
       - name: Install Linux desktop dependencies
         run: |
@@ -136,12 +150,27 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         with:
           projectPath: desktop
-          args: --bundles appimage
+          args: --bundles appimage --verbose
 
       - name: Rename AppImage asset
         run: |
+          set -euo pipefail
           VERSION="${GITHUB_REF_NAME#desktop-v}"
-          APPIMAGE="$(find desktop/target/release/bundle/appimage -maxdepth 1 -name '*.AppImage' | head -n 1)"
+          CANDIDATE_DIRS=(
+            "desktop/target/release/bundle/appimage"
+            "target/release/bundle/appimage"
+          )
+          for dir in "${CANDIDATE_DIRS[@]}"; do
+            echo "Listing ${dir}:"
+            ls -la "${dir}" || true
+          done
+          APPIMAGE="$(
+            find "${CANDIDATE_DIRS[@]}" -maxdepth 1 -type f -name '*.AppImage' 2>/dev/null | head -n 1 || true
+          )"
+          if [[ -z "${APPIMAGE}" ]]; then
+            echo "ERROR: No .AppImage produced in the expected bundle directories." >&2
+            exit 1
+          fi
           cp "${APPIMAGE}" "dist/MarkQL-Desktop-${VERSION}-linux-x86_64.AppImage"
 
       - uses: actions/upload-artifact@v4
@@ -157,7 +186,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
 
       - uses: actions/download-artifact@v4
         with:
