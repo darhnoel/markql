@@ -142,6 +142,17 @@ jobs:
             librsvg2-dev \
             patchelf
 
+      - name: Install AppImage tooling
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libfuse2
+          sudo curl -L -o /usr/local/bin/appimagetool \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          sudo chmod +x /usr/local/bin/appimagetool
+          echo "APPIMAGE_EXTRACT_AND_RUN=1" >> "${GITHUB_ENV}"
+          APPIMAGE_EXTRACT_AND_RUN=1 /usr/local/bin/appimagetool --version || true
+
       - name: Export pkg-config search path
         run: echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig" >> "${GITHUB_ENV}"
 
@@ -167,6 +178,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME#desktop-v}"
           echo "Listing desktop/target/release/bundle/appimage:"
           ls -la desktop/target/release/bundle/appimage || true
+          find desktop/target/release/bundle/appimage -maxdepth 2 -print || true
           mkdir -p dist
           APPIMAGE="$(find desktop/target/release/bundle/appimage -maxdepth 1 -type f -name '*.AppImage' | head -n 1 || true)"
           if [[ -z "${APPIMAGE}" ]]; then
