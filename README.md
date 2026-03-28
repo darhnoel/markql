@@ -108,6 +108,37 @@ Run interactive REPL:
 ./build/markql --interactive --input ./data/index.html
 ```
 
+## Install MarkQL Desktop
+
+Current desktop releases ship three user-facing assets:
+
+- `MarkQL-Desktop-<version>-linux-x86_64.AppImage`
+- `MarkQL-Desktop-<version>-windows-x86_64.msi`
+- `markql-extension.zip`
+
+Python package releases continue to use `v*` tags. Desktop installer releases use `desktop-v*` tags.
+
+Install flow today:
+
+1. Download and install MarkQL Desktop from the latest GitHub Release.
+2. Download `markql-extension.zip` from the same release and extract it.
+3. Open `chrome://extensions`.
+4. Enable `Developer mode`.
+5. Click `Load unpacked`.
+6. Select the extracted `markql-extension` folder.
+7. Launch MarkQL Desktop.
+8. Click `Copy Token`.
+9. Paste the token into the extension.
+10. Open a page and run queries.
+
+Linux AppImage note:
+
+- If the AppImage is not executable after download, run `chmod +x MarkQL-Desktop-<version>-linux-x86_64.AppImage`.
+
+Windows note:
+
+- The MSI is unsigned in the MVP, so Windows may show an "unknown publisher" warning.
+
 ## Browser Plugin MVP
 
 Build and run `markql-agent` (localhost `127.0.0.1:7337`):

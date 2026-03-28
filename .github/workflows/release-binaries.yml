@@ -1,8 +1,8 @@
-name: Release Binaries
+name: Release Desktop
 
 on:
   push:
-    tags: ["v*"]
+    tags: ["desktop-v*"]
   workflow_dispatch:
 
 permissions:
@@ -10,7 +10,7 @@ permissions:
 
 env:
   BUILD_TYPE: MinSizeRel
-  MARKQL_BUILD_CLI: "ON"
+  MARKQL_BUILD_CLI: "OFF"
   MARKQL_BUILD_AGENT: "ON"
   MARKQL_BUILD_TESTS: "OFF"
   MARKQL_BUILD_PYTHON: "OFF"
@@ -19,7 +19,7 @@ env:
   MARKQL_STRIP_BINARIES: "ON"
 
 jobs:
-  build-linux:
+  build-agent-linux:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -28,60 +28,25 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vcpkg_installed
-          key: release-vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
-
-      - name: Install Linux packaging tools
-        run: sudo apt-get update && sudo apt-get install -y ninja-build patchelf desktop-file-utils appstream fakeroot rpm
+          key: desktop-agent-vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
 
       - name: Install vcpkg
         run: |
           git clone https://github.com/microsoft/vcpkg "${HOME}/vcpkg"
           "${HOME}/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
 
-      - name: Configure and build binaries
+      - name: Build markql-agent
         env:
           VCPKG_ROOT: ${{ env.HOME }}/vcpkg
           CMAKE_BUILD_TYPE: ${{ env.BUILD_TYPE }}
         run: ./scripts/build/build.sh
 
-      - name: Smoke test CLI and agent
-        run: |
-          ./build/markql --version
-          ./build/markql-agent --help
-          ./build/markql-agent >/tmp/markql-agent.log 2>&1 &
-          AGENT_PID=$!
-          trap "kill ${AGENT_PID}" EXIT
-          for attempt in $(seq 1 25); do
-            if curl --fail --silent http://127.0.0.1:7337/health; then
-              break
-            fi
-            sleep 0.2
-          done
-
-      - name: Package AppImage
-        run: ./scripts/package/package_appimage.sh --build-dir build --dist-dir dist
-
-      - name: Package Debian archive
-        run: ./scripts/package/package_deb.sh --build-dir build --output-dir dist/deb
-
-      - name: Package tarball
-        run: |
-          mkdir -p dist/tarball/markql-${GITHUB_REF_NAME#v}-linux-x86_64
-          cp build/markql dist/tarball/markql-${GITHUB_REF_NAME#v}-linux-x86_64/
-          cp build/markql-agent dist/tarball/markql-${GITHUB_REF_NAME#v}-linux-x86_64/
-          cp README.md dist/tarball/markql-${GITHUB_REF_NAME#v}-linux-x86_64/
-          tar -C dist/tarball -czf dist/markql-${GITHUB_REF_NAME#v}-linux-x86_64.tar.gz markql-${GITHUB_REF_NAME#v}-linux-x86_64
-
       - uses: actions/upload-artifact@v4
         with:
-          name: release-linux
-          path: |
-            dist/markql-*.tar.gz
-            dist/*.AppImage
-            dist/deb/*.deb
-            build/markql-agent
+          name: markql-agent-linux
+          path: build/markql-agent
 
-  build-windows:
+  build-agent-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -90,7 +55,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vcpkg_installed
-          key: release-vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+          key: desktop-agent-vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
 
       - name: Install vcpkg
         shell: pwsh
@@ -98,105 +63,110 @@ jobs:
           git clone https://github.com/microsoft/vcpkg "$env:USERPROFILE\vcpkg"
           & "$env:USERPROFILE\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
 
-      - name: Configure and build binaries
+      - name: Build markql-agent
         shell: bash
         env:
           VCPKG_ROOT: ${{ env.USERPROFILE }}/vcpkg
           CMAKE_BUILD_TYPE: ${{ env.BUILD_TYPE }}
         run: ./scripts/build/build.sh
 
-      - name: Smoke test CLI and agent
-        shell: pwsh
-        run: |
-          .\build\markql.exe --version
-          .\build\markql-agent.exe --help
+      - uses: actions/upload-artifact@v4
+        with:
+          name: markql-agent-windows
+          path: build/markql-agent.exe
 
-      - name: Package zip
-        shell: pwsh
+  package-extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build extension zip
         run: |
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Copy-Item README.md dist\README.md
-          Compress-Archive -Path build\markql.exe,build\markql-agent.exe,dist\README.md -DestinationPath dist\markql-${{ github.ref_name }}-windows-x86_64.zip -Force
+          mkdir -p dist/markql-extension
+          cp -R browser_plugin/extension/. dist/markql-extension/
+          cd dist
+          zip -r markql-extension.zip markql-extension
 
       - uses: actions/upload-artifact@v4
         with:
-          name: release-windows
-          path: |
-            dist/*.zip
-            build/markql-agent.exe
+          name: markql-extension
+          path: dist/markql-extension.zip
 
   build-desktop-linux:
     runs-on: ubuntu-22.04
-    needs: build-linux
+    needs:
+      - build-agent-linux
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/download-artifact@v4
         with:
-          name: release-linux
-          path: /tmp/release-linux
+          name: markql-agent-linux
+          path: /tmp/markql-agent-linux
 
       - name: Prepare Linux sidecar
         run: |
-          mkdir -p desktop/binaries
-          cp /tmp/release-linux/markql-agent desktop/binaries/markql-agent-x86_64-unknown-linux-gnu
+          mkdir -p desktop/binaries dist
+          cp /tmp/markql-agent-linux/markql-agent desktop/binaries/markql-agent-x86_64-unknown-linux-gnu
           chmod +x desktop/binaries/markql-agent-x86_64-unknown-linux-gnu
 
       - uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: desktop
-          tagName: ${{ github.ref_name }}
-          releaseDraft: false
-          prerelease: false
-          args: --bundles appimage,deb
+          args: --bundles appimage
+
+      - name: Rename AppImage asset
+        run: |
+          VERSION="${GITHUB_REF_NAME#desktop-v}"
+          APPIMAGE="$(find desktop/target/release/bundle/appimage -maxdepth 1 -name '*.AppImage' | head -n 1)"
+          cp "${APPIMAGE}" "dist/MarkQL-Desktop-${VERSION}-linux-x86_64.AppImage"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: release-desktop-linux
-          path: |
-            desktop/target/release/bundle/appimage/*.AppImage
-            desktop/target/release/bundle/deb/*.deb
+          name: markql-desktop-linux
+          path: dist/MarkQL-Desktop-*.AppImage
 
   build-desktop-windows:
     runs-on: windows-latest
-    needs: build-windows
+    needs:
+      - build-agent-windows
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/download-artifact@v4
         with:
-          name: release-windows
-          path: C:\temp\release-windows
+          name: markql-agent-windows
+          path: C:\temp\markql-agent-windows
 
       - name: Prepare Windows sidecar
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path desktop\binaries | Out-Null
-          Copy-Item C:\temp\release-windows\markql-agent.exe desktop\binaries\markql-agent-x86_64-pc-windows-msvc.exe
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item C:\temp\markql-agent-windows\markql-agent.exe desktop\binaries\markql-agent-x86_64-pc-windows-msvc.exe
 
       - uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: desktop
-          tagName: ${{ github.ref_name }}
-          releaseDraft: false
-          prerelease: false
           args: --bundles msi
+
+      - name: Rename MSI asset
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^desktop-v', ''
+          $msi = Get-ChildItem desktop\target\release\bundle\msi\*.msi | Select-Object -First 1
+          Copy-Item $msi.FullName "dist\MarkQL-Desktop-$version-windows-x86_64.msi"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: release-desktop-windows
-          path: desktop/target/release/bundle/msi/*.msi
+          name: markql-desktop-windows
+          path: dist/MarkQL-Desktop-*.msi
 
   publish:
     needs:
-      - build-linux
-      - build-windows
       - build-desktop-linux
       - build-desktop-windows
+      - package-extension
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -210,8 +180,6 @@ jobs:
           draft: true
           generate_release_notes: true
           files: |
-            dist/**/*.tar.gz
-            dist/**/*.zip
-            dist/**/*.deb
-            dist/**/*.AppImage
-            dist/**/*.msi
+            dist/*.AppImage
+            dist/*.msi
+            dist/*.zip
