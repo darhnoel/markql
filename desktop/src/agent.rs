@@ -14,6 +14,7 @@ use tokio::time::{sleep, timeout, Duration, Instant};
 use crate::config::{
     clamp_timeout_ms, generate_token, normalize_port, ConfigStore, DesktopSettings,
 };
+use crate::logging;
 
 const STATUS_EVENT: &str = "agent-status";
 const MAX_RESTARTS: u8 = 3;
@@ -137,7 +138,12 @@ impl AgentManager {
 
     pub async fn start(&self, app: Option<AppHandle>) -> Result<AgentStatus, AgentError> {
         let settings = self.settings().await;
+        logging::log(format!(
+            "agent start requested: port={}, timeout_ms={}",
+            settings.port, settings.query_timeout_ms
+        ));
         if self.is_healthy(settings.port).await {
+            logging::log(format!("external agent already healthy on port {}", settings.port));
             let status = {
                 let mut inner = self.inner.lock().await;
                 inner.child = None;
@@ -151,10 +157,12 @@ impl AgentManager {
         }
 
         if port_is_open(settings.port) {
+            logging::log(format!("port {} is already busy", settings.port));
             return Err(AgentError::PortBusy(settings.port));
         }
 
         let binary = self.resolve_binary(&app)?;
+        logging::log(format!("resolved markql-agent binary: {}", binary.display()));
         let generation = {
             let mut inner = self.inner.lock().await;
             if inner.child.is_some() {
@@ -169,6 +177,10 @@ impl AgentManager {
                 .stdout(Stdio::null())
                 .stderr(Stdio::null());
             let child = command.spawn().map_err(AgentError::Spawn)?;
+            logging::log(format!(
+                "spawned managed markql-agent pid={:?}",
+                child.id()
+            ));
             inner.generation += 1;
             inner.child = Some(ManagedChild {
                 pid: child.id(),
@@ -182,6 +194,7 @@ impl AgentManager {
         };
 
         if let Err(err) = self.wait_for_health(settings.port).await {
+            logging::log(format!("markql-agent health check failed: {err}"));
             let child = {
                 let mut inner = self.inner.lock().await;
                 inner.generation += 1;
@@ -202,6 +215,7 @@ impl AgentManager {
             let mut inner = self.inner.lock().await;
             inner.status_label = "Running".to_string();
         }
+        logging::log(format!("managed markql-agent healthy on port {}", settings.port));
         let status = self.status().await;
         self.emit_status(app.as_ref(), &status);
 
@@ -216,6 +230,7 @@ impl AgentManager {
     }
 
     pub async fn stop(&self, app: Option<AppHandle>) -> Result<AgentStatus, AgentError> {
+        logging::log("agent stop requested");
         let child = {
             let mut inner = self.inner.lock().await;
             inner.generation += 1;
@@ -249,6 +264,15 @@ impl AgentManager {
     }
 
     fn emit_status(&self, app: Option<&AppHandle>, status: &AgentStatus) {
+        logging::log(format!(
+            "status update: running={}, label={}, managed={}, port={}, restarts={}, last_error={}",
+            status.running,
+            status.label,
+            status.managed_process,
+            status.port,
+            status.restart_attempts,
+            status.last_error.as_deref().unwrap_or("none")
+        ));
         if let Some(app_handle) = app {
             let _ = app_handle.emit(STATUS_EVENT, status);
             if let Some(window) = app_handle.get_webview_window("settings") {
@@ -294,6 +318,10 @@ impl AgentManager {
             }
 
             if attempts >= MAX_RESTARTS {
+                logging::log(format!(
+                    "markql-agent restart limit reached after exit code {}",
+                    exit_code
+                ));
                 let status = {
                     let mut inner = self.inner.lock().await;
                     inner.child = None;
@@ -318,6 +346,10 @@ impl AgentManager {
             self.emit_status(Some(&app), &self.status().await);
 
             if let Ok(binary) = self.resolve_binary(&Some(app.clone())) {
+                logging::log(format!(
+                    "attempting markql-agent restart from {}",
+                    binary.display()
+                ));
                 let spawn_result = {
                     let mut command = Command::new(binary);
                     command
@@ -331,6 +363,7 @@ impl AgentManager {
 
                 match spawn_result {
                     Ok(child) => {
+                        logging::log(format!("respawned markql-agent pid={:?}", child.id()));
                         let new_generation = {
                             let mut inner = self.inner.lock().await;
                             inner.generation += 1;
@@ -354,6 +387,7 @@ impl AgentManager {
                         }
                     }
                     Err(err) => {
+                        logging::log(format!("markql-agent respawn failed: {err}"));
                         let status = {
                             let mut inner = self.inner.lock().await;
                             inner.child = None;
@@ -370,6 +404,7 @@ impl AgentManager {
     }
 
     fn resolve_binary(&self, app: &Option<AppHandle>) -> Result<PathBuf, AgentError> {
+        logging::log("resolving markql-agent binary");
         let mut candidates = Vec::new();
         if let Some(app_handle) = app {
             if let Ok(resource_dir) = app_handle.path().resource_dir() {
@@ -395,9 +430,11 @@ impl AgentManager {
 
         for candidate in candidates {
             if candidate.exists() {
+                logging::log(format!("found markql-agent candidate {}", candidate.display()));
                 return Ok(candidate);
             }
         }
+        logging::log("no markql-agent candidate resolved");
         Err(AgentError::BinaryNotFound)
     }
 
