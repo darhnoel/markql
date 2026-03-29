@@ -24,7 +24,11 @@ cd "${REPO_ROOT}"
 : "${MARKQL_WITH_NLOHMANN_JSON:=ON}"
 : "${MARKQL_WITH_CURL:=ON}"
 : "${MARKQL_WITH_ARROW:=ON}"
-VCPKG_ROOT="${VCPKG_ROOT:-$HOME/vcpkg}"
+if [[ -z "${VCPKG_ROOT:-}" && -x "${REPO_ROOT}/vcpkg/vcpkg" ]]; then
+  VCPKG_ROOT="${REPO_ROOT}/vcpkg"
+else
+  VCPKG_ROOT="${VCPKG_ROOT:-$HOME/vcpkg}"
+fi
 VCPKG_LOCAL_INSTALLED_DIR="${REPO_ROOT}/vcpkg_installed"
 VCPKG_LOCAL_BUILDTREES_DIR="${REPO_ROOT}/.vcpkg/buildtrees"
 VCPKG_LOCAL_PACKAGES_DIR="${REPO_ROOT}/.vcpkg/packages"
@@ -101,6 +105,19 @@ BUILD_JOBS="${BUILD_JOBS:-$(detect_parallel_jobs)}"
 CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-MinSizeRel}"
 MARKQL_OPTIMIZE_FOR_SIZE="${MARKQL_OPTIMIZE_FOR_SIZE:-ON}"
 MARKQL_STRIP_BINARIES="${MARKQL_STRIP_BINARIES:-ON}"
+VCPKG_BIN=""
+
+if [[ -n "${VCPKG_ROOT:-}" ]]; then
+  if [[ -x "${VCPKG_ROOT}/vcpkg" ]]; then
+    VCPKG_BIN="${VCPKG_ROOT}/vcpkg"
+  elif [[ -x "${VCPKG_ROOT}/vcpkg.exe" ]]; then
+    VCPKG_BIN="${VCPKG_ROOT}/vcpkg.exe"
+  elif [[ -f "${REPO_ROOT}/vcpkg.json" ]]; then
+    echo "error: vcpkg not found or not executable under VCPKG_ROOT=${VCPKG_ROOT}" >&2
+    echo "hint: install vcpkg there or export VCPKG_ROOT to the correct directory before running scripts/build/build.sh" >&2
+    exit 127
+  fi
+fi
 
 cmake_args=(
   -S "${REPO_ROOT}"
@@ -142,9 +159,9 @@ if [[ -n "${VCPKG_ROOT:-}" ]]; then
   fi
 fi
 
-if [[ -n "${VCPKG_ROOT:-}" && -f "${REPO_ROOT}/vcpkg.json" ]]; then
+if [[ -n "${VCPKG_BIN:-}" && -f "${REPO_ROOT}/vcpkg.json" ]]; then
   mkdir -p "${VCPKG_LOCAL_BUILDTREES_DIR}" "${VCPKG_LOCAL_PACKAGES_DIR}" "${VCPKG_LOCAL_INSTALLED_DIR}"
-  "${VCPKG_ROOT}/vcpkg" install \
+  "${VCPKG_BIN}" install \
     --triplet "${VCPKG_TARGET_TRIPLET}" \
     --host-triplet "${VCPKG_HOST_TRIPLET}" \
     --x-buildtrees-root="${VCPKG_LOCAL_BUILDTREES_DIR}" \

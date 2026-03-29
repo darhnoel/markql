@@ -6,6 +6,7 @@
     "flatbuffers",
     "cpp-httplib",
     "nlohmann-json",
+    "boost-multiprecision",
     {
       "name": "flatbuffers",
       "host": true

@@ -425,18 +425,28 @@ impl AgentManager {
 }
 
 fn platform_binary_candidates(root: &Path) -> Vec<PathBuf> {
-    let candidates = vec![
-        root.join("binaries").join(sidecar_name()),
-        root.join(sidecar_name()),
-        root.join("markql-agent"),
-        root.join("xsql-agent"),
-    ];
     #[cfg(target_os = "windows")]
     {
+        let mut candidates = vec![
+            root.join("binaries").join(sidecar_name()),
+            root.join(sidecar_name()),
+            root.join("markql-agent"),
+            root.join("xsql-agent"),
+        ];
         candidates.push(root.join("markql-agent.exe"));
         candidates.push(root.join("xsql-agent.exe"));
+        candidates
     }
-    candidates
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        vec![
+            root.join("binaries").join(sidecar_name()),
+            root.join(sidecar_name()),
+            root.join("markql-agent"),
+            root.join("xsql-agent"),
+        ]
+    }
 }
 
 fn sidecar_name() -> &'static str {
