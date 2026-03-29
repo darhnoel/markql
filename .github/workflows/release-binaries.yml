@@ -76,6 +76,8 @@ jobs:
         shell: bash
         env:
           CMAKE_BUILD_TYPE: ${{ env.BUILD_TYPE }}
+          VCPKG_TARGET_TRIPLET: x64-windows-static
+          VCPKG_HOST_TRIPLET: x64-windows-static
         run: ./scripts/build/build.sh
 
       - name: Locate markql-agent.exe
@@ -91,8 +93,36 @@ jobs:
           if (-not $found) {
             Write-Error "markql-agent.exe not found. Searched: $($candidates -join ', ')"
           }
+          if ($found -match '\\Debug\\') {
+            Write-Error "markql-agent.exe was built from a Debug configuration: $found"
+          }
           "AGENT_EXE=$found" | Out-File -FilePath $env:GITHUB_ENV -Append
           Write-Host "Using agent artifact: $found"
+
+      - name: Verify Windows agent runtime dependencies
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (!(Test-Path $vswhere)) {
+            Write-Error "vswhere.exe not found; cannot inspect Windows binary dependencies."
+          }
+          $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vsPath) {
+            Write-Error "Visual Studio installation path not found for dumpbin."
+          }
+          $dumpbin = Get-ChildItem (Join-Path $vsPath 'VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe') |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $dumpbin) {
+            Write-Error "dumpbin.exe not found under $vsPath"
+          }
+          $dependents = & $dumpbin.FullName /dependents $env:AGENT_EXE
+          $dependents | Out-String | Write-Host
+          foreach ($blocked in @('VCRUNTIME140D.dll', 'MSVCP140D.dll', 'brotlienc.dll')) {
+            if ($dependents -match [regex]::Escape($blocked)) {
+              Write-Error "Forbidden runtime dependency detected in packaged markql-agent.exe: $blocked"
+            }
+          }
 
       - uses: actions/upload-artifact@v4
         with:

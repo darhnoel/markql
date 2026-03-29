@@ -97,6 +97,12 @@ reset_stale_cmake_cache_for_vcpkg_manifest() {
   fi
 }
 
+cmake_uses_multi_config() {
+  local cache_file
+  cache_file="${REPO_ROOT}/build/CMakeCache.txt"
+  [[ -f "${cache_file}" ]] && grep -q '^CMAKE_CONFIGURATION_TYPES:STRING=' "${cache_file}"
+}
+
 VCPKG_TARGET_TRIPLET="${VCPKG_TARGET_TRIPLET:-$(detect_vcpkg_triplet)}"
 VCPKG_HOST_TRIPLET="${VCPKG_HOST_TRIPLET:-$VCPKG_TARGET_TRIPLET}"
 VCPKG_TARGET_INSTALLED_DIR="${VCPKG_LOCAL_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}"
@@ -174,4 +180,11 @@ if [[ -n "${VCPKG_BIN:-}" && -f "${REPO_ROOT}/vcpkg.json" ]]; then
 fi
 
 cmake "${cmake_args[@]}"
-cmake --build "${REPO_ROOT}/build" --parallel "${BUILD_JOBS}"
+build_args=(
+  --build "${REPO_ROOT}/build"
+  --parallel "${BUILD_JOBS}"
+)
+if cmake_uses_multi_config; then
+  build_args+=(--config "${CMAKE_BUILD_TYPE}")
+fi
+cmake "${build_args[@]}"
