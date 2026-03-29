@@ -185,6 +185,8 @@ fn sanitize_linux_gui_env() {
             "GTK_EXE_PREFIX",
             "GTK_IM_MODULE_FILE",
             "GIO_MODULE_DIR",
+            "GIO_EXTRA_MODULES",
+            "XDG_DATA_DIRS",
         ]
         .into_iter()
         .filter_map(std::env::var_os)
@@ -208,10 +210,13 @@ fn sanitize_linux_gui_env() {
 
     if snap_tainted {
         for key in [
+            "SNAP",
             "GTK_PATH",
             "GTK_EXE_PREFIX",
             "GTK_IM_MODULE_FILE",
             "GIO_MODULE_DIR",
+            "GIO_EXTRA_MODULES",
+            "XDG_DATA_DIRS",
         ] {
             std::env::remove_var(key);
         }
