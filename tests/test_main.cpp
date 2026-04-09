@@ -43,6 +43,7 @@ void register_markql_suggestor_tests(std::vector<TestCase>& tests);
 void register_table_option_tests(std::vector<TestCase>& tests);
 void register_diagnostic_tests(std::vector<TestCase>& tests);
 void register_query_template_renderer_tests(std::vector<TestCase>& tests);
+void register_helper_core_tests(std::vector<TestCase>& tests);
 #ifdef MARKQL_ENABLE_KHMER_NUMBER
 void register_khmer_number_tests(std::vector<TestCase>& tests);
 #endif
@@ -105,6 +106,7 @@ int main(int argc, char** argv) {
   register_table_option_tests(tests);
   register_diagnostic_tests(tests);
   register_query_template_renderer_tests(tests);
+  register_helper_core_tests(tests);
 #ifdef MARKQL_ENABLE_KHMER_NUMBER
   register_khmer_number_tests(tests);
 #endif

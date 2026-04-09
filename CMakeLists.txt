@@ -70,6 +70,10 @@ add_library(markql_core
   core/src/artifacts/artifact_document.cpp
   core/src/artifacts/artifact_query.cpp
   core/src/artifacts/artifact_query_flatbuffers.cpp
+  core/src/helper/helper_controller.cpp
+  core/src/helper/helper_json.cpp
+  core/src/helper/helper_policy.cpp
+  core/src/helper/helper_result_analysis.cpp
   core/src/lang/ast.cpp
   core/src/lang/diagnostics.cpp
   core/src/lang/diagnostics_parse_support.cpp
@@ -360,6 +364,7 @@ if (MARKQL_BUILD_TESTS)
     tests/test_column_names.cpp
     tests/test_self_ref.cpp
     tests/test_query_template_renderer.cpp
+    tests/test_helper_core.cpp
     tests/test_vim_edit.cpp
     tests/test_vim_normal.cpp
     tests/test_render.cpp

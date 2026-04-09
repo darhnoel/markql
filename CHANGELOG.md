@@ -8,6 +8,10 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 ## [Unreleased]
 
 ### Added
+- Added a bounded MarkQL Helper system with:
+  - deterministic helper controller, retrieval packs, and result analysis in C++
+  - Python helper orchestration, adapters, prompt/model contracts, and mock-model tests
+  - `markql-helper` CLI plus `markql.suggest_query(...)`, `markql.repair_query(...)`, and `markql.explain_query(...)`.
 - Added opt-in Jinja2 query-file rendering in the CLI:
   - `--render j2`
   - `--vars <file.toml>`

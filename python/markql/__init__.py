@@ -275,6 +275,9 @@ def __getattr__(name: str):
     raise AttributeError(f"module 'markql' has no attribute {name!r}")
 
 
+from .helper import explain_query, repair_query, suggest_query
+
+
 __all__ = [
     "Document",
     "QueryResult",
@@ -293,4 +296,7 @@ __all__ = [
     "core_version_info",
     "load_toml_vars",
     "render_j2_query_file",
+    "suggest_query",
+    "repair_query",
+    "explain_query",
 ]

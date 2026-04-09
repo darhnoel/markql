@@ -839,3 +839,18 @@ SHOW OPERATORS;
 DESCRIBE doc;
 DESCRIBE language;
 ```
+
+## MarkQL Helper
+
+For bounded next-query help, use the helper surface instead of asking for direct extracted answers:
+
+```bash
+markql-helper suggest --input page.html --goal "extract title, company, salary, link"
+markql-helper repair --input page.html --goal "extract title, company, salary, link" --query "SELECT FROM doc"
+markql-helper explain --input page.html --goal "extract title, company, salary, link" --query "SELECT title FROM doc"
+```
+
+Helper rules:
+- It returns one next MarkQL query or one artifact-escalation request.
+- The common path starts from compact family artifacts, not full HTML.
+- It keeps row-scope repair separate from field-scope repair.
