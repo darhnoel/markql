@@ -183,6 +183,7 @@ test.describe("browser plugin popup", () => {
 
       await popupPage.locator("#captureBtn").click();
       await expect(popupPage.locator("#statusLine")).toContainText("Captured 3 documents");
+      await expect(popupPage.locator("#statusLine")).toContainText("selected=Frame: Main Report");
       await expect(popupPage.locator("#snapshotPickerWrap")).toBeVisible();
       await expect(popupPage.locator("#snapshotSelect option")).toHaveCount(3);
 
