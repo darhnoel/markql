@@ -42,8 +42,13 @@ sudo apt update
 sudo apt install -y \
   git ca-certificates pkg-config \
   build-essential cmake ninja-build \
+  autoconf automake autoconf-archive libtool make \
   libboost-dev
 ```
+
+If the build reconfigures through the repo `vcpkg` manifest, these autotools packages are also
+required for the `python3` port. Missing `autoconf-archive` will typically fail during
+`cmake --build build` with a `vcpkg` configure error.
 
 Optional feature packages:
 
