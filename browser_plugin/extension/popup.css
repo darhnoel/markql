@@ -208,22 +208,22 @@ button:disabled {
 }
 
 #snapshotPickerWrap {
-  flex: 0 1 320px;
-  max-width: 320px;
+  flex: 0 1 260px;
+  max-width: 260px;
   min-width: 0;
   position: relative;
 }
 
 #examplesPickerWrap {
-  flex: 0 1 320px;
-  max-width: 320px;
+  flex: 0 1 170px;
+  max-width: 170px;
   min-width: 0;
   position: relative;
 }
 
 .snapshot-dropdown {
   position: relative;
-  width: 320px;
+  width: 260px;
 }
 
 .snapshot-native-select {
@@ -296,7 +296,7 @@ button:disabled {
 
 .examples-dropdown {
   position: relative;
-  width: 320px;
+  width: 170px;
 }
 
 .examples-native-select {
