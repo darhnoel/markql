@@ -222,9 +222,11 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
   function updateSnapshotPicker() {
     const documents = Array.isArray(state.snapshotDocuments) ? [...state.snapshotDocuments] : [];
     ui.snapshotSelect.innerHTML = "";
+    ui.snapshotDropdownMenu.innerHTML = "";
 
     if (documents.length <= 1) {
       ui.snapshotPickerWrap.classList.add("hidden");
+      closeSnapshotDropdown();
       return;
     }
 
@@ -243,10 +245,124 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
       option.textContent = buildSnapshotLabel(doc, { maxLength: 56 });
       option.title = fullLabel;
       ui.snapshotSelect.appendChild(option);
+
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "snapshot-dropdown-item";
+      item.role = "option";
+      item.dataset.snapshotId = doc.id;
+      item.setAttribute("role", "option");
+      item.setAttribute("aria-selected", doc.id === state.snapshotId ? "true" : "false");
+      item.title = fullLabel;
+      item.classList.toggle("active", doc.id === state.snapshotId);
+
+      const itemLabel = document.createElement("span");
+      itemLabel.className = "snapshot-dropdown-item-label";
+      itemLabel.textContent = buildSnapshotLabel(doc, { maxLength: 56 });
+      item.appendChild(itemLabel);
+      ui.snapshotDropdownMenu.appendChild(item);
     }
 
     ui.snapshotSelect.value = state.snapshotId;
+    ui.snapshotDropdownLabel.textContent = buildSnapshotLabel(
+      state.snapshotDocuments.find((doc) => doc.id === state.snapshotId) || documents[0],
+      { maxLength: 56 }
+    );
+    ui.snapshotDropdownBtn.title = buildSnapshotTooltip(
+      state.snapshotDocuments.find((doc) => doc.id === state.snapshotId) || documents[0]
+    );
     ui.snapshotPickerWrap.classList.remove("hidden");
+  }
+
+  function updateExamplesPicker() {
+    if (!ui.examplesSelect || !ui.examplesDropdownMenu || !ui.examplesDropdownLabel || !ui.examplesDropdownBtn) {
+      return;
+    }
+
+    ui.examplesDropdownMenu.innerHTML = "";
+
+    for (const option of Array.from(ui.examplesSelect.options || [])) {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "examples-dropdown-item";
+      item.dataset.exampleValue = option.value;
+      item.setAttribute("role", "option");
+      item.setAttribute("aria-selected", option.selected ? "true" : "false");
+      item.classList.toggle("active", option.selected);
+      item.title = option.textContent || "Examples";
+
+      const itemLabel = document.createElement("span");
+      itemLabel.className = "examples-dropdown-item-label";
+      itemLabel.textContent = option.textContent || "Examples";
+      item.appendChild(itemLabel);
+      ui.examplesDropdownMenu.appendChild(item);
+    }
+
+    const selectedOption = ui.examplesSelect.selectedOptions && ui.examplesSelect.selectedOptions[0];
+    const label = selectedOption && selectedOption.value ? (selectedOption.textContent || "Examples") : "Examples";
+    ui.examplesDropdownLabel.textContent = label;
+    ui.examplesDropdownBtn.title = label;
+  }
+
+  function setExamplesDropdownOpen(open) {
+    if (!ui.examplesDropdownBtn || !ui.examplesDropdownMenu) return;
+    ui.examplesDropdownMenu.classList.toggle("hidden", !open);
+    ui.examplesDropdownBtn.classList.toggle("open", open);
+    ui.examplesDropdownBtn.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  function closeExamplesDropdown() {
+    setExamplesDropdownOpen(false);
+  }
+
+  function toggleExamplesDropdown() {
+    const open = ui.examplesDropdownMenu.classList.contains("hidden");
+    setExamplesDropdownOpen(open);
+  }
+
+  function refreshExamplesDropdownSelection() {
+    if (!ui.examplesSelect || !ui.examplesDropdownMenu || !ui.examplesDropdownLabel || !ui.examplesDropdownBtn) {
+      return;
+    }
+    const selectedOption = ui.examplesSelect.selectedOptions && ui.examplesSelect.selectedOptions[0];
+    const label = selectedOption && selectedOption.value ? (selectedOption.textContent || "Examples") : "Examples";
+    ui.examplesDropdownLabel.textContent = label;
+    ui.examplesDropdownBtn.title = label;
+    for (const item of ui.examplesDropdownMenu.querySelectorAll(".examples-dropdown-item")) {
+      const active = item.dataset.exampleValue === ui.examplesSelect.value;
+      item.setAttribute("aria-selected", active ? "true" : "false");
+      item.classList.toggle("active", active);
+    }
+  }
+
+  function setSnapshotDropdownOpen(open) {
+    if (!ui.snapshotDropdownBtn || !ui.snapshotDropdownMenu) return;
+    ui.snapshotDropdownMenu.classList.toggle("hidden", !open);
+    ui.snapshotDropdownBtn.classList.toggle("open", open);
+    ui.snapshotDropdownBtn.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  function closeSnapshotDropdown() {
+    setSnapshotDropdownOpen(false);
+  }
+
+  function toggleSnapshotDropdown() {
+    if (ui.snapshotPickerWrap.classList.contains("hidden")) return;
+    const open = ui.snapshotDropdownMenu.classList.contains("hidden");
+    setSnapshotDropdownOpen(open);
+  }
+
+  function refreshSnapshotDropdownSelection() {
+    const selected = state.snapshotDocuments.find((doc) => doc.id === state.snapshotId);
+    const labelDoc = selected || state.snapshotDocuments[0] || null;
+    if (!labelDoc) return;
+    ui.snapshotDropdownLabel.textContent = buildSnapshotLabel(labelDoc, { maxLength: 56 });
+    ui.snapshotDropdownBtn.title = buildSnapshotTooltip(labelDoc);
+    for (const item of ui.snapshotDropdownMenu.querySelectorAll(".snapshot-dropdown-item")) {
+      const active = item.dataset.snapshotId === state.snapshotId;
+      item.setAttribute("aria-selected", active ? "true" : "false");
+      item.classList.toggle("active", active);
+    }
   }
 
   function setRunError(error) {
@@ -355,6 +471,8 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
     state.snapshotHtml = selected.html;
     ui.snapshotSelect.value = selected.id;
     ui.snapshotSelect.title = buildSnapshotTooltip(selected);
+    refreshSnapshotDropdownSelection();
+    closeSnapshotDropdown();
 
     if (clearResults) {
       clearRunError();
@@ -570,6 +688,7 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
     await chrome.storage.local.set({ [STORAGE_KEY_QUERY]: value });
     panes.status("Loaded example query.");
     ui.examplesSelect.selectedIndex = 0;
+    refreshExamplesDropdownSelection();
     editor.focusQueryInput(true);
   }
 
@@ -792,6 +911,55 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
     }
   }
 
+  function bindDropdownDismissHandlers() {
+    if (!ui.snapshotDropdownBtn || !ui.snapshotDropdownMenu) return;
+
+    ui.snapshotDropdownBtn.addEventListener("click", () => {
+      toggleSnapshotDropdown();
+    });
+
+    ui.snapshotDropdownMenu.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target.closest(".snapshot-dropdown-item") : null;
+      if (!target || !target.dataset.snapshotId) return;
+      setSnapshotDropdownOpen(false);
+      guarded(() => selectSnapshot(target.dataset.snapshotId));
+    });
+
+    document.addEventListener("click", (event) => {
+      if (ui.snapshotPickerWrap.classList.contains("hidden")) return;
+      if (ui.snapshotPickerWrap.contains(event.target)) return;
+      closeSnapshotDropdown();
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeSnapshotDropdown();
+        closeExamplesDropdown();
+      }
+    });
+  }
+
+  function bindExamplesDropdownHandlers() {
+    if (!ui.examplesDropdownBtn || !ui.examplesDropdownMenu || !ui.examplesSelect) return;
+
+    ui.examplesDropdownBtn.addEventListener("click", () => {
+      toggleExamplesDropdown();
+    });
+
+    ui.examplesDropdownMenu.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target.closest(".examples-dropdown-item") : null;
+      if (!target || typeof target.dataset.exampleValue !== "string") return;
+      ui.examplesSelect.value = target.dataset.exampleValue;
+      ui.examplesSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      closeExamplesDropdown();
+    });
+
+    document.addEventListener("click", (event) => {
+      if (ui.examplesPickerWrap && ui.examplesPickerWrap.contains(event.target)) return;
+      closeExamplesDropdown();
+    });
+  }
+
   return {
     applySelectedExample,
     captureSnapshot,
@@ -805,8 +973,11 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
     saveToken,
     selectSnapshot,
     setTokenEditorVisible,
+    bindExamplesDropdownHandlers,
+    bindDropdownDismissHandlers,
     toggleLint,
     toggleQueryVisibility,
+    updateExamplesPicker,
     updateTokenUi
   };
 }

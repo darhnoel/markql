@@ -68,6 +68,9 @@ export function bootPopup() {
   }
 
   editor.bindEvents();
+  runtime.updateExamplesPicker();
+  runtime.bindExamplesDropdownHandlers();
+  runtime.bindDropdownDismissHandlers();
 
   editor.renderQueryHighlight();
   panes.refreshDerivedViews(editor.renderLineNumbers);
