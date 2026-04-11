@@ -26,12 +26,20 @@ async function launchExtensionContext() {
   return { context, extensionId };
 }
 
-function startFixtureServer() {
+function startFixtureServer(routes = null) {
   const fixturePath = path.resolve(__dirname, "fixtures/basic-page.html");
   const html = fs.readFileSync(fixturePath, "utf8");
 
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
+      if (routes && req.url && routes[req.url]) {
+        const route = routes[req.url];
+        res.writeHead(route.status || 200, {
+          "content-type": route.contentType || "text/html; charset=utf-8"
+        });
+        res.end(route.body);
+        return;
+      }
       if (!req.url || req.url === "/" || req.url.startsWith("/basic-page")) {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(html);

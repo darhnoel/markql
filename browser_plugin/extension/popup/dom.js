@@ -14,6 +14,8 @@ export function getPopupUi() {
     toggleQueryBtn: document.getElementById("toggleQueryBtn"),
     runResultsBtn: document.getElementById("runResultsBtn"),
     captureBtn: document.getElementById("captureBtn"),
+    snapshotPickerWrap: document.getElementById("snapshotPickerWrap"),
+    snapshotSelect: document.getElementById("snapshotSelect"),
     examplesSelect: document.getElementById("examplesSelect"),
     formatBtn: document.getElementById("formatBtn"),
     lintBtn: document.getElementById("lintBtn"),

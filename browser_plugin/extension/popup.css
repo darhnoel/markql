@@ -207,6 +207,15 @@ button:disabled {
   padding: 0 10px;
 }
 
+#snapshotPickerWrap {
+  max-width: 320px;
+}
+
+#snapshotSelect {
+  min-width: 220px;
+  max-width: 320px;
+}
+
 .toolbar-field {
   display: inline-flex;
   align-items: center;

@@ -35,6 +35,10 @@
 
         <div class="toolbar">
           <button id="captureBtn" class="secondary" type="button">Capture</button>
+          <label id="snapshotPickerWrap" class="toolbar-field hidden">
+            <span>Document</span>
+            <select id="snapshotSelect" class="toolbar-select" aria-label="Captured document"></select>
+          </label>
           <select id="examplesSelect" class="toolbar-select" aria-label="Examples">
             <option value="">Examples</option>
             <option value="SELECT ATTR(a, href)&#10;FROM doc&#10;WHERE href CONTAINS 'http';">Links</option>

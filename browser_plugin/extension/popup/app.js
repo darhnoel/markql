@@ -48,6 +48,9 @@ export function bootPopup() {
     runtime.updateTokenUi();
   });
   ui.captureBtn.addEventListener("click", () => runtime.guarded(() => runtime.captureSnapshot(true)));
+  ui.snapshotSelect.addEventListener("change", () =>
+    runtime.guarded(() => runtime.selectSnapshot(ui.snapshotSelect.value))
+  );
   ui.runBtn.addEventListener("click", () => runtime.guarded(runtime.runQuery));
   ui.toggleQueryBtn.addEventListener("click", () => runtime.guarded(runtime.toggleQueryVisibility));
   ui.runResultsBtn.addEventListener("click", () => runtime.guarded(runtime.runQuery));

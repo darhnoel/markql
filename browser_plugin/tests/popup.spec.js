@@ -129,6 +129,76 @@ test.describe("browser plugin popup", () => {
     }
   });
 
+  test("captures inner frame documents and selects the content frame by default", async () => {
+    const outerHtml = [
+      "<!doctype html>",
+      "<html><head><title>Frameset Fixture</title></head>",
+      "<frameset cols='240,*'>",
+      "  <frame name='nav' src='/frame-nav'>",
+      "  <frame name='mainright' src='/frame-main'>",
+      "</frameset>",
+      "</html>"
+    ].join("");
+    const navHtml =
+      "<!doctype html><html><head><title>Nav</title></head><body><a href='/frame-main'>Open</a></body></html>";
+    const mainHtml = [
+      "<!doctype html>",
+      "<html><head><title>Main Report</title></head>",
+      "<body>",
+      "  <table class='aws_border sortable'><tr><td>Visible report</td></tr></table>",
+      "</body></html>"
+    ].join("");
+
+    const server = await startFixtureServer({
+      "/frameset-page": { body: outerHtml },
+      "/frame-nav": { body: navHtml },
+      "/frame-main": { body: mainHtml }
+    });
+    const { context, extensionId } = await launchExtensionContext();
+
+    try {
+      const capturedRequests = [];
+      await context.route("http://127.0.0.1:7337/v1/query", async (route) => {
+        capturedRequests.push(JSON.parse(route.request().postData() || "{}"));
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            columns: [{ name: "tag" }],
+            rows: [["table"]],
+            elapsed_ms: 5,
+            truncated: false
+          })
+        });
+      });
+
+      const fixturePage = await context.newPage();
+      await fixturePage.goto(`${server.baseUrl}/frameset-page`);
+
+      const popupPage = await openPopupPage(context, extensionId);
+      await bindPopupToFixtureTab(popupPage, server.baseUrl);
+
+      await popupPage.locator("#tokenInput").fill("test-token");
+      await popupPage.locator("#saveTokenBtn").click();
+
+      await popupPage.locator("#captureBtn").click();
+      await expect(popupPage.locator("#statusLine")).toContainText("Captured 3 documents");
+      await expect(popupPage.locator("#snapshotPickerWrap")).toBeVisible();
+      await expect(popupPage.locator("#snapshotSelect option")).toHaveCount(3);
+
+      await popupPage.locator("#queryInput").fill("SELECT table FROM doc;");
+      await popupPage.locator("#runBtn").click();
+
+      expect(capturedRequests).toHaveLength(1);
+      expect(capturedRequests[0].html).toContain("Visible report");
+      expect(capturedRequests[0].html).toContain("aws_border sortable");
+      expect(capturedRequests[0].html).not.toContain("<frameset");
+    } finally {
+      await context.close();
+      await server.close();
+    }
+  });
+
   test("supports examples, formatting, line numbers, and lint/error tabs", async () => {
     const { context, extensionId } = await launchExtensionContext();
 

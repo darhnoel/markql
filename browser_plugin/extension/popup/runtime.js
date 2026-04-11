@@ -9,6 +9,8 @@ import {
   STORAGE_KEY_QUERY,
   STORAGE_KEY_QUERY_COLLAPSED,
   STORAGE_KEY_SNAPSHOT,
+  STORAGE_KEY_SNAPSHOT_DOCS,
+  STORAGE_KEY_SNAPSHOT_ID,
   STORAGE_KEY_SNAPSHOT_SCOPE,
   STORAGE_KEY_TOKEN
 } from "./config.js";
@@ -79,6 +81,83 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
     return `${error.summary}. See Errors.`;
   }
 
+  function normalizeSnapshotDocuments(rawDocuments) {
+    if (!Array.isArray(rawDocuments)) return [];
+    return rawDocuments
+      .filter((doc) => doc && typeof doc.id === "string" && typeof doc.html === "string")
+      .map((doc) => ({
+        id: doc.id,
+        frameId: typeof doc.frameId === "number" ? doc.frameId : -1,
+        parentFrameId: typeof doc.parentFrameId === "number" ? doc.parentFrameId : null,
+        url: typeof doc.url === "string" ? doc.url : "",
+        title: typeof doc.title === "string" ? doc.title : "",
+        frameName: typeof doc.frameName === "string" ? doc.frameName : "",
+        frameElementId: typeof doc.frameElementId === "string" ? doc.frameElementId : "",
+        isTop: !!doc.isTop,
+        source: typeof doc.source === "string" ? doc.source : "unknown",
+        html: doc.html,
+        sizeBytes:
+          typeof doc.sizeBytes === "number" && Number.isFinite(doc.sizeBytes)
+            ? doc.sizeBytes
+            : doc.html.length
+      }));
+  }
+
+  function summarizeSnapshotUrl(url) {
+    if (!url) return "";
+    try {
+      const parsed = new URL(url);
+      if (parsed.pathname && parsed.pathname !== "/") {
+        return parsed.pathname + parsed.search;
+      }
+      return parsed.host;
+    } catch (_err) {
+      return url;
+    }
+  }
+
+  function buildSnapshotLabel(doc) {
+    if (!doc) return "Document";
+    let base = doc.isTop ? "Top document" : "Frame";
+    if (!doc.isTop && doc.frameName) {
+      base += ` ${doc.frameName}`;
+    } else if (!doc.isTop && doc.frameElementId) {
+      base += ` #${doc.frameElementId}`;
+    } else if (doc.title) {
+      base += `: ${doc.title}`;
+    }
+    const suffix = summarizeSnapshotUrl(doc.url);
+    return suffix ? `${base} (${suffix})` : base;
+  }
+
+  function choosePreferredSnapshotId(documents) {
+    if (!documents.length) return "";
+    const frameDocuments = documents.filter((doc) => !doc.isTop);
+    if (frameDocuments.length) {
+      frameDocuments.sort((left, right) => right.html.length - left.html.length);
+      return frameDocuments[0].id;
+    }
+    return documents[0].id;
+  }
+
+  function updateSnapshotPicker() {
+    const documents = Array.isArray(state.snapshotDocuments) ? state.snapshotDocuments : [];
+    ui.snapshotSelect.innerHTML = "";
+    if (documents.length <= 1) {
+      ui.snapshotPickerWrap.classList.add("hidden");
+      return;
+    }
+
+    for (const doc of documents) {
+      const option = document.createElement("option");
+      option.value = doc.id;
+      option.textContent = buildSnapshotLabel(doc);
+      ui.snapshotSelect.appendChild(option);
+    }
+    ui.snapshotSelect.value = state.snapshotId;
+    ui.snapshotPickerWrap.classList.remove("hidden");
+  }
+
   function setRunError(error) {
     const normalized = normalizeRunError(error);
     state.lastRunError = {
@@ -111,12 +190,20 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
     return tabs[0];
   }
 
-  async function saveSnapshotToSession(html, scope) {
+  async function saveSnapshotToSession(
+    html,
+    scope,
+    documents = state.snapshotDocuments,
+    snapshotId = state.snapshotId
+  ) {
+    const normalizedDocuments = normalizeSnapshotDocuments(documents);
     if (!chrome.storage.session) return false;
     try {
       await chrome.storage.session.set({
         [STORAGE_KEY_SNAPSHOT]: html,
-        [STORAGE_KEY_SNAPSHOT_SCOPE]: scope
+        [STORAGE_KEY_SNAPSHOT_SCOPE]: scope,
+        [STORAGE_KEY_SNAPSHOT_DOCS]: JSON.stringify(normalizedDocuments),
+        [STORAGE_KEY_SNAPSHOT_ID]: snapshotId
       });
       return true;
     } catch (err) {
@@ -126,11 +213,26 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
   }
 
   async function restoreSnapshotFromSession() {
-    if (!chrome.storage.session) return { html: "", scope: "" };
-    const data = await chrome.storage.session.get([STORAGE_KEY_SNAPSHOT, STORAGE_KEY_SNAPSHOT_SCOPE]);
+    if (!chrome.storage.session) return { html: "", scope: "", documents: [], snapshotId: "" };
+    const data = await chrome.storage.session.get([
+      STORAGE_KEY_SNAPSHOT,
+      STORAGE_KEY_SNAPSHOT_SCOPE,
+      STORAGE_KEY_SNAPSHOT_DOCS,
+      STORAGE_KEY_SNAPSHOT_ID
+    ]);
     const html = typeof data[STORAGE_KEY_SNAPSHOT] === "string" ? data[STORAGE_KEY_SNAPSHOT] : "";
     const scope = typeof data[STORAGE_KEY_SNAPSHOT_SCOPE] === "string" ? data[STORAGE_KEY_SNAPSHOT_SCOPE] : "";
-    return { html, scope };
+    const snapshotId =
+      typeof data[STORAGE_KEY_SNAPSHOT_ID] === "string" ? data[STORAGE_KEY_SNAPSHOT_ID] : "";
+    let documents = [];
+    if (typeof data[STORAGE_KEY_SNAPSHOT_DOCS] === "string" && data[STORAGE_KEY_SNAPSHOT_DOCS]) {
+      try {
+        documents = normalizeSnapshotDocuments(JSON.parse(data[STORAGE_KEY_SNAPSHOT_DOCS]));
+      } catch (_err) {
+        documents = [];
+      }
+    }
+    return { html, scope, documents, snapshotId };
   }
 
   async function requestSnapshot(tabId, scope) {
@@ -139,6 +241,45 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
       tabId,
       scope
     });
+  }
+
+  function clearResultsForSnapshotChange() {
+    state.lastResult = null;
+    panes.clearResultsTable();
+    panes.renderJsonPane();
+    panes.renderErrorsPane();
+    panes.setActiveTab("table");
+    panes.updateCopyExportLabel();
+  }
+
+  async function selectSnapshot(snapshotId, options = {}) {
+    const { persist = true, announce = true, clearResults = true } = options;
+    if (!Array.isArray(state.snapshotDocuments) || !state.snapshotDocuments.length) {
+      throw new Error("No captured documents available");
+    }
+
+    const selected =
+      state.snapshotDocuments.find((doc) => doc.id === snapshotId) || state.snapshotDocuments[0];
+    state.snapshotId = selected.id;
+    state.snapshotHtml = selected.html;
+    ui.snapshotSelect.value = selected.id;
+
+    if (clearResults) {
+      clearRunError();
+      clearResultsForSnapshotChange();
+    }
+    if (persist) {
+      await saveSnapshotToSession(
+        state.snapshotHtml,
+        state.snapshotScope,
+        state.snapshotDocuments,
+        state.snapshotId
+      );
+    }
+    if (announce) {
+      panes.status(`Selected ${buildSnapshotLabel(selected)} (${selected.html.length} bytes).`);
+    }
+    return selected.html;
   }
 
   async function captureSnapshot(force = false) {
@@ -160,16 +301,48 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
       response = await requestSnapshot(tab.id, FALLBACK_CAPTURE_SCOPE);
     }
 
-    if (!response || !response.ok || typeof response.html !== "string") {
+    const documents = normalizeSnapshotDocuments(response && response.documents);
+    if (!response || !response.ok || (!documents.length && typeof response.html !== "string")) {
       throw new Error(response && response.error ? response.error : "Capture failed");
     }
 
-    state.snapshotHtml = response.html;
+    state.snapshotDocuments = documents.length
+      ? documents
+      : normalizeSnapshotDocuments([
+          {
+            id: "frame-0",
+            frameId: 0,
+            parentFrameId: null,
+            url: "",
+            title: "",
+            frameName: "",
+            frameElementId: "",
+            isTop: true,
+            source: response.source || "unknown",
+            html: response.html,
+            sizeBytes: response.html.length
+          }
+        ]);
     state.snapshotScope = response.scope || PRIMARY_CAPTURE_SCOPE;
-    const cached = await saveSnapshotToSession(state.snapshotHtml, state.snapshotScope);
+    updateSnapshotPicker();
+    const preferredSnapshotId = choosePreferredSnapshotId(state.snapshotDocuments);
+    await selectSnapshot(preferredSnapshotId, { persist: false, announce: false, clearResults: false });
+    const cached = await saveSnapshotToSession(
+      state.snapshotHtml,
+      state.snapshotScope,
+      state.snapshotDocuments,
+      state.snapshotId
+    );
     const captureSource = response.source || "unknown";
+    const inaccessibleCount = Array.isArray(response.inaccessible_frames)
+      ? response.inaccessible_frames.length
+      : 0;
+    const selectedDocument = state.snapshotDocuments.find((doc) => doc.id === state.snapshotId);
     panes.status(
-      `Captured ${response.size_bytes} bytes (${state.snapshotScope}/${captureSource})${cached ? "" : " | cache skipped"}.`
+      `Captured ${state.snapshotDocuments.length} document${state.snapshotDocuments.length === 1 ? "" : "s"} ` +
+        `(${state.snapshotScope}/${captureSource}, selected=${buildSnapshotLabel(selectedDocument)})` +
+        `${inaccessibleCount ? ` | ${inaccessibleCount} frame${inaccessibleCount === 1 ? "" : "s"} unavailable` : ""}` +
+        `${cached ? "" : " | cache skipped"}.`
     );
     return state.snapshotHtml;
   }
@@ -401,19 +574,71 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
     const restoredSnapshot = await restoreSnapshotFromSession();
     state.snapshotHtml = restoredSnapshot.html;
     state.snapshotScope = restoredSnapshot.scope;
+    state.snapshotDocuments = restoredSnapshot.documents;
+    state.snapshotId = restoredSnapshot.snapshotId;
     if (!state.snapshotHtml && chrome.storage.session) {
       const legacySnapshotData = await chrome.storage.session.get([LEGACY_STORAGE_KEY_SNAPSHOT]);
       const legacySnapshot = legacySnapshotData[LEGACY_STORAGE_KEY_SNAPSHOT];
       if (typeof legacySnapshot === "string" && legacySnapshot) {
         state.snapshotHtml = legacySnapshot;
         state.snapshotScope = "";
-        await saveSnapshotToSession(state.snapshotHtml, state.snapshotScope);
+        state.snapshotDocuments = normalizeSnapshotDocuments([
+          {
+            id: "frame-0",
+            frameId: 0,
+            parentFrameId: null,
+            url: "",
+            title: "",
+            frameName: "",
+            frameElementId: "",
+            isTop: true,
+            source: "legacy",
+            html: state.snapshotHtml,
+            sizeBytes: state.snapshotHtml.length
+          }
+        ]);
+        state.snapshotId = "frame-0";
+        await saveSnapshotToSession(
+          state.snapshotHtml,
+          state.snapshotScope,
+          state.snapshotDocuments,
+          state.snapshotId
+        );
       }
     }
     if (state.snapshotHtml) {
+      if (!state.snapshotDocuments.length) {
+        state.snapshotDocuments = normalizeSnapshotDocuments([
+          {
+            id: "frame-0",
+            frameId: 0,
+            parentFrameId: null,
+            url: "",
+            title: "",
+            frameName: "",
+            frameElementId: "",
+            isTop: true,
+            source: "restored",
+            html: state.snapshotHtml,
+            sizeBytes: state.snapshotHtml.length
+          }
+        ]);
+      }
+      updateSnapshotPicker();
+      const restoredId =
+        state.snapshotId && state.snapshotDocuments.some((doc) => doc.id === state.snapshotId)
+          ? state.snapshotId
+          : choosePreferredSnapshotId(state.snapshotDocuments);
+      await selectSnapshot(restoredId, { persist: false, announce: false, clearResults: false });
       const scopeLabel = state.snapshotScope || "unknown";
-      panes.status(`Restored cached snapshot (${state.snapshotHtml.length} bytes, scope=${scopeLabel}).`);
+      const selectedDocument = state.snapshotDocuments.find((doc) => doc.id === state.snapshotId);
+      panes.status(
+        `Restored cached snapshot (${state.snapshotHtml.length} bytes, scope=${scopeLabel}, selected=${buildSnapshotLabel(selectedDocument)}).`
+      );
     } else {
+      state.snapshotDocuments = [];
+      state.snapshotId = "";
+      updateSnapshotPicker();
       panes.status("Ready.");
     }
 
@@ -429,6 +654,7 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
   async function guarded(action) {
     const controls = [
       ui.captureBtn,
+      ui.snapshotSelect,
       ui.runBtn,
       ui.toggleQueryBtn,
       ui.runResultsBtn,
@@ -470,6 +696,7 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
     restoreSettings,
     runQuery,
     saveToken,
+    selectSnapshot,
     setTokenEditorVisible,
     toggleLint,
     toggleQueryVisibility,

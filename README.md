@@ -158,6 +158,8 @@ Notes:
 - `MARKQL_AGENT_TOKEN` is the primary agent token variable.
 - `scripts/agent/start-agent.sh` sets a default token if not provided.
 - A legacy agent token variable still works during the migration window.
+- The browser plugin captures the top document plus accessible frame documents and lets you pick
+  which captured document to query when a page uses frames.
 - You can set your own token:
 
 ```bash
