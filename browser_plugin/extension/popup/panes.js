@@ -159,6 +159,7 @@ export function createPaneController({ ui, state, getQueryText, lintQuery }) {
     for (const col of result.columns) {
       const th = document.createElement("th");
       th.textContent = col.name;
+      th.title = col.name;
       headTr.appendChild(th);
     }
     ui.resultsHead.appendChild(headTr);

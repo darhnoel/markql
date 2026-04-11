@@ -535,7 +535,8 @@ button:disabled {
 }
 
 table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: 12px;
 }
@@ -546,8 +547,12 @@ td {
   padding: 7px 9px;
   vertical-align: top;
   text-align: left;
+}
+
+td {
   white-space: pre-wrap;
   word-break: break-word;
+  max-width: 220px;
 }
 
 th {
@@ -555,6 +560,11 @@ th {
   top: 0;
   background: #f8fbfd;
   z-index: 1;
+  min-width: 72px;
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .text-output {
