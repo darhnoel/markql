@@ -15,6 +15,16 @@ bool is_name_char(char c) {
   return std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_' || c == ':';
 }
 
+/// Returns true for HTML elements that must not remain open on the naive stack.
+/// MUST keep legacy void elements like <frame> from corrupting later sibling structure.
+/// Inputs are lowercase tag names; outputs are booleans with no side effects.
+bool is_void_or_immediately_closed_html_element(const std::string& tag) {
+  return tag == "area" || tag == "base" || tag == "br" || tag == "col" || tag == "embed" ||
+         tag == "frame" || tag == "hr" || tag == "img" || tag == "input" || tag == "link" ||
+         tag == "meta" || tag == "param" || tag == "source" || tag == "track" ||
+         tag == "wbr";
+}
+
 /// Advances an index past ASCII whitespace in the input string.
 /// MUST not skip non-whitespace content to preserve parsing boundaries.
 /// Inputs are string/index; outputs are updated index with no side effects.
@@ -150,7 +160,7 @@ HtmlDocument parse_html_naive(const std::string& html) {
         i = (close_end == std::string::npos) ? html.size() : close_end + 1;
         continue;
       }
-      if (!self_close) {
+      if (!self_close && !is_void_or_immediately_closed_html_element(node.tag)) {
         stack.push_back(OpenNode{node.id, content_start});
       }
       continue;

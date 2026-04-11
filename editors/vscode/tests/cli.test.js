@@ -74,7 +74,7 @@ test("executeCliWithFallback skips ENOENT and uses the next candidate", async ()
       }
       return {
         exitCode: 0,
-        stdout: "markql 1.22.0\n",
+        stdout: "markql 1.22.1\n",
         stderr: ""
       };
     }

@@ -23,6 +23,7 @@ void register_flatten_text_tests(std::vector<TestCase>& tests);
 void register_flatten_extract_tests(std::vector<TestCase>& tests);
 void register_repl_tests(std::vector<TestCase>& tests);
 void register_malformed_html_tests(std::vector<TestCase>& tests);
+void register_legacy_frames_tests(std::vector<TestCase>& tests);
 void register_fragments_tests(std::vector<TestCase>& tests);
 void register_guardrails_tests(std::vector<TestCase>& tests);
 void register_meta_command_tests(std::vector<TestCase>& tests);
@@ -86,6 +87,7 @@ int main(int argc, char** argv) {
   register_flatten_extract_tests(tests);
   register_repl_tests(tests);
   register_malformed_html_tests(tests);
+  register_legacy_frames_tests(tests);
   register_fragments_tests(tests);
   register_guardrails_tests(tests);
   register_meta_command_tests(tests);

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.22.1
+
+- Updated for the MarkQL 1.22.1 patch release.
+
 ## 1.22.0
 
 - Added compatibility for the MarkQL 1.21 CLI release.

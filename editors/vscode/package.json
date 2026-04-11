@@ -2,7 +2,7 @@
   "name": "markql-vscode",
   "displayName": "MarkQL",
   "description": "Syntax highlighting, snippets, and CLI-backed linting for MarkQL queries.",
-  "version": "1.22.0",
+  "version": "1.22.1",
   "publisher": "borannchanrathnak",
   "license": "SEE LICENSE IN LICENSE",
   "homepage": "https://github.com/darhnoel/markql/tree/main/editors/vscode",

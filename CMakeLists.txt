@@ -350,6 +350,7 @@ if (MARKQL_BUILD_TESTS)
     tests/test_exports.cpp
     tests/test_artifacts.cpp
     tests/test_malformed_html.cpp
+    tests/test_legacy_frames.cpp
     tests/test_flatten_text.cpp
     tests/test_flatten_extract.cpp
     tests/test_repl.cpp
@@ -589,6 +590,12 @@ if (MARKQL_BUILD_TESTS)
     malformed_missing_closing_tags
     malformed_mismatched_nesting
     malformed_junk_bytes_no_throw
+    legacy_frames_naive_siblings_under_frameset
+    legacy_frames_fast_node_count
+    legacy_frames_query_frame_rows_are_siblings
+    legacy_frames_query_frame_parent_is_frameset
+    legacy_frames_query_frameset_exists_child_frame
+    legacy_frames_query_noframes_parent_is_frameset
     summarize_content_basic
     summarize_content_khmer_requires_plugin
     summarize_content_max_tokens

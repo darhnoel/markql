@@ -7,6 +7,10 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 
 ## [Unreleased]
 
+### Fixed
+- Fixed the fallback HTML parser so legacy void elements like `<frame>` do not stay open on the naive stack, which keeps `frameset` children and following `noframes` content in the correct sibling structure.
+- Added regression coverage for legacy `frameset` / `frame` parsing in both direct DOM parsing and query execution paths.
+
 ### Added
 - Added a bounded MarkQL Helper system with:
   - deterministic helper controller, retrieval packs, and result analysis in C++
