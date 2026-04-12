@@ -84,3 +84,5 @@ desktop/target/
 desktop/binaries/*
 !desktop/binaries/.gitkeep
 desktop/gen/
+
+plugins/.xsql_logs/
