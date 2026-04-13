@@ -40,44 +40,25 @@
         <div id="snapshotPickerWrap" class="toolbar-field hidden">
           <span>Document</span>
           <div class="snapshot-dropdown">
-            <button
-              id="snapshotDropdownBtn"
-              class="snapshot-dropdown-btn"
-              type="button"
-              aria-haspopup="listbox"
-              aria-expanded="false"
-            >
+            <button id="snapshotDropdownBtn" class="snapshot-dropdown-btn" type="button" aria-haspopup="listbox"
+              aria-expanded="false">
               <span id="snapshotDropdownLabel">Document</span>
               <span class="snapshot-dropdown-caret" aria-hidden="true">▾</span>
             </button>
-            <select
-              id="snapshotSelect"
-              class="snapshot-native-select"
-              aria-label="Captured document"
-              tabindex="-1"
-            ></select>
+            <select id="snapshotSelect" class="snapshot-native-select" aria-label="Captured document"
+              tabindex="-1"></select>
             <div id="snapshotDropdownMenu" class="snapshot-dropdown-menu hidden" role="listbox"></div>
           </div>
         </div>
         <div id="examplesPickerWrap" class="toolbar-field">
           <span>Examples</span>
           <div class="examples-dropdown">
-            <button
-              id="examplesDropdownBtn"
-              class="examples-dropdown-btn"
-              type="button"
-              aria-haspopup="listbox"
-              aria-expanded="false"
-            >
+            <button id="examplesDropdownBtn" class="examples-dropdown-btn" type="button" aria-haspopup="listbox"
+              aria-expanded="false">
               <span id="examplesDropdownLabel">Examples</span>
               <span class="examples-dropdown-caret" aria-hidden="true">▾</span>
             </button>
-            <select
-              id="examplesSelect"
-              class="examples-native-select"
-              aria-label="Examples"
-              tabindex="-1"
-            >
+            <select id="examplesSelect" class="examples-native-select" aria-label="Examples" tabindex="-1">
               <option value="">Examples</option>
               <option value="SELECT ATTR(a, href)&#10;FROM doc&#10;WHERE href CONTAINS 'http';">Links</option>
               <option value="SELECT TEXT(title)&#10;FROM doc&#10;WHERE node_id=1;">Page Title</option>

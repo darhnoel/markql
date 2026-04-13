@@ -602,23 +602,41 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
 
     panes.status("Running query...");
 
+    const normalizedHtmlForAgent = normalizeHtmlEncodingForAgent(state.snapshotHtml);
+
+    const requestBody = {
+      html: normalizedHtmlForAgent,
+      query,
+      options: {
+        max_rows: maxRows,
+        timeout_ms: timeoutMs
+      }
+    };
+    // console.log("[MarkQL] Full request body:", requestBody);
+    const requestBodyJson = JSON.stringify(requestBody);
+    // console.log(
+    //   "[MarkQL] JSON-encoded request size:",
+    //   {
+    //     originalHtmlSize: state.snapshotHtml.length,
+    //     normalizedHtmlSize: normalizedHtmlForAgent.length,
+    //     charsetMetaNormalized: normalizedHtmlForAgent !== state.snapshotHtml,
+    //     jsonEncodedSize: requestBodyJson.length,
+    //     jsonFirst500: requestBodyJson.slice(0, 500),
+    //     jsonLast500: requestBodyJson.slice(-500)
+    //   }
+    // );
+
     const response = await fetch(AGENT_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-MarkQL-Token": token
       },
-      body: JSON.stringify({
-        html: state.snapshotHtml,
-        query,
-        options: {
-          max_rows: maxRows,
-          timeout_ms: timeoutMs
-        }
-      })
+      body: requestBodyJson
     });
 
     const payload = await response.json();
+    // console.log("[MarkQL] Response from agent:", payload);
     if (!response.ok || (payload && payload.error)) {
       const errorPayload = payload && payload.error ? payload.error : null;
       setRunError({
@@ -640,8 +658,27 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
 
     const trunc = payload.truncated ? " (truncated)" : "";
     panes.status(
-      `Snapshot ${state.snapshotHtml.length} bytes | elapsed ${payload.elapsed_ms} ms | rows ${payload.rows.length}${trunc}`
+      `Snapshot ${state.snapshotHtml.length} bytes | ` +
+      `elapsed ${payload.elapsed_ms} ms | rows ${payload.rows.length}${trunc}`
     );
+  }
+
+  function normalizeHtmlEncodingForAgent(html) {
+    if (!html) return html;
+
+    let normalized = html;
+
+    // Avoid downstream re-decode as Shift_JIS when the payload already arrived as UTF-8 JSON text.
+    normalized = normalized.replace(
+      /(<meta[^>]*charset\s*=\s*["']?)([^"'\s>]+)(["']?[^>]*>)/gi,
+      "$1UTF-8$3"
+    );
+    normalized = normalized.replace(
+      /(<meta[^>]*http-equiv\s*=\s*["']content-type["'][^>]*content\s*=\s*["'][^"']*charset\s*=\s*)([^"';\s>]+)([^"']*["'][^>]*>)/gi,
+      "$1UTF-8$3"
+    );
+
+    return normalized;
   }
 
   async function copyQuery() {

@@ -715,7 +715,7 @@ th {
   font-family: "JetBrains Mono", "Fira Code", "SFMono-Regular", Consolas, monospace;
 }
 
-.errors-section + .errors-section {
+.errors-section+.errors-section {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid #e6ebf0;
