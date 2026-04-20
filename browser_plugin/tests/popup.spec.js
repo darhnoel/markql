@@ -63,6 +63,11 @@ async function readEditorState(popupPage) {
   }));
 }
 
+async function readClipboardTextWithPermission(popupPage) {
+  await popupPage.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  return popupPage.evaluate(() => navigator.clipboard.readText());
+}
+
 test.describe("browser plugin popup", () => {
   test("captures the active page and runs a query through the agent", async () => {
     const server = await startFixtureServer();
@@ -98,14 +103,16 @@ test.describe("browser plugin popup", () => {
 
       const copyButton = popupPage.locator("#copyExportBtn");
       const exportButton = popupPage.locator("#exportBtn");
+      const oneShotButton = popupPage.locator("#oneShotBtn");
       const runResultsButton = popupPage.locator("#runResultsBtn");
       await expect(copyButton).toBeVisible();
       await expect(exportButton).toBeVisible();
+      await expect(oneShotButton).toBeVisible();
       await expect(runResultsButton).toBeVisible();
       const buttons = await popupPage.locator(".output-actions > button").evaluateAll((nodes) =>
         nodes.map((node) => node.id)
       );
-      expect(buttons).toEqual(["copyExportBtn", "exportBtn", "runResultsBtn"]);
+      expect(buttons).toEqual(["copyExportBtn", "exportBtn", "oneShotBtn", "runResultsBtn"]);
 
       await popupPage.locator("#queryInput").fill(
         "SELECT ATTR(a, href)\nFROM doc\nWHERE href CONTAINS 'example.com';"
@@ -140,6 +147,112 @@ test.describe("browser plugin popup", () => {
       expect(capturedRequests[0].html).toContain("Fixture Page");
       expect(capturedRequests[0].html).toContain("https://example.com/alpha");
       expect(capturedRequests[1].query).toContain("SELECT ATTR(a, href)");
+    } finally {
+      await context.close();
+      await server.close();
+    }
+  });
+
+  test("runs one-shot CSV flow from the table tab", async () => {
+    const server = await startFixtureServer();
+    const { context, extensionId } = await launchExtensionContext();
+
+    try {
+      const capturedRequests = [];
+      await context.route("http://127.0.0.1:7337/v1/query", async (route) => {
+        capturedRequests.push(JSON.parse(route.request().postData() || "{}"));
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            columns: [{ name: "href" }],
+            rows: [["https://example.com/alpha"], ["https://example.com/beta"]],
+            elapsed_ms: 11,
+            truncated: false
+          })
+        });
+      });
+
+      const fixturePage = await context.newPage();
+      await fixturePage.goto(`${server.baseUrl}/basic-page`);
+
+      const popupPage = await openPopupPage(context, extensionId);
+      await bindPopupToFixtureTab(popupPage, server.baseUrl);
+
+      await popupPage.locator("#tokenInput").fill("test-token");
+      await popupPage.locator("#saveTokenBtn").click();
+      await popupPage.locator("#queryInput").fill(
+        "SELECT ATTR(a, href)\nFROM doc\nWHERE href CONTAINS 'example.com';"
+      );
+
+      await expect(popupPage.locator("#oneShotBtn")).toHaveText("One-shot CSV");
+      const csvDownloadPromise = popupPage.waitForEvent("download");
+      await popupPage.locator("#oneShotBtn").click();
+      const csvDownload = await csvDownloadPromise;
+
+      expect(csvDownload.suggestedFilename()).toMatch(/^markql-results-\d{8}-\d{6}\.csv$/);
+      await expect(popupPage.locator("#statusLine")).toContainText("One-shot CSV complete (2 rows).");
+      await expect(popupPage.locator("#resultsTable tbody tr")).toHaveCount(2);
+      expect(capturedRequests).toHaveLength(1);
+
+      const clipboardText = await readClipboardTextWithPermission(popupPage);
+      expect(clipboardText).toContain("href");
+      expect(clipboardText).toContain("https://example.com/alpha");
+      expect(clipboardText).toContain("https://example.com/beta");
+    } finally {
+      await context.close();
+      await server.close();
+    }
+  });
+
+  test("runs one-shot JSON flow from the JSON tab", async () => {
+    const server = await startFixtureServer();
+    const { context, extensionId } = await launchExtensionContext();
+
+    try {
+      const capturedRequests = [];
+      await context.route("http://127.0.0.1:7337/v1/query", async (route) => {
+        capturedRequests.push(JSON.parse(route.request().postData() || "{}"));
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            columns: [{ name: "href" }],
+            rows: [["https://example.com/alpha"], ["https://example.com/beta"]],
+            elapsed_ms: 10,
+            truncated: false
+          })
+        });
+      });
+
+      const fixturePage = await context.newPage();
+      await fixturePage.goto(`${server.baseUrl}/basic-page`);
+
+      const popupPage = await openPopupPage(context, extensionId);
+      await bindPopupToFixtureTab(popupPage, server.baseUrl);
+
+      await popupPage.locator("#tokenInput").fill("test-token");
+      await popupPage.locator("#saveTokenBtn").click();
+      await popupPage.locator("#queryInput").fill(
+        "SELECT ATTR(a, href)\nFROM doc\nWHERE href CONTAINS 'example.com';"
+      );
+      await popupPage.locator("#tabJsonBtn").click();
+      await expect(popupPage.locator("#oneShotBtn")).toHaveText("One-shot JSON");
+
+      const jsonDownloadPromise = popupPage.waitForEvent("download");
+      await popupPage.locator("#oneShotBtn").click();
+      const jsonDownload = await jsonDownloadPromise;
+
+      expect(jsonDownload.suggestedFilename()).toMatch(/^markql-results-\d{8}-\d{6}\.json$/);
+      await expect(popupPage.locator("#statusLine")).toContainText("One-shot JSON complete (2 rows).");
+      await expect(popupPage.locator("#tabJsonBtn")).toHaveAttribute("aria-selected", "true");
+      expect(capturedRequests).toHaveLength(1);
+
+      const clipboardText = await readClipboardTextWithPermission(popupPage);
+      const parsed = JSON.parse(clipboardText);
+      expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed).toHaveLength(2);
+      expect(parsed[0]).toEqual({ href: "https://example.com/alpha" });
     } finally {
       await context.close();
       await server.close();
@@ -238,11 +351,15 @@ test.describe("browser plugin popup", () => {
       await expect(popupPage.locator("#copyExportBtn")).toHaveText("Copy Errors");
       await expect(popupPage.locator("#exportBtn")).toHaveText("Export");
       await expect(popupPage.locator("#exportBtn")).toBeDisabled();
+      await expect(popupPage.locator("#oneShotBtn")).toHaveText("One-shot");
+      await expect(popupPage.locator("#oneShotBtn")).toBeDisabled();
 
       await popupPage.locator("#tabJsonBtn").click();
       await expect(popupPage.locator("#copyExportBtn")).toHaveText("Copy JSON");
       await expect(popupPage.locator("#exportBtn")).toHaveText("Export JSON");
       await expect(popupPage.locator("#exportBtn")).toBeEnabled();
+      await expect(popupPage.locator("#oneShotBtn")).toHaveText("One-shot JSON");
+      await expect(popupPage.locator("#oneShotBtn")).toBeEnabled();
       await expect(popupPage.locator("#jsonOutput")).toContainText("No result yet.");
     } finally {
       await context.close();

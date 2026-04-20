@@ -28,6 +28,7 @@ export function getPopupUi() {
     copyQueryBtn: document.getElementById("copyQueryBtn"),
     copyExportBtn: document.getElementById("copyExportBtn"),
     exportBtn: document.getElementById("exportBtn"),
+    oneShotBtn: document.getElementById("oneShotBtn"),
     maxRowsInput: document.getElementById("maxRowsInput"),
     timeoutInput: document.getElementById("timeoutInput"),
     lineNumbers: document.getElementById("lineNumbers"),

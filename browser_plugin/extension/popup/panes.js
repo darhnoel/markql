@@ -193,16 +193,25 @@ export function createPaneController({ ui, state, getQueryText, lintQuery }) {
       ui.exportBtn.textContent = "Export CSV";
       ui.exportBtn.disabled = false;
       ui.exportBtn.title = "Export CSV";
+      ui.oneShotBtn.textContent = "One-shot CSV";
+      ui.oneShotBtn.disabled = false;
+      ui.oneShotBtn.title = "Capture, run, copy, and export CSV.";
     } else if (state.activeOutputTab === "json") {
       ui.copyExportBtn.textContent = "Copy JSON";
       ui.exportBtn.textContent = "Export JSON";
       ui.exportBtn.disabled = false;
       ui.exportBtn.title = "Export JSON";
+      ui.oneShotBtn.textContent = "One-shot JSON";
+      ui.oneShotBtn.disabled = false;
+      ui.oneShotBtn.title = "Capture, run, copy, and export JSON.";
     } else {
       ui.copyExportBtn.textContent = "Copy Errors";
       ui.exportBtn.textContent = "Export";
       ui.exportBtn.disabled = true;
       ui.exportBtn.title = "Export is available on Table or JSON results.";
+      ui.oneShotBtn.textContent = "One-shot";
+      ui.oneShotBtn.disabled = true;
+      ui.oneShotBtn.title = "One-shot is available on Table or JSON tabs.";
     }
   }
 

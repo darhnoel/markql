@@ -690,30 +690,40 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
     panes.status("Copied query.");
   }
 
-  async function copyActiveExport() {
-    if (state.activeOutputTab === "table") {
-      if (!state.lastResult || !Array.isArray(state.lastResult.columns) || !Array.isArray(state.lastResult.rows)) {
-        throw new Error("No table result to export");
-      }
-      const csv = panes.buildCsv(state.lastResult.columns, state.lastResult.rows);
-      await navigator.clipboard.writeText(csv);
-      panes.status(`Copied CSV (${state.lastResult.rows.length} rows).`);
-      return;
+  function resolveResultFormatFromTab(tabName = state.activeOutputTab) {
+    if (tabName === "table") return "csv";
+    if (tabName === "json") return "json";
+    return "";
+  }
+
+  function getMimeAndExtension(format) {
+    if (format === "csv") {
+      return { mimeType: "text/csv;charset=utf-8", extension: "csv", label: "CSV" };
     }
-    if (state.activeOutputTab === "json") {
-      if (!state.lastResult || !Array.isArray(state.lastResult.columns) || !Array.isArray(state.lastResult.rows)) {
-        throw new Error("No JSON result to export");
-      }
-      await navigator.clipboard.writeText(panes.buildJson(state.lastResult.columns, state.lastResult.rows));
-      panes.status(`Copied JSON (${state.lastResult.rows.length} rows).`);
-      return;
+    if (format === "json") {
+      return { mimeType: "application/json;charset=utf-8", extension: "json", label: "JSON" };
     }
-    const errorsText = ui.errorsOutput.textContent || "";
-    if (!errorsText.trim()) {
-      throw new Error("No errors to copy");
+    throw new Error("Unknown export format");
+  }
+
+  function getResultColumnsAndRows(format, result = state.lastResult) {
+    if (result && Array.isArray(result.columns) && Array.isArray(result.rows)) {
+      return { columns: result.columns, rows: result.rows };
     }
-    await navigator.clipboard.writeText(errorsText);
-    panes.status("Copied errors.");
+    if (format === "csv") {
+      throw new Error("No table result to export");
+    }
+    throw new Error("No JSON result to export");
+  }
+
+  function buildResultText(format, columns, rows) {
+    if (format === "csv") {
+      return panes.buildCsv(columns, rows);
+    }
+    if (format === "json") {
+      return panes.buildJson(columns, rows);
+    }
+    throw new Error("Unknown export format");
   }
 
   function buildExportFilename(extension) {
@@ -742,26 +752,90 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
     setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
   }
 
+  async function copyResult(format, result = state.lastResult, options = {}) {
+    const { announce = true } = options;
+    const { columns, rows } = getResultColumnsAndRows(format, result);
+    const { label } = getMimeAndExtension(format);
+    const text = buildResultText(format, columns, rows);
+    await navigator.clipboard.writeText(text);
+    if (announce) {
+      panes.status(`Copied ${label} (${rows.length} rows).`);
+    }
+    return { columns, rows, label };
+  }
+
+  async function downloadResult(format, result = state.lastResult, options = {}) {
+    const { announce = true } = options;
+    const { columns, rows } = getResultColumnsAndRows(format, result);
+    const { mimeType, extension, label } = getMimeAndExtension(format);
+    const text = buildResultText(format, columns, rows);
+    downloadTextFile(text, buildExportFilename(extension), mimeType);
+    if (announce) {
+      panes.status(`Exported ${label} (${rows.length} rows).`);
+    }
+    return { columns, rows, label };
+  }
+
+  async function copyActiveExport() {
+    const format = resolveResultFormatFromTab();
+    if (format) {
+      await copyResult(format);
+      return;
+    }
+    const errorsText = ui.errorsOutput.textContent || "";
+    if (!errorsText.trim()) {
+      throw new Error("No errors to copy");
+    }
+    await navigator.clipboard.writeText(errorsText);
+    panes.status("Copied errors.");
+  }
+
   async function exportActiveResult() {
-    if (state.activeOutputTab === "table") {
-      if (!state.lastResult || !Array.isArray(state.lastResult.columns) || !Array.isArray(state.lastResult.rows)) {
-        throw new Error("No table result to export");
-      }
-      const csv = panes.buildCsv(state.lastResult.columns, state.lastResult.rows);
-      downloadTextFile(csv, buildExportFilename("csv"), "text/csv;charset=utf-8");
-      panes.status(`Exported CSV (${state.lastResult.rows.length} rows).`);
-      return;
+    const format = resolveResultFormatFromTab();
+    if (!format) {
+      throw new Error("Export is only available for table or JSON results");
     }
-    if (state.activeOutputTab === "json") {
-      if (!state.lastResult || !Array.isArray(state.lastResult.columns) || !Array.isArray(state.lastResult.rows)) {
-        throw new Error("No JSON result to export");
-      }
-      const json = panes.buildJson(state.lastResult.columns, state.lastResult.rows);
-      downloadTextFile(json, buildExportFilename("json"), "application/json;charset=utf-8");
-      panes.status(`Exported JSON (${state.lastResult.rows.length} rows).`);
-      return;
+    await downloadResult(format);
+  }
+
+  async function runOneShotForActiveTab() {
+    const targetTab = state.activeOutputTab;
+    const format = resolveResultFormatFromTab(targetTab);
+    if (!format) {
+      throw new Error("One-shot is only available for table or JSON results");
     }
-    throw new Error("Export is only available for table or JSON results");
+
+    try {
+      await captureSnapshot(true);
+    } catch (err) {
+      throw new Error(`Capture failed: ${err && err.message ? err.message : String(err)}`);
+    }
+
+    try {
+      await runQuery();
+    } catch (err) {
+      throw new Error(`Run failed: ${err && err.message ? err.message : String(err)}`);
+    }
+
+    if (targetTab === "json") {
+      panes.setActiveTab("json");
+      panes.updateCopyExportLabel();
+    }
+
+    try {
+      await copyResult(format, state.lastResult, { announce: false });
+    } catch (err) {
+      throw new Error(`Copy failed: ${err && err.message ? err.message : String(err)}`);
+    }
+
+    let downloadSummary;
+    try {
+      downloadSummary = await downloadResult(format, state.lastResult, { announce: false });
+    } catch (err) {
+      throw new Error(`Export failed: ${err && err.message ? err.message : String(err)}`);
+    }
+
+    panes.status(`One-shot ${downloadSummary.label} complete (${downloadSummary.rows.length} rows).`);
   }
 
   async function applySelectedExample() {
@@ -975,6 +1049,7 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
       ui.copyQueryBtn,
       ui.copyExportBtn,
       ui.exportBtn,
+      ui.oneShotBtn,
       ui.saveTokenBtn,
       ui.cancelTokenBtn,
       ui.editTokenBtn
@@ -1057,6 +1132,7 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
     formatCurrentQuery,
     guarded,
     restoreSettings,
+    runOneShotForActiveTab,
     runQuery,
     saveToken,
     selectSnapshot,

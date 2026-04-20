@@ -60,6 +60,7 @@ export function bootPopup() {
   ui.copyQueryBtn.addEventListener("click", () => runtime.guarded(runtime.copyQuery));
   ui.copyExportBtn.addEventListener("click", () => runtime.guarded(runtime.copyActiveExport));
   ui.exportBtn.addEventListener("click", () => runtime.guarded(runtime.exportActiveResult));
+  ui.oneShotBtn.addEventListener("click", () => runtime.guarded(runtime.runOneShotForActiveTab));
 
   for (const button of ui.tabButtons) {
     button.addEventListener("click", () => {
