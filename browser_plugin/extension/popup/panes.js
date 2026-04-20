@@ -190,10 +190,19 @@ export function createPaneController({ ui, state, getQueryText, lintQuery }) {
   function updateCopyExportLabel() {
     if (state.activeOutputTab === "table") {
       ui.copyExportBtn.textContent = "Copy CSV";
+      ui.exportBtn.textContent = "Export CSV";
+      ui.exportBtn.disabled = false;
+      ui.exportBtn.title = "Export CSV";
     } else if (state.activeOutputTab === "json") {
       ui.copyExportBtn.textContent = "Copy JSON";
+      ui.exportBtn.textContent = "Export JSON";
+      ui.exportBtn.disabled = false;
+      ui.exportBtn.title = "Export JSON";
     } else {
       ui.copyExportBtn.textContent = "Copy Errors";
+      ui.exportBtn.textContent = "Export";
+      ui.exportBtn.disabled = true;
+      ui.exportBtn.title = "Export is available on Table or JSON results.";
     }
   }
 

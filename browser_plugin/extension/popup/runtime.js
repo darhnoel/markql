@@ -716,6 +716,54 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
     panes.status("Copied errors.");
   }
 
+  function buildExportFilename(extension) {
+    const now = new Date();
+    const pad = (value) => String(value).padStart(2, "0");
+    const stamp =
+      `${now.getFullYear()}` +
+      `${pad(now.getMonth() + 1)}` +
+      `${pad(now.getDate())}` +
+      `-${pad(now.getHours())}` +
+      `${pad(now.getMinutes())}` +
+      `${pad(now.getSeconds())}`;
+    return `markql-results-${stamp}.${extension}`;
+  }
+
+  function downloadTextFile(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = filename;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+  }
+
+  async function exportActiveResult() {
+    if (state.activeOutputTab === "table") {
+      if (!state.lastResult || !Array.isArray(state.lastResult.columns) || !Array.isArray(state.lastResult.rows)) {
+        throw new Error("No table result to export");
+      }
+      const csv = panes.buildCsv(state.lastResult.columns, state.lastResult.rows);
+      downloadTextFile(csv, buildExportFilename("csv"), "text/csv;charset=utf-8");
+      panes.status(`Exported CSV (${state.lastResult.rows.length} rows).`);
+      return;
+    }
+    if (state.activeOutputTab === "json") {
+      if (!state.lastResult || !Array.isArray(state.lastResult.columns) || !Array.isArray(state.lastResult.rows)) {
+        throw new Error("No JSON result to export");
+      }
+      const json = panes.buildJson(state.lastResult.columns, state.lastResult.rows);
+      downloadTextFile(json, buildExportFilename("json"), "application/json;charset=utf-8");
+      panes.status(`Exported JSON (${state.lastResult.rows.length} rows).`);
+      return;
+    }
+    throw new Error("Export is only available for table or JSON results");
+  }
+
   async function applySelectedExample() {
     const value = ui.examplesSelect.value;
     if (!value) return;
@@ -926,6 +974,7 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
       ui.lintBtn,
       ui.copyQueryBtn,
       ui.copyExportBtn,
+      ui.exportBtn,
       ui.saveTokenBtn,
       ui.cancelTokenBtn,
       ui.editTokenBtn
@@ -945,6 +994,7 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
       for (const control of controls) {
         control.disabled = false;
       }
+      panes.updateCopyExportLabel();
     }
   }
 
@@ -1003,6 +1053,7 @@ export function createPopupRuntime({ ui, state, editor, panes }) {
     clearRunError,
     copyActiveExport,
     copyQuery,
+    exportActiveResult,
     formatCurrentQuery,
     guarded,
     restoreSettings,

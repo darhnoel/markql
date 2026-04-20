@@ -97,13 +97,15 @@ test.describe("browser plugin popup", () => {
       await expect(popupPage.locator("#statusLine")).toContainText("Captured");
 
       const copyButton = popupPage.locator("#copyExportBtn");
+      const exportButton = popupPage.locator("#exportBtn");
       const runResultsButton = popupPage.locator("#runResultsBtn");
       await expect(copyButton).toBeVisible();
+      await expect(exportButton).toBeVisible();
       await expect(runResultsButton).toBeVisible();
       const buttons = await popupPage.locator(".output-actions > button").evaluateAll((nodes) =>
         nodes.map((node) => node.id)
       );
-      expect(buttons).toEqual(["copyExportBtn", "runResultsBtn"]);
+      expect(buttons).toEqual(["copyExportBtn", "exportBtn", "runResultsBtn"]);
 
       await popupPage.locator("#queryInput").fill(
         "SELECT ATTR(a, href)\nFROM doc\nWHERE href CONTAINS 'example.com';"
@@ -113,6 +115,21 @@ test.describe("browser plugin popup", () => {
       await expect(popupPage.locator("#resultsTable tbody tr")).toHaveCount(2);
       await expect(popupPage.locator("#resultsTable tbody")).toContainText("https://example.com/alpha");
       await expect(popupPage.locator("#statusLine")).toContainText("rows 2");
+      await expect(exportButton).toHaveText("Export CSV");
+
+      const csvDownloadPromise = popupPage.waitForEvent("download");
+      await exportButton.click();
+      const csvDownload = await csvDownloadPromise;
+      expect(csvDownload.suggestedFilename()).toMatch(/^markql-results-\d{8}-\d{6}\.csv$/);
+      await expect(popupPage.locator("#statusLine")).toContainText("Exported CSV (2 rows).");
+
+      await popupPage.locator("#tabJsonBtn").click();
+      await expect(exportButton).toHaveText("Export JSON");
+      const jsonDownloadPromise = popupPage.waitForEvent("download");
+      await exportButton.click();
+      const jsonDownload = await jsonDownloadPromise;
+      expect(jsonDownload.suggestedFilename()).toMatch(/^markql-results-\d{8}-\d{6}\.json$/);
+      await expect(popupPage.locator("#statusLine")).toContainText("Exported JSON (2 rows).");
 
       await runResultsButton.click();
       await expect(popupPage.locator("#resultsTable tbody tr")).toHaveCount(2);
@@ -219,9 +236,13 @@ test.describe("browser plugin popup", () => {
       await popupPage.locator("#tabErrorsBtn").click();
       await expect(popupPage.locator("#errorsOutput")).toContainText("Unterminated single-quoted string");
       await expect(popupPage.locator("#copyExportBtn")).toHaveText("Copy Errors");
+      await expect(popupPage.locator("#exportBtn")).toHaveText("Export");
+      await expect(popupPage.locator("#exportBtn")).toBeDisabled();
 
       await popupPage.locator("#tabJsonBtn").click();
       await expect(popupPage.locator("#copyExportBtn")).toHaveText("Copy JSON");
+      await expect(popupPage.locator("#exportBtn")).toHaveText("Export JSON");
+      await expect(popupPage.locator("#exportBtn")).toBeEnabled();
       await expect(popupPage.locator("#jsonOutput")).toContainText("No result yet.");
     } finally {
       await context.close();
