@@ -86,3 +86,6 @@ desktop/binaries/*
 desktop/gen/
 
 plugins/.xsql_logs/
+
+# tools
+tools/html_inspector/target/
