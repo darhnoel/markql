@@ -1,0 +1,14 @@
+[package]
+name = "markql_html_inspector"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "inspect"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "=1.0.97"
+crossterm = "=0.28.1"
+ratatui = "=0.29.0"
+unicode-width = "=0.2.0"
