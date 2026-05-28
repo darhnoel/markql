@@ -66,6 +66,8 @@ __pycache__/
 
 # Specs
 specs/*
+!specs/markql/
+!specs/markql/**
 examples/*
 
 # frontend
