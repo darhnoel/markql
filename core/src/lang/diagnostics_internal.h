@@ -15,7 +15,7 @@ inline constexpr const char* kFunctionsDoc = "docs/book/appendix-function-refere
 inline constexpr const char* kSourcesDoc = "docs/book/ch04-sources-and-loading.md";
 inline constexpr const char* kCliDoc = "docs/markql-cli-guide.md";
 inline constexpr const char* kSelectSelfDoc =
-    "docs/book/appendix-grammar.md#select-self-for-current-row-nodes";
+    "specs/markql/01-grammar.md#grammar-002-sql-faithful-alias-surface";
 
 std::string to_upper_ascii(std::string_view in);
 std::string to_lower_ascii(std::string_view in);

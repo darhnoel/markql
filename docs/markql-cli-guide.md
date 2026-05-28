@@ -281,7 +281,7 @@ Each `diagnostics[]` entry keeps the existing diagnostic fields and now includes
 - `encountered`
 
 `SELECT <from_alias>` now emits a warning (`MQL-LINT-0001`) because alias-as-value
-is ambiguous; use `SELECT self` for current-row node projection.
+is ambiguous; use `SELECT alias.*` for current-row node projection.
 
 Suspicious qualified member accesses can also emit warnings when MarkQL accepts them as dynamic attribute syntax but they look like likely mistakes, for example a near-miss built-in field such as `alias.tagy`.
 

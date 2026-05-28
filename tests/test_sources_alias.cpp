@@ -65,6 +65,35 @@ void test_parse_alias_field_with_explicit_alias() {
   expect_true(parsed.query.has_value(), "parse explicit alias field references");
 }
 
+void test_parse_alias_star_with_explicit_alias() {
+  auto parsed = markql::parse_query("SELECT n.* FROM doc AS n WHERE n.tag = 'div'");
+  expect_true(parsed.query.has_value(), "parse explicit alias star node projection");
+}
+
+void test_alias_star_returns_current_row_node() {
+  std::string html = "<div id='a'>A</div><span id='b'>B</span>";
+  auto result = run_query(html, "SELECT n.* FROM doc AS n WHERE tag = 'span'");
+  expect_eq(result.rows.size(), 1, "alias star row count");
+  if (!result.rows.empty()) {
+    expect_true(result.rows[0].tag == "span", "alias star keeps current row tag");
+    expect_true(result.rows[0].attributes["id"] == "b", "alias star keeps attributes");
+  }
+}
+
+void test_alias_star_rejects_unbound_identifier() {
+  bool threw = false;
+  try {
+    std::string html = "<div>One</div>";
+    run_query(html, "SELECT x.* FROM doc AS n WHERE n.tag = 'div'");
+  } catch (const std::exception& ex) {
+    threw = true;
+    expect_true(std::string(ex.what()) ==
+                    "Unknown identifier 'x' (expected a FROM alias or legacy tag binding)",
+                "alias star unknown identifier error message");
+  }
+  expect_true(threw, "alias star unknown identifier should fail validation");
+}
+
 void test_parse_legacy_tag_binding_still_works() {
   auto parsed = markql::parse_query("SELECT li.node_id, TEXT(li) FROM doc WHERE tag = 'li'");
   expect_true(parsed.query.has_value(), "parse legacy tag binding");
@@ -146,6 +175,12 @@ void register_source_alias_tests(std::vector<TestCase>& tests) {
       {"parse_alias_field_with_implicit_doc", test_parse_alias_field_with_implicit_doc});
   tests.push_back(
       {"parse_alias_field_with_explicit_alias", test_parse_alias_field_with_explicit_alias});
+  tests.push_back(
+      {"parse_alias_star_with_explicit_alias", test_parse_alias_star_with_explicit_alias});
+  tests.push_back(
+      {"alias_star_returns_current_row_node", test_alias_star_returns_current_row_node});
+  tests.push_back(
+      {"alias_star_rejects_unbound_identifier", test_alias_star_rejects_unbound_identifier});
   tests.push_back(
       {"parse_legacy_tag_binding_still_works", test_parse_legacy_tag_binding_still_works});
   tests.push_back({"duplicate_source_alias_rejected", test_duplicate_source_alias_rejected});

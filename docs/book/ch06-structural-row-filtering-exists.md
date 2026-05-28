@@ -79,7 +79,7 @@ Row `16` is excluded because it does not have a matching descendant span with `r
 
 <!-- VERIFY: ch06-listing-3-fail -->
 ```bash
-# EXPECT_FAIL: Expected axis name
+# EXPECT_FAIL: Malformed EXISTS(...) predicate
 ./build/markql --mode plain --color=disabled \
   --query "SELECT section.node_id FROM doc WHERE EXISTS(foo WHERE tag = 'h3');" \
   --input docs/fixtures/basic.html
@@ -88,7 +88,7 @@ Row `16` is excluded because it does not have a matching descendant span with `r
 Observed error:
 
 ```text
-Error: Query parse error: Expected axis name (self, parent, child, ancestor, descendant)
+ERROR[MQL-SYN-0001]: Malformed EXISTS(...) predicate
 ```
 
 Fix by choosing an explicit axis (`child` or `descendant`) based on depth requirements.

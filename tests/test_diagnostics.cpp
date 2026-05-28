@@ -51,16 +51,22 @@ void test_lint_warns_select_from_alias_as_ambiguous_node_value() {
   expect_true(first.category == "style_warning", "warning category is stable");
   expect_true(first.message == "Selecting the FROM alias as a value is ambiguous",
               "warning message is stable");
-  expect_true(first.help == "Use SELECT self to return the current node", "warning help is stable");
-  expect_true(first.doc_ref.find("appendix-grammar.md#select-self-for-current-row-nodes") !=
-                  std::string::npos,
-              "warning doc_ref points to canonical self docs");
+  expect_true(first.help == "Use SELECT node_row.* to return the current node row",
+              "warning help is stable");
+  expect_true(first.doc_ref.find("specs/markql/01-grammar.md") != std::string::npos,
+              "warning doc_ref points to canonical alias-star docs");
 }
 
 void test_lint_select_self_has_no_alias_ambiguity_warning() {
   std::vector<markql::Diagnostic> diagnostics =
       markql::lint_query("SELECT self FROM doc AS node_row WHERE node_row.tag = 'div'");
   expect_true(diagnostics.empty(), "canonical select self has no ambiguity warning");
+}
+
+void test_lint_select_alias_star_has_no_alias_ambiguity_warning() {
+  std::vector<markql::Diagnostic> diagnostics =
+      markql::lint_query("SELECT node_row.* FROM doc AS node_row WHERE node_row.tag = 'div'");
+  expect_true(diagnostics.empty(), "canonical select alias star has no ambiguity warning");
 }
 
 void test_lint_detailed_reports_full_coverage_for_simple_query() {
@@ -410,6 +416,8 @@ void register_diagnostic_tests(std::vector<TestCase>& tests) {
                    test_lint_warns_select_from_alias_as_ambiguous_node_value});
   tests.push_back({"lint_select_self_has_no_alias_ambiguity_warning",
                    test_lint_select_self_has_no_alias_ambiguity_warning});
+  tests.push_back({"lint_select_alias_star_has_no_alias_ambiguity_warning",
+                   test_lint_select_alias_star_has_no_alias_ambiguity_warning});
   tests.push_back({"lint_detailed_reports_full_coverage_for_simple_query",
                    test_lint_detailed_reports_full_coverage_for_simple_query});
   tests.push_back({"lint_detailed_reports_reduced_coverage_for_relation_query",

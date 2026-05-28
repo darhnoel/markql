@@ -768,6 +768,14 @@ bool Parser::parse_select_item(std::vector<Query::SelectItem>& items, bool& saw_
   }
   if (current_.type == TokenType::Dot) {
     advance();
+    if (current_.type == TokenType::Star) {
+      item.self_node_projection = true;
+      item.span = Span{start, current_.pos + current_.text.size()};
+      advance();
+      items.push_back(item);
+      saw_tag_only = true;
+      return true;
+    }
     if (current_.type != TokenType::Identifier) {
       return set_error("Expected field identifier after '.'");
     }

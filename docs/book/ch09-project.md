@@ -209,7 +209,7 @@ SELECT PROJECT(li) FROM doc WHERE tag='li';
 
 <!-- VERIFY: ch09-listing-5-fail -->
 ```bash
-# EXPECT_FAIL: requires AS (alias: expression, ...)
+# EXPECT_FAIL: Invalid PROJECT()/FLATTEN_EXTRACT() usage
 ./build/markql --mode plain --color=disabled \
   --query "SELECT PROJECT(li) FROM doc WHERE tag='li';" \
   --input docs/fixtures/products.html
@@ -218,7 +218,7 @@ SELECT PROJECT(li) FROM doc WHERE tag='li';
 Observed error:
 
 ```text
-Error: Query parse error: PROJECT()/FLATTEN_EXTRACT() requires AS (alias: expression, ...)
+ERROR[MQL-SYN-0001]: Invalid PROJECT()/FLATTEN_EXTRACT() usage
 ```
 
 Why this fails: `PROJECT` is schema-construction syntax, not a scalar function call. Without `AS (...)`, the engine has no declared output fields and cannot build a deterministic schema.

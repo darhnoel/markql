@@ -44,8 +44,8 @@ FROM <source> [AS <alias>]
 - Tag rows: `SELECT div FROM doc ...`
 - Field projections: `SELECT a.href, a.tag FROM doc ...`
 - Selector field-list projections: `SELECT a(href, tag) FROM doc ...`
-- Current row node projection (canonical): `SELECT self FROM doc ...`
-- Current row field projections: `SELECT self.node_id, self.tag FROM doc ...`
+- Current row node projection (canonical): `SELECT alias.* FROM doc AS alias ...`
+- Current row field projections: `SELECT alias.node_id, alias.tag FROM doc AS alias ...`
 - `FLATTEN(tag[, depth]) AS (c1, c2, ...)`
 - `PROJECT(tag) AS (alias: expr, ...)`
 - Extraction forms:
@@ -118,7 +118,7 @@ cells AS (
     TEXT(c) AS val
   FROM rows AS r
   CROSS JOIN LATERAL (
-    SELECT self
+    SELECT c.*
     FROM doc AS c
     WHERE c.parent_id = r.row_id
       AND c.tag = 'td'
@@ -144,7 +144,7 @@ r_cells AS (
     TEXT(node_cell) AS val
   FROM r_rows AS r_row
   CROSS JOIN LATERAL (
-    SELECT self
+    SELECT node_cell.*
     FROM doc AS node_cell
     WHERE node_cell.parent_id = r_row.row_id
       AND node_cell.tag = 'td'
@@ -155,25 +155,27 @@ FROM r_rows AS r_row
 JOIN r_cells AS r_cell ON r_cell.row_id = r_row.row_id;
 ```
 
-## SELECT self for current row nodes
+## SELECT alias.* for current row nodes
 
 Canonical rule:
-- In node-stream queries, write `SELECT self` to return the current row node.
+- In node-stream queries, write `SELECT alias.*` to return the current row node.
 
 Why:
-- It reads as projection of a value expression, not as "select the row variable name".
+- It uses familiar SQL wildcard syntax for "the row for this alias".
+- It avoids selecting the bare row variable name as if it were a scalar value.
 - It reduces ambiguity in `CROSS JOIN LATERAL` workflows where aliases are used for scoping.
 
 Compatibility:
 - Legacy `SELECT <from_alias>` is still accepted for backward compatibility.
+- Legacy `SELECT self` is still accepted during migration.
 - Behavior of legacy form is preserved as-is (including query-shape differences in older flows).
 - Lint warns on that ambiguous form with:
   - code: `MQL-LINT-0001`
   - message: `Selecting the FROM alias as a value is ambiguous`
-  - help: `Use SELECT self to return the current node`
+  - help: `Use SELECT node_row.* to return the current node row`
 
 Migration:
-- Replace `SELECT <from_alias>` with `SELECT self` when the intent is "return current row node".
+- Replace `SELECT <from_alias>` and `SELECT self` with `SELECT alias.*` when the intent is "return current row node".
 
 ## Diagnostics Quick Use
 

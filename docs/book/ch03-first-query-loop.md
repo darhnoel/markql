@@ -142,12 +142,12 @@ Observed output:
 
 At this point, the first query loop has done its job. You now have controlled row scope and controlled value shape. Larger chapter examples are just this loop repeated with richer expressions.
 
-## Listing 3-5: Canonical current-row node projection (`SELECT self`)
+## Listing 3-5: Canonical current-row node projection (`SELECT alias.*`)
 
 <!-- VERIFY: ch03-listing-5 -->
 ```bash
 ./build/markql --mode plain --color=disabled \
-  --query "SELECT self FROM doc AS node_x WHERE node_x.tag = 'section' ORDER BY node_id LIMIT 1;" \
+  --query "SELECT node_x.* FROM doc AS node_x WHERE node_x.tag = 'section' ORDER BY node_id LIMIT 1;" \
   --input docs/fixtures/basic.html
 ```
 
@@ -168,15 +168,15 @@ out="$(./build/markql --lint "SELECT node_td FROM doc AS node_td WHERE node_td.t
 echo "$out"
 grep -F "WARNING[MQL-LINT-0001]" <<<"$out"
 grep -F "Selecting the FROM alias as a value is ambiguous" <<<"$out"
-grep -F "Use SELECT self to return the current node" <<<"$out"
+grep -F "Use SELECT node_row.* to return the current node row" <<<"$out"
 ```
 
-## Listing 3-8: Nested LATERAL with canonical `SELECT self`
+## Listing 3-8: Nested LATERAL with canonical `SELECT alias.*`
 
 <!-- VERIFY: ch03-listing-8 -->
 ```bash
 ./build/markql --mode plain --color=disabled \
-  --query "WITH r_tables AS (SELECT self.node_id AS table_id FROM doc AS node_table WHERE node_table.tag = 'table'), r_cells AS (SELECT r_table.table_id, TEXT(node_td) AS cell_text FROM r_tables AS r_table CROSS JOIN LATERAL (SELECT self FROM doc AS node_tr WHERE node_tr.parent_id = r_table.table_id AND node_tr.tag = 'tr') AS node_tr CROSS JOIN LATERAL (SELECT self FROM doc AS node_td WHERE node_td.parent_id = node_tr.node_id AND node_td.tag IN ('th','td')) AS node_td) SELECT r_cells.cell_text FROM r_cells ORDER BY cell_text LIMIT 3;" \
+  --query "WITH r_tables AS (SELECT node_table.node_id AS table_id FROM doc AS node_table WHERE node_table.tag = 'table'), r_cells AS (SELECT r_table.table_id, TEXT(node_td) AS cell_text FROM r_tables AS r_table CROSS JOIN LATERAL (SELECT node_tr.* FROM doc AS node_tr WHERE node_tr.parent_id = r_table.table_id AND node_tr.tag = 'tr') AS node_tr CROSS JOIN LATERAL (SELECT node_td.* FROM doc AS node_td WHERE node_td.parent_id = node_tr.node_id AND node_td.tag IN ('th','td')) AS node_td) SELECT r_cells.cell_text FROM r_cells ORDER BY cell_text LIMIT 3;" \
   --input docs/fixtures/basic.html
 ```
 

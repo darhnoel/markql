@@ -331,6 +331,14 @@ if (MARKQL_BUILD_CLI)
   markql_maybe_strip_target(markql)
 endif()
 
+add_executable(markql_migrate_sql_faithful
+  tools/markql_migrate_sql_faithful/main.cpp
+)
+target_link_libraries(markql_migrate_sql_faithful PRIVATE markql_core)
+target_include_directories(markql_migrate_sql_faithful PRIVATE core/src core/include)
+set_target_properties(markql_migrate_sql_faithful PROPERTIES OUTPUT_NAME markql_migrate_sql_faithful)
+markql_maybe_strip_target(markql_migrate_sql_faithful)
+
 if (MARKQL_BUILD_TESTS)
   enable_testing()
   add_executable(markql_tests
@@ -502,6 +510,9 @@ if (MARKQL_BUILD_TESTS)
     attr_shorthand_axis_paths
     parse_alias_field_with_implicit_doc
     parse_alias_field_with_explicit_alias
+    parse_alias_star_with_explicit_alias
+    alias_star_returns_current_row_node
+    alias_star_rejects_unbound_identifier
     parse_legacy_tag_binding_still_works
     duplicate_source_alias_rejected
     implicit_doc_alias_matches_explicit_alias_values
@@ -519,6 +530,7 @@ if (MARKQL_BUILD_TESTS)
     with_left_join_lateral_baseline_values
     with_left_join_lateral_missing_right_value_null
     lateral_select_self_equivalent_to_select_alias
+    lateral_select_alias_star_equivalent_to_select_self
     with_qualified_parent_axis_and_case_projection
     shorthand_attribute_filter
     shorthand_qualified_attribute_filter
@@ -692,6 +704,7 @@ if (MARKQL_BUILD_TESTS)
     lint_semantic_diagnostic_has_stable_code
     lint_warns_select_from_alias_as_ambiguous_node_value
     lint_select_self_has_no_alias_ambiguity_warning
+    lint_select_alias_star_has_no_alias_ambiguity_warning
     diagnostic_text_renderer_contains_help_and_caret
     diagnostic_json_renderer_contains_stable_fields
     diagnostic_json_renderer_matches_snapshot
@@ -756,6 +769,11 @@ if (MARKQL_BUILD_TESTS)
   foreach(test_name IN LISTS MARKQL_TESTS)
     add_test(NAME markql_${test_name} COMMAND markql_tests ${test_name})
   endforeach()
+  add_test(
+    NAME markql_migrate_sql_faithful_noop
+    COMMAND markql_migrate_sql_faithful --check
+            "${CMAKE_SOURCE_DIR}/tests/fixtures/migration/alias_star_already_canonical.sql"
+  )
 endif()
 
 if (MARKQL_BUILD_PYTHON)

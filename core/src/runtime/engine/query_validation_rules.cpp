@@ -352,6 +352,24 @@ void validate_qualifiers(const Query& query) {
     active_alias = util::to_lower(*query.source.alias);
   }
 
+  for (const auto& item : query.select_items) {
+    if (!item.self_node_projection) continue;
+    const std::string projected_alias = util::to_lower(item.tag);
+    if (projected_alias == "self") continue;
+    if (active_alias.has_value() && projected_alias == *active_alias) continue;
+    if (!active_alias.has_value() && query.source.kind == Source::Kind::Document &&
+        projected_alias == "doc") {
+      continue;
+    }
+    if (query.source.kind == Source::Kind::Document && projected_alias == "doc" &&
+        active_alias.has_value() && *active_alias != "doc") {
+      throw std::runtime_error("Identifier 'doc' is not bound; did you mean '" +
+                               *query.source.alias + "'?");
+    }
+    throw std::runtime_error("Unknown identifier '" + item.tag +
+                             "' (expected a FROM alias or legacy tag binding)");
+  }
+
   auto qualifier_error =
       [&](const std::optional<std::string>& qualifier) -> std::optional<std::string> {
     if (!qualifier.has_value()) return std::nullopt;

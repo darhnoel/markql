@@ -66,8 +66,8 @@ Diagnostic make_select_alias_ambiguity_warning(const std::string& query, size_t 
   d.category = "style_warning";
   d.message = "Selecting the FROM alias as a value is ambiguous";
   d.why = "The alias names the current row source, but selecting it as a value is easy to misread.";
-  d.help = "Use SELECT self to return the current node";
-  d.example = "SELECT self FROM doc AS node_row WHERE node_row.tag = 'div'";
+  d.help = "Use SELECT node_row.* to return the current node row";
+  d.example = "SELECT node_row.* FROM doc AS node_row WHERE node_row.tag = 'div'";
   d.doc_ref = kSelectSelfDoc;
   d.span = span_from_bytes(query, byte_start, byte_end);
   d.snippet = render_code_frame(query, d.span, "");

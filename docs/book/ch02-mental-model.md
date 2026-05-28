@@ -115,7 +115,7 @@ SELECT section.node_id FROM doc WHERE EXISTS(foo WHERE tag = 'h3');
 
 <!-- VERIFY: ch02-listing-3-fail -->
 ```bash
-# EXPECT_FAIL: Expected axis name
+# EXPECT_FAIL: Malformed EXISTS(...) predicate
 ./build/markql --mode plain --color=disabled \
   --query "SELECT section.node_id FROM doc WHERE EXISTS(foo WHERE tag = 'h3');" \
   --input docs/fixtures/basic.html
@@ -124,7 +124,7 @@ SELECT section.node_id FROM doc WHERE EXISTS(foo WHERE tag = 'h3');
 Observed error:
 
 ```text
-Error: Query parse error: Expected axis name (self, parent, child, ancestor, descendant)
+ERROR[MQL-SYN-0001]: Malformed EXISTS(...) predicate
 ```
 
 The parser is protecting the scope model. `EXISTS` must declare an axis universe. A vague axis name would make evaluation ambiguous.
