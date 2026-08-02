@@ -105,13 +105,10 @@ The C++20 engine (`core/`). Public API in `core/include/markql/`. Parser must no
 The `markql` binary (`cli/`). One-shot query/lint/template-render modes plus an interactive REPL.
 
 **markql-agent**:
-A localhost HTTP service (`127.0.0.1:7337`) exposing `/health` and `/v1/query`, token-gated, used by the browser plugin and bundled into the desktop app.
+A localhost HTTP service (`127.0.0.1:7337`) exposing `/health` and `/v1/query`, token-gated, used by the browser plugin. Shipped as a standalone binary that prints a generated token on startup unless `MARKQL_AGENT_TOKEN` is set.
 
 **Browser plugin**:
 The Chrome extension (`browser_plugin/extension/`) that captures the page DOM (top document plus accessible frames) and queries the agent. The companion `browser_plugin/agent/` is the C++ agent server.
-
-**MarkQL Desktop**:
-A Tauri desktop shell that bundles `markql-agent` and ships AppImage/deb/MSI packages.
 
 **Python package**:
 The `markql` Python package (`python/markql/`) with pybind bindings (`_core.cpp`) and a CLI-fallback path. Published to PyPI under the legacy name `pyxsql`.

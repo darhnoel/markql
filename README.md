@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/darhnoel/markql/actions/workflows/python-wheels.yml"><img src="https://github.com/darhnoel/markql/actions/workflows/python-wheels.yml/badge.svg" alt="Build wheels"></a>
-  <a href="https://github.com/darhnoel/markql/actions/workflows/release-binaries.yml"><img src="https://github.com/darhnoel/markql/actions/workflows/release-binaries.yml/badge.svg" alt="Release Desktop"></a>
+  <a href="https://github.com/darhnoel/markql/actions/workflows/release-binaries.yml"><img src="https://github.com/darhnoel/markql/actions/workflows/release-binaries.yml/badge.svg" alt="Release Agent + Extension"></a>
   <img src="https://img.shields.io/badge/status-beta-orange" alt="Status: Beta">
   <a href="https://github.com/darhnoel/markql/tags"><img src="https://img.shields.io/github/v/tag/darhnoel/markql" alt="GitHub tag"></a>
   <a href="https://pypi.org/project/pyxsql/"><img src="https://img.shields.io/pypi/v/pyxsql" alt="PyPI version"></a>
@@ -114,36 +114,34 @@ Run interactive REPL:
 ./build/markql --interactive --input ./data/index.html
 ```
 
-## Install MarkQL Desktop
+## Install the Agent + Extension
 
-Current desktop releases ship three user-facing assets:
+Releases ship three user-facing assets:
 
-- `MarkQL-Desktop-<version>-linux-x86_64.AppImage`
-- `MarkQL-Desktop-<version>-windows-x86_64.msi`
+- `markql-agent` (Linux x86_64)
+- `markql-agent.exe` (Windows x86_64)
 - `markql-extension.zip`
 
-Python package releases continue to use `v*` tags. Desktop installer releases use `desktop-v*` tags.
+Python package releases use `v*` tags. Agent/extension releases use `desktop-v*` tags.
 
-Install flow today:
+Install flow:
 
-1. Download and install MarkQL Desktop from the latest GitHub Release.
-2. Download `markql-extension.zip` from the same release and extract it.
+1. Download `markql-agent` (or `markql-agent.exe`) and `markql-extension.zip` from the latest GitHub Release.
+2. Extract `markql-extension.zip`.
 3. Open `chrome://extensions`.
 4. Enable `Developer mode`.
 5. Click `Load unpacked`.
 6. Select the extracted `markql-extension` folder.
-7. Launch MarkQL Desktop.
-8. Click `Copy Token`.
+7. Run the agent. On Linux/macOS you may need `chmod +x markql-agent` first.
+8. The agent prints a generated token on startup. Copy it.
 9. Paste the token into the extension.
 10. Open a page and run queries.
 
-Linux AppImage note:
-
-- If the AppImage is not executable after download, run `chmod +x MarkQL-Desktop-<version>-linux-x86_64.AppImage`.
+To use a fixed token instead of the generated one, set `MARKQL_AGENT_TOKEN` before launching.
 
 Windows note:
 
-- The MSI is unsigned in the MVP, so Windows may show an "unknown publisher" warning.
+- The agent binary is unsigned, so Windows SmartScreen may warn on first run.
 
 ## Browser Plugin MVP
 

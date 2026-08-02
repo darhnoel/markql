@@ -79,11 +79,6 @@ tests/integration/rust/target
 
 python/markql.egg-info/*
 
-# desktop app
-desktop/target/
-desktop/binaries/*
-!desktop/binaries/.gitkeep
-desktop/gen/
 
 plugins/.xsql_logs/
 

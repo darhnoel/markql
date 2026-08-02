@@ -15,7 +15,6 @@ allowed_legacy_paths=(
   "browser_plugin/agent/src/main.cpp"
   "browser_plugin/extension/popup/config.js"
   "browser_plugin/extension/content.js"
-  "desktop/src/agent.rs"
   "editors/vscode/src/cli.ts"
   "editors/vscode/out/cli.js"
 )
