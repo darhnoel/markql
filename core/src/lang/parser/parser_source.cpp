@@ -43,31 +43,6 @@ bool Parser::parse_source(Source& src) {
     if (!consume(TokenType::RParen, "Expected ) after RAW argument")) return false;
     return parse_source_alias(src);
   }
-  if (current_.type == TokenType::KeywordFragments) {
-    size_t start = current_.pos;
-    advance();
-    if (!consume(TokenType::LParen, "Expected ( after FRAGMENTS")) return false;
-    src.kind = Source::Kind::Fragments;
-    if (current_.type == TokenType::KeywordRaw) {
-      size_t raw_start = current_.pos;
-      advance();
-      if (!consume(TokenType::LParen, "Expected ( after RAW")) return false;
-      if (current_.type != TokenType::String) {
-        return set_error("Expected string literal inside RAW()");
-      }
-      src.fragments_raw = current_.text;
-      src.span = Span{raw_start, current_.pos + current_.text.size()};
-      advance();
-      if (!consume(TokenType::RParen, "Expected ) after RAW argument")) return false;
-    } else {
-      std::shared_ptr<Query> subquery;
-      if (!parse_subquery(subquery)) return false;
-      src.fragments_query = std::move(subquery);
-    }
-    if (!consume(TokenType::RParen, "Expected ) after FRAGMENTS argument")) return false;
-    src.span = Span{start, current_.pos};
-    return parse_source_alias(src);
-  }
   if (current_.type == TokenType::KeywordParse) {
     size_t start = current_.pos;
     advance();
@@ -127,11 +102,11 @@ bool Parser::parse_source(Source& src) {
     return true;
   }
   return set_error(
-      "Expected document, CTE name, derived subquery, string literal, RAW(), FRAGMENTS(), or "
+      "Expected document, CTE name, derived subquery, string literal, RAW(), or "
       "PARSE() source");
 }
 
-/// Parses a full query inside FRAGMENTS(), stopping before a closing ).
+/// Parses a full subquery, stopping before a closing ).
 /// MUST return with current_ positioned at the closing parenthesis.
 /// Inputs are token streams; outputs are Query pointers or errors.
 bool Parser::parse_subquery(std::shared_ptr<Query>& out) {

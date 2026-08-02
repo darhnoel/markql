@@ -24,15 +24,12 @@ struct Source {
     Path,
     Url,
     RawHtml,
-    Fragments,
     Parse,
     CteRef,
     DerivedSubquery
   } kind = Kind::Document;
   std::string value;
   std::optional<std::string> alias;
-  std::shared_ptr<Query> fragments_query;
-  std::optional<std::string> fragments_raw;
   std::shared_ptr<Query> parse_query;
   std::shared_ptr<ScalarExpr> parse_expr;
   std::shared_ptr<Query> derived_query;

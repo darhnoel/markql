@@ -170,8 +170,6 @@ Use these before guessing syntax. They return small, structured outputs (cheap o
 markql --lint "<query>" --format json    # parse + validate, no execute
 markql --query "<q>" --input page.html   # one-shot
 markql --query-file q.sql --input page.html
-markql --input page.html --write-mqd cache/page.mqd        # cache parsed doc
-markql --query-file q.sql --input cache/page.mqd           # reuse cache
 ```
 
 Exit codes: `0` success, `1` parse/runtime error, `2` CLI/IO failure.

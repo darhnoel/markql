@@ -19,7 +19,7 @@ namespace {
 bool is_node_stream_source(const Source& source) {
   return source.kind == Source::Kind::Document || source.kind == Source::Kind::Path ||
          source.kind == Source::Kind::Url || source.kind == Source::Kind::RawHtml ||
-         source.kind == Source::Kind::Fragments || source.kind == Source::Kind::Parse;
+         source.kind == Source::Kind::Parse;
 }
 
 bool is_bare_identifier_node_projection(const Query::SelectItem& item) {
@@ -231,9 +231,6 @@ void collect_select_alias_ambiguity_warnings(const Query& q, const std::string& 
     if (source.derived_query != nullptr) {
       collect_select_alias_ambiguity_warnings(*source.derived_query, query_text, diagnostics);
     }
-    if (source.fragments_query != nullptr) {
-      collect_select_alias_ambiguity_warnings(*source.fragments_query, query_text, diagnostics);
-    }
     if (source.parse_query != nullptr) {
       collect_select_alias_ambiguity_warnings(*source.parse_query, query_text, diagnostics);
     }
@@ -395,9 +392,6 @@ void collect_relation_suspicion_warnings(const Query& q, const std::string& quer
 
   auto visit_source = [&](const Source& source) -> void {
     if (source.parse_expr != nullptr) visit_scalar(*source.parse_expr);
-    if (source.fragments_query != nullptr) {
-      collect_relation_suspicion_warnings(*source.fragments_query, query_text, diagnostics, seen);
-    }
     if (source.parse_query != nullptr) {
       collect_relation_suspicion_warnings(*source.parse_query, query_text, diagnostics, seen);
     }

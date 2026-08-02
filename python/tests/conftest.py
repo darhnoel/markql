@@ -38,16 +38,3 @@ def supports_parse_source() -> bool:
         return True
     except RuntimeError:
         return False
-
-
-@pytest.fixture(scope="session")
-def supports_fragments_warnings() -> bool:
-    doc = markql.load("<html><body></body></html>")
-    try:
-        result = markql.execute(
-            "SELECT li FROM FRAGMENTS(RAW('<ul><li>1</li></ul>')) AS frag",
-            doc=doc,
-        )
-    except RuntimeError:
-        return False
-    return bool(result.warnings)

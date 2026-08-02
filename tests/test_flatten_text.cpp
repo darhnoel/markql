@@ -148,7 +148,7 @@ void test_flatten_text_realistic_flight_card() {
   if (!result.rows.empty()) {
     expect_true(result.rows[0].computed_fields["t1"] == "08:00", "flatten_text realistic t1");
     expect_true(result.rows[0].computed_fields["dur"] == "10h", "flatten_text realistic duration");
-    expect_true(result.rows[0].computed_fields["layover"] == "3h 20m in Guangzhou",
+    expect_true(result.rows[0].computed_fields["layover"] == "3h 20m in Sample City",
                 "flatten_text realistic layover");
     expect_true(result.rows[0].computed_fields["t2"] == "20:00", "flatten_text realistic t2");
     expect_true(result.rows[0].computed_fields["price"] == "US$463",

@@ -7,6 +7,10 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 
 ## [Unreleased]
 
+### Removed
+- Removed the experimental `.mqd` / `.mqp` artifact feature, including the `--write-mqd`, `--write-mqp`, and `--artifact-info` CLI commands, transparent artifact input/query loading, the `markql_bench_artifacts` benchmark, and the FlatBuffers dependency.
+- Removed the deprecated `FRAGMENTS(...)` source constructor. Use `PARSE(...)` instead, which covers both raw HTML strings and subquery-produced HTML.
+
 ### Fixed
 - Fixed the fallback HTML parser so legacy void elements like `<frame>` do not stay open on the naive stack, which keeps `frameset` children and following `noframes` content in the correct sibling structure.
 - Added regression coverage for legacy `frameset` / `frame` parsing in both direct DOM parsing and query execution paths.
@@ -21,20 +25,6 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
   - `--vars <file.toml>`
   - `--rendered-out <file.mql>|-`
 - Added Python rendering helpers for TOML vars loading and strict-undefined Jinja2 rendering.
-- Added versioned artifact snapshots:
-  - `.mqd` for serialized parsed-document snapshots
-  - `.mqp` for serialized prepared queries after parse + validate.
-- Added repo-local `vcpkg` manifest support for FlatBuffers so `DOCN` schema generation and runtime linkage stay reproducible without system package installs.
-- Added CLI artifact commands:
-  - `--write-mqd` to persist the parsed `doc` input once
-  - `--write-mqp` to persist a prepared query once
-  - `--artifact-info` to inspect artifact metadata and compatibility.
-- Added transparent CLI execution support for:
-  - running normal SQL text against `.mqd`
-  - running `.mqp` against HTML/stdin/URL input
-  - running `.mqp` against `.mqd`.
-- Added artifact tests for direct-vs-artifact result equivalence, deterministic bytes, major-version rejection, and corruption safety.
-- Added `markql_bench_artifacts` benchmark covering HTML parse, `.mqd` write/read, parsed-document execution, `.mqd`-loaded execution, and artifact size.
 - Added `PARSE(...)` as a source constructor for parsing HTML strings into queryable node streams.
 - Added `PARSE(...)` support for both scalar HTML expressions and subquery-produced HTML strings.
 - Added SQL-style row alias field binding with `alias.field` across projections/predicates.
@@ -65,34 +55,12 @@ Historical entries were backfilled from git commit history on 2026-02-07 and foc
 - Added tests for diagnostics color on/off behavior, JSON ANSI guards, and CLI color policy precedence.
 - Added `MARKQL_BENCH_STATS` (opt-in env toggle) to report PROJECT selector hot-path counters for benchmarking.
 
-### Deprecated
-- Deprecated `FRAGMENTS(...)` in favor of `PARSE(...)`.
-- `FRAGMENTS(...)` remains supported for backward compatibility and now emits a deprecation warning.
-
 ### Changed
 - Official rename completed across the tracked repository: internal namespaces, headers, CMake targets, CLI/test target names, install paths, docs, and CI now use `markql` / `MarkQL` consistently, with `pyxsql` preserved as the only intentional legacy identifier.
 - Parse diagnostics now use a reusable expected-token-family repair layer before generic fallback, so operator/keyword/axis/value typos in local contexts such as `EXISTS(...)`, `SHOW`, `DESCRIBE`, `TO`, and `TABLE(...)` options produce local repair guidance and examples instead of unrelated top-level query help.
 - Lint now reports coverage-aware summaries (`parse_only` / `full` / `reduced`), emits cautious clean-result wording (`no proven diagnostics`), returns a top-level JSON lint result envelope for CLI/editor use, and adds non-breaking suspicion/binding warnings for likely mistakes in reduced-coverage relation-style queries.
 - Upgraded lint diagnostics to provide clearer mistake-specific messages, categories, `why` explanations, short valid examples, and additive JSON/Python fields (`category`, `why`, `example`, `expected`, `encountered`) while keeping the existing C++ lint engine authoritative.
-- Marked `.mqd` / `.mqp` artifact workflows as experimental in CLI help and documentation so WIP builds do not imply a fully settled interface.
 - `build.sh` now detects a default `vcpkg` triplet for Linux, macOS, and Windows environments instead of hardcoding `x64-linux`, and it falls back to portable CPU-count detection when `nproc` is unavailable.
-- Artifact persistence now uses explicit file magic, format versioning, producer-major compatibility checks, and additive sectioned payloads instead of private runtime layouts.
-- `.mqd` document artifacts keep the existing MarkQL outer envelope and store the `DOCN` section as a FlatBuffers payload verified after header/checksum validation.
-- `.mqp` prepared-query artifacts now keep the same outer envelope while storing the `QAST` section as a FlatBuffers payload verified after header/checksum validation.
-- `.mqp` readers keep a narrow legacy fallback for older manual-`QAST` artifacts when the FlatBuffers required-feature bit is absent.
-- Artifact readers now treat `.mqd` and `.mqp` as untrusted data:
-  - strict UTF-8 validation for all persisted text fields
-  - bounded file/section/string/node/attribute/count parsing
-  - payload checksum verification
-  - rejection of unknown required feature flags
-  - terminal-safe escaping for artifact-derived CLI metadata output.
-- Added truth-first artifact benchmark reporting for cold-path comparisons between:
-  - raw HTML + query text
-  - raw HTML + `.mqp`
-  - `.mqd` + query text
-  - `.mqd` + `.mqp`
-  along with separated phase timings for HTML read/parse, `.mqd` load, query parse/prepare, `.mqp` load, and execution on parsed-vs-loaded documents.
-- `execute_query_from_file(...)` now accepts `.mqd` inputs transparently while preserving existing HTML-file behavior.
 - `FROM doc AS <alias>` is now accepted directly (for example `FROM doc AS n`).
 - `SELECT self` is now the documented canonical form for returning the current node in node-stream queries.
 - Alias misuse now emits clearer errors:

@@ -366,21 +366,6 @@ Relation evaluate_source_relation(const Source& source, const std::string* defau
     }
     doc = parse_html(source.value);
     source_uri = "raw";
-  } else if (source.kind == Source::Kind::Fragments) {
-    FragmentSource fragments;
-    if (source.fragments_raw.has_value()) {
-      fragments.fragments.push_back(*source.fragments_raw);
-    } else if (source.fragments_query != nullptr) {
-      const Query& subquery = *source.fragments_query;
-      QueryResult sub = execute_query_with_source_context(subquery, default_html, default_document,
-                                                          default_source_uri, ctes, nullptr, cache);
-      fragments = collect_html_fragments(sub, "FRAGMENTS");
-    } else {
-      throw std::runtime_error("FRAGMENTS requires a subquery or RAW('<...>') input");
-    }
-    doc = build_fragments_document(fragments);
-    source_uri = "fragment";
-    warnings.push_back("FRAGMENTS is deprecated; use PARSE(...) instead.");
   } else if (source.kind == Source::Kind::Parse) {
     FragmentSource fragments;
     if (source.parse_expr != nullptr) {

@@ -11,7 +11,7 @@ It matters because extraction bugs usually come from skipping steps. Users often
 This may feel slower at first because you run more small queries. In practice it is faster, because each query has one purpose and one testable expectation. Once the loop becomes habit, your extraction development feels less like trial-and-error and more like compilation.
 
 > ### Note: Think in checkpoints, not in final query shape
-> A final production query is the *last* artifact. The first artifact is evidence: “these are the rows,” then “these are the values.” If you cannot explain your query at each checkpoint, you are probably carrying an incorrect scope assumption.
+> A final production query is the *last* deliverable. The first deliverable is evidence: “these are the rows,” then “these are the values.” If you cannot explain your query at each checkpoint, you are probably carrying an incorrect scope assumption.
 
 ## Rules
 - Start with `SELECT * ... LIMIT` to see structural reality.

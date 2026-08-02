@@ -45,7 +45,6 @@ You can inspect the runtime list with:
 - `RAW('<html...>')`
 - `PARSE('<html...>')`
 - `PARSE(SELECT inner_html(...) FROM doc ...)`
-- `FRAGMENTS(...)` (deprecated; prefer `PARSE(...)`)
 
 ## Behavior and constraints
 - `self` refers to the current node for the current row produced by `FROM`.

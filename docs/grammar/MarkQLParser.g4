@@ -319,7 +319,6 @@ source
     : DOCUMENT sourceAlias?
     | DOC sourceAlias?
     | RAW LPAREN stringLiteral RPAREN sourceAlias?
-    | FRAGMENTS LPAREN (RAW LPAREN stringLiteral RPAREN | subqueryBody) RPAREN sourceAlias?
     | PARSE LPAREN (subqueryBody | scalarExpr) RPAREN sourceAlias?
     | LPAREN subqueryBody RPAREN sourceAliasRequired
     | stringLiteral sourceAlias?

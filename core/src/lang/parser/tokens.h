@@ -52,7 +52,6 @@ enum class TokenType {
   KeywordJson,
   KeywordNdjson,
   KeywordRaw,
-  KeywordFragments,
   KeywordParse,
   KeywordContains,
   KeywordHasDirectText,

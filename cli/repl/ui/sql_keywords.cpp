@@ -11,7 +11,7 @@ const std::vector<std::string>& markql_reserved_keywords() {
       "is",      "null",      "not",      "exists",  "like",    "limit",
       "order",   "by",        "asc",      "desc",    "exclude", "as",
       "to",      "list",      "csv",      "parquet", "json",    "ndjson",
-      "raw",     "fragments", "contains", "all",     "any",     "has_direct_text",
+      "raw",     "contains",  "all",      "any",     "has_direct_text",
       "project", "show",      "describe", "input",   "inputs",  "functions",
       "axes",    "operators", "case",     "when",    "then",    "else",
       "end"};
@@ -47,7 +47,6 @@ const std::vector<std::string>& markql_completion_keywords() {
                                                     "document",
                                                     "doc",
                                                     "raw",
-                                                    "fragments",
                                                     "contains",
                                                     "all",
                                                     "any",

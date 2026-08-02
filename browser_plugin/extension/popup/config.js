@@ -19,7 +19,7 @@ export const SQL_KEYWORDS = new Set([
   "ANY", "ALL", "LIKE", "EXCLUDE",
   "WITH", "JOIN", "LEFT", "CROSS", "LATERAL", "ON",
   "TO", "TABLE", "LIST", "CSV", "PARQUET", "JSON", "NDJSON",
-  "RAW", "FRAGMENTS", "PARSE",
+  "RAW", "PARSE",
   "SHOW", "DESCRIBE", "INPUT", "INPUTS", "FUNCTIONS", "AXES", "OPERATORS", "LANGUAGE",
   "CASE", "WHEN", "THEN", "ELSE", "END",
   "HEADER", "NOHEADER", "NO_HEADER", "DEFAULT",

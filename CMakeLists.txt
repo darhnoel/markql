@@ -25,7 +25,6 @@ option(MARKQL_WITH_LIBXML2 "Use libxml2 for HTML parsing" ON)
 option(MARKQL_WITH_NLOHMANN_JSON "Use nlohmann/json for CLI output" ON)
 option(MARKQL_WITH_CURL "Use libcurl for URL fetching" ON)
 option(MARKQL_WITH_ARROW "Enable Apache Arrow for Parquet export" ON)
-option(MARKQL_WITH_FLATBUFFERS "Use FlatBuffers for DOCN artifact payloads" ON)
 option(MARKQL_ENABLE_KHMER_NUMBER "Enable built-in Khmer number module" ON)
 option(MARKQL_AGENT_FETCH_DEPS "Fetch markql-agent deps with FetchContent when missing" ${_markql_agent_fetch_deps_default})
 option(MARKQL_OPTIMIZE_FOR_SIZE "Enable size-focused compile/link flags" OFF)
@@ -65,11 +64,6 @@ endfunction()
 
 add_library(markql_core
   core/src/version.cpp
-  core/src/artifacts/artifacts.cpp
-  core/src/artifacts/artifact_internal.cpp
-  core/src/artifacts/artifact_document.cpp
-  core/src/artifacts/artifact_query.cpp
-  core/src/artifacts/artifact_query_flatbuffers.cpp
   core/src/helper/helper_controller.cpp
   core/src/helper/helper_json.cpp
   core/src/helper/helper_policy.cpp
@@ -156,30 +150,6 @@ target_compile_definitions(markql_core
     MARKQL_GIT_COMMIT="${MARKQL_GIT_COMMIT}"
     MARKQL_GIT_DIRTY=${MARKQL_GIT_DIRTY}
 )
-
-if (MARKQL_WITH_FLATBUFFERS)
-  find_package(flatbuffers CONFIG QUIET)
-  if (NOT flatbuffers_FOUND)
-    message(FATAL_ERROR "flatbuffers not found. Configure with the repo vcpkg manifest/build path or set MARKQL_WITH_FLATBUFFERS=OFF.")
-  endif()
-  set(MARKQL_DOCN_SCHEMA "${CMAKE_CURRENT_SOURCE_DIR}/core/src/artifacts/schema/document.fbs")
-  set(MARKQL_QAST_SCHEMA "${CMAKE_CURRENT_SOURCE_DIR}/core/src/artifacts/schema/prepared_query_payload.fbs")
-  flatbuffers_generate_headers(
-    TARGET markql_artifact_docn_flatbuffers
-    SCHEMAS ${MARKQL_DOCN_SCHEMA}
-    INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/core/src/artifacts/schema"
-  )
-  flatbuffers_generate_headers(
-    TARGET markql_artifact_qast_flatbuffers
-    SCHEMAS ${MARKQL_QAST_SCHEMA}
-    INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/core/src/artifacts/schema"
-  )
-  add_dependencies(markql_core GENERATE_markql_artifact_docn_flatbuffers)
-  add_dependencies(markql_core GENERATE_markql_artifact_qast_flatbuffers)
-  target_link_libraries(markql_core PRIVATE flatbuffers::flatbuffers
-                                          markql_artifact_docn_flatbuffers
-                                          markql_artifact_qast_flatbuffers)
-endif()
 
 if (MARKQL_ENABLE_KHMER_NUMBER)
   target_sources(markql_core PRIVATE core/src/khmer_number.cpp)
@@ -348,13 +318,12 @@ if (MARKQL_BUILD_TESTS)
     tests/test_order_by.cpp
     tests/test_duckbox.cpp
     tests/test_exports.cpp
-    tests/test_artifacts.cpp
     tests/test_malformed_html.cpp
     tests/test_legacy_frames.cpp
     tests/test_flatten_text.cpp
     tests/test_flatten_extract.cpp
     tests/test_repl.cpp
-    tests/test_fragments.cpp
+    tests/test_raw_parse.cpp
     tests/test_guardrails.cpp
     tests/test_meta_commands.cpp
     tests/test_cli_utils.cpp
@@ -424,11 +393,6 @@ if (MARKQL_BUILD_TESTS)
   target_link_libraries(markql_tests PRIVATE markql_core)
   target_include_directories(markql_tests PRIVATE cli core/src core/include tests)
   target_compile_definitions(markql_tests PRIVATE MARKQL_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
-  if (MARKQL_WITH_FLATBUFFERS)
-    target_link_libraries(markql_tests PRIVATE flatbuffers::flatbuffers
-                                             markql_artifact_docn_flatbuffers
-                                             markql_artifact_qast_flatbuffers)
-  endif()
   if (MARKQL_ARROW_TARGET AND MARKQL_PARQUET_TARGET)
     target_link_libraries(markql_tests PRIVATE ${MARKQL_ARROW_TARGET} ${MARKQL_PARQUET_TARGET})
     target_compile_definitions(markql_tests PRIVATE MARKQL_USE_ARROW)
@@ -451,24 +415,6 @@ if (MARKQL_BUILD_TESTS)
     COMMENT "Creating compatibility binary: markql_bench_inner_html -> markql_bench_inner_html"
   )
   markql_maybe_strip_target(markql_bench_inner_html)
-  add_executable(markql_bench_artifacts tests/bench_artifacts.cpp)
-  target_link_libraries(markql_bench_artifacts PRIVATE markql_core)
-  target_include_directories(markql_bench_artifacts PRIVATE cli core/src core/include tests)
-  if (MARKQL_WITH_FLATBUFFERS)
-    target_link_libraries(markql_bench_artifacts PRIVATE flatbuffers::flatbuffers
-                                                      markql_artifact_docn_flatbuffers
-                                                      markql_artifact_qast_flatbuffers)
-  endif()
-  set_target_properties(markql_bench_artifacts PROPERTIES OUTPUT_NAME markql_bench_artifacts)
-  add_custom_command(
-    TARGET markql_bench_artifacts
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "$<TARGET_FILE:markql_bench_artifacts>"
-            "$<TARGET_FILE_DIR:markql_bench_artifacts>/markql_bench_artifacts${CMAKE_EXECUTABLE_SUFFIX}"
-    COMMENT "Creating compatibility binary: markql_bench_artifacts -> markql_bench_artifacts"
-  )
-  markql_maybe_strip_target(markql_bench_artifacts)
   set(MARKQL_TESTS
     select_ul_by_id
     class_in_matches_token
@@ -566,27 +512,11 @@ if (MARKQL_BUILD_TESTS)
     json_export_integration
     ndjson_export_integration
     json_ndjson_stdout_fallback
-    artifact_cli_args
-    artifact_html_and_mqd_results_match
-    artifact_query_and_mqp_results_match
-    artifact_mqp_on_mqd_matches_direct
-    artifact_lint_behavior_unchanged
-    artifact_document_round_trip_is_deterministic
-    artifact_query_round_trip_is_deterministic
-    artifact_document_major_version_rejected
-    artifact_query_major_version_rejected
-    artifact_corrupted_files_fail_safely
-    artifact_inspect_reports_metadata
     raw_source_literal
-    fragments_from_raw
-    fragments_from_inner_html
-    fragments_non_html_error
-    fragments_warn_deprecated
     parse_from_string_expr
     parse_from_subquery
     guardrails_limit_cap
     guardrails_regex_length_cap
-    guardrails_fragments_count_cap
     malformed_missing_closing_tags
     malformed_mismatched_nesting
     malformed_junk_bytes_no_throw

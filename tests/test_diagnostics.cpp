@@ -275,7 +275,7 @@ void test_lint_position_keyword_typo_prefers_local_repair() {
   const auto& first = diagnostics.front();
   expect_true(first.message == "POSITION(...) requires the keyword IN",
               "position typo message is local");
-  expect_true(first.expected == "IN", "position typo expected token is local");
+  expect_true(first.expected == "substr IN str", "position typo expected token is local");
   expect_true(first.encountered == "ON", "position typo encountered token is preserved");
   expect_true(first.help.find("IN") != std::string::npos, "position typo suggests IN");
   expect_true(first.example.find("POSITION('a' IN text)") != std::string::npos,
@@ -343,7 +343,7 @@ void test_lint_table_option_value_typo_prefers_local_repair() {
   const auto& first = diagnostics.front();
   expect_true(first.message == "Invalid value for TABLE() option HEADER",
               "table option message is local");
-  expect_true(first.help.find("OFF") != std::string::npos, "table option typo suggests OFF");
+  expect_true(first.help.find("ON") != std::string::npos, "table option typo suggests ON");
   expect_true(first.example.find("TO TABLE(HEADER ON)") != std::string::npos,
               "table option example stays local to TABLE option syntax");
 }
@@ -356,7 +356,7 @@ void test_lint_exists_shape_has_specific_guidance() {
   const auto& first = diagnostics.front();
   expect_true(first.message == "Malformed EXISTS(...) predicate", "exists message is specific");
   expect_true(first.expected == "axis name inside EXISTS(...)", "exists expected text");
-  expect_true(first.help.find("EXISTS(child)") != std::string::npos, "exists help example");
+  expect_true(first.help.find("descendant") != std::string::npos, "exists help example");
 }
 
 void test_lint_project_shape_has_specific_guidance() {

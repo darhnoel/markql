@@ -150,7 +150,6 @@ Token Lexer::lex_identifier_or_keyword() {
   if (upper == "JSON") return make_token(TokenType::KeywordJson, out, start);
   if (upper == "NDJSON") return make_token(TokenType::KeywordNdjson, out, start);
   if (upper == "RAW") return make_token(TokenType::KeywordRaw, out, start);
-  if (upper == "FRAGMENTS") return make_token(TokenType::KeywordFragments, out, start);
   if (upper == "PARSE") return make_token(TokenType::KeywordParse, out, start);
   if (upper == "CONTAINS") return make_token(TokenType::KeywordContains, out, start);
   if (upper == "HAS_DIRECT_TEXT") return make_token(TokenType::KeywordHasDirectText, out, start);

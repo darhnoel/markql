@@ -35,7 +35,6 @@ PARQUET         : 'PARQUET';
 JSON            : 'JSON';
 NDJSON          : 'NDJSON';
 RAW             : 'RAW';
-FRAGMENTS       : 'FRAGMENTS';
 PARSE           : 'PARSE';
 CONTAINS        : 'CONTAINS';
 HAS_DIRECT_TEXT : 'HAS_DIRECT_TEXT';

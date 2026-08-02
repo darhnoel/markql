@@ -3,13 +3,6 @@
 #include <stdexcept>
 #include <string>
 
-#ifndef MARKQL_WITH_ARTIFACTS
-#define MARKQL_WITH_ARTIFACTS 1
-#endif
-
-#if MARKQL_WITH_ARTIFACTS
-#include "../../artifacts/artifacts.h"
-#endif
 #include "../../dom/html_parser.h"
 #include "../../lang/markql_parser.h"
 #include "../../util/string_util.h"
@@ -72,31 +65,6 @@ QueryResult execute_query_with_source_legacy(const Query& query, const std::stri
     HtmlDocument doc = parse_html(query.source.value);
     effective_source_uri = "raw";
     return execute_query_ast(query, doc, effective_source_uri);
-  }
-  if (query.source.kind == Source::Kind::Fragments) {
-    FragmentSource fragments;
-    if (query.source.fragments_raw.has_value()) {
-      if (query.source.fragments_raw->size() > markql_internal::kMaxRawHtmlBytes) {
-        throw std::runtime_error("FRAGMENTS RAW() input exceeds maximum size");
-      }
-      fragments.fragments.push_back(*query.source.fragments_raw);
-    } else if (query.source.fragments_query != nullptr) {
-      const Query& subquery = *query.source.fragments_query;
-      validate_query_for_execution(subquery);
-      if (subquery.source.kind == Source::Kind::Path || subquery.source.kind == Source::Kind::Url) {
-        throw std::runtime_error("FRAGMENTS subquery cannot use URL or file sources");
-      }
-      QueryResult sub_result =
-          execute_query_with_source(subquery, default_html, default_document, default_source_uri);
-      fragments = collect_html_fragments(sub_result, "FRAGMENTS");
-    } else {
-      throw std::runtime_error("FRAGMENTS requires a subquery or RAW('<...>') input");
-    }
-    HtmlDocument doc = build_fragments_document(fragments);
-    effective_source_uri = "fragment";
-    QueryResult out = execute_query_ast(query, doc, effective_source_uri);
-    out.warnings.push_back("FRAGMENTS is deprecated; use PARSE(...) instead.");
-    return out;
   }
   if (query.source.kind == Source::Kind::Parse) {
     FragmentSource fragments;
@@ -163,16 +131,6 @@ QueryResult execute_query_from_document(const std::string& html, const std::stri
 /// MUST read from disk and MUST propagate IO failures as exceptions.
 /// Inputs are path/query; outputs are QueryResult with file IO side effects.
 QueryResult execute_query_from_file(const std::string& path, const std::string& query) {
-#if MARKQL_WITH_ARTIFACTS
-  if (artifacts::path_has_artifact_magic(path)) {
-    artifacts::ArtifactInfo info = artifacts::inspect_artifact_file(path);
-    if (info.header.kind == artifacts::ArtifactKind::DocumentSnapshot) {
-      artifacts::DocumentArtifact document = artifacts::read_document_artifact_file(path);
-      return artifacts::execute_query_text_on_document(query, document);
-    }
-    throw std::runtime_error("Prepared query artifacts (.mqp) cannot be used as input documents");
-  }
-#endif
   std::string html = markql_internal::read_file(path);
   return execute_query_from_html(html, path, query);
 }

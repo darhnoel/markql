@@ -30,7 +30,7 @@ void test_projection_attributes() {
 }
 
 void test_projection_tag_field_list() {
-  std::string html = "<div id='root'><span></span></div>";
+  std::string html = "<html><body><div id='root'><span></span></div></body></html>";
   auto result = run_query(html, "SELECT div(node_id, tag, parent_id) FROM document");
   expect_eq(result.columns.size(), 3, "tag field list column count");
   if (result.columns.size() == 3) {

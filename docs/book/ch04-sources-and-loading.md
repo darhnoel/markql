@@ -19,8 +19,6 @@ This may feel unfamiliar if you normally tie scraping logic to browser state dir
 - Use `RAW(...)` for tiny inline fixtures in docs/tests.
 - Use `PARSE(...)` when your snippet has sibling roots or when HTML comes from query output.
 - Use stdin when piping dynamic HTML from another command.
-- Use `.mqd` when you want a stable parsed-document snapshot for repeated CLI runs.
-- Use `.mqp` when you want a stable prepared query for repeated CLI runs.
 - Use `.mql.j2` only with explicit `--render j2` when you want template-driven query files.
 
 ## Scope
@@ -33,15 +31,7 @@ CLI input path
 ```
 
 ```text
-Artifact path
-  --input file.mqd
-      -> load parsed DOM snapshot
-      -> available as table: doc
-
-  --query-file file.mqp
-      -> load prepared query
-      -> execute against html/stdin/url/mqd input
-
+Template render path
   --query-file file.mql.j2 --render j2 --vars file.toml
       -> render plain MarkQL text first
       -> then lint/execute that rendered query
@@ -155,10 +145,6 @@ Observed output:
 ]
 ```
 
-Compatibility note:
-- `FRAGMENTS(...)` is still supported but deprecated.
-- Migration: `FRAGMENTS(x)` -> `PARSE(x)`.
-
 ## Template query files via `--query-file`
 
 `--query-file` can also load a templated query file when you opt in explicitly:
@@ -183,82 +169,6 @@ Recommended file naming:
 - `query.toml` for vars
 - `query.mql` for rendered output
 
-## Versioned Artifacts
-
-Experimental status:
-
-- `.mqd` / `.mqp` artifact support is still experimental in this branch.
-- Treat the feature as WIP even though the files are versioned and validated.
-
-MarkQL's artifact MVP adds two explicit cacheable boundaries:
-
-- `.mqd` stores the parsed node-table facts needed for execution
-- `.mqp` stores a prepared query after parse + validate
-
-This keeps the semantic boundary stable:
-
-- MarkQL still executes against the same `doc` node-table model
-- result behavior stays the same as direct HTML + SQL execution
-- artifacts are versioned and rejected cleanly when major versions are incompatible
-- artifacts are treated as untrusted data and validated before use
-- the outer MarkQL artifact envelope stays custom while both `.mqd` `DOCN` and `.mqp` `QAST` payloads now use FlatBuffers
-- older manual-`QAST` `.mqp` files still read through a narrow fallback when the FlatBuffers required-feature bit is absent
-
-Create and inspect them from the CLI:
-
-```bash
-./build/markql --input docs/fixtures/basic.html --write-mqd /tmp/basic.mqd
-./build/markql --query "SELECT a.href FROM doc WHERE href IS NOT NULL" --write-mqp /tmp/links.mqp
-./build/markql --artifact-info /tmp/basic.mqd
-```
-
-Run a prepared query against a prepared document:
-
-```bash
-./build/markql --query-file /tmp/links.mqp --input /tmp/basic.mqd
-```
-
-MVP limits:
-
-- artifact loading is only exposed through CLI `--input` / `--query-file`
-- `--lint` still works on SQL text only
-- `--lint --query-file query.mql.j2 --render j2 --vars query.toml` lints rendered SQL text
-- `.mqp` is single-statement only
-- compression is not used in the MVP artifact format
-
-Security contract:
-
-- `.mqd` and `.mqp` are untrusted files, not trusted serialized objects.
-- The reader parses fields one-by-one instead of deserializing private C++ structs.
-- Every textual field in the current format is strict UTF-8; malformed text is rejected.
-- The reader enforces hard bounds on file size, section count, section size, string bytes, node count, attribute count, and collection counts before allocation.
-- Payload checksum verification detects corruption/tampering before section payloads are trusted.
-- `.mqd` loading is verified in two steps:
-  - validate the MarkQL header, section framing, required features, and checksum
-  - then verify the `DOCN` FlatBuffers payload before reading any document fields
-- `.mqp` loading is verified in the same two steps, with the verifier applied to the `QAST` FlatBuffers payload before decoding prepared-query fields
-- `--artifact-info` escapes control characters before printing artifact-derived metadata.
-- The checksum is for corruption detection only; it is not an authenticity or signing mechanism.
-
-Prepared-query semantic boundary:
-
-- `.mqp` persists the validated `Query` AST meaning needed for later execution.
-- It does not persist executor-private state or raw memory layouts.
-- Query kind and source kind metadata must still match the decoded query after load.
-
-Build note:
-
-- The repo now carries a `vcpkg.json` manifest entry for FlatBuffers.
-- `scripts/build/build.sh` installs FlatBuffers into `./vcpkg_installed` and uses the repo-local `flatc` during CMake generation.
-- The build does not require system-wide FlatBuffers packages.
-- `scripts/build/build.sh` auto-selects a default `vcpkg` triplet for Linux, macOS, and Windows shell environments, and you can override `VCPKG_TARGET_TRIPLET` / `VCPKG_HOST_TRIPLET` explicitly for cross-target builds.
-
-Benchmark methodology and current result:
-
-- `tests/bench_artifacts.cpp` runs 31 iterations and reports median values for query parse, query prepare, `.mqp` write, `.mqp` load, query-text execution on raw HTML, `.mqp` execution on raw HTML, `.mqp` execution on `.mqd`, and `.mqp` file size.
-- On `examples/html/koku_tk.html`, the current medians were `0.060 ms` parse, `0.074 ms` prepare, `0.090 ms` `.mqp` write, `0.146 ms` `.mqp` load, `9.608 ms` query text on raw HTML, `9.642 ms` `.mqp` on raw HTML, `2.987 ms` `.mqp` on `.mqd`, with `1079` artifact bytes.
-- That means this branch makes prepared-query load cheap, but on this fixture `.mqp` alone does not materially change raw-HTML execution time because HTML parsing still dominates. The larger win appears when `.mqp` is combined with `.mqd`.
-
 ## Before/after diagrams
 
 ```text
@@ -278,4 +188,4 @@ After
   Fix: keep explicit row narrowing in outer `WHERE`.
 
 ## Chapter takeaway
-Good extraction starts before query syntax: choose input sources that make behavior repeatable, and freeze parsed inputs or prepared queries when repeated-work cost matters more than one-off setup cost.
+Good extraction starts before query syntax: choose input sources that make behavior repeatable, and prefer stable local inputs when reproducibility matters more than one-off setup cost.

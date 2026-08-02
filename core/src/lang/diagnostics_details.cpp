@@ -575,8 +575,7 @@ void set_semantic_details(Diagnostic& d) {
     d.doc_ref = kGrammarDoc;
     return;
   }
-  if (contains_icase(m, "PARSE()") || contains_icase(m, "FRAGMENTS()") ||
-      contains_icase(m, "RAW()")) {
+  if (contains_icase(m, "PARSE()") || contains_icase(m, "RAW()")) {
     d.category = "semantic";
     d.code = "MQL-SEM-0501";
     d.why = "Source constructors accept only supported argument shapes and valid text inputs.";

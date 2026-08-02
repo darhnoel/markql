@@ -81,7 +81,7 @@ void test_duplicate_source_alias_rejected() {
 }
 
 void test_implicit_doc_alias_matches_explicit_alias_values() {
-  std::string html = "<div>One</div><div>Two</div><span>Skip</span>";
+  std::string html = "<html><body><div>One</div><div>Two</div><span>Skip</span></body></html>";
   auto implicit = run_query(html,
                             "SELECT doc.node_id, TEXT(doc) FROM doc "
                             "WHERE doc.tag = 'div' AND doc.parent_id IS NOT NULL ORDER BY node_id");

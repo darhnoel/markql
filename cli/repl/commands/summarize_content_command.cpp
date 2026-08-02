@@ -226,8 +226,9 @@ CommandHandler make_summarize_content_command() {
     if (lang == "khmer" && !ctx.plugin_manager.has_tokenizer(lang)) {
       std::string error;
       if (!ctx.plugin_manager.load("khmer_segmenter", error)) {
-        bool missing = error.find("No such file or directory") != std::string::npos ||
-                       error.find("cannot open shared object file") != std::string::npos;
+        std::string error_lower = to_lower(error);
+        bool missing = error_lower.find("no such file") != std::string::npos ||
+                       error_lower.find("cannot open shared object file") != std::string::npos;
         if (missing) {
           std::cerr << "Khmer content summarization requires the khmer_segmenter plugin."
                     << std::endl;

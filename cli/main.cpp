@@ -6,7 +6,6 @@
 #include <unistd.h>
 
 #include "markql/markql.h"
-#include "artifacts/artifacts.h"
 #include "dom/html_parser.h"
 #include "export/export_sinks.h"
 #include "render/duckbox_renderer.h"
@@ -94,10 +93,6 @@ int main(int argc, char** argv) {
       if (query_file.empty()) {
         throw QueryRenderError("Missing query file for rendering");
       }
-      if (!options.render_mode.empty() && markql::artifacts::path_has_artifact_magic(query_file)) {
-        throw QueryRenderError(
-            "--render expects SQL text template files, not prepared query artifacts (.mqp)");
-      }
       prepared_query_file =
           load_query_file_text(query_file, options.render_mode, options.render_vars_file);
       if (prepared_query_file->rendered && !options.rendered_out.empty() &&
@@ -106,89 +101,6 @@ int main(int argc, char** argv) {
       }
       return *prepared_query_file;
     };
-
-    if (!options.artifact_info.empty()) {
-      auto query_kind_name = [](markql::Query::Kind kind) {
-        switch (kind) {
-          case markql::Query::Kind::Select:
-            return "select";
-          case markql::Query::Kind::ShowInput:
-            return "show_input";
-          case markql::Query::Kind::ShowInputs:
-            return "show_inputs";
-          case markql::Query::Kind::ShowFunctions:
-            return "show_functions";
-          case markql::Query::Kind::ShowAxes:
-            return "show_axes";
-          case markql::Query::Kind::ShowOperators:
-            return "show_operators";
-          case markql::Query::Kind::DescribeDoc:
-            return "describe_doc";
-          case markql::Query::Kind::DescribeLanguage:
-            return "describe_language";
-        }
-        return "unknown";
-      };
-      auto source_kind_name = [](markql::Source::Kind kind) {
-        switch (kind) {
-          case markql::Source::Kind::Document:
-            return "document";
-          case markql::Source::Kind::Path:
-            return "path";
-          case markql::Source::Kind::Url:
-            return "url";
-          case markql::Source::Kind::RawHtml:
-            return "raw_html";
-          case markql::Source::Kind::Fragments:
-            return "fragments";
-          case markql::Source::Kind::Parse:
-            return "parse";
-          case markql::Source::Kind::CteRef:
-            return "cte_ref";
-          case markql::Source::Kind::DerivedSubquery:
-            return "derived_subquery";
-        }
-        return "unknown";
-      };
-      markql::artifacts::ArtifactInfo info =
-          markql::artifacts::inspect_artifact_file(options.artifact_info);
-      const std::string compatibility_error =
-          markql::artifacts::artifact_compatibility_error(info.header);
-      const bool compatible = compatibility_error.empty();
-      std::cout << "Type: "
-                << (info.header.kind == markql::artifacts::ArtifactKind::DocumentSnapshot ? "mqd"
-                                                                                          : "mqp")
-                << std::endl;
-      std::cout << "Format: " << info.header.format_major << "." << info.header.format_minor
-                << std::endl;
-      std::cout << "Producer version: " << escape_control_for_terminal(info.producer_version)
-                << std::endl;
-      std::cout << "Producer major: " << info.header.producer_major << std::endl;
-      std::cout << "Language version: " << escape_control_for_terminal(info.language_version)
-                << std::endl;
-      std::cout << "Language major: " << info.header.language_major << std::endl;
-      std::cout << "Required features: " << info.header.required_features << std::endl;
-      std::cout << "Sections: " << info.header.section_count << std::endl;
-      std::cout << "Payload bytes: " << info.header.payload_bytes << std::endl;
-      std::cout << "Payload checksum: " << info.header.payload_checksum << std::endl;
-      std::cout << "Compatible: " << (compatible ? "yes" : "no") << std::endl;
-      if (!compatible) {
-        std::cout << "Compatibility note: " << compatibility_error << std::endl;
-      }
-      if (info.metadata_available) {
-        if (info.header.kind == markql::artifacts::ArtifactKind::DocumentSnapshot) {
-          std::cout << "Source URI: " << escape_control_for_terminal(info.source_uri) << std::endl;
-          std::cout << "Nodes: " << info.node_count << std::endl;
-        } else {
-          std::cout << "Query kind: " << query_kind_name(info.query_kind) << std::endl;
-          std::cout << "Source kind: " << source_kind_name(info.source_kind) << std::endl;
-          std::cout << "Original query bytes: " << info.original_query.size() << std::endl;
-        }
-      } else {
-        std::cout << "Metadata: unavailable for this artifact format" << std::endl;
-      }
-      return 0;
-    }
 
     if (options.lint) {
       markql::LintResult lint_result;
@@ -232,11 +144,6 @@ int main(int argc, char** argv) {
       };
 
       if (!query_file.empty()) {
-        if (markql::artifacts::path_has_artifact_magic(query_file)) {
-          std::cerr << "Error: --lint expects SQL text, not prepared query artifacts (.mqp)"
-                    << std::endl;
-          return 2;
-        }
         std::string script = load_prepared_query_file().text;
         ScriptSplitResult split = split_sql_script(script);
         if (split.error_message.has_value()) {
@@ -268,53 +175,6 @@ int main(int argc, char** argv) {
         std::cout << markql::render_lint_result_json(lint_result) << std::endl;
       }
       return lint_result.summary.error_count > 0 ? 1 : 0;
-    }
-
-    auto load_default_html = [&]() -> std::pair<std::string, std::string> {
-      if (input.empty() || input == "document") {
-        return {read_stdin(), "document"};
-      }
-      if (is_url(input)) {
-        return {markql::markql_internal::fetch_url(input, timeout_ms), input};
-      }
-      return {markql::markql_internal::read_file(input), input};
-    };
-
-    if (!options.write_mqd.empty()) {
-      auto [html, source_uri] = load_default_html();
-      markql::HtmlDocument document = markql::parse_html(html);
-      markql::artifacts::write_document_artifact_file(document, source_uri, options.write_mqd);
-      std::cout << "Wrote MQD: " << options.write_mqd << std::endl;
-      return 0;
-    }
-
-    if (!options.write_mqp.empty()) {
-      if (!query_file.empty() && markql::artifacts::path_has_artifact_magic(query_file)) {
-        std::cerr << "Error: --write-mqp expects SQL text, not an existing artifact" << std::endl;
-        return 2;
-      }
-      std::string artifact_query = query;
-      if (!query_file.empty()) {
-        std::string script = load_prepared_query_file().text;
-        ScriptSplitResult split = split_sql_script(script);
-        if (split.error_message.has_value()) {
-          auto [line, col] = line_col_from_offset(script, split.error_position);
-          std::cerr << "Error: " << *split.error_message << " at line " << line << ", column "
-                    << col << std::endl;
-          return 1;
-        }
-        if (split.statements.size() != 1) {
-          std::cerr << "Error: --write-mqp requires exactly one SQL statement" << std::endl;
-          return 2;
-        }
-        artifact_query = split.statements.front().text;
-      }
-      markql::artifacts::PreparedQueryArtifact artifact =
-          markql::artifacts::prepare_query_artifact(artifact_query);
-      markql::artifacts::write_prepared_query_artifact_file(
-          artifact.query, artifact.info.original_query, options.write_mqp);
-      std::cout << "Wrote MQP: " << options.write_mqp << std::endl;
-      return 0;
     }
 
     if (interactive) {
@@ -499,44 +359,6 @@ int main(int argc, char** argv) {
       }
       render_result(result, started_at, rss_before_bytes);
     };
-
-    if (!query_file.empty() && markql::artifacts::path_has_artifact_magic(query_file)) {
-      markql::artifacts::PreparedQueryArtifact artifact =
-          markql::artifacts::read_prepared_query_artifact_file(query_file);
-      const auto started_at = std::chrono::steady_clock::now();
-      const auto rss_before_bytes = read_process_rss_bytes();
-      markql::QueryResult result;
-      if (artifact.query.kind != markql::Query::Kind::Select) {
-        result = markql::artifacts::execute_prepared_query_on_html(artifact, "", "document");
-      } else if (artifact.query.source.kind == markql::Source::Kind::Url ||
-                 artifact.query.source.kind == markql::Source::Kind::Path ||
-                 artifact.query.source.kind == markql::Source::Kind::RawHtml ||
-                 artifact.query.source.kind == markql::Source::Kind::Fragments ||
-                 artifact.query.source.kind == markql::Source::Kind::Parse) {
-        result = markql::artifacts::execute_prepared_query_on_html(artifact, "", "document");
-      } else if (input.empty() || input == "document") {
-        if (!stdin_cache.has_value()) stdin_cache = read_stdin();
-        result =
-            markql::artifacts::execute_prepared_query_on_html(artifact, *stdin_cache, "document");
-      } else if (is_url(input)) {
-        std::string html = markql::markql_internal::fetch_url(input, timeout_ms);
-        result = markql::artifacts::execute_prepared_query_on_html(artifact, html, input);
-      } else if (markql::artifacts::path_has_artifact_magic(input)) {
-        markql::artifacts::ArtifactInfo info = markql::artifacts::inspect_artifact_file(input);
-        if (info.header.kind != markql::artifacts::ArtifactKind::DocumentSnapshot) {
-          throw std::runtime_error(
-              "Prepared query artifacts (.mqp) cannot be used as input documents");
-        }
-        markql::artifacts::DocumentArtifact document =
-            markql::artifacts::read_document_artifact_file(input);
-        result = markql::artifacts::execute_prepared_query_on_document(artifact, document);
-      } else {
-        std::string html = markql::markql_internal::read_file(input);
-        result = markql::artifacts::execute_prepared_query_on_html(artifact, html, input);
-      }
-      render_result(result, started_at, rss_before_bytes);
-      return 0;
-    }
 
     if (!query_file.empty()) {
       std::string script = load_prepared_query_file().text;

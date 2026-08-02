@@ -78,12 +78,6 @@ SELECT ... FROM doc WHERE ... TO PARQUET('out.parquet');
 SELECT table FROM doc WHERE id = '<id>' TO TABLE(EXPORT='out.csv');
 ```
 
-For repeated runs against the same file:
-```bash
-markql --input page.html --write-mqd cache/page.mqd
-markql --query-file q.sql --input cache/page.mqd
-```
-
 ## Syntax gotchas (validated against the live CLI)
 
 These will fail. Use the right form on the right side.

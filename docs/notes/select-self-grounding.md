@@ -11,8 +11,8 @@ This note captures the pre-change spec/runtime baseline used for the `SELECT sel
   - current-row field projection (`SELECT self.node_id`, `SELECT self.tag`).
 - Lint diagnostics are documented and implemented with stable fields:
   - `severity`, `code`, `message`, `help`, `doc_ref`, spans, snippets.
-- Deprecation precedent exists and is backward-compatible:
-  - `FRAGMENTS(...)` remains supported but emits warnings to migrate to `PARSE(...)`.
+- Deprecation precedent was resolved by removal:
+  - `FRAGMENTS(...)` was removed; use `PARSE(...)` for HTML string sources.
 - Existing docs/case-study SQL include `CROSS JOIN LATERAL` subqueries that use:
   - `SELECT <from_alias>`
   - e.g. `SELECT node_badge FROM doc AS node_badge`.

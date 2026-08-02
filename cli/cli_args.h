@@ -22,9 +22,6 @@ struct CliOptions {
   std::string render_vars_file;
   std::string rendered_out;
   std::string input;
-  std::string write_mqd;
-  std::string write_mqp;
-  std::string artifact_info;
   bool interactive = false;
   bool color = true;
   std::string output_mode = "duckbox";

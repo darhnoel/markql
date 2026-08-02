@@ -114,7 +114,6 @@ ext_modules = [
             ("MARKQL_VERSION", f'"{PACKAGE_VERSION}"'),
             ("MARKQL_GIT_COMMIT", f'"{git_commit_short()}"'),
             ("MARKQL_GIT_DIRTY", git_dirty_flag()),
-            ("MARKQL_WITH_ARTIFACTS", "0"),
         ],
         extra_compile_args=platform_compile_args(),
         cxx_std=20,

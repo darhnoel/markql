@@ -32,7 +32,6 @@ FROM <source> [AS <alias>]
 - `PARSE('<fragment...>')`
 - `PARSE(SELECT inner_html(...) FROM doc ...)`
 - `PARSE(...) AS node_fragment`
-- `FRAGMENTS(RAW('<fragment...>'))` (deprecated; use `PARSE(...)`)
 
 ## Joins
 - `JOIN <source> AS node_right ON <expr>` (inner join)

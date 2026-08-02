@@ -170,11 +170,25 @@ std::string to_upper(const std::string& s) {
 std::string trim_ws(const std::string& s) {
   size_t start = 0;
   // WHY: trim only edges to preserve meaningful internal whitespace.
-  while (start < s.size() && std::isspace(static_cast<unsigned char>(s[start]))) {
+  // NBSP is UTF-8 encoded as C2 A0; isspace() may treat the low byte as
+  // whitespace under a non-C locale, so consume the pair atomically to avoid
+  // leaving a dangling high byte.
+  auto is_ws = [&s](size_t i, bool trailing) {
+    const unsigned char c = static_cast<unsigned char>(s[i]);
+    if (c == 0xC2 && !trailing && i + 1 < s.size() &&
+        static_cast<unsigned char>(s[i + 1]) == 0xA0) {
+      return true;
+    }
+    if (c == 0xA0 && trailing && i > 0 && static_cast<unsigned char>(s[i - 1]) == 0xC2) {
+      return true;
+    }
+    return std::isspace(c) != 0;
+  };
+  while (start < s.size() && is_ws(start, false)) {
     ++start;
   }
   size_t end = s.size();
-  while (end > start && std::isspace(static_cast<unsigned char>(s[end - 1]))) {
+  while (end > start && is_ws(end - 1, true)) {
     --end;
   }
   return s.substr(start, end - start);

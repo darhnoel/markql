@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cctype>
 #include <fstream>
-#include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -337,12 +336,6 @@ std::optional<QuerySource> parse_query_source(const std::string& query) {
       }
       return true;
     }
-    if (source.kind == markql::Source::Kind::Fragments) {
-      if (source.fragments_raw.has_value()) return false;
-      if (source.fragments_query != nullptr)
-        return self_query(*source.fragments_query, self_source, self_query);
-      return true;
-    }
     if (source.kind == markql::Source::Kind::Parse) {
       if (source.parse_expr != nullptr) return false;
       if (source.parse_query != nullptr)
@@ -457,26 +450,6 @@ bool is_valid_utf8(const std::string& text) {
     i += len;
   }
   return true;
-}
-
-std::string escape_control_for_terminal(const std::string& text) {
-  std::ostringstream out;
-  out << std::uppercase << std::hex;
-  for (unsigned char ch : text) {
-    if (ch == '\n') {
-      out << "\\n";
-    } else if (ch == '\r') {
-      out << "\\r";
-    } else if (ch == '\t') {
-      out << "\\t";
-    } else if (ch < 0x20 || ch == 0x7F) {
-      out << "\\x" << std::setw(2) << std::setfill('0') << static_cast<int>(ch);
-      out << std::setfill(' ');
-    } else {
-      out << static_cast<char>(ch);
-    }
-  }
-  return out.str();
 }
 
 std::vector<std::string> collect_source_uris(const markql::QueryResult& result) {
