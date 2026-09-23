@@ -15,7 +15,7 @@ jobs:
       CIBW_ARCHS: auto64
       CIBW_BUILD_VERBOSITY: 1
       CIBW_TEST_COMMAND: >-
-        python -c "import markql; import markql.rendering; print(markql.__version__)"
+        python -c "import markql; import markql.rendering; assert markql.inspect(b'').to_dict()['schema_version'] == 1; print(markql.__version__)"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

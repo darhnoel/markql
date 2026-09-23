@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -20,6 +21,9 @@ def _blank_decision() -> ModelDecision:
 
 
 def _pick_family(artifact: ArtifactSummary) -> str:
+    if artifact.get('source') == 'markql.inspect':
+        records = json.loads(artifact['content'])['record_candidates']
+        return records[0]['id'] if records else ''
     for line in artifact["content"].splitlines():
         stripped = line.strip()
         if not stripped:
@@ -30,6 +34,9 @@ def _pick_family(artifact: ArtifactSummary) -> str:
 
 
 def _row_tag_from_artifact(artifact: ArtifactSummary) -> str:
+    if artifact.get('source') == 'markql.inspect':
+        records = json.loads(artifact['content'])['record_candidates']
+        return records[0]['recipe']['tag'] if records else 'div'
     for line in artifact["content"].splitlines():
         stripped = line.strip()
         if "|" not in stripped:
@@ -73,6 +80,13 @@ class HeuristicModelAdapter:
         family = _pick_family(artifact)
         row_tag = _row_tag_from_artifact(artifact)
         decision["chosen_family"] = family
+        if artifact.get('source') == 'markql.inspect' and not family:
+            decision['status'] = 'need_more_artifact'
+            decision['diagnosis'] = 'artifact_too_lossy'
+            decision['reason'] = 'no repeated records discovered; inspect the document structure'
+            decision['requested_artifact'] = 'skeleton'
+            decision['next_action'] = 'escalate'
+            return decision
         if not artifact.get("content", "").strip():
             decision["status"] = "need_more_artifact"
             decision["diagnosis"] = "artifact_too_lossy"

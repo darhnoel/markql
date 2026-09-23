@@ -27,6 +27,7 @@ void register_legacy_frames_tests(std::vector<TestCase>& tests);
 void register_raw_parse_tests(std::vector<TestCase>& tests);
 void register_guardrails_tests(std::vector<TestCase>& tests);
 void register_meta_command_tests(std::vector<TestCase>& tests);
+void register_inspection_tests(std::vector<TestCase>& tests);
 void register_cli_utils_tests(std::vector<TestCase>& tests);
 void register_lexer_comment_tests(std::vector<TestCase>& tests);
 void register_script_runner_tests(std::vector<TestCase>& tests);
@@ -90,6 +91,7 @@ int main(int argc, char** argv) {
   register_raw_parse_tests(tests);
   register_guardrails_tests(tests);
   register_meta_command_tests(tests);
+  register_inspection_tests(tests);
   register_cli_utils_tests(tests);
   register_lexer_comment_tests(tests);
   register_script_runner_tests(tests);

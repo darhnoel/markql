@@ -63,6 +63,7 @@ function(markql_maybe_strip_target target_name)
 endfunction()
 
 add_library(markql_core
+  core/src/inspection/structural_evidence.cpp
   core/src/version.cpp
   core/src/helper/helper_controller.cpp
   core/src/helper/helper_json.cpp
@@ -305,6 +306,7 @@ if (MARKQL_BUILD_TESTS)
   enable_testing()
   add_executable(markql_tests
     tests/test_main.cpp
+    tests/test_inspection.cpp
     tests/test_harness.cpp
     tests/test_utils.cpp
     tests/test_query_basic.cpp
@@ -416,6 +418,8 @@ if (MARKQL_BUILD_TESTS)
   )
   markql_maybe_strip_target(markql_bench_inner_html)
   set(MARKQL_TESTS
+    inspection_records
+    inspection_limits
     select_ul_by_id
     class_in_matches_token
     parent_attribute_filter
@@ -689,11 +693,12 @@ if (MARKQL_BUILD_TESTS)
 endif()
 
 if (MARKQL_BUILD_PYTHON)
-  find_package(Python COMPONENTS Development.Module REQUIRED)
+  set_property(TARGET markql_core PROPERTY POSITION_INDEPENDENT_CODE ON)
+  find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
   find_package(pybind11 CONFIG REQUIRED)
   pybind11_add_module(_core python/markql/_core.cpp)
   target_link_libraries(_core PRIVATE markql_core)
-  target_include_directories(_core PRIVATE core/include)
+  target_include_directories(_core PRIVATE core/include core/src)
   set_target_properties(_core PROPERTIES OUTPUT_NAME "_core")
   markql_maybe_strip_target(_core)
   if (DEFINED SKBUILD_PLATLIB_DIR)

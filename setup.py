@@ -38,6 +38,7 @@ def git_dirty_flag() -> str:
 
 def core_sources() -> list[str]:
     sources = [
+        "core/src/inspection/structural_evidence.cpp",
         "python/markql/_core.cpp",
         "core/src/version.cpp",
         "core/src/helper/helper_controller.cpp",

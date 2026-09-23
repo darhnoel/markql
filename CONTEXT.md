@@ -118,11 +118,11 @@ _Avoid_: "pyxsql" in new code/docs except for that intentional package identifie
 The bounded suggestion system (`core/src/helper/` + `python/markql/helper/`): `suggest` / `repair` / `explain` return one next MarkQL query, driven by a deterministic C++ controller with optional model assistance.
 
 **Artifact (helper)**:
-An html_inspector inspection snapshot at one detail level, ordered by escalation: `compact_families` → `families` → `skeleton` → `targeted_subtree` → `full_html`. Distinct from the removed `.mqd` / `.mqp` serialized-file "artifact" feature.
+A local inspection snapshot at one detail level, ordered by escalation: `compact_families` → `families` → `skeleton` → `targeted_subtree` → `full_html`. The Python helper defaults to native structural evidence for families and native query execution for skeletons; an external inspector is opt-in. Distinct from the removed `.mqd` / `.mqp` serialized-file "artifact" feature.
 _Avoid_: using "artifact" for serialized query/document files (removed).
 
 **html_inspector**:
-The Rust tool (`tools/html_inspector/`) that emits deterministic, low-token DOM family/skeleton summaries (the helper's artifacts).
+The experimental Rust tool (`tools/html_inspector/`) for interactive inspection and prototype family/skeleton reports. It is not required by the Python library. Native structural discovery is owned by `markql::inspect_html`, exposed as `markql.inspect`; see `docs/structural-inspection.md` for the versioned evidence contract and limitations.
 
 **Retrieval pack**:
 A small doc-grounded snippet bundle (topic, facts, verified examples, doc refs) shipped to the model; the helper never sends the full manual.

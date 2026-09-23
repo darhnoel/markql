@@ -4,6 +4,10 @@ Minimal Rust terminal UI for inspecting HTML structure while drafting MarkQL que
 The page fills the terminal, and the inspector appears as a popup overlay when a text span is selected.
 The inspector shows a tree-style DOM path from `html` down to the selected element.
 
+For Python/library integration use [`markql.inspect`](../../docs/structural-inspection.md),
+backed by the C++ core. This Rust tool remains experimental and is not required
+by the default Python helper. Its prototype JSON is not the native API contract.
+
 Build:
 
 ```bash

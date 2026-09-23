@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from pathlib import Path
@@ -67,15 +68,28 @@ class LocalToolAdapters:
     """Stable adapter layer for local helper operations."""
 
     def __init__(self, inspector_cmd: list[str] | None = None) -> None:
-        self._inspector_cmd = inspector_cmd or [
-            "cargo",
-            "run",
-            "--manifest-path",
-            "tools/html_inspector/Cargo.toml",
-            "--",
-        ]
+        self._inspector_cmd = inspector_cmd
+
+    def _native_families(self, input_path: str, *, compact: bool) -> ArtifactSummary:
+        from ..inspection import inspect
+
+        payload = inspect(Path(input_path)).to_dict()
+        records = payload['record_candidates']
+        if compact:
+            for record in records:
+                record.pop('field_candidates')
+        return {
+            'kind': 'compact_families' if compact else 'families',
+            'content': json.dumps(payload, ensure_ascii=False),
+            'selector_or_scope': '',
+            'family_hint': records[0]['id'] if records else '',
+            'lossy': True,
+            'source': 'markql.inspect',
+        }
 
     def _run_inspector(self, flag: str, input_path: str) -> str:
+        if self._inspector_cmd is None:
+            raise RuntimeError('No external inspector configured')
         result = subprocess.run(
             [*self._inspector_cmd, flag, input_path],
             capture_output=True,
@@ -88,6 +102,8 @@ class LocalToolAdapters:
         return result.stdout
 
     def inspect_compact_families(self, input_path: str) -> ArtifactSummary:
+        if self._inspector_cmd is None:
+            return self._native_families(input_path, compact=True)
         content = self._run_inspector("--families-compact", input_path)
         family_hint = ""
         for line in content.splitlines():
@@ -104,6 +120,8 @@ class LocalToolAdapters:
         }
 
     def inspect_families(self, input_path: str) -> ArtifactSummary:
+        if self._inspector_cmd is None:
+            return self._native_families(input_path, compact=False)
         return {
             "kind": "families",
             "content": self._run_inspector("--families", input_path),
@@ -114,6 +132,21 @@ class LocalToolAdapters:
         }
 
     def inspect_skeleton(self, input_path: str) -> ArtifactSummary:
+        if self._inspector_cmd is None:
+            document = load(Path(input_path))
+            rows = execute(
+                'SELECT self.node_id, self.parent_id, self.tag FROM doc '
+                'ORDER BY node_id LIMIT 1000',
+                doc=document,
+            ).rows
+            return {
+                'kind': 'skeleton',
+                'content': json.dumps(rows, ensure_ascii=False),
+                'selector_or_scope': '',
+                'family_hint': '',
+                'lossy': True,
+                'source': 'markql',
+            }
         return {
             "kind": "skeleton",
             "content": self._run_inspector("--skeleton", input_path),

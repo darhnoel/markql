@@ -67,6 +67,7 @@ __pycache__/
 # Specs
 specs/*
 examples/*
+!examples/inspection.py
 
 # frontend
 static_server/*

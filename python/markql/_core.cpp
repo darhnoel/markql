@@ -5,6 +5,7 @@
 #include "helper/helper_policy.h"
 #include "helper/helper_result_analysis.h"
 #include "markql/markql.h"
+#include "markql/inspection.h"
 
 namespace py = pybind11;
 
@@ -406,6 +407,45 @@ py::dict controller_step_to_dict(const markql::helper::ControllerStep& step) {
 
 PYBIND11_MODULE(_core, m) {
   m.doc() = "Native bindings for MARKQL query execution.";
+
+  m.def("inspect_document", [](const std::string& html) {
+    const auto evidence = markql::inspect_html(html);
+    auto recipe_dict = [](const markql::ElementRecipe& recipe) {
+      py::dict out;
+      out["tag"] = recipe.tag;
+      out["classes"] = recipe.classes;
+      out["parent_tag"] = py::cast(recipe.parent_tag);
+      out["parent_classes"] = recipe.parent_classes;
+      return out;
+    };
+    py::dict out;
+    out["schema"] = evidence.schema;
+    out["schema_version"] = evidence.schema_version;
+    out["truncated"] = evidence.truncated;
+    py::list records;
+    for (const auto& record : evidence.record_candidates) {
+      py::dict item;
+      item["id"] = record.id;
+      item["count"] = record.count;
+      item["recipe"] = recipe_dict(record.recipe);
+      item["markers"] = record.markers;
+      py::list fields;
+      for (const auto& field : record.field_candidates) {
+        py::dict value;
+        value["id"] = field.id;
+        value["kind"] = field.kind;
+        value["recipe"] = recipe_dict(field.recipe);
+        value["attribute"] = py::cast(field.attribute);
+        value["samples"] = field.samples;
+        value["path"] = field.path;
+        fields.append(value);
+      }
+      item["field_candidates"] = fields;
+      records.append(item);
+    }
+    out["record_candidates"] = records;
+    return out;
+  }, py::arg("html"));
 
   m.def(
       "execute_from_document",

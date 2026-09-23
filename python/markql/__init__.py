@@ -276,9 +276,12 @@ def __getattr__(name: str):
 
 
 from .helper import explain_query, repair_query, suggest_query
+from .inspection import StructuralEvidence, inspect
 
 
 __all__ = [
+    "inspect",
+    "StructuralEvidence",
     "Document",
     "QueryResult",
     "TableResult",
