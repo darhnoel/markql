@@ -1,0 +1,3 @@
+SELECT title
+FROM doc
+WHERE (attributes.class CONTAINS 'product' AND tag = 'li');

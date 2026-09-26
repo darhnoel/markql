@@ -1,0 +1,7 @@
+SELECT PROJECT(div) AS (
+  title: TEXT(h3 WHERE attributes.class CONTAINS 'page-title'),
+  description: TEXT(p WHERE attributes.class CONTAINS 'lead')
+)
+FROM doc
+WHERE attributes.class CONTAINS 'page'
+TO JSON();

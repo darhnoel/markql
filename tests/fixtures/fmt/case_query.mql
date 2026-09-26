@@ -1,0 +1,2 @@
+SELECT CASE WHEN tag = 'li' THEN 'item' ELSE 'other' END AS kind
+FROM doc;

@@ -1,0 +1,6 @@
+SELECT title
+FROM doc
+WHERE tag = 'li'
+ORDER BY price DESC
+LIMIT 10
+TO JSON();

@@ -1,0 +1,5 @@
+WITH products AS (
+  SELECT title FROM doc
+)
+SELECT title
+FROM products;

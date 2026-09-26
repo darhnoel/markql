@@ -82,6 +82,7 @@ add_library(markql_core
   core/src/lang/parser/parser_select.cpp
   core/src/lang/parser/parser_select_extract.cpp
   core/src/lang/parser/parser_source.cpp
+  core/src/lang/query_formatter.cpp
   core/src/lang/parser/parser_util.cpp
   core/src/lang/parser/lexer.cpp
   core/src/dom/html_parser.cpp
@@ -301,6 +302,14 @@ if (MARKQL_BUILD_CLI)
   )
   markql_maybe_strip_target(markql)
 endif()
+
+add_executable(markql_fmt
+  tools/markql_fmt/main.cpp
+)
+target_link_libraries(markql_fmt PRIVATE markql_core)
+target_include_directories(markql_fmt PRIVATE core/src core/include)
+set_target_properties(markql_fmt PROPERTIES OUTPUT_NAME markql-fmt)
+markql_maybe_strip_target(markql_fmt)
 
 if (MARKQL_BUILD_TESTS)
   enable_testing()
@@ -690,6 +699,90 @@ if (MARKQL_BUILD_TESTS)
   foreach(test_name IN LISTS MARKQL_TESTS)
     add_test(NAME markql_${test_name} COMMAND markql_tests ${test_name})
   endforeach()
+  add_test(NAME markql_fmt_help COMMAND "$<TARGET_FILE:markql_fmt>" --help)
+  add_test(
+    NAME markql_fmt_handles_comment_trivia
+    COMMAND "${CMAKE_COMMAND}"
+            "-DMARKQL_FMT=$<TARGET_FILE:markql_fmt>"
+            "-DSOURCE_FILE=${CMAKE_SOURCE_DIR}/tests/fixtures/fmt/comments_and_strings.mql"
+            "-DWORK_FILE=${CMAKE_BINARY_DIR}/tests/fmt/comments_and_strings.mql"
+            "-DEXPECT_RESULT=1"
+            -P "${CMAKE_SOURCE_DIR}/tests/cmake/run_markql_fmt_fixture.cmake"
+  )
+  add_test(
+    NAME markql_fmt_accepts_multiline_query
+    COMMAND "${CMAKE_COMMAND}"
+            "-DMARKQL_FMT=$<TARGET_FILE:markql_fmt>"
+            "-DSOURCE_FILE=${CMAKE_SOURCE_DIR}/tests/fixtures/fmt/multiline_query.mql"
+            "-DWORK_FILE=${CMAKE_BINARY_DIR}/tests/fmt/multiline_query.mql"
+            "-DEXPECT_RESULT=0"
+            -P "${CMAKE_SOURCE_DIR}/tests/cmake/run_markql_fmt_fixture.cmake"
+  )
+  add_test(
+    NAME markql_fmt_formats_where_predicate
+    COMMAND "${CMAKE_COMMAND}"
+            "-DMARKQL_FMT=$<TARGET_FILE:markql_fmt>"
+            "-DSOURCE_FILE=${CMAKE_SOURCE_DIR}/tests/fixtures/fmt/where_predicate.mql"
+            "-DWORK_FILE=${CMAKE_BINARY_DIR}/tests/fmt/where_predicate.mql"
+            "-DEXPECT_RESULT=0"
+            -P "${CMAKE_SOURCE_DIR}/tests/cmake/run_markql_fmt_fixture.cmake"
+  )
+  add_test(
+    NAME markql_fmt_formats_order_limit_sink
+    COMMAND "${CMAKE_COMMAND}"
+            "-DMARKQL_FMT=$<TARGET_FILE:markql_fmt>"
+            "-DSOURCE_FILE=${CMAKE_SOURCE_DIR}/tests/fixtures/fmt/order_limit_sink.mql"
+            "-DWORK_FILE=${CMAKE_BINARY_DIR}/tests/fmt/order_limit_sink.mql"
+            "-DEXPECT_RESULT=0"
+            -P "${CMAKE_SOURCE_DIR}/tests/cmake/run_markql_fmt_fixture.cmake"
+  )
+  add_test(
+    NAME markql_fmt_formats_project
+    COMMAND "${CMAKE_COMMAND}"
+            "-DMARKQL_FMT=$<TARGET_FILE:markql_fmt>"
+            "-DSOURCE_FILE=${CMAKE_SOURCE_DIR}/tests/fixtures/fmt/project_supported.mql"
+            "-DWORK_FILE=${CMAKE_BINARY_DIR}/tests/fmt/project_supported.mql"
+            "-DEXPECT_RESULT=0"
+            -P "${CMAKE_SOURCE_DIR}/tests/cmake/run_markql_fmt_fixture.cmake"
+  )
+  foreach(fmt_unsupported_case IN ITEMS cte_query join_query case_query)
+    add_test(
+      NAME "markql_fmt_characterizes_${fmt_unsupported_case}"
+      COMMAND "${CMAKE_COMMAND}"
+              "-DMARKQL_FMT=$<TARGET_FILE:markql_fmt>"
+              "-DSOURCE_FILE=${CMAKE_SOURCE_DIR}/tests/fixtures/fmt/${fmt_unsupported_case}.mql"
+              "-DWORK_FILE=${CMAKE_BINARY_DIR}/tests/fmt/${fmt_unsupported_case}.mql"
+              "-DEXPECT_RESULT=2"
+              -P "${CMAKE_SOURCE_DIR}/tests/cmake/run_markql_fmt_fixture.cmake"
+    )
+  endforeach()
+  add_test(
+    NAME markql_fmt_check_noop
+    COMMAND "${CMAKE_COMMAND}"
+            "-DMARKQL_FMT=$<TARGET_FILE:markql_fmt>"
+            "-DSOURCE_FILE=${CMAKE_SOURCE_DIR}/tests/fixtures/fmt/already_formatted.mql"
+            "-DWORK_FILE=${CMAKE_BINARY_DIR}/tests/fmt/already_formatted.mql"
+            "-DEXPECT_RESULT=0"
+            -P "${CMAKE_SOURCE_DIR}/tests/cmake/run_markql_fmt_fixture.cmake"
+  )
+  add_test(
+    NAME markql_fmt_check_detects_drift
+    COMMAND "${CMAKE_COMMAND}"
+            "-DMARKQL_FMT=$<TARGET_FILE:markql_fmt>"
+            "-DSOURCE_FILE=${CMAKE_SOURCE_DIR}/tests/fixtures/fmt/trailing_space.mql"
+            "-DWORK_FILE=${CMAKE_BINARY_DIR}/tests/fmt/trailing_space.mql"
+            "-DEXPECT_RESULT=1"
+            -P "${CMAKE_SOURCE_DIR}/tests/cmake/run_markql_fmt_fixture.cmake"
+  )
+  add_test(
+    NAME markql_fmt_rejects_invalid_query
+    COMMAND "${CMAKE_COMMAND}"
+            "-DMARKQL_FMT=$<TARGET_FILE:markql_fmt>"
+            "-DSOURCE_FILE=${CMAKE_SOURCE_DIR}/tests/fixtures/fmt/invalid_query.mql"
+            "-DWORK_FILE=${CMAKE_BINARY_DIR}/tests/fmt/invalid_query.mql"
+            "-DEXPECT_RESULT=2"
+            -P "${CMAKE_SOURCE_DIR}/tests/cmake/run_markql_fmt_fixture.cmake"
+  )
 endif()
 
 if (MARKQL_BUILD_PYTHON)

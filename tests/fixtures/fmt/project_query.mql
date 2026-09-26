@@ -1,0 +1,6 @@
+SELECT PROJECT(li) AS (
+  name: TEXT(h3),
+  price: TEXT(p)
+)
+FROM doc
+WHERE tag = 'li';

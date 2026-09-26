@@ -1,0 +1,2 @@
+SELECT title, price
+FROM doc;

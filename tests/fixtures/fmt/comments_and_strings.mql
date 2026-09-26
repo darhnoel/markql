@@ -1,0 +1,3 @@
+-- Preserve this comment's trailing   spaces inside its text
+SELECT title
+FROM doc;

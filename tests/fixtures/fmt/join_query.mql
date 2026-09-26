@@ -1,0 +1,3 @@
+SELECT a.title
+FROM doc AS a
+JOIN doc AS b ON a.node_id = b.node_id;
