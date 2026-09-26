@@ -21,11 +21,11 @@ use ratatui::Terminal;
 
 use crate::app::App;
 use crate::dom::DomTree;
-use crate::families::{print_family_report, print_family_report_compact};
+use crate::families::{print_evidence_json, print_family_report, print_family_report_compact};
 use crate::fetch::load_input;
 use crate::skeleton::print_skeleton;
 
-const USAGE: &str = "usage: cargo run -- <path-or-url>\n       cargo run -- --skeleton <path-or-url>\n       cargo run -- --families <path-or-url>\n       cargo run -- --families-compact <path-or-url>";
+const USAGE: &str = "usage: cargo run -- <path-or-url>\n       cargo run -- --skeleton <path-or-url>\n       cargo run -- --families <path-or-url>\n       cargo run -- --families-compact <path-or-url>\n       cargo run -- --evidence-json <path-or-url>";
 
 fn main() -> Result<()> {
     match parse_args()? {
@@ -52,6 +52,12 @@ fn main() -> Result<()> {
             print_family_report_compact(&dom);
             Ok(())
         }
+        Command::EvidenceJson(input) => {
+            let html = load_input(&input)?;
+            let dom = DomTree::parse(&html)?;
+            print_evidence_json(&dom)?;
+            Ok(())
+        }
     }
 }
 
@@ -60,6 +66,7 @@ enum Command {
     Skeleton(String),
     Families(String),
     FamiliesCompact(String),
+    EvidenceJson(String),
 }
 
 fn parse_args() -> Result<Command> {
@@ -88,6 +95,14 @@ fn parse_args() -> Result<Command> {
             bail!("{USAGE}");
         }
         return Ok(Command::FamiliesCompact(input));
+    }
+
+    if first == "--evidence-json" {
+        let input = args.next().context(USAGE)?;
+        if args.next().is_some() {
+            bail!("{USAGE}");
+        }
+        return Ok(Command::EvidenceJson(input));
     }
 
     if args.next().is_some() {

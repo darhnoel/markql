@@ -96,6 +96,9 @@ A parse + validate-only check that returns structured diagnostics without execut
 **Diagnostic**:
 A structured problem with `severity`, a stable code, `message`, optional `help`, `doc_ref`, and byte/line-column spans plus caret snippets.
 
+**Canonical query formatting**:
+The deterministic presentation of a parsed MarkQL query. It preserves query meaning and literal values for review and reuse; it is distinct from syntax migration, which is an explicit language-change operation.
+
 ### Subsystems
 
 **markql core**:
@@ -116,6 +119,79 @@ _Avoid_: "pyxsql" in new code/docs except for that intentional package identifie
 
 **helper**:
 The bounded suggestion system (`core/src/helper/` + `python/markql/helper/`): `suggest` / `repair` / `explain` return one next MarkQL query, driven by a deterministic C++ controller with optional model assistance.
+
+**MarkQL AI Lab**:
+The experimental context for developing and evaluating models that translate extraction intent and page evidence into MarkQL. It is not part of the helper runtime. Lives in the sibling `markql-ai-lab` repository, which consumes this one; nothing here depends on it.
+_Avoid_: AI discovery, model lab, helper model
+
+**MarkQL synthesis**:
+The learning task of producing exactly one MarkQL query, and no tool or control action, from extraction intent, page evidence, and explicit constraints.
+_Avoid_: AI discovery, code completion
+
+**Synthesis correctness**:
+A synthesized query is correct when it is valid MarkQL and returns the requested schema and ordered typed rows defined by the independent oracle. Reference-query text equality is diagnostic, not correctness.
+_Avoid_: exact-match accuracy
+
+**Synthesis attempt**:
+One MarkQL query proposed by the model and the resulting local validation feedback.
+
+**Synthesis episode**:
+A bounded sequence of synthesis attempts for one extraction intent and one page snapshot. It ends on synthesis correctness or when its attempt budget is exhausted.
+_Avoid_: browsing session
+
+**Attempt feedback**:
+The parser, lint, and execution evidence returned after a synthesis attempt. It excludes independent-oracle values and comparisons.
+
+**Independent oracle**:
+The training-and-evaluation authority for the requested schema and ordered typed rows. It determines reward and correctness but is never page evidence or attempt feedback.
+_Avoid_: model feedback, answer hint
+
+**Page evidence**:
+A versioned, bounded representation of a page snapshot containing structural, content, and attribute evidence needed for MarkQL synthesis. It excludes oracle information and unstable node identifiers.
+_Avoid_: raw website, full HTML, helper artifact
+
+**Extraction request**:
+A structured natural-language contract with `Records`, `Fields`, and optional `Context`. It defines what each output row represents, the output field names and types, and the semantic constraints for choosing values.
+_Avoid_: prompt, unrestricted prose
+
+**Extraction intent**:
+The deterministic parsed form of an extraction request, preserving its requested records, typed fields, required or optional values, and semantic context.
+_Avoid_: model interpretation, generated query
+
+**Output schema**:
+The typed record shape derived from an extraction request's `Fields`, including field names, value types, and required or optional values.
+_Avoid_: independently supplied schema, inferred schema
+
+**Semantic binding**:
+The setup-time association between one requested output field and a structural value candidate in page evidence. A binding defines reusable extraction logic; it is not a per-row or per-page model decision.
+_Avoid_: extracted value, model-generated query
+
+**Record binding**:
+The setup-time association between the requested records and the structural page family that produces one output row. It establishes row scope before semantic bindings are chosen for fields within each row.
+_Avoid_: field binding, page-type match
+
+**Supervised bootstrap**:
+The initial learning phase that teaches MarkQL synthesis and repair from verified examples before verifier rewards are introduced.
+
+**Repair example**:
+A verified training transition from a failed MarkQL query and its attempt feedback to a corrected query for the same extraction intent and page snapshot.
+_Avoid_: synthetic error
+
+**Verifier-guided learning**:
+A post-bootstrap learning phase in which independent-oracle outcomes reward generated queries without exposing oracle information to the model.
+_Avoid_: oracle prompting
+
+**Verifier reward**:
+A private, shaped measure of synthesis progress whose unique maximum requires synthesis correctness. Partial validity or result agreement can improve reward but can never equal a correct query.
+_Avoid_: lint score, oracle feedback
+
+**Page acquisition**:
+The controlled creation of a local page snapshot from an external page. Acquisition is strictly outside learning and evaluation loops.
+_Avoid_: live training, model browsing
+
+**Page snapshot**:
+An immutable local HTML document used by the MarkQL AI Lab. Learning and evaluation operate on snapshots, never directly on external pages.
+_Avoid_: live page, website input
 
 **Artifact (helper)**:
 A local inspection snapshot at one detail level, ordered by escalation: `compact_families` → `families` → `skeleton` → `targeted_subtree` → `full_html`. The Python helper defaults to native structural evidence for families and native query execution for skeletons; an external inspector is opt-in. Distinct from the removed `.mqd` / `.mqp` serialized-file "artifact" feature.

@@ -1,12 +1,15 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use anyhow::Result;
+use serde::Serialize;
+
 use crate::dom::{DomTree, ElementData, NodeId};
 use crate::skeleton::{
-    FoldedChild, MAX_DEPTH, child_elements, fold_sibling_runs, format_label, render_skeleton,
-    skeleton_roots,
+    child_elements, format_label, render_skeleton, skeleton_roots, FoldedChild, MAX_DEPTH,
 };
 
 const COMPACT_FAMILY_LIMIT: usize = 8;
+const EVIDENCE_MAX_DEPTH: usize = 64;
 
 pub fn print_family_report(dom: &DomTree) {
     for line in render_family_report(dom, MAX_DEPTH) {
@@ -18,6 +21,11 @@ pub fn print_family_report_compact(dom: &DomTree) {
     for line in render_family_report_compact(dom, MAX_DEPTH) {
         println!("{line}");
     }
+}
+
+pub fn print_evidence_json(dom: &DomTree) -> Result<()> {
+    println!("{}", render_evidence_json(dom, EVIDENCE_MAX_DEPTH)?);
+    Ok(())
 }
 
 fn render_family_report(dom: &DomTree, max_depth: usize) -> Vec<String> {
@@ -110,10 +118,29 @@ fn render_family_report_compact(dom: &DomTree, max_depth: usize) -> Vec<String> 
     lines
 }
 
+fn render_evidence_json(dom: &DomTree, max_depth: usize) -> Result<String> {
+    let families = analyze_families(dom, max_depth);
+    let record_candidates = rank_families(&families)
+        .into_iter()
+        .map(|family| RecordCandidate {
+            id: family.id.clone(),
+            count: family.count,
+            recipe: element_recipe(dom, family.exemplar_id),
+            markers: family.distinguishing_markers.clone(),
+            field_candidates: collect_field_candidates(dom, family),
+        })
+        .collect();
+    Ok(serde_json::to_string_pretty(&EvidenceDocument {
+        version: 1,
+        record_candidates,
+    })?)
+}
+
 #[derive(Debug, Clone)]
 struct RowFamily {
     id: String,
     exemplar_id: NodeId,
+    member_ids: Vec<NodeId>,
     parent_tag: String,
     repeated_tag: String,
     count: usize,
@@ -128,6 +155,38 @@ struct RowFamily {
     exemplar_shape: Vec<String>,
 }
 
+#[derive(Debug, Serialize)]
+struct EvidenceDocument {
+    version: u8,
+    record_candidates: Vec<RecordCandidate>,
+}
+
+#[derive(Debug, Serialize)]
+struct RecordCandidate {
+    id: String,
+    count: usize,
+    recipe: ElementRecipe,
+    markers: Vec<String>,
+    field_candidates: Vec<FieldCandidate>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ElementRecipe {
+    tag: String,
+    classes: Vec<String>,
+    parent_tag: Option<String>,
+    parent_classes: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct FieldCandidate {
+    id: String,
+    kind: &'static str,
+    recipe: ElementRecipe,
+    attribute: Option<String>,
+    samples: Vec<String>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct FamilyRankKey {
     table_data_priority: usize,
@@ -138,7 +197,12 @@ struct FamilyRankKey {
     non_header_priority: usize,
 }
 
-fn collect_row_families(dom: &DomTree, node_id: NodeId, depth_left: usize, families: &mut Vec<RowFamily>) {
+fn collect_row_families(
+    dom: &DomTree,
+    node_id: NodeId,
+    depth_left: usize,
+    families: &mut Vec<RowFamily>,
+) {
     if depth_left == 0 {
         return;
     }
@@ -148,7 +212,9 @@ fn collect_row_families(dom: &DomTree, node_id: NodeId, depth_left: usize, famil
         return;
     }
 
-    let folded = fold_sibling_runs(dom, &children, depth_left.saturating_sub(1));
+    // Group by the repeated element and its direct child shape. Deeper attributes often
+    // vary per record (for example product rating classes) and must not split one family.
+    let folded = group_structural_siblings(dom, &children);
     let highest_repeat_count = folded
         .iter()
         .filter_map(|child| match child {
@@ -165,11 +231,193 @@ fn collect_row_families(dom: &DomTree, node_id: NodeId, depth_left: usize, famil
             }
             FoldedChild::Run { exemplar, count } => {
                 if should_promote_row_family(dom, exemplar, count) {
-                    families.push(build_row_family(dom, node_id, exemplar, count, highest_repeat_count, &folded));
+                    let member_ids = group_member_ids(dom, &children, exemplar);
+                    families.push(build_row_family(
+                        dom,
+                        node_id,
+                        exemplar,
+                        member_ids,
+                        count,
+                        highest_repeat_count,
+                        &folded,
+                    ));
                 }
                 collect_row_families(dom, exemplar, depth_left.saturating_sub(1), families);
             }
         }
+    }
+}
+
+fn group_structural_siblings(dom: &DomTree, children: &[NodeId]) -> Vec<FoldedChild> {
+    let mut groups: Vec<(String, Vec<NodeId>)> = Vec::new();
+    for child_id in children {
+        let key = structural_sibling_key(dom, *child_id);
+        if let Some((_, members)) = groups.iter_mut().find(|(existing, _)| *existing == key) {
+            members.push(*child_id);
+        } else {
+            groups.push((key, vec![*child_id]));
+        }
+    }
+    groups
+        .into_iter()
+        .map(|(_, members)| {
+            if members.len() == 1 {
+                FoldedChild::Single(members[0])
+            } else {
+                FoldedChild::Run {
+                    exemplar: members[0],
+                    count: members.len(),
+                }
+            }
+        })
+        .collect()
+}
+
+fn group_member_ids(dom: &DomTree, children: &[NodeId], exemplar_id: NodeId) -> Vec<NodeId> {
+    let key = structural_sibling_key(dom, exemplar_id);
+    children
+        .iter()
+        .copied()
+        .filter(|child_id| structural_sibling_key(dom, *child_id) == key)
+        .collect()
+}
+
+fn structural_sibling_key(dom: &DomTree, node_id: NodeId) -> String {
+    let Some(element) = dom.element(node_id) else {
+        return "node".to_string();
+    };
+    let attribute_names = element
+        .attrs
+        .keys()
+        .filter(|name| name.as_str() != "class")
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(",");
+    let direct_shape = child_elements(dom, node_id)
+        .into_iter()
+        .filter_map(|child_id| dom.element(child_id).map(|child| child.tag.clone()))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("{}|{attribute_names}|{direct_shape}", element.tag)
+}
+
+fn element_classes(element: &ElementData) -> Vec<String> {
+    element
+        .attrs
+        .get("class")
+        .map(|value| value.split_whitespace().map(str::to_string).collect())
+        .unwrap_or_default()
+}
+
+fn element_recipe(dom: &DomTree, node_id: NodeId) -> ElementRecipe {
+    let element = dom.element(node_id);
+    let parent = dom
+        .node(node_id)
+        .parent
+        .and_then(|parent_id| dom.element(parent_id));
+    ElementRecipe {
+        tag: element.map(|value| value.tag.clone()).unwrap_or_default(),
+        classes: element.map(element_classes).unwrap_or_default(),
+        parent_tag: parent.map(|value| value.tag.clone()),
+        parent_classes: parent.map(element_classes).unwrap_or_default(),
+    }
+}
+
+fn collect_field_candidates(dom: &DomTree, family: &RowFamily) -> Vec<FieldCandidate> {
+    let mut candidates: BTreeMap<String, FieldCandidate> = BTreeMap::new();
+    for member_id in family.member_ids.iter().take(3) {
+        collect_field_candidates_inner(dom, *member_id, &mut candidates);
+    }
+    candidates
+        .into_values()
+        .enumerate()
+        .map(|(index, mut candidate)| {
+            candidate.id = format!("{}.F{}", family.id, index + 1);
+            candidate
+        })
+        .collect()
+}
+
+fn collect_field_candidates_inner(
+    dom: &DomTree,
+    node_id: NodeId,
+    candidates: &mut BTreeMap<String, FieldCandidate>,
+) {
+    let Some(element) = dom.element(node_id) else {
+        return;
+    };
+    let recipe = element_recipe(dom, node_id);
+    if matches!(
+        element.tag.as_str(),
+        "a" | "p"
+            | "span"
+            | "strong"
+            | "time"
+            | "h1"
+            | "h2"
+            | "h3"
+            | "h4"
+            | "h5"
+            | "h6"
+            | "td"
+            | "th"
+    ) {
+        let sample = dom.collect_text(node_id);
+        if !sample.is_empty() && sample.len() <= 200 {
+            add_field_candidate(candidates, "text", recipe.clone(), None, sample);
+        }
+    }
+    for attribute in [
+        "href",
+        "src",
+        "title",
+        "id",
+        "style",
+        "aria-label",
+        "data-index",
+    ] {
+        if let Some(value) = element.attrs.get(attribute) {
+            if !value.is_empty() {
+                add_field_candidate(
+                    candidates,
+                    "attribute",
+                    recipe.clone(),
+                    Some(attribute.to_string()),
+                    value.clone(),
+                );
+            }
+        }
+    }
+    for child_id in child_elements(dom, node_id) {
+        collect_field_candidates_inner(dom, child_id, candidates);
+    }
+}
+
+fn add_field_candidate(
+    candidates: &mut BTreeMap<String, FieldCandidate>,
+    kind: &'static str,
+    recipe: ElementRecipe,
+    attribute: Option<String>,
+    sample: String,
+) {
+    let key = format!(
+        "{}|{}|{}|{}|{}|{}",
+        kind,
+        recipe.tag,
+        recipe.classes.join("."),
+        recipe.parent_tag.as_deref().unwrap_or_default(),
+        recipe.parent_classes.join("."),
+        attribute.as_deref().unwrap_or_default()
+    );
+    let candidate = candidates.entry(key).or_insert_with(|| FieldCandidate {
+        id: String::new(),
+        kind,
+        recipe,
+        attribute,
+        samples: Vec::new(),
+    });
+    if candidate.samples.len() < 3 && !candidate.samples.contains(&sample) {
+        candidate.samples.push(sample);
     }
 }
 
@@ -191,29 +439,39 @@ fn should_promote_row_family(dom: &DomTree, exemplar_id: NodeId, count: usize) -
     {
         return false;
     }
-    if matches!(exemplar.tag.as_str(), "td" | "th" | "span" | "a" | "img" | "br") {
+    if matches!(exemplar.tag.as_str(), "td" | "th" | "span" | "img" | "br") {
         return false;
     }
 
-    matches!(exemplar.tag.as_str(), "li" | "tr")
-        || !child_elements(dom, exemplar_id).is_empty()
+    if exemplar.tag == "a" {
+        return child_elements(dom, exemplar_id).len() >= 2;
+    }
+
+    matches!(exemplar.tag.as_str(), "li" | "tr") || !child_elements(dom, exemplar_id).is_empty()
 }
 
 fn build_row_family(
     dom: &DomTree,
     parent_id: NodeId,
     exemplar_id: NodeId,
+    member_ids: Vec<NodeId>,
     count: usize,
     highest_repeat_count: usize,
     sibling_groups: &[FoldedChild],
 ) -> RowFamily {
-    let exemplar = dom.element(exemplar_id).expect("row family exemplar must be an element");
+    let exemplar = dom
+        .element(exemplar_id)
+        .expect("row family exemplar must be an element");
     let parent_tag = dom
         .element(parent_id)
         .map(|element| element.tag.clone())
         .unwrap_or_else(|| "#document".to_string());
     let direct_children = child_elements(dom, exemplar_id);
-    let direct_child_labels = count_labels(direct_children.iter().filter_map(|child_id| dom.element(*child_id)));
+    let direct_child_labels = count_labels(
+        direct_children
+            .iter()
+            .filter_map(|child_id| dom.element(*child_id)),
+    );
     let descendant_markers = collect_descendant_markers(dom, exemplar_id);
     let direct_child_tag_set: BTreeSet<String> = direct_children
         .iter()
@@ -226,8 +484,9 @@ fn build_row_family(
     let has_field_markers = descendant_markers
         .iter()
         .any(|(marker, _)| matches!(marker.as_str(), "a[href]" | "img[src]" | "span"));
-    let likely_data_family =
-        !likely_header_family && count == highest_repeat_count && (has_td_children || has_field_markers);
+    let likely_data_family = !likely_header_family
+        && count == highest_repeat_count
+        && (has_td_children || has_field_markers);
 
     let mut distinguishing_markers = Vec::new();
     for tag in direct_child_tag_set.iter().take(3) {
@@ -244,15 +503,17 @@ fn build_row_family(
 
     let slot_hints = infer_slot_hints(dom, exemplar_id);
     let distinct_slot_count = slot_hints.iter().collect::<BTreeSet<_>>().len();
-    let recommended_extraction_mode = if likely_data_family && has_field_markers && distinct_slot_count >= 2 {
-        "PROJECT"
-    } else {
-        "FLATTEN"
-    };
+    let recommended_extraction_mode =
+        if likely_data_family && has_field_markers && distinct_slot_count >= 2 {
+            "PROJECT"
+        } else {
+            "FLATTEN"
+        };
 
     RowFamily {
         id: String::new(),
         exemplar_id,
+        member_ids,
         parent_tag,
         repeated_tag: exemplar.tag.clone(),
         count,
@@ -313,7 +574,12 @@ fn collect_table_families(dom: &DomTree, node_id: NodeId, families: &mut Vec<Row
     }
 }
 
-fn add_table_section_families(dom: &DomTree, section_id: NodeId, table_id: NodeId, families: &mut Vec<RowFamily>) {
+fn add_table_section_families(
+    dom: &DomTree,
+    section_id: NodeId,
+    table_id: NodeId,
+    families: &mut Vec<RowFamily>,
+) {
     let rows: Vec<NodeId> = child_elements(dom, section_id)
         .into_iter()
         .filter(|child_id| {
@@ -357,11 +623,22 @@ fn add_table_section_families(dom: &DomTree, section_id: NodeId, table_id: NodeI
     }
 }
 
-fn build_table_family(dom: &DomTree, table_id: NodeId, row_ids: &[NodeId], is_data_family: bool) -> RowFamily {
+fn build_table_family(
+    dom: &DomTree,
+    table_id: NodeId,
+    row_ids: &[NodeId],
+    is_data_family: bool,
+) -> RowFamily {
     let exemplar_id = select_table_exemplar(dom, row_ids);
-    let exemplar = dom.element(exemplar_id).expect("table exemplar must be element");
+    let exemplar = dom
+        .element(exemplar_id)
+        .expect("table exemplar must be element");
     let direct_children = child_elements(dom, exemplar_id);
-    let direct_child_labels = count_labels(direct_children.iter().filter_map(|child_id| dom.element(*child_id)));
+    let direct_child_labels = count_labels(
+        direct_children
+            .iter()
+            .filter_map(|child_id| dom.element(*child_id)),
+    );
     let descendant_markers = collect_descendant_markers(dom, exemplar_id);
     let direct_child_tag_set: BTreeSet<String> = direct_children
         .iter()
@@ -386,15 +663,17 @@ fn build_table_family(dom: &DomTree, table_id: NodeId, row_ids: &[NodeId], is_da
     let has_field_markers = descendant_markers
         .iter()
         .any(|(marker, _)| matches!(marker.as_str(), "a[href]" | "img[src]" | "span"));
-    let recommended_extraction_mode = if is_data_family && has_field_markers && distinct_slot_count >= 2 {
-        "PROJECT"
-    } else {
-        "FLATTEN"
-    };
+    let recommended_extraction_mode =
+        if is_data_family && has_field_markers && distinct_slot_count >= 2 {
+            "PROJECT"
+        } else {
+            "FLATTEN"
+        };
 
     RowFamily {
         id: String::new(),
         exemplar_id,
+        member_ids: row_ids.to_vec(),
         parent_tag: dom
             .element(table_id)
             .map(|element| element.tag.clone())
@@ -424,7 +703,12 @@ fn select_table_exemplar(dom: &DomTree, row_ids: &[NodeId]) -> NodeId {
 
     counts
         .into_iter()
-        .max_by(|left, right| left.1 .0.cmp(&right.1 .0).then_with(|| right.1 .1.cmp(&left.1 .1)))
+        .max_by(|left, right| {
+            left.1
+                 .0
+                .cmp(&right.1 .0)
+                .then_with(|| right.1 .1.cmp(&left.1 .1))
+        })
         .map(|(_, (_, exemplar_id))| exemplar_id)
         .unwrap_or(row_ids[0])
 }
@@ -498,7 +782,9 @@ fn family_rank_key(family: &RowFamily) -> FamilyRankKey {
         informative_descendant_count: family
             .required_descendants
             .iter()
-            .filter(|item| item.contains("a[href]") || item.contains("img[src]") || item.contains("span"))
+            .filter(|item| {
+                item.contains("a[href]") || item.contains("img[src]") || item.contains("span")
+            })
             .count(),
         table_priority: usize::from(family.table_family),
         non_header_priority: usize::from(!family.likely_header_family),
@@ -556,7 +842,11 @@ fn summary_marker(element: &ElementData) -> Option<String> {
     None
 }
 
-fn nearby_child_tag_set(dom: &DomTree, exemplar_id: NodeId, sibling_groups: &[FoldedChild]) -> BTreeSet<String> {
+fn nearby_child_tag_set(
+    dom: &DomTree,
+    exemplar_id: NodeId,
+    sibling_groups: &[FoldedChild],
+) -> BTreeSet<String> {
     let mut tags = BTreeSet::new();
 
     for group in sibling_groups {
@@ -731,14 +1021,20 @@ fn strongest_slot_hint(family: &RowFamily) -> String {
     family
         .slot_hints
         .iter()
-        .max_by(|left, right| slot_hint_rank(left).cmp(&slot_hint_rank(right)).then_with(|| right.cmp(left)))
+        .max_by(|left, right| {
+            slot_hint_rank(left)
+                .cmp(&slot_hint_rank(right))
+                .then_with(|| right.cmp(left))
+        })
         .map(|slot| compact_slot_hint(slot))
         .unwrap_or_else(|| family.repeated_tag.clone())
 }
 
 fn slot_hint_rank(slot: &str) -> (usize, usize, usize) {
     (
-        usize::from(slot.contains("a [href]") || slot.contains("img [src]") || slot.contains("span")),
+        usize::from(
+            slot.contains("a [href]") || slot.contains("img [src]") || slot.contains("span"),
+        ),
         slot.matches('>').count(),
         slot.len(),
     )
@@ -794,7 +1090,7 @@ fn compact_element_label(element: &ElementData) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{render_family_report, render_family_report_compact};
+    use super::{render_evidence_json, render_family_report, render_family_report_compact};
     use crate::dom::DomTree;
 
     #[test]
@@ -846,5 +1142,64 @@ mod tests {
         assert!(output.contains("KIND: D=data, H=header, U=unknown"));
         assert!(output.contains("MODE: F=FLATTEN, P=PROJECT"));
         assert!(output.contains("D1|ul>li|3|D|F|slot:div>a[href]|sig:div>a[href]"));
+    }
+
+    #[test]
+    fn groups_records_when_deeper_classes_vary() {
+        let dom = DomTree::parse(
+            r#"
+            <ol class="row">
+              <li class="card"><article><p class="rating one"></p><h3><a href="/a" title="Alpha">A</a></h3><p class="price">£1</p></article></li>
+              <li class="card"><article><p class="rating two"></p><h3><a href="/b">B</a></h3><p class="price">£2</p></article></li>
+              <li class="card"><article><p class="rating three"></p><h3><a href="/c">C</a></h3><p class="price">£3</p></article></li>
+              <li class="card"><article><p class="rating four"></p><h3><a href="/d">D</a></h3><p class="price">£4</p></article></li>
+            </ol>
+            "#,
+        )
+        .expect("valid html");
+
+        let output = render_family_report(&dom, 10).join("\n");
+        assert!(output.contains("count: 4"));
+
+        let evidence = render_evidence_json(&dom, 10).expect("valid evidence JSON");
+        let parsed: serde_json::Value = serde_json::from_str(&evidence).expect("parse evidence");
+        assert_eq!(parsed["version"], 1);
+        assert_eq!(parsed["record_candidates"][0]["count"], 4);
+        assert!(parsed["record_candidates"][0]["field_candidates"]
+            .as_array()
+            .is_some_and(|fields| fields.iter().any(|field| field["attribute"] == "href")));
+        assert!(parsed["record_candidates"][0]["field_candidates"]
+            .as_array()
+            .is_some_and(|fields| fields.iter().any(|field| field["attribute"] == "title")));
+    }
+
+    #[test]
+    fn detects_structured_anchor_records_with_varying_ids() {
+        let dom = DomTree::parse(
+            r#"
+            <section data-testid="heatmap">
+              <div class="heatMap-container">
+                <a id="NVDA" class="rect-container" href="/quote/NVDA/" style="--width: 20" aria-label="Heatmap region for NVDA" data-index="0"><span class="ticker-div">NVDA</span><span class="percent-div">+0.66%</span></a>
+                <a id="AAPL" class="rect-container" href="/quote/AAPL/" style="--width: 18" aria-label="Heatmap region for AAPL" data-index="1"><span class="ticker-div">AAPL</span><span class="percent-div">+0.23%</span></a>
+                <a id="MSFT" class="rect-container" href="/quote/MSFT/" style="--width: 16" aria-label="Heatmap region for MSFT" data-index="2"><span class="ticker-div">MSFT</span><span class="percent-div">-0.72%</span></a>
+              </div>
+            </section>
+            "#,
+        )
+        .expect("valid html");
+
+        let evidence = render_evidence_json(&dom, 10).expect("valid evidence JSON");
+        let parsed: serde_json::Value = serde_json::from_str(&evidence).expect("parse evidence");
+        let candidate = &parsed["record_candidates"][0];
+        assert_eq!(candidate["count"], 3);
+        assert_eq!(candidate["recipe"]["tag"], "a");
+        let fields = candidate["field_candidates"]
+            .as_array()
+            .expect("field candidates");
+        for attribute in ["href", "id", "style", "aria-label", "data-index"] {
+            assert!(fields.iter().any(|field| field["attribute"] == attribute));
+        }
+        assert!(fields.iter().any(|field| field["samples"][0] == "NVDA"));
+        assert!(fields.iter().any(|field| field["samples"][0] == "+0.66%"));
     }
 }

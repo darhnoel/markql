@@ -44,6 +44,12 @@ Print a compact AI-oriented family summary:
 cargo run --manifest-path tools/html_inspector/Cargo.toml -- --families-compact https://example.com
 ```
 
+Emit versioned machine-readable evidence for bounded semantic decisions:
+
+```bash
+cargo run --manifest-path tools/html_inspector/Cargo.toml -- --evidence-json https://example.com
+```
+
 Compact family output is documented in [docs/compact_family_mode.md](./docs/compact_family_mode.md).
 The low-token AI workflow is documented in [docs/ai_inspection_playbook.md](./docs/ai_inspection_playbook.md).
 The strict MarkQL agent contract is documented in [docs/ai_markql_musts.md](./docs/ai_markql_musts.md).
