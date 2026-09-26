@@ -41,3 +41,72 @@ def test_large_html_fails_fast() -> None:
     html = "<div></div>" * 100_001
     with pytest.raises(ValueError):
         markql.load(html)
+
+
+# --- Content-Encoding -------------------------------------------------------
+# Servers may compress a response even when it was not asked for: Yahoo
+# Finance sends gzip to a request with no Accept-Encoding, and the loader
+# decoded the compressed bytes as UTF-8 text, handing the engine noise.
+
+import gzip
+import http.server
+import threading
+import zlib
+
+
+def _serve(body: bytes, encoding: str):
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Encoding", encoding)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, f"http://127.0.0.1:{server.server_port}/"
+
+
+PAGE = "<ul><li class='row'>Fish &amp; Chips £4.50</li></ul>"
+
+
+@pytest.mark.parametrize("encoding,compress", [
+    ("gzip", gzip.compress),
+    ("x-gzip", gzip.compress),
+    ("deflate", zlib.compress),
+    ("deflate", lambda d: zlib.compress(d)[2:-4]),  # raw deflate, as some servers send
+])
+def test_compressed_response_is_decoded(encoding, compress) -> None:
+    server, url = _serve(compress(PAGE.encode("utf-8")), encoding)
+    try:
+        doc = markql.load(url, allow_network=True, allow_private_network=True)
+    finally:
+        server.shutdown()
+    assert doc.html == PAGE
+
+
+def test_compression_cannot_bypass_max_bytes() -> None:
+    """A few kilobytes of gzip can expand to gigabytes; the limit is on HTML."""
+    bomb = gzip.compress(b"<p>" + b"a" * 5_000_000 + b"</p>")
+    assert len(bomb) < 50_000
+    server, url = _serve(bomb, "gzip")
+    try:
+        with pytest.raises(ValueError, match="max_bytes"):
+            markql.load(url, allow_network=True, allow_private_network=True,
+                        max_bytes=1_000_000)
+    finally:
+        server.shutdown()
+
+
+def test_unsupported_encoding_is_an_error_not_garbage() -> None:
+    server, url = _serve(b"\x8b\x00\x80compressed", "br")
+    try:
+        with pytest.raises(ValueError, match="Content-Encoding"):
+            markql.load(url, allow_network=True, allow_private_network=True)
+    finally:
+        server.shutdown()

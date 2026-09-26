@@ -4,6 +4,7 @@ import os
 import pathlib
 import re
 import urllib.request
+import zlib
 from html.parser import HTMLParser
 from typing import Optional, Tuple, Union
 from urllib.error import HTTPError, URLError
@@ -61,6 +62,36 @@ def _decode_html(data: bytes) -> str:
     return data.decode("utf-8", errors="replace")
 
 
+def _decompress(data: bytes, encoding: Optional[str], max_bytes: int) -> bytes:
+    """Undo a response's Content-Encoding, bounded by max_bytes.
+
+    No Accept-Encoding is sent, yet servers compress anyway: Yahoo Finance
+    answers with gzip, and decoding those bytes as UTF-8 handed the engine
+    noise instead of a page. The bound applies to the decompressed HTML,
+    because a few kilobytes of gzip can expand without limit.
+    """
+    encoding = (encoding or "").strip().lower()
+    if encoding in ("", "identity"):
+        return data
+    if encoding in ("gzip", "x-gzip"):
+        attempts = [16 + zlib.MAX_WBITS]
+    elif encoding == "deflate":
+        # zlib-wrapped per the spec, but some servers send raw deflate.
+        attempts = [zlib.MAX_WBITS, -zlib.MAX_WBITS]
+    else:
+        raise ValueError(f"Unsupported Content-Encoding: {encoding}")
+    for wbits in attempts:
+        decompressor = zlib.decompressobj(wbits)
+        try:
+            html = decompressor.decompress(data, max_bytes + 1)
+        except zlib.error:
+            continue
+        if len(html) > max_bytes or decompressor.unconsumed_tail:
+            raise ValueError("Downloaded HTML exceeds max_bytes")
+        return html
+    raise ValueError(f"Could not decode {encoding} Content-Encoding")
+
+
 def _validate_content_type(content_type: Optional[str]) -> None:
     if not content_type:
         return
@@ -90,6 +121,8 @@ def _fetch_url(url: str, policy: FetchPolicy) -> Tuple[str, str]:
                 data = response.read(policy.max_bytes + 1)
                 if len(data) > policy.max_bytes:
                     raise ValueError("Downloaded HTML exceeds max_bytes")
+                data = _decompress(data, response.headers.get("Content-Encoding"),
+                                   policy.max_bytes)
                 return _decode_html(data), current
         except HTTPError as err:
             if 300 <= err.code < 400:
